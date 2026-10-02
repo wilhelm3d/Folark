@@ -98,12 +98,12 @@
     <string name="widget_unavailable">Widget unavailable</string>
     <string name="widget_restore_tap">Tap to set up</string>
     <string name="widget_resize">Resize</string>
-    <string name="nothing_clock_widget_name">Nothing Clock</string>
+    <string name="nothing_clock_widget_name">Dot Matrix Clock</string>
     <string name="nothing_clock_widget_desc">Minimalist dot-matrix clock and battery</string>
-    <string name="samsung_weather_widget_name">Samsung Weather &amp; Briefing</string>
+    <string name="samsung_weather_widget_name">Category Card Weather &amp; Briefing</string>
     <string name="samsung_weather_widget_desc">Weather forecast and daily greeting</string>
-    <string name="samsung_notification_widget_name">Samsung Notification Card</string>
-    <string name="samsung_notification_widget_desc">Active notifications in One UI card style</string>
+    <string name="samsung_notification_widget_name">Category Card Notification</string>
+    <string name="samsung_notification_widget_desc">Active notifications in structured card style</string>
     <string name="samsung_greeting_morning">Good morning</string>
     <string name="samsung_greeting_afternoon">Good afternoon</string>
     <string name="samsung_greeting_evening">Good evening</string>

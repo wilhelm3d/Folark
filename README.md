@@ -1,6 +1,6 @@
 # Folark — Modern Dual-Screen Foldable Launcher
 
-> *A modern, lightweight, highly customizable Android launcher based on ARK Launcher, specifically engineered for foldable phones and designed in mind for the Motorola Razr Fold.*
+> *A modern, lightweight, highly customizable Android launcher based on ARK Launcher, specifically engineered for foldable phones and designed in mind for flagship clamshell foldables.*
 
 [![Latest release](https://img.shields.io/github/v/release/wilhelm3d/Folark?sort=semver)](https://github.com/wilhelm3d/Folark/releases/latest)
 [![License: Apache-2.0](https://img.shields.io/github/license/wilhelm3d/Folark)](LICENSE)
@@ -11,13 +11,13 @@
 
 ## 🚀 Overview
 
-**Folark** is an open-source, ultra-responsive Android home-screen launcher built from the ground up with **Jetpack Compose** and **Material 3 Expressive Design**. Derived from the high-performance foundations of **ARK Launcher**, Folark has been completely re-architected and transformed to deliver a native, fluid, and tailor-made experience for foldable devices, with special optimizations for clamshell foldables like the **Motorola Razr Fold**.
+**Folark** is an open-source, ultra-responsive Android home-screen launcher built from the ground up with **Jetpack Compose** and **Material 3 Expressive Design**. Derived from the high-performance foundations of **ARK Launcher**, Folark has been completely re-architected and transformed to deliver a native, fluid, and tailor-made experience for foldable devices, with special optimizations for flagship clamshell foldables.
 
 ---
 
 ## ✨ Key Features
 
-### 📐 Designed for Foldables & Motorola Razr
+### 📐 Designed for Modern Foldables
 - **Dual-Screen Independent Profile Architecture**: Maintain separate workspace layouts, grid configurations, widgets, and dock items for the outer cover screen and inner main display.
 - **Hardware-Accurate Posture Detection**: Seamless transition between closed, flex/half-folded, and unfolded postures (`1080×2520` outer cover screen vs `2232×2484` inner main screen).
 
@@ -26,20 +26,20 @@
 - **Kryo Multi-Core Processing**: Distributed background task handling for instant app indexing, widget updates, and layout persistence.
 - **165Hz LTPO AMOLED Frame Pacing**: Native support for high-refresh-rate displays up to 165Hz with zero jitter.
 
-### 🎨 Oppo Aquamorphic Fluid Animations
+### 🎨 Fluid Dynamic Motion
 - **Bouncy Touch Feedback**: Tactile `0.92x` spring scale press effect on icons, cards, and buttons.
 - **3D Book Unfold Sweep**: Spatial perspective rotation transition as the device unfolds from cover display to main display.
 - **App Launch Zoom**: Expressive `1.25x` launch zoom curve connecting app icons seamlessly to launching activities.
 - **Page Edge Bounce**: Fluid overscroll physical momentum when scrolling workspace pages and app drawers.
 
-### 🍷 Brand Drawer Styles & Liquid Glass
-- **4 Distinct Brand Drawer Styles**:
+### 🍷 Drawer Styles & Liquid Glass
+- **4 Distinct Drawer Styles**:
   - **Standard Grid**: Clean, classic vertical scrolling grid.
-  - **Samsung One UI**: Horizontal paged drawer with smooth pagination.
-  - **Nothing OS**: Minimalist Dot-Matrix styled typography and icon alignment.
-  - **Moto**: Clean, stock Motorola-inspired launcher drawer layout.
+  - **Category Card Interface**: Horizontal paged drawer with smooth pagination.
+  - **Dot Matrix Retro Style**: Minimalist Dot-Matrix styled typography and icon alignment.
+  - **Bottom Search Flow Style**: Clean, streamlined launcher drawer layout.
 - **Custom Accent Color Picker**: Full custom accent color selection alongside dynamic Material You system colors.
-- **Liquid Glass Frosted Blur**: Real-time Apple-style translucent frosted glass blur backgrounds with customizable opacity and blur radius.
+- **Liquid Glass Frosted Blur**: Real-time Glassmorphism Aesthetics translucent frosted glass blur backgrounds with customizable opacity and blur radius.
 
 ### 🔔 Pro Interactive Notification List Widget
 - **Interactive Gestures**: Swipe right to dismiss notifications; swipe left to pin critical notifications.

@@ -45,7 +45,7 @@ class NothingClockViewModel @Inject constructor(
 }
 
 /**
- * Nothing OS inspired Dot-Matrix / Minimalist Clock Widget:
+ * Dot Matrix Retro Style inspired Minimalist Clock Widget:
  * Features bold minimalist typography, digital time format, date, battery status,
  * and Nothing's signature red accent dot styling.
  */

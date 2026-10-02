@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 
 /**
- * Oppo Aquamorphic touch feedback modifier applying a bouncy spring scale-down (0.92f)
+ * Fluid Dynamic Motion touch feedback modifier applying a bouncy spring scale-down (0.92f)
  * on touch down using spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
  * with an organic liquid press indication.
  */

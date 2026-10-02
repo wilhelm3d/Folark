@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Apple-style frosted Liquid Glass container sheet.
+ * Glassmorphism Aesthetics frosted Liquid Glass container sheet.
  *
  * Uses hardware-accelerated [RenderEffect.createBlurEffect] on API 31+ with frosted
  * translucency fallback on API < 31.

@@ -98,12 +98,12 @@
     <string name="widget_unavailable">Widget ei käytettävissä</string>
     <string name="widget_restore_tap">Napauta ottaaksesi käyttöön</string>
     <string name="widget_resize">Muuta kokoa</string>
-    <string name="nothing_clock_widget_name">Nothing-kello</string>
+    <string name="nothing_clock_widget_name">Pistematriisi-kello</string>
     <string name="nothing_clock_widget_desc">Minimalistinen dot-matrix kello ja akku</string>
-    <string name="samsung_weather_widget_name">Samsung Sää &amp; Päivän katsaus</string>
+    <string name="samsung_weather_widget_name">Kortti Sää &amp; Päivän katsaus</string>
     <string name="samsung_weather_widget_desc">Sääennuste ja päivittäinen tervehdys</string>
-    <string name="samsung_notification_widget_name">Samsung Ilmoituskortti</string>
-    <string name="samsung_notification_widget_desc">Aktiiviset ilmoitukset One UI -korttityylillä</string>
+    <string name="samsung_notification_widget_name">Kortti-ilmoitus</string>
+    <string name="samsung_notification_widget_desc">Aktiiviset ilmoitukset korttityylillä</string>
     <string name="samsung_greeting_morning">Hyvää huomenta</string>
     <string name="samsung_greeting_afternoon">Hyvää iltapäivää</string>
     <string name="samsung_greeting_evening">Hyvää iltaa</string>

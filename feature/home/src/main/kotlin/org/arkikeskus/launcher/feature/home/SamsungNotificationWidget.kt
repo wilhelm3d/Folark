@@ -37,7 +37,7 @@ import org.arkikeskus.launcher.ui.component.NotificationBadge
 import androidx.compose.ui.Alignment
 
 /**
- * Samsung One UI Briefing Card Notification Widget:
+ * Category Card Interface Briefing Card Notification Widget:
  * Features a clean rounded M3 card with subtle background tint, active notification
  * summary header ("Notifications"), grouped app notification icons row, latest
  * notification title & body snippet, and unread count badge.

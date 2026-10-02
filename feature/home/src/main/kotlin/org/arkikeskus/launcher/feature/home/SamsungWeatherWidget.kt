@@ -28,7 +28,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Samsung One UI inspired Weather & Briefing Card Widget:
+ * Category Card Interface inspired Weather & Briefing Card Widget:
  * Features a clean rounded card design, daily greeting, weather condition summary,
  * temperature, and date.
  */

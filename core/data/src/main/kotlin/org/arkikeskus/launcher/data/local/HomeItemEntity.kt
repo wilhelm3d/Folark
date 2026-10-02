@@ -77,13 +77,13 @@ data class HomeItemEntity(
         /** [builtinType] of the people widget (conversations grouped by person, as quiet tiles). */
         const val BUILTIN_PEOPLE = "people"
 
-        /** [builtinType] of the Nothing OS Dot-Matrix clock widget. */
+        /** [builtinType] of the Dot Matrix Retro Style clock widget. */
         const val BUILTIN_NOTHING_CLOCK = "nothing_clock"
 
-        /** [builtinType] of the Samsung One UI weather & briefing card widget. */
+        /** [builtinType] of the Category Card Interface weather & briefing card widget. */
         const val BUILTIN_SAMSUNG_WEATHER = "samsung_weather"
 
-        /** [builtinType] of the Samsung One UI briefing card notification widget. */
+        /** [builtinType] of the Category Card Interface briefing card notification widget. */
         const val BUILTIN_NOTIFICATION_WIDGET = "notification_widget"
 
         /** [builtinType] of the Pro Interactive Notification List Widget. */

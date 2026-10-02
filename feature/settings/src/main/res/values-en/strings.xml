@@ -179,11 +179,11 @@
     <string name="settings_category_appearance_desc">AMOLED dark, themed icons, icon pack, weather &amp; status bar</string>
     <string name="settings_category_notifications_desc">Notification dots, badge count style, size &amp; live badge preview</string>
     <string name="settings_category_permissions_desc">Set default launcher, notification access &amp; system permissions</string>
-    <string name="settings_drawer_styles_and_themes">Drawer Styles &amp; Brand Themes</string>
+    <string name="settings_drawer_styles_and_themes">Drawer Styles &amp; Expressive Themes</string>
     <string name="settings_drawer_style_standard_grid">Standard Grid (M3)</string>
-    <string name="settings_drawer_style_one_ui">One UI</string>
-    <string name="settings_drawer_style_nothing_os">Nothing OS</string>
-    <string name="settings_drawer_style_moto">Moto</string>
+    <string name="settings_drawer_style_one_ui">Category Card Interface</string>
+    <string name="settings_drawer_style_nothing_os">Dot Matrix Retro Style</string>
+    <string name="settings_drawer_style_moto">Bottom Search Flow Style</string>
     <string name="settings_drawer_theme_tint">Drawer Background Theme &amp; Tint</string>
     <string name="settings_drawer_accent_color">Drawer Accent Color</string>
     <string name="settings_drawer_accent_teal_cyan">Teal / Cyan</string>
@@ -197,8 +197,8 @@
     <string name="settings_drawer_theme_accent_tint">Accent Tint</string>
     <string name="settings_drawer_theme_monochrome">Monochrome</string>
     <string name="settings_animations_fluid_motion">Animations &amp; Fluid Motion</string>
-    <string name="settings_category_animations_desc">Aquamorphic touch feedback, fold transitions, launch zoom &amp; page edge bounce</string>
-    <string name="settings_aquamorphic_touch">Oppo Aquamorphic Touch Feedback</string>
+    <string name="settings_category_animations_desc">Fluid dynamic motion feedback, fold transitions, launch zoom &amp; page edge bounce</string>
+    <string name="settings_aquamorphic_touch">Organic Touch Engine</string>
     <string name="settings_aquamorphic_touch_desc">Organic spring press response on icons and cards</string>
     <string name="settings_app_launch_zoom">App Launch Zoom Feedback</string>
     <string name="settings_app_launch_zoom_desc">Spring scale-zoom animation when tapping icons</string>
@@ -206,7 +206,7 @@
     <string name="settings_page_bounce_desc">Spring overscroll effect when swiping past outer pages</string>
     <string name="settings_transition_morph_scale_fade">Morph Scale &amp; Crossfade</string>
     <string name="settings_transition_book_unfold_sweep">3D Book Page Sweep</string>
-    <string name="settings_transition_aquamorphic_ripple">Aquamorphic Liquid Ripple</string>
+    <string name="settings_transition_aquamorphic_ripple">Fluid Dynamic Liquid Ripple</string>
     <string name="settings_search_hint">Search settings…</string>
     <string name="settings_no_results">No settings found</string>
 </resources>

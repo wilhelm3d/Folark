@@ -527,7 +527,7 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    /** Adds the Samsung One UI briefing card notification widget at the first free full-width rectangle. */
+    /** Adds the Category Card Interface briefing card notification widget at the first free full-width rectangle. */
     fun addSamsungNotificationWidget() = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(

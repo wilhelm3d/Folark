@@ -179,11 +179,11 @@
     <string name="settings_category_appearance_desc">AMOLED-musta, teemakuvakkeet, ikonipaketti, sää &amp; tilapalkki</string>
     <string name="settings_category_notifications_desc">Ilmoituspisteet, lukumäärät, koko &amp; esikatselu</string>
     <string name="settings_category_permissions_desc">Oletuslauncher, ilmoitusten käyttöoikeus &amp; järjestelmän luvat</string>
-    <string name="settings_drawer_styles_and_themes">Laatikon tyylit &amp; bränditeemat</string>
+    <string name="settings_drawer_styles_and_themes">Laatikon tyylit &amp; teemat</string>
     <string name="settings_drawer_style_standard_grid">Vakioruudukko (M3)</string>
-    <string name="settings_drawer_style_one_ui">One UI</string>
-    <string name="settings_drawer_style_nothing_os">Nothing OS</string>
-    <string name="settings_drawer_style_moto">Moto</string>
+    <string name="settings_drawer_style_one_ui">Kategoriakortti-liittymä</string>
+    <string name="settings_drawer_style_nothing_os">Pistematriisi retrotyyli</string>
+    <string name="settings_drawer_style_moto">Alahaun virtaustyyli</string>
     <string name="settings_drawer_theme_tint">Laatikon taustateema &amp; sävy</string>
     <string name="settings_drawer_accent_color">Laatikon korostusväri</string>
     <string name="settings_drawer_accent_teal_cyan">Turkoosi / Syaani</string>
@@ -197,8 +197,8 @@
     <string name="settings_drawer_theme_accent_tint">Korostussävy</string>
     <string name="settings_drawer_theme_monochrome">Yksivärinen</string>
     <string name="settings_animations_fluid_motion">Animaatiot &amp; Soljuva Liike</string>
-    <string name="settings_category_animations_desc">Aquamorphic-kosketuspalaute, taittumissiirtymät, käynnistyszoomaus &amp; sivun reuna-alueen kimmoisuus</string>
-    <string name="settings_aquamorphic_touch">Oppo Aquamorphic -kosketuspalaute</string>
+    <string name="settings_category_animations_desc">Orgaaninen kosketuspalaute, taittumissiirtymät, käynnistyszoomaus &amp; sivun reuna-alueen kimmoisuus</string>
+    <string name="settings_aquamorphic_touch">Orgaaninen kosketuspalaute</string>
     <string name="settings_aquamorphic_touch_desc">Orgaaninen jousipaine-palaute kuvakkeissa ja korteissa</string>
     <string name="settings_app_launch_zoom">Sovelluksen käynnistyszoomaus</string>
     <string name="settings_app_launch_zoom_desc">Jousiskaalauksen animaatio kuvaketta napautettaessa</string>
@@ -206,7 +206,7 @@
     <string name="settings_page_bounce_desc">Ylivierityksen jousiefekti työpöydän reunasivuilla</string>
     <string name="settings_transition_morph_scale_fade">Muotoskaalaus &amp; Ristiinhäivytys</string>
     <string name="settings_transition_book_unfold_sweep">3D Kirjasivun pyyhkäisy</string>
-    <string name="settings_transition_aquamorphic_ripple">Nestemäinen Aquamorphic-aalto</string>
+    <string name="settings_transition_aquamorphic_ripple">Nestemäinen virtausaalto</string>
     <string name="settings_search_hint">Etsi asetuksista…</string>
     <string name="settings_no_results">Asetuksia ei löytynyt</string>
 </resources>
