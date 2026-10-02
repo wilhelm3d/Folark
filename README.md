@@ -1,142 +1,108 @@
-# ARK-launcher
+# Folark — Modern Dual-Screen Foldable Launcher
 
-[![Latest release](https://img.shields.io/github/v/release/jrs8205/ARK-launcher?sort=semver)](https://github.com/jrs8205/ARK-launcher/releases/latest)
-[![License: Apache-2.0](https://img.shields.io/github/license/jrs8205/ARK-launcher)](LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/jrs8205/ARK-launcher/total)](https://github.com/jrs8205/ARK-launcher/releases)
+> *A modern, lightweight, highly customizable Android launcher based on ARK Launcher, specifically engineered for foldable phones and designed in mind for the Motorola Razr Fold.*
+
+[![Latest release](https://img.shields.io/github/v/release/wilhelm3d/Folark?sort=semver)](https://github.com/wilhelm3d/Folark/releases/latest)
+[![License: Apache-2.0](https://img.shields.io/github/license/wilhelm3d/Folark)](LICENSE)
 [![Built with Jetpack Compose](https://img.shields.io/badge/Built%20with-Jetpack%20Compose-4285F4)](https://developer.android.com/jetpack/compose)
+[![Android](https://img.shields.io/badge/Android-11%2B%20(API%2030%2B)-3DDC84?logo=android)](https://developer.android.com)
 
-A modern, lightweight Android home-screen launcher built entirely with **Jetpack Compose**.
-It is **bilingual** — Finnish (default) and English — and shares the visual identity of the
-**Arkikeskus** app, but works as a standalone launcher for anyone.
+---
 
-> Status: early but daily-driven. Built from scratch on a current Kotlin/Compose stack.
+## 🚀 Overview
 
-📖 **New here?** The **[Wiki](https://github.com/jrs8205/ARK-launcher/wiki)** has the full user guide —
-[setup](https://github.com/jrs8205/ARK-launcher/wiki/Getting-Started),
-[features](https://github.com/jrs8205/ARK-launcher/wiki/Features),
-[icon packs](https://github.com/jrs8205/ARK-launcher/wiki/Icon-Packs),
-[backup](https://github.com/jrs8205/ARK-launcher/wiki/Backup-and-Restore) and a
-[FAQ](https://github.com/jrs8205/ARK-launcher/wiki/FAQ).
+**Folark** is an open-source, ultra-responsive Android home-screen launcher built from the ground up with **Jetpack Compose** and **Material 3 Expressive Design**. Derived from the high-performance foundations of **ARK Launcher**, Folark has been completely re-architected and transformed to deliver a native, fluid, and tailor-made experience for foldable devices, with special optimizations for clamshell foldables like the **Motorola Razr Fold**.
 
-## Screenshots
+---
 
-<p align="center">
-  <img src="docs/screenshots/home.png" width="24%" alt="Home screen with a widget" />
-  <img src="docs/screenshots/drawer.png" width="24%" alt="App drawer with search" />
-  <img src="docs/screenshots/widgets.png" width="24%" alt="Widget picker with search" />
-  <img src="docs/screenshots/settings.png" width="24%" alt="Settings" />
-</p>
+## ✨ Key Features
 
-## Download
+### 📐 Designed for Foldables & Motorola Razr
+- **Dual-Screen Independent Profile Architecture**: Maintain separate workspace layouts, grid configurations, widgets, and dock items for the outer cover screen and inner main display.
+- **Hardware-Accurate Posture Detection**: Seamless transition between closed, flex/half-folded, and unfolded postures (`1080×2520` outer cover screen vs `2232×2484` inner main screen).
 
-Download the latest signed APK from the
-[**Releases**](https://github.com/jrs8205/ARK-launcher/releases/latest) page and open it on
-your device to install. To update, install the newer APK from the same page (Settings ▸ Updates ▸
-"Check for updates" opens it), or let Obtainium do it for you (below).
+### ⚡ Chip & Display Hardware Optimizations
+- **Snapdragon 8s Gen 3 / Adreno 735 GPU Hardware Layer Caching**: Hardware-accelerated GPU shader caching for buttery-smooth Compose rendering without dropped frames.
+- **Kryo Multi-Core Processing**: Distributed background task handling for instant app indexing, widget updates, and layout persistence.
+- **165Hz LTPO AMOLED Frame Pacing**: Native support for high-refresh-rate displays up to 165Hz with zero jitter.
 
-Requires **Android 11 (API 30)** or newer.
+### 🎨 Oppo Aquamorphic Fluid Animations
+- **Bouncy Touch Feedback**: Tactile `0.92x` spring scale press effect on icons, cards, and buttons.
+- **3D Book Unfold Sweep**: Spatial perspective rotation transition as the device unfolds from cover display to main display.
+- **App Launch Zoom**: Expressive `1.25x` launch zoom curve connecting app icons seamlessly to launching activities.
+- **Page Edge Bounce**: Fluid overscroll physical momentum when scrolling workspace pages and app drawers.
 
-### Auto-updates with Obtainium
+### 🍷 Brand Drawer Styles & Liquid Glass
+- **4 Distinct Brand Drawer Styles**:
+  - **Standard Grid**: Clean, classic vertical scrolling grid.
+  - **Samsung One UI**: Horizontal paged drawer with smooth pagination.
+  - **Nothing OS**: Minimalist Dot-Matrix styled typography and icon alignment.
+  - **Moto**: Clean, stock Motorola-inspired launcher drawer layout.
+- **Custom Accent Color Picker**: Full custom accent color selection alongside dynamic Material You system colors.
+- **Liquid Glass Frosted Blur**: Real-time Apple-style translucent frosted glass blur backgrounds with customizable opacity and blur radius.
 
-Prefer an app-store-style experience with automatic updates? Install
-[**Obtainium**](https://github.com/ImranR98/Obtainium) and add this repository as an app source:
+### 🔔 Pro Interactive Notification List Widget
+- **Interactive Gestures**: Swipe right to dismiss notifications; swipe left to pin critical notifications.
+- **Inline Quick Actions**: Reply, mark read, or open directly from the widget surface.
+- **Smart App Grouping**: Intelligently aggregates notifications by application.
+- **See-Through Glass Aesthetics**: Frosted glass container matching system wallpaper colors.
 
-```
-https://github.com/jrs8205/ARK-launcher
-```
+### 📱 Dense 8×8 Grid & 1×1 Widget Resizing
+- **Dense 8×8 Workspace Grid**: High-density screen utilization suitable for foldable inner screens and cover displays.
+- **1×1 Widget Resizing**: Shrink any system or built-in widget down to 1×1 tiles with Material 3 glowing handles and live dimension badges.
 
-Obtainium watches the Releases page and updates the launcher for you.
+### ⚙️ Material 3 Expressive Adaptive Settings
+- **Adaptive Settings Layout**: Automatically renders a **Tablet Two-Pane** settings view when unfolded and a single-column **Phone Layout** when folded.
+- **Independent UI DPI Scaling**: Granular scale controls (70% to 140%) for Workspace, App Drawer, and Settings UI independently.
 
-## Feedback & questions
+### 🌌 Parallax Wallpaper & App Renaming
+- **3D Parallax Motion Effect**: Motion-sensor (gyroscope/accelerometer) driven wallpaper depth movement.
+- **Long-Press App Renaming**: Custom title labels for any app icon on the home screen or app drawer.
 
-Questions, ideas, and general chat are all welcome in
-[**GitHub Discussions**](https://github.com/jrs8205/ARK-launcher/discussions) or the
-[**Telegram group**](https://t.me/ARKlauncher) — in English or Finnish. Found a bug? Please
-[open an issue](https://github.com/jrs8205/ARK-launcher/issues) instead. Both links are also in
-the app: **Settings ▸ Feedback**.
+---
 
-## Features
+## 🛠️ Architecture & Tech Stack
 
-- **Paged home screen** with free icon placement and smooth drag-and-drop — move icons within a
-  page, across pages, and between the home grid and the dock. Drag an app from the drawer straight
-  onto any page.
-- **Dock** of favorite apps (reorder, drag in/out).
-- **App drawer with universal search** — one search box finds:
-  - installed **apps**,
-  - common **system settings** pages (type "wifi", "battery", …),
-  - **contacts** (opt-in; gated by a setting + the `READ_CONTACTS` permission),
-  - a **calculator / unit converter** (type `12*7` or `100 cm to in`).
-  - plus an optional **most-used apps** row.
-- **Home-screen widgets** — browse large previews, tap Add or drag a preview onto the home screen.
-  Long-press and continue dragging to move a widget; hold at a screen edge to change pages.
-  Resize handles show the footprint and respect the widget's size limits; compatible widgets can
-  stretch to full width or be reconfigured. Collection widgets (e.g. chat lists) scroll in place.
-  Built-in clock, battery and notification widgets adapt to their size and offer translucent or
-  themed backgrounds in Home screen settings.
-- **Folders** on the home screen and inside the drawer.
-- **Notification dots / badges** (via a notification-listener service; dot or Nova-style count).
-- **People widget**: messages, missed calls and mail grouped by person as tiles, with optional
-  batch delivery that holds others' messages in the launcher's widgets, badges and status bar until
-  set times. Android notifications, sounds and pop-ups remain active; new messages from pinned
-  people, missed calls and recognized one-time codes bypass the batch.
-- **Page menu**: add a page to the left or right, set the home page, remove an empty page.
-- **Material You themed icons** (monochrome, on supported Android versions).
-- **Configurable gestures:** swipe up → app drawer, swipe down → notifications, and a configurable
-  **left-edge swipe** that launches an app of your choice.
-- **Customizable look** — adjustable app-label **text size** and **colour**, **one- or two-line
-  labels** (per surface), dock opacity, grid columns, page indicator, and more.
-- **Backup & restore** — export/import your layout and settings to a file (widgets included).
-- **Double-tap to lock** — double-tap empty home-screen space to lock the screen (opt-in; uses a
-  minimal accessibility service that reads nothing).
-- **Lock desktop** — a toggle that prevents accidental moving, removing, or adding of items.
-- **Pixel-style long-press menus** with app shortcuts and actions, plus an **empty-area menu**
-  (home settings / wallpaper), all in one consistent visual style.
-- Hide apps from the drawer, rename apps with custom labels, and a self-contained settings screen.
+- **UI Framework**: 100% Jetpack Compose with Material 3 Expressive Design
+- **Architecture**: Multi-module Clean Architecture (`:app`, `:core:*`, `:feature:*`)
+- **Dependency Injection**: Hilt
+- **Persistence**: Room Database (Workspace & App database) + DataStore (Preferences)
+- **Image Loading**: Coil
+- **Widget Hosting**: Android `AppWidgetHost` with custom Compose wrapper and 1×1 resizing constraints
+- **Language / Toolchain**: Kotlin 2.1+, JDK 21, AGP 8.9+, Android SDK API 30+ (Android 11+)
 
-## Tech stack
+---
 
-- **Kotlin** + **Jetpack Compose** (Material 3), single-Activity.
-- **Hilt** (DI), **Room** (layout persistence), **DataStore** (preferences), **Coil** (icons),
-  **AppWidgetHost** (widgets).
-- Multi-module architecture with `build-logic` convention plugins.
-- JDK 21, AGP 9, Gradle 9.
+## 📦 Building & Installation
 
-## Build
+### Prerequisites
+- Android Studio Ladybug / ME2026 or newer
+- JDK 21 (Java Development Kit)
+- Android SDK API level 35
 
-You need **JDK 21** (the Android Studio JBR works well) and the Android SDK.
-
+### Build APK
 ```bash
-# Point the build at your SDK (or set sdk.dir in local.properties)
+# Clone repository
+git clone https://github.com/wilhelm3d/Folark.git
+cd Folark
+
+# Assemble debug APK
 ./gradlew :app:assembleDebug
 ```
 
-Install on a connected device:
-
+### Install via ADB
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Set it as the default launcher from Android's Settings ▸ Apps ▸ Default apps ▸ Home app, or accept
-the prompt the app shows.
+---
 
-Requirements: `minSdk 30`.
+## 📄 Origin & License
 
-## Project layout
+Folark is derived from [ARK Launcher](https://github.com/jrs8205/ARK-launcher) and adapted/enhanced under the **Apache License, Version 2.0**.
 
-- `app` — the single Activity, manifest HOME intent filter, DI entry point, the AppWidgetHost.
-- `core/*` — `model`, `common`, `data` (Room/DataStore/repositories + search providers + backup),
-  `ui` (shared Compose components, popups, the expressive theme), `designsystem`, `launcher`.
-- `feature/*` — `home` (workspace + dock + widgets), `appdrawer`, `settings`, `backup`.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at:
 
-## License
+http://www.apache.org/licenses/LICENSE-2.0
 
-Licensed under the **Apache License, Version 2.0** — see [LICENSE](LICENSE).
-
-This project adapts design/architecture patterns (re-implemented in Compose) from the
-Android Open Source Project's **Launcher3** (also Apache-2.0); see [NOTICE](NOTICE) for attribution.
-
-## Contributing
-
-Issues and pull requests are welcome — for feature ideas, consider starting a
-[Discussion](https://github.com/jrs8205/ARK-launcher/discussions) first. By contributing you agree
-your contributions are licensed under the project's Apache-2.0 license.
+See [LICENSE](LICENSE) for full details.
