@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -20,8 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,18 +45,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.toBitmap
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import org.arkikeskus.launcher.data.AppRepository
@@ -62,17 +68,23 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.StatusNotification
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.NotificationBadge
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class NotificationsWidgetViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val badgeRepository: NotificationBadgeRepository,
     private val appRepository: AppRepository,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
+
+    private val _screenType = MutableStateFlow(ScreenType.OUTER)
+    fun setScreenType(type: ScreenType) { _screenType.value = type }
 
     /** One widget slot: an app's newest notification + the resolved launcher app (null when the
      *  package has no launcher activity). Rendered from the notification's small icon when there
@@ -93,9 +105,10 @@ class NotificationsWidgetViewModel @Inject constructor(
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     }.getOrDefault(false)
 
-    val countStyle: StateFlow<String> = settingsRepository.settings
-        .map { it.notificationWidgetCountStyle }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.COUNT_NUMBER)
+    val countStyle: StateFlow<String> = _screenType.flatMapLatest { screenType ->
+        settingsRepository.settings(screenType)
+            .map { it.notificationWidgetCountStyle }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.COUNT_NUMBER)
 
     /** One launcher entry per package+profile; see [NotificationWidgetLayout.representative]. */
     private val appsByBadgeKey: Flow<Map<String, AppItem>> = appRepository.apps.map { apps ->
@@ -148,8 +161,11 @@ class NotificationsWidgetViewModel @Inject constructor(
 fun NotificationsWidget(
     modifier: Modifier = Modifier,
     viewModel: NotificationsWidgetViewModel = hiltViewModel(),
+    screenType: ScreenType = LocalScreenType.current,
 ) {
-    val context = LocalContext.current
+    LaunchedEffect(screenType) { viewModel.setScreenType(screenType) }
+    CompositionLocalProvider(LocalScreenType provides screenType) {
+        val context = LocalContext.current
     val hasAccess by viewModel.hasAccess.collectAsStateWithLifecycle()
     val slots by viewModel.slots.collectAsStateWithLifecycle()
     val countStyle by viewModel.countStyle.collectAsStateWithLifecycle()
@@ -178,6 +194,7 @@ fun NotificationsWidget(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .background(widgetSurfaceColor(), RoundedCornerShape(24.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
                     .clickable(interactionSource = noIndication, indication = null) {
                         openNotificationListenerSettings(context)
                     }
@@ -196,6 +213,7 @@ fun NotificationsWidget(
                     verticalArrangement = Arrangement.spacedBy(spacing),
                     modifier = Modifier
                         .background(widgetSurfaceColor(), RoundedCornerShape(24.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
                         .padding(horizontal = (12 * scale).dp, vertical = (8 * scale).dp),
                 ) {
                     shown.forEach { slot ->
@@ -225,6 +243,7 @@ fun NotificationsWidget(
             }
         }
     }
+}
 }
 
 @Composable

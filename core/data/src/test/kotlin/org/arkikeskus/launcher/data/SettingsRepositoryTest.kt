@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ScreenType
 import org.junit.Test
 
 /**
@@ -43,18 +45,6 @@ class SettingsRepositoryTest {
     }
 
     private fun newRepository() = SettingsRepository(InMemoryDataStore())
-
-    @Test
-    fun widgetBackgroundPreservesOldDefaultAndRoundTripsThroughBackup() = runTest {
-        val source = newRepository()
-        assertThat(source.settings.first().widgetTonalBackground).isFalse()
-        source.setWidgetTonalBackground(true)
-        val restored = newRepository()
-        restored.importRaw(source.exportRaw())
-        assertThat(restored.settings.first().widgetTonalBackground).isTrue()
-        restored.importRaw(mapOf("widget_tonal_background" to "invalid"))
-        assertThat(restored.settings.first().widgetTonalBackground).isFalse()
-    }
 
     @Test
     fun `reorderVisibleDock keeps favorites hidden by the column cap`() = runTest {
@@ -181,109 +171,18 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `app usage is excluded from export`() = runTest {
-        val store = InMemoryDataStore()
-        val settings = SettingsRepository(store)
-        val usage = AppUsageRepository(store)
-        // Volatile per-launch frecency data is device-local and must not enter a backup.
-        usage.recordLaunch("com.example/Main/0")
-
-        assertThat(settings.exportRaw().keys).doesNotContain(AppUsageRepository.USAGE_KEY)
-    }
-
-    @Test
-    fun `app usage survives a restore that omits it`() = runTest {
-        val store = InMemoryDataStore()
-        val settings = SettingsRepository(store)
-        val usage = AppUsageRepository(store)
-        usage.recordLaunch("com.example/Main/0")
-
-        // Restoring a backup that no longer carries app_usage must not wipe this device's stats.
-        settings.importRaw(mapOf("home_columns" to 5))
-
-        assertThat(usage.usage.first()).containsKey("com.example/Main/0")
-        assertThat(settings.settings.first().homeColumns).isEqualTo(5)
-    }
-
-    @Test
-    fun `importRaw preserves device-local state and applies restored values`() = runTest {
+    fun `homeColumns defaults to 4, persists and coerces to its range`() = runTest {
         val repo = newRepository()
-        repo.setLocalLastBackup(123L)
+        assertThat(repo.settings.first().homeColumns).isEqualTo(4)
 
-        repo.importRaw(mapOf("home_columns" to 5))
+        repo.setHomeColumns(8)
+        assertThat(repo.settings.first().homeColumns).isEqualTo(8)
 
-        // The device's own last-export timestamp survives the restore; the value applies.
-        assertThat(repo.localLastBackupTime.first()).isEqualTo(123L)
-        assertThat(repo.settings.first().homeColumns).isEqualTo(5)
-    }
+        repo.setHomeColumns(99)
+        assertThat(repo.settings.first().homeColumns).isEqualTo(SettingsRepository.MAX_COLUMNS)
 
-    @Test
-    fun `held notifications survive restoring a backup and recreating the repository`() = runTest {
-        val store = InMemoryDataStore()
-        val repo = SettingsRepository(store)
-        val held = mapOf(
-            "0|example.mail|42|message|10001" to 1_790_752_800_000L,
-            "0|example.chat|7|conversation|10002" to 1_790_770_800_000L,
-        )
-        repo.setHeldNotifications(held)
-        repo.setHomeColumns(5)
-        val backup = repo.exportRaw()
-        assertThat(backup).doesNotContainKey("people_held_notifications")
-
-        repo.setHomeColumns(4)
-        repo.importRaw(backup)
-
-        // A new listener must be able to identify its snoozes from the persisted state after restore.
-        val reopened = SettingsRepository(store)
-        assertThat(reopened.heldNotifications.first()).containsExactlyEntriesIn(held)
-        assertThat(reopened.settings.first().homeColumns).isEqualTo(5)
-    }
-
-    @Test
-    fun `restoring foreign held notifications preserves this devices own registry`() = runTest {
-        val store = InMemoryDataStore()
-        val repo = SettingsRepository(store)
-        val held = mapOf("local-notification" to 1_790_752_800_000L)
-        repo.setHeldNotifications(held)
-
-        repo.importRaw(
-            mapOf(
-                "people_held_notifications" to "foreign-notification\t1790770800000",
-                "home_columns" to 5,
-            ),
-        )
-
-        val reopened = SettingsRepository(store)
-        assertThat(reopened.heldNotifications.first()).containsExactlyEntriesIn(held)
-        assertThat(reopened.settings.first().homeColumns).isEqualTo(5)
-    }
-
-    @Test
-    fun `restoring a foreign registry never creates held notifications on this device`() = runTest {
-        val repo = newRepository()
-
-        repo.importRaw(mapOf("people_held_notifications" to "foreign-notification\t1790770800000"))
-
-        assertThat(repo.heldNotifications.first()).isEmpty()
-        assertThat(repo.exportRaw()).doesNotContainKey("people_held_notifications")
-    }
-
-    @Test
-    fun `importRaw tolerates a legacy Drive-era backup without importing its keys`() = runTest {
-        val repo = newRepository()
-        // A ≤0.7.11 backup may contain Drive/updater bookkeeping (both features were removed in
-        // 0.7.12); the names must be dropped silently and the rest of the restore must apply.
-        repo.importRaw(
-            mapOf(
-                "drive_backup_enabled" to true,
-                "auto_update_enabled" to false,
-                "update_last_notified_version" to "0.7.11",
-                "home_columns" to 5,
-            ),
-        )
-
-        assertThat(repo.settings.first().homeColumns).isEqualTo(5)
-        assertThat(repo.exportRaw().keys).containsNoneOf("drive_backup_enabled", "auto_update_enabled")
+        repo.setHomeColumns(1)
+        assertThat(repo.settings.first().homeColumns).isEqualTo(SettingsRepository.MIN_COLUMNS)
     }
 
     @Test
@@ -291,8 +190,8 @@ class SettingsRepositoryTest {
         val repo = newRepository()
         assertThat(repo.settings.first().homeRows).isEqualTo(6)
 
-        repo.setHomeRows(7)
-        assertThat(repo.settings.first().homeRows).isEqualTo(7)
+        repo.setHomeRows(8)
+        assertThat(repo.settings.first().homeRows).isEqualTo(8)
 
         repo.setHomeRows(99)
         assertThat(repo.settings.first().homeRows).isEqualTo(SettingsRepository.MAX_ROWS)
@@ -321,28 +220,15 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `importRaw ignores a wrong-typed value for a known key`() = runTest {
+    fun `amoledDark defaults to false and round-trips`() = runTest {
         val repo = newRepository()
-        repo.importRaw(
-            mapOf(
-                "home_columns" to true,        // boolean for an int key -> must be dropped
-                "show_weather" to 7,           // number for a boolean key -> must be dropped
-                "drawer_columns" to 6,         // correct type -> applied
-            ),
-        )
-        val s = repo.settings.first()          // must not throw ClassCastException
-        assertThat(s.homeColumns).isEqualTo(4) // default
-        assertThat(s.showWeather).isTrue()     // default
-        assertThat(s.drawerColumns).isEqualTo(6)
-    }
+        assertThat(repo.settings.first().amoledDark).isFalse()
 
-    @Test
-    fun `importRaw never imports device-local bookkeeping keys`() = runTest {
-        val repo = newRepository()
-        repo.importRaw(mapOf("drive_backup_enabled" to "not-a-boolean", "app_usage" to 12345))
-        // Settings stay readable (no wrong-typed value landed) and the name never re-exports.
-        assertThat(repo.settings.first().homeColumns).isEqualTo(4) // default, no crash
-        assertThat(repo.exportRaw().keys).doesNotContain("drive_backup_enabled")
+        repo.setAmoledDark(true)
+        assertThat(repo.settings.first().amoledDark).isTrue()
+
+        repo.setAmoledDark(false)
+        assertThat(repo.settings.first().amoledDark).isFalse()
     }
 
     @Test
@@ -380,23 +266,401 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `the two-line label switches survive a backup round-trip and reject a wrong type`() = runTest {
+    fun `drawerLayoutMode defaults to grid and round-trips`() = runTest {
         val repo = newRepository()
-        repo.setTwoLineHomeLabels(true)
-        repo.setTwoLineDrawerLabels(false)
-        val exported = repo.exportRaw()
-        assertThat(exported).containsEntry("two_line_home_labels", true)
-        assertThat(exported).containsEntry("two_line_drawer_labels", false)
+        assertThat(repo.settings.first().drawerLayoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_GRID)
 
-        val restored = newRepository()
-        restored.importRaw(exported)
-        assertThat(restored.settings.first().twoLineHomeLabels).isTrue()
-        assertThat(restored.settings.first().twoLineDrawerLabels).isFalse()
+        repo.setDrawerLayoutMode(LauncherSettings.DRAWER_LAYOUT_LIST)
+        assertThat(repo.settings.first().drawerLayoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_LIST)
 
-        // Registered as boolean keys: a wrong-typed value is dropped instead of poisoning the store.
-        restored.importRaw(mapOf("two_line_home_labels" to "yes", "two_line_drawer_labels" to 1))
-        val s = restored.settings.first() // must not throw ClassCastException
-        assertThat(s.twoLineHomeLabels).isFalse()
-        assertThat(s.twoLineDrawerLabels).isTrue()
+        repo.setDrawerLayoutMode(LauncherSettings.DRAWER_LAYOUT_GRID)
+        assertThat(repo.settings.first().drawerLayoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_GRID)
+    }
+
+    @Test
+    fun `customLabels saves and reads correctly`() = runTest {
+        val repo = newRepository()
+        assertThat(repo.customLabels.first()).isEmpty()
+
+        repo.setCustomLabel("com.example.app/0", "Custom Name")
+        assertThat(repo.customLabels.first()["com.example.app/0"]).isEqualTo("Custom Name")
+
+        repo.setCustomLabel("com.example.app/0", null)
+        assertThat(repo.customLabels.first()).isEmpty()
+    }
+
+    @Test
+    fun `setCustomAppLabel saves and removes correctly`() = runTest {
+        val repo = newRepository()
+        assertThat(repo.customLabels.first()).isEmpty()
+
+        repo.setCustomAppLabel("com.example.app/MainActivity", "My Custom App")
+        assertThat(repo.customLabels.first()["com.example.app/MainActivity"]).isEqualTo("My Custom App")
+
+        repo.setCustomAppLabel("com.example.app/MainActivity", "")
+        assertThat(repo.customLabels.first()["com.example.app/MainActivity"]).isNull()
+    }
+
+    @Test
+    fun `parallaxWallpaper defaults to false and toggles`() = runTest {
+        val repo = newRepository()
+        assertThat(repo.settings.first().parallaxWallpaper).isFalse()
+
+        repo.setParallaxWallpaper(true)
+        assertThat(repo.settings.first().parallaxWallpaper).isTrue()
+
+        repo.setParallaxWallpaper(false)
+        assertThat(repo.settings.first().parallaxWallpaper).isFalse()
+    }
+
+    @Test
+    fun `drawerColumns defaults to 4 outer and 6 inner, coerces to range 3-8 and is independent`() = runTest {
+        val repo = newRepository()
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerColumns).isEqualTo(4)
+        assertThat(repo.settings(ScreenType.INNER).first().drawerColumns).isEqualTo(6)
+
+        repo.setDrawerColumns(5, ScreenType.OUTER)
+        repo.setDrawerColumns(8, ScreenType.INNER)
+
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerColumns).isEqualTo(5)
+        assertThat(repo.settings(ScreenType.INNER).first().drawerColumns).isEqualTo(8)
+
+        // Test range clamping (3 to 8)
+        repo.setDrawerColumns(1, ScreenType.OUTER)
+        repo.setDrawerColumns(10, ScreenType.INNER)
+
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerColumns).isEqualTo(3)
+        assertThat(repo.settings(ScreenType.INNER).first().drawerColumns).isEqualTo(8)
+    }
+
+    @Test
+    fun `drawerRows defaults to 6, coerces to range 3-8 and is independent`() = runTest {
+        val repo = newRepository()
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerRows).isEqualTo(6)
+        assertThat(repo.settings(ScreenType.INNER).first().drawerRows).isEqualTo(6)
+
+        repo.setDrawerRows(5, ScreenType.OUTER)
+        repo.setDrawerRows(7, ScreenType.INNER)
+
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerRows).isEqualTo(5)
+        assertThat(repo.settings(ScreenType.INNER).first().drawerRows).isEqualTo(7)
+
+        // Test range clamping (3 to 8)
+        repo.setDrawerRows(1, ScreenType.OUTER)
+        repo.setDrawerRows(12, ScreenType.INNER)
+
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerRows).isEqualTo(3)
+        assertThat(repo.settings(ScreenType.INNER).first().drawerRows).isEqualTo(8)
+    }
+
+    @Test
+    fun `advanced folding features roundtrip and persist correctly`() = runTest {
+        val repo = newRepository()
+        repo.setFoldAction(LauncherSettings.ACTION_PAGE_0, ScreenType.OUTER)
+        repo.setUnfoldAction(LauncherSettings.ACTION_SEARCH, ScreenType.INNER)
+        repo.setInnerTaskbarEnabled(false, ScreenType.INNER)
+        repo.setOuterWallpaperScale(1.5f)
+        repo.setInnerWallpaperScale(1.2f)
+        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_SLIDE)
+
+        val outerSettings = repo.settings(ScreenType.OUTER).first()
+        assertThat(outerSettings.foldAction).isEqualTo(LauncherSettings.ACTION_PAGE_0)
+        assertThat(outerSettings.outerWallpaperScale).isEqualTo(1.5f)
+        assertThat(outerSettings.foldTransitionStyle).isEqualTo(LauncherSettings.TRANSITION_SLIDE)
+
+        val innerSettings = repo.settings(ScreenType.INNER).first()
+        assertThat(innerSettings.unfoldAction).isEqualTo(LauncherSettings.ACTION_SEARCH)
+        assertThat(innerSettings.innerTaskbarEnabled).isFalse()
+        assertThat(innerSettings.innerWallpaperScale).isEqualTo(1.2f)
+    }
+
+    @Test
+    fun `aquamorphic animations and fluid motion settings roundtrip and support independent outer and inner screen configuration`() = runTest {
+        val repo = newRepository()
+        repo.setAquamorphicTouchEnabled(false, ScreenType.OUTER)
+        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP, ScreenType.OUTER)
+        repo.setAppLaunchZoomEnabled(false, ScreenType.OUTER)
+        repo.setPageBounceEnabled(false, ScreenType.OUTER)
+
+        repo.setAquamorphicTouchEnabled(true, ScreenType.INNER)
+        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE, ScreenType.INNER)
+        repo.setAppLaunchZoomEnabled(true, ScreenType.INNER)
+        repo.setPageBounceEnabled(true, ScreenType.INNER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.aquamorphicTouchEnabled).isFalse()
+        assertThat(outer.foldTransitionStyle).isEqualTo(LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP)
+        assertThat(outer.appLaunchZoomEnabled).isFalse()
+        assertThat(outer.pageBounceEnabled).isFalse()
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.aquamorphicTouchEnabled).isTrue()
+        assertThat(inner.foldTransitionStyle).isEqualTo(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE)
+        assertThat(inner.appLaunchZoomEnabled).isTrue()
+        assertThat(inner.pageBounceEnabled).isTrue()
+    }
+
+    @Test
+    fun `advanced app drawer customizations roundtrip and support independent outer and inner screen configuration`() = runTest {
+        val repo = newRepository()
+        // Outer screen config
+        repo.setDrawerSearchPosition(LauncherSettings.SEARCH_BOTTOM, ScreenType.OUTER)
+        repo.setDrawerIndexBarEnabled(false, ScreenType.OUTER)
+        repo.setAzIndexPosition(LauncherSettings.AZ_POSITION_VERTICAL_LEFT, ScreenType.OUTER)
+        repo.setDrawerBackgroundBlur(12f, ScreenType.OUTER)
+        repo.setDrawerScrimOpacity(0.7f, ScreenType.OUTER)
+        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_MOTO, ScreenType.OUTER)
+        repo.setDrawerAccentColor(0xFF00BCD4.toInt(), ScreenType.OUTER)
+        repo.setShowDrawerLabels(false, ScreenType.OUTER)
+        repo.setShowFrequentApps(true, ScreenType.OUTER)
+
+        // Inner screen config (independent)
+        repo.setDrawerSearchPosition(LauncherSettings.SEARCH_TOP, ScreenType.INNER)
+        repo.setDrawerIndexBarEnabled(true, ScreenType.INNER)
+        repo.setAzIndexPosition(LauncherSettings.AZ_POSITION_HORIZONTAL_TOP, ScreenType.INNER)
+        repo.setDrawerBackgroundBlur(4f, ScreenType.INNER)
+        repo.setDrawerScrimOpacity(0.3f, ScreenType.INNER)
+        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI, ScreenType.INNER)
+        repo.setDrawerAccentColor(0xFFFF1744.toInt(), ScreenType.INNER)
+        repo.setShowDrawerLabels(true, ScreenType.INNER)
+        repo.setShowFrequentApps(false, ScreenType.INNER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.drawerSearchPosition).isEqualTo(LauncherSettings.SEARCH_BOTTOM)
+        assertThat(outer.drawerIndexBarEnabled).isFalse()
+        assertThat(outer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_VERTICAL_LEFT)
+        assertThat(outer.drawerBackgroundBlur).isEqualTo(12f)
+        assertThat(outer.drawerScrimOpacity).isEqualTo(0.7f)
+        assertThat(outer.drawerStyle).isEqualTo(LauncherSettings.DRAWER_STYLE_MOTO)
+        assertThat(outer.drawerAccentColor).isEqualTo(0xFF00BCD4.toInt())
+        assertThat(outer.showDrawerLabels).isFalse()
+        assertThat(outer.showFrequentApps).isTrue()
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.drawerSearchPosition).isEqualTo(LauncherSettings.SEARCH_TOP)
+        assertThat(inner.drawerIndexBarEnabled).isTrue()
+        assertThat(inner.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_HORIZONTAL_TOP)
+        assertThat(inner.drawerBackgroundBlur).isEqualTo(4f)
+        assertThat(inner.drawerScrimOpacity).isEqualTo(0.3f)
+        assertThat(inner.drawerStyle).isEqualTo(LauncherSettings.DRAWER_STYLE_ONE_UI)
+        assertThat(inner.drawerAccentColor).isEqualTo(0xFFFF1744.toInt())
+        assertThat(inner.showDrawerLabels).isTrue()
+        assertThat(inner.showFrequentApps).isFalse()
+    }
+
+    @Test
+    fun `gesture settings support independent outer and inner screen configuration`() = runTest {
+        val repo = newRepository()
+        repo.setLeftSwipeAppKey("app.outer", ScreenType.OUTER)
+        repo.setRightSwipeAppKey("app.outer.right", ScreenType.OUTER)
+        repo.setDoubleTapToLock(true, ScreenType.OUTER)
+
+        repo.setLeftSwipeAppKey("app.inner", ScreenType.INNER)
+        repo.setRightSwipeAppKey("app.inner.right", ScreenType.INNER)
+        repo.setDoubleTapToLock(false, ScreenType.INNER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.leftSwipeAppKey).isEqualTo("app.outer")
+        assertThat(outer.rightSwipeAppKey).isEqualTo("app.outer.right")
+        assertThat(outer.doubleTapToLock).isTrue()
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.leftSwipeAppKey).isEqualTo("app.inner")
+        assertThat(inner.rightSwipeAppKey).isEqualTo("app.inner.right")
+        assertThat(inner.doubleTapToLock).isFalse()
+    }
+
+    @Test
+    fun `drawer style automatically adopts authentic signature brand color accent`() = runTest {
+        val repo = newRepository()
+        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI, ScreenType.OUTER)
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerAccentColor).isEqualTo(0xFF0A84FF.toInt())
+
+        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_MOTO, ScreenType.OUTER)
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerAccentColor).isEqualTo(0xFF00BFA5.toInt())
+
+        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_NOTHING_OS, ScreenType.OUTER)
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerAccentColor).isEqualTo(0xFFFF3B30.toInt())
+    }
+
+    @Test
+    fun `dpi scaling settings roundtrip and support independent outer and inner screen configuration`() = runTest {
+        val repo = newRepository()
+        val defaultOuter = repo.settings(ScreenType.OUTER).first()
+        assertThat(defaultOuter.dpiWorkspace).isEqualTo(1.0f)
+        assertThat(defaultOuter.dpiAppDrawer).isEqualTo(1.0f)
+        assertThat(defaultOuter.dpiSettings).isEqualTo(1.0f)
+
+        repo.setDpiWorkspace(0.8f, ScreenType.OUTER)
+        repo.setDpiAppDrawer(0.9f, ScreenType.OUTER)
+        repo.setDpiSettings(1.1f, ScreenType.OUTER)
+
+        repo.setDpiWorkspace(1.2f, ScreenType.INNER)
+        repo.setDpiAppDrawer(1.3f, ScreenType.INNER)
+        repo.setDpiSettings(1.4f, ScreenType.INNER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.dpiWorkspace).isEqualTo(0.8f)
+        assertThat(outer.dpiAppDrawer).isEqualTo(0.9f)
+        assertThat(outer.dpiSettings).isEqualTo(1.1f)
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.dpiWorkspace).isEqualTo(1.2f)
+        assertThat(inner.dpiAppDrawer).isEqualTo(1.3f)
+        assertThat(inner.dpiSettings).isEqualTo(1.4f)
+    }
+
+    @Test
+    fun `dpi scaling values are coerced within 0,7f to 1,4f range`() = runTest {
+        val repo = newRepository()
+        repo.setDpiWorkspace(0.5f, ScreenType.OUTER)
+        repo.setDpiAppDrawer(2.0f, ScreenType.OUTER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.dpiWorkspace).isEqualTo(0.7f)
+        assertThat(outer.dpiAppDrawer).isEqualTo(1.4f)
+    }
+
+    @Test
+    fun `drawer dimensions and alignment settings roundtrip and support independent outer and inner screen configuration`() = runTest {
+        val repo = newRepository()
+        val defaultOuter = repo.settings(ScreenType.OUTER).first()
+        assertThat(defaultOuter.drawerHeightFraction).isEqualTo(1.0f)
+        assertThat(defaultOuter.drawerWidthFraction).isEqualTo(1.0f)
+        assertThat(defaultOuter.drawerAlignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_CENTER)
+
+        // Configure OUTER
+        repo.setDrawerHeightFraction(0.8f, ScreenType.OUTER)
+        repo.setDrawerWidthFraction(0.7f, ScreenType.OUTER)
+        repo.setDrawerAlignment(LauncherSettings.DRAWER_ALIGNMENT_LEFT, ScreenType.OUTER)
+
+        // Configure INNER
+        repo.setDrawerHeightFraction(0.6f, ScreenType.INNER)
+        repo.setDrawerWidthFraction(0.5f, ScreenType.INNER)
+        repo.setDrawerAlignment(LauncherSettings.DRAWER_ALIGNMENT_RIGHT, ScreenType.INNER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.drawerHeightFraction).isEqualTo(0.8f)
+        assertThat(outer.drawerWidthFraction).isEqualTo(0.7f)
+        assertThat(outer.drawerAlignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_LEFT)
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.drawerHeightFraction).isEqualTo(0.6f)
+        assertThat(inner.drawerWidthFraction).isEqualTo(0.5f)
+        assertThat(inner.drawerAlignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_RIGHT)
+    }
+
+    @Test
+    fun `drawer dimension fractions are coerced within 0,4f to 1,0f range`() = runTest {
+        val repo = newRepository()
+        repo.setDrawerHeightFraction(0.2f, ScreenType.OUTER)
+        repo.setDrawerWidthFraction(1.5f, ScreenType.OUTER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.drawerHeightFraction).isEqualTo(0.4f)
+        assertThat(outer.drawerWidthFraction).isEqualTo(1.0f)
+    }
+
+    @Test
+    fun `all configuration preferences strictly isolate between outer and inner screen profiles`() = runTest {
+        val repo = newRepository()
+
+        // Outer configurations
+        repo.setHomeColumns(5, ScreenType.OUTER)
+        repo.setHomeRows(7, ScreenType.OUTER)
+        repo.setDockColumns(5, ScreenType.OUTER)
+        repo.setDockEnabled(true, ScreenType.OUTER)
+        repo.setDockBackgroundOpacity(0.8f, ScreenType.OUTER)
+        repo.setShowDockLabels(true, ScreenType.OUTER)
+        repo.setShowHomeLabels(false, ScreenType.OUTER)
+        repo.setAppLabelTextScale(1.2f, ScreenType.OUTER)
+        repo.setAppLabelColor(0xFF112233.toInt(), ScreenType.OUTER)
+        repo.setTwoLineHomeLabels(true, ScreenType.OUTER)
+        repo.setTwoLineDrawerLabels(false, ScreenType.OUTER)
+        repo.setParallaxWallpaper(true, ScreenType.OUTER)
+        repo.setAmoledDark(true, ScreenType.OUTER)
+        repo.setShowDrawerSearch(false, ScreenType.OUTER)
+        repo.setDrawerOpensAtTop(false, ScreenType.OUTER)
+        repo.setShowStatusBar(true, ScreenType.OUTER)
+        repo.setHideSystemStatusBar(true, ScreenType.OUTER)
+        repo.setStatusBarScrimOpacity(0.9f, ScreenType.OUTER)
+        repo.setShowPageIndicator(false, ScreenType.OUTER)
+        repo.setSwipeDownAction(LauncherSettings.GESTURE_SEARCH, ScreenType.OUTER)
+        repo.setDoubleTapAction(LauncherSettings.GESTURE_LOCK, ScreenType.OUTER)
+        repo.setSwipeUpAction(LauncherSettings.GESTURE_NONE, ScreenType.OUTER)
+
+        // Inner configurations
+        repo.setHomeColumns(6, ScreenType.INNER)
+        repo.setHomeRows(8, ScreenType.INNER)
+        repo.setDockColumns(6, ScreenType.INNER)
+        repo.setDockEnabled(false, ScreenType.INNER)
+        repo.setDockBackgroundOpacity(0.2f, ScreenType.INNER)
+        repo.setShowDockLabels(false, ScreenType.INNER)
+        repo.setShowHomeLabels(true, ScreenType.INNER)
+        repo.setAppLabelTextScale(0.9f, ScreenType.INNER)
+        repo.setAppLabelColor(0xFF445566.toInt(), ScreenType.INNER)
+        repo.setTwoLineHomeLabels(false, ScreenType.INNER)
+        repo.setTwoLineDrawerLabels(true, ScreenType.INNER)
+        repo.setParallaxWallpaper(false, ScreenType.INNER)
+        repo.setAmoledDark(false, ScreenType.INNER)
+        repo.setShowDrawerSearch(true, ScreenType.INNER)
+        repo.setDrawerOpensAtTop(true, ScreenType.INNER)
+        repo.setShowStatusBar(false, ScreenType.INNER)
+        repo.setHideSystemStatusBar(false, ScreenType.INNER)
+        repo.setStatusBarScrimOpacity(0.3f, ScreenType.INNER)
+        repo.setShowPageIndicator(true, ScreenType.INNER)
+        repo.setSwipeDownAction(LauncherSettings.GESTURE_DRAWER, ScreenType.INNER)
+        repo.setDoubleTapAction(LauncherSettings.GESTURE_NOTIFICATIONS, ScreenType.INNER)
+        repo.setSwipeUpAction(LauncherSettings.GESTURE_SEARCH, ScreenType.INNER)
+
+        // Assert Outer Screen settings
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.homeColumns).isEqualTo(5)
+        assertThat(outer.homeRows).isEqualTo(7)
+        assertThat(outer.dockColumns).isEqualTo(5)
+        assertThat(outer.dockEnabled).isTrue()
+        assertThat(outer.dockBackgroundOpacity).isEqualTo(0.8f)
+        assertThat(outer.showDockLabels).isTrue()
+        assertThat(outer.showHomeLabels).isFalse()
+        assertThat(outer.appLabelTextScale).isEqualTo(1.2f)
+        assertThat(outer.appLabelColor).isEqualTo(0xFF112233.toInt())
+        assertThat(outer.twoLineHomeLabels).isTrue()
+        assertThat(outer.twoLineDrawerLabels).isFalse()
+        assertThat(outer.parallaxWallpaper).isTrue()
+        assertThat(outer.amoledDark).isTrue()
+        assertThat(outer.showDrawerSearch).isFalse()
+        assertThat(outer.drawerOpensAtTop).isFalse()
+        assertThat(outer.showStatusBar).isTrue()
+        assertThat(outer.hideSystemStatusBar).isTrue()
+        assertThat(outer.statusBarScrimOpacity).isEqualTo(0.9f)
+        assertThat(outer.showPageIndicator).isFalse()
+        assertThat(outer.swipeDownAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
+        assertThat(outer.doubleTapAction).isEqualTo(LauncherSettings.GESTURE_LOCK)
+        assertThat(outer.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_NONE)
+
+        // Assert Inner Screen settings
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.homeColumns).isEqualTo(6)
+        assertThat(inner.homeRows).isEqualTo(8)
+        assertThat(inner.dockColumns).isEqualTo(6)
+        assertThat(inner.dockEnabled).isFalse()
+        assertThat(inner.dockBackgroundOpacity).isEqualTo(0.2f)
+        assertThat(inner.showDockLabels).isFalse()
+        assertThat(inner.showHomeLabels).isTrue()
+        assertThat(inner.appLabelTextScale).isEqualTo(0.9f)
+        assertThat(inner.appLabelColor).isEqualTo(0xFF445566.toInt())
+        assertThat(inner.twoLineHomeLabels).isFalse()
+        assertThat(inner.twoLineDrawerLabels).isTrue()
+        assertThat(inner.parallaxWallpaper).isFalse()
+        assertThat(inner.amoledDark).isFalse()
+        assertThat(inner.showDrawerSearch).isTrue()
+        assertThat(inner.drawerOpensAtTop).isTrue()
+        assertThat(inner.showStatusBar).isFalse()
+        assertThat(inner.hideSystemStatusBar).isFalse()
+        assertThat(inner.statusBarScrimOpacity).isEqualTo(0.3f)
+        assertThat(inner.showPageIndicator).isTrue()
+        assertThat(inner.swipeDownAction).isEqualTo(LauncherSettings.GESTURE_DRAWER)
+        assertThat(inner.doubleTapAction).isEqualTo(LauncherSettings.GESTURE_NOTIFICATIONS)
+        assertThat(inner.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
     }
 }

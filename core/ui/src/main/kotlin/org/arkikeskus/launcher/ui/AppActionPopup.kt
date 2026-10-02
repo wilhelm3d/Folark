@@ -75,11 +75,49 @@ fun AppActionPopup(
     actions: List<PopupAction>,
     onDismiss: () -> Unit,
     onPinShortcut: ((AppShortcuts.Item) -> Unit)? = null,
+    onRename: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var shortcuts by remember(app.key) { mutableStateOf<List<AppShortcuts.Item>>(emptyList()) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(app.key) {
         shortcuts = withContext(Dispatchers.IO) { AppShortcuts.query(context, app) }
+    }
+
+    if (showRenameDialog) {
+        RenameDialog(
+            initialName = app.label,
+            onConfirm = { newName ->
+                onRename?.invoke(newName)
+                showRenameDialog = false
+                onDismiss()
+            },
+            onReset = {
+                onRename?.invoke("")
+                showRenameDialog = false
+                onDismiss()
+            },
+            onDismiss = {
+                showRenameDialog = false
+                onDismiss()
+            },
+        )
+    }
+
+    val renameLabel = stringResource(R.string.rename)
+    val effectiveActions = remember(actions, onRename, renameLabel) {
+        if (onRename != null && actions.none { it.icon == LauncherIcons.Edit }) {
+            listOf(
+                PopupAction(
+                    label = renameLabel,
+                    icon = LauncherIcons.Edit,
+                    onClick = { showRenameDialog = true },
+                ),
+            ) + actions
+        } else {
+            actions
+        }
     }
 
     ExpressivePopupCard(anchor = anchor, preferAbove = preferAbove, onDismiss = onDismiss) {
@@ -104,10 +142,14 @@ fun AppActionPopup(
                 color = LocalExpressivePalette.current.trackOff,
             )
         }
-        actions.forEach { action ->
+        effectiveActions.forEach { action ->
             PopupRow(action.label, action.icon) {
-                action.onClick()
-                onDismiss()
+                if (action.icon == LauncherIcons.Edit && onRename != null) {
+                    showRenameDialog = true
+                } else {
+                    action.onClick()
+                    onDismiss()
+                }
             }
         }
     }

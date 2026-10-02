@@ -10,6 +10,11 @@ class WidgetSizingTest {
         assertThat(resizeWidgetStartEdge(0, 4, 1, 2, 5)).isEqualTo(1 to 3)
     }
 
+    @Test fun allowsOneByOneMinimumSpanResizing() {
+        assertThat(resizeWidgetStartEdge(1, 2, 1, 1, 5)).isEqualTo(2 to 1)
+        assertThat(resizeWidgetStartEdge(0, 2, 1, 1, 5)).isEqualTo(1 to 1)
+    }
+
     @Test fun minimumUsesActualCellHeightAndRoundsUp() {
         assertThat(minimumWidgetCells(130f, 60f)).isEqualTo(3)
         assertThat(minimumWidgetCells(130f, 100f)).isEqualTo(2)

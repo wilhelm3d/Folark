@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -31,6 +32,7 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.AppShortcuts
 import javax.inject.Inject
 
@@ -168,6 +170,10 @@ class HomeViewModel @Inject constructor(
     private val signalMonitor: org.arkikeskus.launcher.launcher.system.SignalMonitor,
 ) : ViewModel() {
 
+    /** The current screen layout profile. */
+    private val _screenType = MutableStateFlow(ScreenType.OUTER)
+    fun setScreenType(type: ScreenType) { _screenType.value = type }
+
     /** True while the first-run intro should cover the home screen (fresh installs only). */
     private val _showOnboarding = kotlinx.coroutines.flow.MutableStateFlow(false)
     val showOnboarding: StateFlow<Boolean> = _showOnboarding
@@ -185,30 +191,30 @@ class HomeViewModel @Inject constructor(
             // mid-seed leaves the home non-empty, which must not flip a fresh install into an
             // "updating user" on the retry (dock never seeded, intro never shown).
             val fresh = settingsRepository.firstRunFreshOnce() ?: run {
-                val decided = homeLayoutRepository.isHomeEmpty()
+                val decided = homeLayoutRepository.isHomeEmpty(_screenType.value)
                 settingsRepository.setFirstRunFresh(decided)
                 decided
             }
             if (!seeded) {
                 if (fresh) {
-                    val settings = settingsRepository.settings.first()
+                    val settings = settingsRepository.settings(_screenType.value).first()
                     // Idempotent on a retry: the widget only while home is still empty, the dock
                     // only while the favorites are still empty.
-                    if (homeLayoutRepository.isHomeEmpty()) {
+                    if (homeLayoutRepository.isHomeEmpty(_screenType.value)) {
                         // Full width so the centered clock sits in the middle of the screen.
                         homeLayoutRepository.addBuiltin(
                             HomeItemEntity.BUILTIN_SMARTSPACE,
-                            settings.homeColumns, SMARTSPACE_DEFAULT_SPAN_Y, settings.homeColumns, settings.homeRows,
+                            settings.homeColumns, SMARTSPACE_DEFAULT_SPAN_Y, settings.homeColumns, settings.homeRows, _screenType.value
                         )
                     }
                     // The app list needs a beat on a cold start; a fresh device always has apps.
                     val apps = appRepository.apps.first { it.isNotEmpty() }
                     val dockKeys = resolveDefaultDockKeys(context, apps)
-                    if (dockKeys.isNotEmpty() && settingsRepository.dockFavorites.first().isEmpty()) {
-                        settingsRepository.seedDock(dockKeys)
+                    if (dockKeys.isNotEmpty() && settingsRepository.dockFavorites(_screenType.value).first().isEmpty()) {
+                        settingsRepository.seedDock(dockKeys, _screenType.value)
                         // The seed is 5 apps but the dock defaults to 4 columns — widen to fit.
                         if (dockKeys.size > settings.dockColumns) {
-                            settingsRepository.setDockColumns(dockKeys.size)
+                            settingsRepository.setDockColumns(dockKeys.size, _screenType.value)
                         }
                     }
                 }
@@ -279,109 +285,112 @@ class HomeViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), false)
 
-    val uiState: StateFlow<HomeUiState> = combine(
-        settingsRepository.settings,
-        settingsRepository.dockFavorites,
-        appRepository.apps,
-        homeLayoutRepository.homeItems,
-        notificationBadgeRepository.badges,
-    ) { settings, favoriteKeys, apps, homeItems, badges ->
-        val byKey = apps.associateBy { it.key }
-        val dockApps = favoriteKeys.mapNotNull { byKey[it] }.take(settings.dockColumns)
-        // Children grouped by their folder id, kept in stored order.
-        val childrenByFolder = homeItems
-            .filter { it.containerId != HomeItemEntity.HOME }
-            .groupBy { it.containerId }
-        // Resolve any not-yet-cached pinned shortcuts (label + icon) off the main thread.
-        for (row in homeItems) {
-            if (row.containerId == HomeItemEntity.HOME && row.isShortcut) {
-                val k = "${row.packageName}/${row.shortcutId}/${row.userSerial}"
-                if (!shortcutCache.containsKey(k)) {
-                    withContext(Dispatchers.IO) {
-                        AppShortcuts.resolve(context, row.packageName, row.shortcutId!!, row.userSerial)
-                    }?.let { shortcutCache[k] = it }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<HomeUiState> = _screenType.flatMapLatest { screenType ->
+        combine(
+            settingsRepository.settings(screenType),
+            settingsRepository.dockFavorites(screenType),
+            appRepository.apps,
+            homeLayoutRepository.homeItems(screenType),
+            notificationBadgeRepository.badges,
+        ) { settings, favoriteKeys, apps, homeItems, badges ->
+            val byKey = apps.associateBy { it.key }
+            val dockApps = favoriteKeys.mapNotNull { byKey[it] }.take(settings.dockColumns)
+            // Children grouped by their folder id, kept in stored order.
+            val childrenByFolder = homeItems
+                .filter { it.containerId != HomeItemEntity.HOME }
+                .groupBy { it.containerId }
+            // Resolve any not-yet-cached pinned shortcuts (label + icon) off the main thread.
+            for (row in homeItems) {
+                if (row.containerId == HomeItemEntity.HOME && row.isShortcut) {
+                    val k = "${row.packageName}/${row.shortcutId}/${row.userSerial}"
+                    if (!shortcutCache.containsKey(k)) {
+                        withContext(Dispatchers.IO) {
+                            AppShortcuts.resolve(context, row.packageName, row.shortcutId!!, row.userSerial)
+                        }?.let { shortcutCache[k] = it }
+                    }
                 }
             }
-        }
-        val entries = homeItems
-            .filter { it.containerId == HomeItemEntity.HOME }
-            .mapNotNull { row ->
-                when {
-                    row.isBuiltin -> PlacedBuiltin(
-                        rowId = row.id,
-                        type = row.builtinType!!,
-                        page = row.page, cellX = row.cellX, cellY = row.cellY,
-                        spanX = row.spanX, spanY = row.spanY,
-                    )
-                    row.isFolder -> {
-                        // distinctBy: a duplicate child row (old data from before the merge fix, or
-                        // an edited backup) must never reach the folder grid's app-key lazy keys.
-                        val folderApps = childrenByFolder[row.id].orEmpty()
-                            .mapNotNull { byKey[it.key] }
-                            .distinctBy { it.key }
-                        PlacedFolder(row.id, row.folderName.orEmpty(), folderApps, row.page, row.cellX, row.cellY)
-                    }
-                    row.isShortcut -> {
-                        val k = "${row.packageName}/${row.shortcutId}/${row.userSerial}"
-                        shortcutCache[k]?.let { r ->
-                            PlacedShortcut(
-                                rowId = row.id,
-                                packageName = row.packageName,
-                                shortcutId = row.shortcutId!!,
-                                userSerial = row.userSerial,
-                                label = r.label,
-                                icon = r.icon,
-                                page = row.page,
-                                cellX = row.cellX,
-                                cellY = row.cellY,
-                            )
+            val entries = homeItems
+                .filter { it.containerId == HomeItemEntity.HOME }
+                .mapNotNull { row ->
+                    when {
+                        row.isBuiltin -> PlacedBuiltin(
+                            rowId = row.id,
+                            type = row.builtinType!!,
+                            page = row.page, cellX = row.cellX, cellY = row.cellY,
+                            spanX = row.spanX, spanY = row.spanY,
+                        )
+                        row.isFolder -> {
+                            // distinctBy: a duplicate child row (old data from before the merge fix, or
+                            // an edited backup) must never reach the folder grid's app-key lazy keys.
+                            val folderApps = childrenByFolder[row.id].orEmpty()
+                                .mapNotNull { byKey[it.key] }
+                                .distinctBy { it.key }
+                            PlacedFolder(row.id, row.folderName.orEmpty(), folderApps, row.page, row.cellX, row.cellY)
                         }
-                    }
-                    row.isWidget -> {
-                        ComponentName.unflattenFromString(row.widgetProvider.orEmpty())?.let { provider ->
-                            PlacedWidget(
-                                rowId = row.id,
-                                appWidgetId = row.appWidgetId!!,
-                                provider = provider,
-                                page = row.page, cellX = row.cellX, cellY = row.cellY,
-                                spanX = row.spanX, spanY = row.spanY,
-                            )
-                        }
-                    }
-                    else -> {
-                        // A restored widget row carries a provider but no bound id → placeholder until
-                        // re-bound; anything else is a plain app. (Local val so the null-check smart-casts
-                        // — widgetProvider is a cross-module property that can't be smart-cast directly.)
-                        val wp = row.widgetProvider
-                        if (wp != null) {
-                            ComponentName.unflattenFromString(wp)?.let { provider ->
-                                PendingWidget(
+                        row.isShortcut -> {
+                            val k = "${row.packageName}/${row.shortcutId}/${row.userSerial}"
+                            shortcutCache[k]?.let { r ->
+                                PlacedShortcut(
                                     rowId = row.id,
+                                    packageName = row.packageName,
+                                    shortcutId = row.shortcutId!!,
+                                    userSerial = row.userSerial,
+                                    label = r.label,
+                                    icon = r.icon,
+                                    page = row.page,
+                                    cellX = row.cellX,
+                                    cellY = row.cellY,
+                                )
+                            }
+                        }
+                        row.isWidget -> {
+                            ComponentName.unflattenFromString(row.widgetProvider.orEmpty())?.let { provider ->
+                                PlacedWidget(
+                                    rowId = row.id,
+                                    appWidgetId = row.appWidgetId!!,
                                     provider = provider,
                                     page = row.page, cellX = row.cellX, cellY = row.cellY,
                                     spanX = row.spanX, spanY = row.spanY,
                                 )
                             }
-                        } else {
-                            byKey[row.key]?.let { PlacedApp(it, row.page, row.cellX, row.cellY) }
+                        }
+                        else -> {
+                            // A restored widget row carries a provider but no bound id → placeholder until
+                            // re-bound; anything else is a plain app. (Local val so the null-check smart-casts
+                            // — widgetProvider is a cross-module property that can't be smart-cast directly.)
+                            val wp = row.widgetProvider
+                            if (wp != null) {
+                                ComponentName.unflattenFromString(wp)?.let { provider ->
+                                    PendingWidget(
+                                        rowId = row.id,
+                                        provider = provider,
+                                        page = row.page, cellX = row.cellX, cellY = row.cellY,
+                                        spanX = row.spanX, spanY = row.spanY,
+                                    )
+                                }
+                            } else {
+                                byKey[row.key]?.let { PlacedApp(it, row.page, row.cellX, row.cellY) }
+                            }
                         }
                     }
                 }
-            }
-        val occupied = homeItems.filter { it.containerId == HomeItemEntity.HOME }.map { it.page }.toSet()
-        // A new trailing page is offered transiently by the workspace while dragging, and becomes
-        // permanent once an icon lands.
-        val pageCount = permanentPageCount(occupied, settings.homePageCount)
-        HomeUiState(
-            settings = settings,
-            dockApps = dockApps,
-            entries = entries,
-            pageCount = pageCount,
-            homePage = settings.homePage.coerceIn(0, pageCount - 1),
-            occupiedPages = occupied,
-            badges = badges,
-            loaded = true,
-        )
+            val occupied = homeItems.filter { it.containerId == HomeItemEntity.HOME }.map { it.page }.toSet()
+            // A new trailing page is offered transiently by the workspace while dragging, and becomes
+            // permanent once an icon lands.
+            val pageCount = permanentPageCount(occupied, settings.homePageCount)
+            HomeUiState(
+                settings = settings,
+                dockApps = dockApps,
+                entries = entries,
+                pageCount = pageCount,
+                homePage = settings.homePage.coerceIn(0, pageCount - 1),
+                occupiedPages = occupied,
+                badges = badges,
+                loaded = true,
+            )
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -395,11 +404,21 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Launches the app bound to the home left-edge swipe (Settings ▸ Eleet ▸ Vasen reuna). No-op when
+     * Launches the app bound to the home left-edge swipe. No-op when
      * none is configured (blank key) or the app no longer resolves (e.g. uninstalled).
      */
     fun onLeftSwipe() = viewModelScope.launch {
-        val key = settingsRepository.settings.first().leftSwipeAppKey
+        val key = settingsRepository.settings(_screenType.value).first().leftSwipeAppKey
+        if (key.isBlank()) return@launch
+        appRepository.apps.first().firstOrNull { it.key == key }?.let { launch(it) }
+    }
+
+    /**
+     * Launches the app bound to the home right-edge swipe. No-op when
+     * none is configured (blank key) or the app no longer resolves (e.g. uninstalled).
+     */
+    fun onRightSwipe() = viewModelScope.launch {
+        val key = settingsRepository.settings(_screenType.value).first().rightSwipeAppKey
         if (key.isBlank()) return@launch
         appRepository.apps.first().firstOrNull { it.key == key }?.let { launch(it) }
     }
@@ -411,8 +430,8 @@ class HomeViewModel @Inject constructor(
     /** Stores a pinned shortcut on home (the system-level pin is done by the caller, which has a
      *  Context). Idempotent — the repository skips one already present. */
     fun addPinnedShortcut(packageName: String, shortcutId: String, userSerial: Long) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.homeColumns, s.homeRows, _screenType.value)
     }
 
     /** Removes a pinned shortcut from home and re-pins the remaining set for its package in the system. */
@@ -432,31 +451,31 @@ class HomeViewModel @Inject constructor(
 
     /** Places a freshly-bound widget on the home grid (spans are the picker's default). */
     fun addWidget(appWidgetId: Int, provider: String, spanX: Int, spanY: Int) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        homeLayoutRepository.addWidget(appWidgetId, provider, spanX, spanY, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.addWidget(appWidgetId, provider, spanX, spanY, s.homeColumns, s.homeRows, _screenType.value)
     }
 
     suspend fun addWidgetAt(
         appWidgetId: Int?, provider: String?, builtinType: String?,
         placement: org.arkikeskus.launcher.model.WidgetPlacement,
     ): Boolean {
-        val s = settingsRepository.settings.first()
+        val s = settingsRepository.settings(_screenType.value).first()
         return homeLayoutRepository.addWidgetAt(
-            appWidgetId, provider, builtinType, placement, s.homeColumns, s.homeRows,
+            appWidgetId, provider, builtinType, placement, s.homeColumns, s.homeRows, _screenType.value
         )
     }
 
     // --- Pages (the empty-area menu) -----------------------------------------------------------
 
     private val pageOperations = WorkspacePageOperations(
-        settings = { settingsRepository.settings.first() },
+        settings = { settingsRepository.settings(_screenType.value).first() },
         occupiedPages = {
-            homeLayoutRepository.homeItems.first().filter { it.containerId == HomeItemEntity.HOME }
+            homeLayoutRepository.homeItems(_screenType.value).first().filter { it.containerId == HomeItemEntity.HOME }
                 .map { it.page }.toSet()
         },
-        insertRows = homeLayoutRepository::insertPage,
-        removeRows = homeLayoutRepository::removeEmptyPage,
-        save = settingsRepository::setHomePages,
+        insertRows = { at -> homeLayoutRepository.insertPage(at, _screenType.value) },
+        removeRows = { page, force -> homeLayoutRepository.removeEmptyPage(page, force, _screenType.value) },
+        save = { home, count -> settingsRepository.setHomePages(home, count, _screenType.value) },
     )
 
     /** Opens an empty page at [at] (0..pageCount); what was there and after moves right. Returns the
@@ -490,10 +509,10 @@ class HomeViewModel @Inject constructor(
 
     /** Adds the built-in smartspace widget at the first free full-width rectangle (widget picker). */
     fun addSmartspace() = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
+        val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(
             HomeItemEntity.BUILTIN_SMARTSPACE,
-            s.homeColumns, SMARTSPACE_DEFAULT_SPAN_Y, s.homeColumns, s.homeRows,
+            s.homeColumns, SMARTSPACE_DEFAULT_SPAN_Y, s.homeColumns, s.homeRows, _screenType.value
         )
     }
 
@@ -501,25 +520,34 @@ class HomeViewModel @Inject constructor(
      *  Full width like the smartspace clock: the icon group centers inside its own footprint, so any
      *  narrower default could never sit symmetric on an odd column count (e.g. 4 wide in 5 columns). */
     fun addNotificationsWidget() = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
+        val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(
             HomeItemEntity.BUILTIN_NOTIFICATIONS,
-            s.homeColumns, NOTIFICATIONS_DEFAULT_SPAN_Y, s.homeColumns, s.homeRows,
+            s.homeColumns, NOTIFICATIONS_DEFAULT_SPAN_Y, s.homeColumns, s.homeRows, _screenType.value
+        )
+    }
+
+    /** Adds the Samsung One UI briefing card notification widget at the first free full-width rectangle. */
+    fun addSamsungNotificationWidget() = viewModelScope.launch {
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.addBuiltin(
+            HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET,
+            s.homeColumns, 2, s.homeColumns, s.homeRows, _screenType.value
         )
     }
 
     /** Adds the built-in battery widget (an app-icon-sized ring) at the first free cell (widget picker). */
     fun addBatteryWidget() = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
+        val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(
             HomeItemEntity.BUILTIN_BATTERY,
-            BATTERY_SPAN, BATTERY_SPAN, s.homeColumns, s.homeRows,
+            BATTERY_SPAN, BATTERY_SPAN, s.homeColumns, s.homeRows, _screenType.value
         )
     }
 
     /** Turns bound widget rows whose id this device's host never allocated back into placeholders
      *  (the Google Auto Backup / device-transfer restore path — see HomeScreen's startup sweep). */
-    suspend fun unbindStaleWidgets(validIds: Set<Int>) = homeLayoutRepository.unbindStaleWidgets(validIds)
+    suspend fun unbindStaleWidgets(validIds: Set<Int>) = homeLayoutRepository.unbindStaleWidgets(validIds, _screenType.value)
 
     /** Binds a restored placeholder widget to its freshly allocated [appWidgetId] (the caller did the
      *  allocate + system bind/configure); the row turns back into a live widget. */
@@ -530,45 +558,43 @@ class HomeViewModel @Inject constructor(
     suspend fun boundWidgetIds(): Set<Int> = homeLayoutRepository.boundWidgetIds()
 
     fun reorderDock(newOrder: List<AppItem>) =
-        viewModelScope.launch { settingsRepository.reorderVisibleDock(newOrder.map { it.key }) }
+        viewModelScope.launch { settingsRepository.reorderVisibleDock(newOrder.map { it.key }, _screenType.value) }
 
     fun removeFromHome(appItem: AppItem) =
-        viewModelScope.launch { homeLayoutRepository.removeFromHome(appItem) }
+        viewModelScope.launch { homeLayoutRepository.removeFromHome(appItem, _screenType.value) }
 
     fun addToDock(appItem: AppItem) =
-        viewModelScope.launch { settingsRepository.addToDock(appItem.key) }
+        viewModelScope.launch { settingsRepository.addToDock(appItem.key, _screenType.value) }
 
     fun removeFromDock(appItem: AppItem) =
-        viewModelScope.launch { settingsRepository.removeFromDock(appItem.key) }
+        viewModelScope.launch { settingsRepository.removeFromDock(appItem.key, _screenType.value) }
 
     fun addToHome(appItem: AppItem) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        homeLayoutRepository.addToHome(appItem, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.addToHome(appItem, s.homeColumns, s.homeRows, _screenType.value)
     }
 
     /** Moves/swaps a home shortcut; returns whether the repository accepted it (see [Workspace]). */
     suspend fun moveItem(appItem: AppItem, page: Int, cellX: Int, cellY: Int): Boolean =
-        homeLayoutRepository.moveItem(appItem, page, cellX, cellY)
+        homeLayoutRepository.moveItem(appItem, page, cellX, cellY, _screenType.value)
 
     /** Moves/swaps a folder to a home cell (folder relocation on the grid). */
     suspend fun moveFolder(folderId: Long, page: Int, cellX: Int, cellY: Int): Boolean =
-        homeLayoutRepository.moveFolder(folderId, page, cellX, cellY)
+        homeLayoutRepository.moveFolder(folderId, page, cellX, cellY, _screenType.value)
 
     /** Moves or resizes a widget to the given bounds; returns whether the repository accepted it
      *  (the Workspace clears its optimistic override on false). */
     suspend fun setWidgetBounds(rowId: Long, page: Int, cellX: Int, cellY: Int, spanX: Int, spanY: Int): Boolean {
-        val s = settingsRepository.settings.first()
-        return homeLayoutRepository.setWidgetBounds(rowId, page, cellX, cellY, spanX, spanY, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        return homeLayoutRepository.setWidgetBounds(rowId, page, cellX, cellY, spanX, spanY, s.homeColumns, s.homeRows, _screenType.value)
     }
 
     /** Cross-surface: an icon dragged from the dock onto a home cell — place it and leave the dock. */
     fun moveToHome(appItem: AppItem, page: Int, cellX: Int, cellY: Int) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        // Add-first so an interruption can only duplicate, never lose; NonCancellable so a
-        // ViewModel clear between the halves can't strand the item on both surfaces.
+        val s = settingsRepository.settings(_screenType.value).first()
         withContext(NonCancellable) {
-            if (homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.homeColumns, s.homeRows)) {
-                settingsRepository.removeFromDock(appItem.key)
+            if (homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.homeColumns, s.homeRows, _screenType.value)) {
+                settingsRepository.removeFromDock(appItem.key, _screenType.value)
             }
         }
     }
@@ -576,25 +602,25 @@ class HomeViewModel @Inject constructor(
     /** Cross-surface: a home icon dragged into the dock at [index] — add to dock and leave home. */
     fun moveToDock(appItem: AppItem, index: Int) = viewModelScope.launch {
         withContext(NonCancellable) {
-            settingsRepository.addToDockAt(appItem.key, index)
-            homeLayoutRepository.removeFromHome(appItem)
+            settingsRepository.addToDockAt(appItem.key, index, _screenType.value)
+            homeLayoutRepository.removeFromHome(appItem, _screenType.value)
         }
     }
 
     /** Drop an app onto another home app → make a folder of the two. */
     fun createFolder(target: AppItem, dropped: AppItem, name: String) = viewModelScope.launch {
-        homeLayoutRepository.createFolder(target, dropped, name)
+        homeLayoutRepository.createFolder(target, dropped, name, _screenType.value)
     }
 
     /** Drop an app onto an existing folder → add it to that folder. */
     fun addToFolder(appItem: AppItem, folderId: Long) = viewModelScope.launch {
-        homeLayoutRepository.addToFolder(appItem, folderId)
+        homeLayoutRepository.addToFolder(appItem, folderId, _screenType.value)
     }
 
     /** Take an app out of a folder back onto the home screen (dissolves the folder if one is left). */
     fun removeFromFolder(appItem: AppItem, folderId: Long) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        homeLayoutRepository.removeFromFolder(appItem, folderId, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.removeFromFolder(appItem, folderId, s.homeColumns, s.homeRows, _screenType.value)
     }
 
     fun renameFolder(folderId: Long, name: String) =
@@ -603,4 +629,7 @@ class HomeViewModel @Inject constructor(
     /** Sets a custom display name for an app (blank/null clears it back to the system label). */
     fun setCustomLabel(key: String, label: String?) =
         viewModelScope.launch { settingsRepository.setCustomLabel(key, label) }
+
+    fun setCustomAppLabel(componentName: String, label: String) =
+        viewModelScope.launch { settingsRepository.setCustomAppLabel(componentName, label) }
 }

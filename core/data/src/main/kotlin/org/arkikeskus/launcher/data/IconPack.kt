@@ -39,7 +39,7 @@ class IconPack(
  * feature for the picker list.
  */
 @Singleton
-class IconPackRepository @Inject constructor(
+open class IconPackRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     // package -> parsed pack (or null when it has no usable appfilter); LinkedHashMap for a stable order.
@@ -72,6 +72,12 @@ class IconPackRepository @Inject constructor(
         if (!cache.containsKey(pkg)) return false
         cache.remove(pkg)
         return true
+    }
+
+    /** Clears all cached icon packs. */
+    @Synchronized
+    fun clearCache() {
+        cache.clear()
     }
 
     /** Loads + parses [pkg] (cached, including a cached "no pack" result). */

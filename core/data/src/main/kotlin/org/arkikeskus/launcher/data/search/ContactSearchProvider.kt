@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.SettingsRepository
+import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
 
@@ -45,7 +46,7 @@ class ContactSearchProvider @Inject constructor(
 ) : SearchProvider {
 
     override suspend fun isEnabled(): Boolean =
-        settingsRepository.settings.first().searchContacts &&
+        settingsRepository.settings(ScreenType.OUTER).first().searchContacts &&
             permissionChecker.has(Manifest.permission.READ_CONTACTS)
 
     override suspend fun query(query: String): List<SearchResult> =

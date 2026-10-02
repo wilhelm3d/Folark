@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapLatest
@@ -25,6 +26,8 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.data.search.SearchAggregator
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import org.arkikeskus.launcher.model.SearchResults
 import javax.inject.Inject
@@ -37,6 +40,7 @@ data class AppDrawerUiState(
     val folders: List<DrawerFolderUi> = emptyList(),
     val query: String = "",
     val columns: Int = 4,
+    val rows: Int = 6,
     val dockKeys: Set<String> = emptySet(),
     /** Visible dock capacity — the drawer hides "Add to dock" once this many favorites exist. */
     val dockColumns: Int = 4,
@@ -59,6 +63,22 @@ data class AppDrawerUiState(
     /** Labels may wrap onto a second line (Settings ▸ App drawer ▸ Two-line labels). */
     val twoLineLabels: Boolean = true,
     val drawerOpensAtTop: Boolean = true,
+    val drawerSearchPosition: String = LauncherSettings.SEARCH_TOP,
+    val drawerIndexBarEnabled: Boolean = true,
+    val azIndexPosition: String = LauncherSettings.AZ_POSITION_VERTICAL_RIGHT,
+    val drawerBackgroundBlur: Float = 0f,
+    val drawerScrimOpacity: Float = 0.5f,
+    val glassBlurRadius: Float = 25f,
+    val glassDarkTint: Float = 0.45f,
+    val drawerStyle: String = LauncherSettings.DRAWER_STYLE_STANDARD_GRID,
+    val drawerThemeTint: String = LauncherSettings.DRAWER_THEME_DEFAULT_DARK,
+    val drawerAccentColor: Int = 0xFF00B0FF.toInt(),
+    val drawerHeightFraction: Float = 1.0f,
+    val drawerWidthFraction: Float = 1.0f,
+    val drawerAlignment: String = LauncherSettings.DRAWER_ALIGNMENT_CENTER,
+    val drawerLayoutMode: String = LauncherSettings.DRAWER_LAYOUT_GRID,
+    val dpiAppDrawer: Float = 1f,
+    val innerSidebarAppDrawer: Boolean = false,
 )
 
 @HiltViewModel
@@ -72,6 +92,9 @@ class AppDrawerViewModel @Inject constructor(
     private val appUsageRepository: org.arkikeskus.launcher.data.AppUsageRepository,
 ) : ViewModel() {
 
+    private val _screenType = MutableStateFlow(ScreenType.OUTER)
+    fun setScreenType(type: ScreenType) { _screenType.value = type }
+
     private val query = MutableStateFlow("")
 
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -81,12 +104,12 @@ class AppDrawerViewModel @Inject constructor(
     ) { q, _ -> q }
         .mapLatest { searchAggregator.search(it) }          // mapLatest cancels the previous run
 
-    val uiState: StateFlow<AppDrawerUiState> = combine(
+    val uiState: StateFlow<AppDrawerUiState> = _screenType.flatMapLatest { screenType -> combine(
         appRepository.apps,
         query,
-        settingsRepository.settings,
-        settingsRepository.dockFavorites,
-        homeLayoutRepository.homeItems,
+        settingsRepository.settings(screenType),
+        settingsRepository.dockFavorites(screenType),
+        homeLayoutRepository.homeItems(screenType),
     ) { apps, q, settings, favorites, homeItems ->
         // Favorites whose app was uninstalled don't render in the dock (HomeViewModel drops them),
         // so they must not count toward its visible capacity either.
@@ -95,6 +118,7 @@ class AppDrawerViewModel @Inject constructor(
             apps = apps,
             query = q,
             columns = settings.drawerColumns,
+            rows = settings.drawerRows,
             dockKeys = favorites.filterTo(LinkedHashSet()) { it in installed },
             dockColumns = settings.dockColumns,
             // Only apps placed directly on home (not folder rows or apps inside folders).
@@ -114,8 +138,24 @@ class AppDrawerViewModel @Inject constructor(
             appLabelTextScale = settings.appLabelTextScale,
             twoLineLabels = settings.twoLineDrawerLabels,
             drawerOpensAtTop = settings.drawerOpensAtTop,
+            drawerSearchPosition = settings.drawerSearchPosition,
+            drawerIndexBarEnabled = settings.drawerIndexBarEnabled,
+            azIndexPosition = settings.azIndexPosition,
+            drawerBackgroundBlur = settings.drawerBackgroundBlur,
+            drawerScrimOpacity = settings.drawerScrimOpacity,
+            glassBlurRadius = settings.glassBlurRadius,
+            glassDarkTint = settings.glassDarkTint,
+            drawerStyle = settings.drawerStyle,
+            drawerThemeTint = settings.drawerThemeTint,
+            drawerAccentColor = settings.drawerAccentColor,
+            drawerHeightFraction = settings.drawerHeightFraction,
+            drawerWidthFraction = settings.drawerWidthFraction,
+            drawerAlignment = settings.drawerAlignment,
+            drawerLayoutMode = settings.drawerLayoutMode,
+            dpiAppDrawer = settings.dpiAppDrawer,
+            innerSidebarAppDrawer = settings.innerSidebarAppDrawer,
         )
-    }.combine(notificationBadgeRepository.badges) { state, badges ->
+    } }.combine(notificationBadgeRepository.badges) { state, badges ->
         state.copy(badges = badges)
     }.combine(settingsRepository.hiddenApps) { state, hidden ->
         // Hide selected apps from the drawer (also excludes them from search results).
@@ -179,27 +219,27 @@ class AppDrawerViewModel @Inject constructor(
             .onFailure { Log.w("AppDrawerViewModel", "Failed to launch ${appItem.key}", it) }
             .isSuccess
 
-    fun addToDock(appItem: AppItem) = viewModelScope.launch { settingsRepository.addToDock(appItem.key) }
+    fun addToDock(appItem: AppItem) = viewModelScope.launch { settingsRepository.addToDock(appItem.key, _screenType.value) }
 
-    fun removeFromDock(appItem: AppItem) = viewModelScope.launch { settingsRepository.removeFromDock(appItem.key) }
+    fun removeFromDock(appItem: AppItem) = viewModelScope.launch { settingsRepository.removeFromDock(appItem.key, _screenType.value) }
 
     fun addToHome(appItem: AppItem) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        homeLayoutRepository.addToHome(appItem, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.addToHome(appItem, s.homeColumns, s.homeRows, _screenType.value)
     }
 
     /** Drag-and-drop from the drawer onto a specific home cell (free cell, or first free if taken). */
     fun addToHomeAt(appItem: AppItem, page: Int, cellX: Int, cellY: Int) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.homeColumns, s.homeRows, _screenType.value)
     }
 
-    fun removeFromHome(appItem: AppItem) = viewModelScope.launch { homeLayoutRepository.removeFromHome(appItem) }
+    fun removeFromHome(appItem: AppItem) = viewModelScope.launch { homeLayoutRepository.removeFromHome(appItem, _screenType.value) }
 
     /** Stores a pinned shortcut on home (system-level pin done by the caller, which has a Context). */
     fun addPinnedShortcut(packageName: String, shortcutId: String, userSerial: Long) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.homeColumns, s.homeRows)
+        val s = settingsRepository.settings(_screenType.value).first()
+        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.homeColumns, s.homeRows, _screenType.value)
     }
 
     /** Pins [item] in the system (IO — the Binder round-trips must not run on the main thread) and
@@ -213,6 +253,9 @@ class AppDrawerViewModel @Inject constructor(
     /** Sets a custom display name for an app (blank/null clears it back to the system label). */
     fun setCustomLabel(key: String, label: String?) =
         viewModelScope.launch { settingsRepository.setCustomLabel(key, label) }
+
+    fun setCustomAppLabel(componentName: String, label: String) =
+        viewModelScope.launch { settingsRepository.setCustomAppLabel(componentName, label) }
 
     // --- Drawer folders --------------------------------------------------------------------------
     fun renameDrawerFolder(id: Long, name: String) =

@@ -8,12 +8,24 @@ data class LauncherSettings(
     /** Home-grid row count — more rows = tighter icon rows + more free cells for widgets. */
     val homeRows: Int = 6,
     val drawerColumns: Int = 4,
+    val drawerRows: Int = 6,
     val showDrawerSearch: Boolean = true,
-    val swipeUpForDrawer: Boolean = true,
-    val swipeDownForNotifications: Boolean = true,
     val showDockLabels: Boolean = false,
     val showHomeLabels: Boolean = true,
     val showDrawerLabels: Boolean = true,
+    val drawerSearchPosition: String = SEARCH_TOP,
+    val drawerIndexBarEnabled: Boolean = true,
+    val azIndexPosition: String = AZ_POSITION_VERTICAL_RIGHT,
+    val drawerBackgroundBlur: Float = 0f,
+    val drawerScrimOpacity: Float = 0.5f,
+    val glassBlurRadius: Float = 25.0f,
+    val glassDarkTint: Float = 0.45f,
+    val drawerStyle: String = DRAWER_STYLE_STANDARD_GRID,
+    val drawerThemeTint: String = DRAWER_THEME_DEFAULT_DARK,
+    val drawerAccentColor: Int = 0xFF00B0FF.toInt(),
+    val drawerHeightFraction: Float = 1.0f,
+    val drawerWidthFraction: Float = 1.0f,
+    val drawerAlignment: String = DRAWER_ALIGNMENT_CENTER,
     val dockBackgroundOpacity: Float = 0.35f,
     val showPageIndicator: Boolean = true,
     val showNotificationDots: Boolean = true,
@@ -28,8 +40,10 @@ data class LauncherSettings(
     val iconPackPackage: String = "",
     /** Include contacts in app-drawer search (gated by READ_CONTACTS; requested when enabled). */
     val searchContacts: Boolean = false,
-    /** App key launched by the left-edge home swipe (Settings ▸ Eleet); blank = gesture disabled. */
+    /** App key launched by the left-edge home swipe; blank = gesture disabled. */
     val leftSwipeAppKey: String = "",
+    /** App key launched by the right-edge home swipe; blank = gesture disabled. */
+    val rightSwipeAppKey: String = "",
     /** Lock the desktop layout: when true, home + dock items can't be moved, removed, or added. */
     val desktopLocked: Boolean = false,
     /** Show a "most used" row (top apps by decayed launch frequency) above the drawer's app list. */
@@ -82,8 +96,74 @@ data class LauncherSettings(
     /** Pages the user added explicitly (0 = none): the home keeps at least this many pages even
      *  when some are empty. Pages that hold an icon or widget exist regardless. */
     val homePageCount: Int = 0,
+    /** Workspace density / cell padding scale: [DENSITY_COMPACT], [DENSITY_NORMAL], [DENSITY_SPACIOUS]. */
+    val workspaceDensity: String = DENSITY_NORMAL,
+    /** Allow home screen landscape rotation on this screen profile. */
+    val allowLandscape: Boolean = false,
+    /** Swipe-down gesture action: [GESTURE_NOTIFICATIONS], [GESTURE_DRAWER], [GESTURE_SEARCH], [GESTURE_LOCK], [GESTURE_NONE]. */
+    val swipeDownAction: String = GESTURE_NOTIFICATIONS,
+    /** Double-tap gesture action on empty space: [GESTURE_NOTIFICATIONS], [GESTURE_DRAWER], [GESTURE_SEARCH], [GESTURE_LOCK], [GESTURE_NONE]. */
+    val doubleTapAction: String = GESTURE_NONE,
+    /** Swipe-up gesture action: [GESTURE_DRAWER], [GESTURE_SEARCH], [GESTURE_NONE]. */
+    val swipeUpAction: String = GESTURE_DRAWER,
+    /** Enable tabletop / half-opened layout mode when the device is half-folded. */
+    val halfOpenedModeEnabled: Boolean = false,
+    /** AMOLED dark mode (pure black backgrounds and surfaces). */
+    val amoledDark: Boolean = false,
+    val foldAction: String = ACTION_STAY,
+    val unfoldAction: String = ACTION_STAY,
+    val innerTaskbarEnabled: Boolean = true,
+    val outerWallpaperScale: Float = 1.0f,
+    val innerWallpaperScale: Float = 1.0f,
+    val foldTransitionStyle: String = TRANSITION_BOOK_UNFOLD_SWEEP,
+    val aquamorphicTouchEnabled: Boolean = true,
+    val appLaunchZoomEnabled: Boolean = true,
+    val pageBounceEnabled: Boolean = true,
+    val dpiWorkspace: Float = 1.0f,
+    val dpiAppDrawer: Float = 1.0f,
+    val dpiSettings: Float = 1.0f,
+    val innerDualPageWorkspace: Boolean = false,
+    val innerSidebarAppDrawer: Boolean = false,
+    val innerDockAlignment: String = DOCK_ALIGNMENT_CENTER,
+    val parallaxWallpaper: Boolean = false,
+    val drawerLayoutMode: String = DRAWER_LAYOUT_GRID,
 ) {
     companion object {
+        const val DRAWER_LAYOUT_GRID = "grid"
+        const val DRAWER_LAYOUT_LIST = "list"
+
+        const val AZ_POSITION_VERTICAL_RIGHT = "VERTICAL_RIGHT"
+        const val AZ_POSITION_VERTICAL_LEFT = "VERTICAL_LEFT"
+        const val AZ_POSITION_HORIZONTAL_TOP = "HORIZONTAL_TOP"
+        const val AZ_POSITION_HORIZONTAL_BOTTOM = "HORIZONTAL_BOTTOM"
+
+        const val DOCK_ALIGNMENT_CENTER = "center"
+        const val DOCK_ALIGNMENT_LEFT = "left"
+        const val DOCK_ALIGNMENT_RIGHT = "right"
+        const val DOCK_ALIGNMENT_FLOATING = "floating"
+
+        const val MIN_DPI_SCALE = 0.7f
+        const val MAX_DPI_SCALE = 1.4f
+
+        const val SEARCH_TOP = "top"
+        const val SEARCH_BOTTOM = "bottom"
+
+        const val DRAWER_STYLE_STANDARD_GRID = "standard_grid"
+        const val DRAWER_STYLE_ONE_UI = "one_ui"
+        const val DRAWER_STYLE_NOTHING_OS = "nothing_os"
+        const val DRAWER_STYLE_MOTO = "moto"
+        const val DRAWER_STYLE_VERTICAL = "vertical"
+        const val DRAWER_STYLE_HORIZONTAL = "horizontal"
+
+        const val DRAWER_THEME_DEFAULT_DARK = "default_dark"
+        const val DRAWER_THEME_OBSIDIAN_BLACK = "obsidian_black"
+        const val DRAWER_THEME_ACCENT_TINT = "accent_tint"
+        const val DRAWER_THEME_MONOCHROME = "monochrome"
+
+        const val DRAWER_ALIGNMENT_LEFT = "left"
+        const val DRAWER_ALIGNMENT_CENTER = "center"
+        const val DRAWER_ALIGNMENT_RIGHT = "right"
+
         const val COUNT_NUMBER = "number"
         const val COUNT_DOT = "dot"
         const val COUNT_NONE = "none"
@@ -91,6 +171,29 @@ data class LauncherSettings(
         const val PRIVACY_ALL = "all"
         const val PRIVACY_SENDER = "sender"
         const val PRIVACY_COUNT = "count"
+
+        const val DENSITY_COMPACT = "compact"
+        const val DENSITY_NORMAL = "normal"
+        const val DENSITY_SPACIOUS = "spacious"
+
+        const val GESTURE_NOTIFICATIONS = "notifications"
+        const val GESTURE_DRAWER = "drawer"
+        const val GESTURE_SEARCH = "search"
+        const val GESTURE_LOCK = "lock"
+        const val GESTURE_NONE = "none"
+
+        const val ACTION_PAGE_0 = "page_0"
+        const val ACTION_LOCK = "lock"
+        const val ACTION_SEARCH = "search"
+        const val ACTION_DRAWER = "drawer"
+        const val ACTION_STAY = "stay"
+
+        const val TRANSITION_MORPH_SCALE_FADE = "morph_scale_fade"
+        const val TRANSITION_BOOK_UNFOLD_SWEEP = "book_unfold_sweep"
+        const val TRANSITION_AQUAMORPHIC_RIPPLE = "aquamorphic_ripple"
+        const val TRANSITION_CROSSFADE = "crossfade"
+        const val TRANSITION_SCALE = "scale"
+        const val TRANSITION_SLIDE = "slide"
 
         const val DEFAULT_BATCH_TIMES = "08:00,12:00,17:00"
     }

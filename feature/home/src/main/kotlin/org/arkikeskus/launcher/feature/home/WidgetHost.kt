@@ -65,16 +65,12 @@ fun widgetResizeRange(
     cellHeightDp: Float,
 ): WidgetResizeRange {
     val density = context.resources.displayMetrics.density
-    val minX = minimumWidgetCells(
-        (if (info.minResizeWidth > 0) minOf(info.minResizeWidth, info.minWidth) else info.minWidth) / density, cellWidthDp,
-    )
-    val minY = minimumWidgetCells(
-        (if (info.minResizeHeight > 0) minOf(info.minResizeHeight, info.minHeight) else info.minHeight) / density, cellHeightDp,
-    )
+    val minX = 1
+    val minY = 1
     val maxX = maximumWidgetCells(if (Build.VERSION.SDK_INT >= 31) info.maxResizeWidth / density else 0f, cellWidthDp, gridColumns)
     val maxY = maximumWidgetCells(if (Build.VERSION.SDK_INT >= 31) info.maxResizeHeight / density else 0f, cellHeightDp, rows)
-    val horizontal = info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0
-    val vertical = info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0
+    val horizontal = (info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0) || info.resizeMode == 0
+    val vertical = (info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0) || info.resizeMode == 0
     return WidgetResizeRange(
         minX = minX,
         minY = minY,

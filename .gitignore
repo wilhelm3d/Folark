@@ -40,3 +40,7 @@ lawnchair-src/
 
 # Design reference drops (local only — extracted/applied, not committed as binaries)
 Android launcherin teeman asetukset.zip
+
+.artifacts/
+*.py
+

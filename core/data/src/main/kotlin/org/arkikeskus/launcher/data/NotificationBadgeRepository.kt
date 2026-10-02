@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.data
 
+import android.app.Notification
 import android.app.PendingIntent
 import android.graphics.drawable.Icon
 import android.os.SystemClock
@@ -27,6 +28,12 @@ data class StatusNotification(
     /** The app asked surfaces to show [icon] over its launcher icon
      *  (Notification.EXTRA_PREFER_SMALL_ICON — a dialer's handset vs. its message-bubble app icon). */
     val preferSmallIcon: Boolean = false,
+    
+    // Additional properties for Interactive Notifications Widget
+    val title: String? = null,
+    val text: String? = null,
+    val color: Int? = null,
+    val actions: List<Notification.Action> = emptyList(),
 )
 
 /**
@@ -45,6 +52,9 @@ class NotificationBadgeRepository @Inject constructor() {
     /** Active notifications' small icons (most-recent first), for the home status bar's left side. */
     private val _icons = MutableStateFlow<List<StatusNotification>>(emptyList())
     val icons: StateFlow<List<StatusNotification>> = _icons.asStateFlow()
+
+    private val _allNotifications = MutableStateFlow<List<StatusNotification>>(emptyList())
+    val allNotifications: StateFlow<List<StatusNotification>> = _allNotifications.asStateFlow()
 
     /** [SystemClock.elapsedRealtime] of the last heads-up-worthy notification post (0 = none yet). The
      *  home status bar blanks the themed bar for a window after this while the system TRANSIENTLY reveals
@@ -79,6 +89,10 @@ class NotificationBadgeRepository @Inject constructor() {
     fun setIcons(icons: List<StatusNotification>) {
         _icons.value = icons
     }
+    
+    fun setAllNotifications(notifications: List<StatusNotification>) {
+        _allNotifications.value = notifications
+    }
 
     /** Set by the notification listener while connected; cancels an active notification by key. */
     private val canceller = AtomicReference<((String) -> Unit)?>(null)
@@ -91,5 +105,24 @@ class NotificationBadgeRepository @Inject constructor() {
      *  listener isn't connected. */
     fun cancelNotification(key: String) {
         canceller.get()?.invoke(key)
+    }
+
+    private val allCanceller = AtomicReference<((List<String>) -> Unit)?>(null)
+    
+    fun registerAllCanceller(cancelAll: (List<String>) -> Unit) = allCanceller.set(cancelAll)
+    
+    fun clearAllCanceller() = allCanceller.set(null)
+    
+    fun cancelAllNotifications(excludeKeys: List<String>) {
+        allCanceller.get()?.invoke(excludeKeys)
+    }
+
+    private val _pinnedKeys = MutableStateFlow<Set<String>>(emptySet())
+    val pinnedKeys: StateFlow<Set<String>> = _pinnedKeys.asStateFlow()
+
+    fun togglePin(key: String) {
+        val current = _pinnedKeys.value.toMutableSet()
+        if (current.contains(key)) current.remove(key) else current.add(key)
+        _pinnedKeys.value = current
     }
 }

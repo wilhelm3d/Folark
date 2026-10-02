@@ -287,4 +287,28 @@ class HomeLayoutRepositoryTest {
         assertThat(b.cell()).isEqualTo(folderCell)
         assertThat(home.any { it.packageName == "a" }).isTrue()
     }
+
+    @Test
+    fun reflow_supports8x8Grid() = runTest {
+        repeat(64) { i ->
+            dao.insert(
+                HomeItemEntity(
+                    packageName = "p$i",
+                    className = "p$i.M",
+                    userSerial = 0,
+                    page = 0,
+                    cellX = i % 8,
+                    cellY = i / 8,
+                ),
+            )
+        }
+
+        repo.reflow(columns = 8, rows = 8)
+
+        val items = dao.getContainer(HomeItemEntity.HOME)
+        assertThat(items).hasSize(64)
+        assertThat(items.all { it.cellX in 0..7 && it.cellY in 0..7 }).isTrue()
+        assertThat(items.all { it.page == 0 }).isTrue()
+        assertThat(items.map { it.cell() }).containsNoDuplicates()
+    }
 }

@@ -1,5 +1,12 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
+import android.widget.Toast
+import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ScreenType
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,12 +22,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -28,7 +41,10 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -52,12 +68,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -78,6 +99,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,10 +121,12 @@ import org.arkikeskus.launcher.ui.PopupAction
 import org.arkikeskus.launcher.ui.RenameDialog
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.ContactAvatar
+import org.arkikeskus.launcher.ui.component.aquamorphicTouch
 import org.arkikeskus.launcher.ui.component.iconSizeForCell
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
 import org.arkikeskus.launcher.ui.component.LocalIconPack
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import org.arkikeskus.launcher.ui.component.NotificationBadge
 import org.arkikeskus.launcher.ui.expressive.Accent
@@ -125,9 +149,19 @@ fun AppDrawerScreen(
     onDragOutStart: () -> Unit = {},
     homeSignals: Flow<Boolean> = emptyFlow(),
     drawerOpen: Boolean = true,
+    drawerHeightFraction: Float? = null,
+    drawerWidthFraction: Float? = null,
+    drawerAlignment: String? = null,
     viewModel: AppDrawerViewModel = hiltViewModel(),
+    screenType: ScreenType = LocalScreenType.current,
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(screenType) { viewModel.setScreenType(screenType) }
+    CompositionLocalProvider(LocalScreenType provides screenType) {
+        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val effectiveHeightFraction = (drawerHeightFraction ?: uiState.drawerHeightFraction).coerceIn(0.4f, 1.0f)
+    val effectiveWidthFraction = (drawerWidthFraction ?: uiState.drawerWidthFraction).coerceIn(0.4f, 1.0f)
+    val effectiveAlignment = drawerAlignment ?: uiState.drawerAlignment
+
     val context = LocalContext.current
     var menuTarget by remember { mutableStateOf<Pair<AppItem, Rect>?>(null) }
     var renameTarget by remember { mutableStateOf<AppItem?>(null) }
@@ -138,12 +172,17 @@ fun AppDrawerScreen(
     // across opens. When "open at top" is on, reset it to the top as the drawer closes (invisible),
     // so the next open shows the "most used" row / A–Z start instead of the last scroll position.
     val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
     LaunchedEffect(drawerOpen, uiState.drawerOpensAtTop) {
         // Check the offset too: a short scroll leaves the first row visible (index still 0) but
         // offset > 0, and skipping the reset then would reopen the drawer slightly scrolled.
-        val scrolled = gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0
-        if (!drawerOpen && uiState.drawerOpensAtTop && scrolled) {
+        val gridScrolled = gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0
+        if (!drawerOpen && uiState.drawerOpensAtTop && gridScrolled) {
             gridState.scrollToItem(0)
+        }
+        val listScrolled = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        if (!drawerOpen && uiState.drawerOpensAtTop && listScrolled) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -196,6 +235,7 @@ fun AppDrawerScreen(
             }
         },
         onAppLongClick = { app, bounds -> menuTarget = app to bounds },
+        onClose = onClose,
         onDrawerDrag = onDrawerDrag,
         onDrawerSettle = onDrawerSettle,
         dragController = dragController,
@@ -208,6 +248,15 @@ fun AppDrawerScreen(
         contactResults = uiState.contactResults,
         locked = uiState.desktopLocked,
         gridState = gridState,
+        listState = listState,
+        drawerLayoutMode = uiState.drawerLayoutMode,
+        drawerIndexBarEnabled = uiState.drawerIndexBarEnabled,
+        azIndexPosition = uiState.azIndexPosition,
+        drawerOpen = drawerOpen,
+        drawerHeightFraction = effectiveHeightFraction,
+        drawerWidthFraction = effectiveWidthFraction,
+        drawerAlignment = effectiveAlignment,
+        drawerScrimOpacity = uiState.drawerScrimOpacity,
         modifier = modifier,
     )
 
@@ -255,14 +304,15 @@ fun AppDrawerScreen(
             ),
             onDismiss = { menuTarget = null },
             onPinShortcut = { item -> viewModel.pinShortcut(item) },
+            onRename = { newLabel -> viewModel.setCustomAppLabel(app.key, newLabel) },
         )
     }
 
     renameTarget?.let { app ->
         RenameDialog(
             initialName = app.label,
-            onConfirm = { viewModel.setCustomLabel(app.key, it) },
-            onReset = { viewModel.setCustomLabel(app.key, null) },
+            onConfirm = { viewModel.setCustomAppLabel(app.key, it) },
+            onReset = { viewModel.setCustomAppLabel(app.key, "") },
             onDismiss = { renameTarget = null },
         )
     }
@@ -297,6 +347,7 @@ fun AppDrawerScreen(
     }
     }
     }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -315,6 +366,7 @@ private fun AppDrawerContent(
     onFolderClick: (DrawerFolderUi) -> Unit,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem, Rect) -> Unit,
+    onClose: () -> Unit = {},
     onDrawerDrag: (Float) -> Unit,
     onDrawerSettle: (Float) -> Unit,
     dragController: HomeDragController,
@@ -327,17 +379,22 @@ private fun AppDrawerContent(
     contactResults: List<SearchResult.Contact>,
     locked: Boolean,
     gridState: LazyGridState,
+    listState: LazyListState,
+    drawerLayoutMode: String = LauncherSettings.DRAWER_LAYOUT_GRID,
+    drawerIndexBarEnabled: Boolean = true,
+    azIndexPosition: String = LauncherSettings.AZ_POSITION_VERTICAL_RIGHT,
+    drawerOpen: Boolean = true,
+    drawerHeightFraction: Float = 1.0f,
+    drawerWidthFraction: Float = 1.0f,
+    drawerAlignment: String = LauncherSettings.DRAWER_ALIGNMENT_CENTER,
+    drawerScrimOpacity: Float = 0.5f,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    // Finger-following pull-to-close: when the grid is at the top and the user keeps dragging down,
-    // the leftover over-scroll reaches onPostScroll as a positive y — feed it to the shared drawer
-    // progress so the drawer tracks the finger; the fling velocity settles it open/closed.
-    val pullConnection = remember(onDrawerDrag, onDrawerSettle) {
+    val pullConnection = remember(onDrawerDrag, onDrawerSettle, drawerOpen) {
         object : NestedScrollConnection {
             private var pulling = false
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // While pulling, an upward scroll re-opens the drawer rather than scrolling the list.
                 if (pulling && available.y < 0f) {
                     onDrawerDrag(available.y)
                     return available
@@ -346,10 +403,6 @@ private fun AppDrawerContent(
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                // Only the FINGER may start a pull-to-close. A fast downward fling that lands the grid
-                // at its top delivers its leftover as Fling-source deltas here — feeding those in set
-                // `pulling` and let onPreFling slam the drawer shut when the user only meant to scroll
-                // to the top. Fling leftovers now go to the grid's stretch overscroll instead.
                 if (available.y > 0f && source == NestedScrollSource.UserInput) {
                     pulling = true
                     onDrawerDrag(available.y)
@@ -368,9 +421,6 @@ private fun AppDrawerContent(
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                // Safety net: a pull-to-close that ends without a fling (e.g. a slow drag, finger
-                // lifted) would otherwise never reach onPreFling, leaving `pulling` stuck true and the
-                // drawer half-open. Reset here and settle on whatever velocity remains.
                 if (pulling) {
                     pulling = false
                     onDrawerSettle(consumed.y + available.y)
@@ -381,17 +431,44 @@ private fun AppDrawerContent(
         }
     }
 
-    Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {
-        Column(
+    val sheetAlignment = when (drawerAlignment.lowercase()) {
+        LauncherSettings.DRAWER_ALIGNMENT_LEFT -> Alignment.BottomStart
+        LauncherSettings.DRAWER_ALIGNMENT_RIGHT -> Alignment.BottomEnd
+        else -> Alignment.BottomCenter
+    }
+
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = sheetAlignment,
+    ) {
+        if (drawerScrimOpacity > 0f || drawerHeightFraction < 1.0f || drawerWidthFraction < 1.0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = (drawerScrimOpacity * 0.7f).coerceIn(0f, 0.8f)))
+                    .pointerInput(Unit) {
+                        detectTapGestures { onClose() }
+                    }
+            )
+        }
+
+        Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .nestedScroll(pullConnection),
+                .fillMaxWidth(drawerWidthFraction.coerceIn(0.4f, 1.0f))
+                .fillMaxHeight(drawerHeightFraction.coerceIn(0.4f, 1.0f))
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .nestedScroll(pullConnection),
+            ) {
             DragHandle()
             if (showSearch) {
                 val searchPalette = LocalExpressivePalette.current
-                // Version C: rounded pill, surfaceHi background, Accent cursor, no underline.
                 TextField(
                     value = query,
                     onValueChange = onQueryChange,
@@ -427,112 +504,508 @@ private fun AppDrawerContent(
             val searching = query.isNotBlank()
             var gridWidthPx by remember { mutableStateOf(0) }
             val density = LocalDensity.current
-            // Icon size derived from the column width so 6–7 columns fit a narrow screen (the fixed
-            // 56dp default bled into neighbouring cells there). 56dp until the grid is measured.
             val drawerIconSize = if (gridWidthPx > 0 && columns > 0) {
                 iconSizeForCell(with(density) { (gridWidthPx.toFloat() / columns).toDp() }, 56.dp)
             } else {
                 56.dp
             }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(columns),
-                state = gridState,
-                contentPadding = PaddingValues(vertical = 8.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .onSizeChanged { gridWidthPx = it.width },
-            ) {
-                if (!searching) {
-                    if (frequentApps.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }, contentType = { "frequent" }) {
-                            FrequentAppsCard(
-                                apps = frequentApps,
-                                columns = columns,
-                                badges = badges,
-                                badgeShowCount = badgeShowCount,
-                                badgeScale = badgeScale,
-                                showLabels = showLabels,
-                                iconSize = drawerIconSize,
-                                onAppClick = onAppClick,
-                                onAppLongClick = onAppLongClick,
-                            )
-                        }
-                    }
-                    items(items = folders, key = { "folder-${it.id}" }, contentType = { "folder" }) { folder ->
-                        DrawerFolderTile(
-                            folder = folder,
-                            showLabel = showLabels,
-                            tileSize = drawerIconSize,
-                            // Aggregated like the home-screen FolderIcon: members left the flat A–Z
-                            // grid, so without this their unread badges vanished from the drawer.
-                            badgeCount = folder.apps.sumOf { badges[it.badgeKey] ?: 0 },
-                            badgeShowCount = badgeShowCount,
-                            badgeScale = badgeScale,
-                            onClick = { onFolderClick(folder) },
-                        )
-                    }
-                    appCells(apps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
-                        onAppLongClick, dragController, onDragOutStart, onDropOnHome, onDropOnDock, haptics, locked)
-                } else {
-                    calc?.let { c ->
-                        item(span = { GridItemSpan(maxLineSpan) }, contentType = { "calc" }) {
-                            val copiedMsg = stringResource(R.string.search_calc_copied)
-                            CalcResultCard(c) {
-                                val clip = context.getSystemService(android.content.ClipboardManager::class.java)
-                                clip?.setPrimaryClip(android.content.ClipData.newPlainText("result", c.result))
-                                android.widget.Toast.makeText(context, copiedMsg, android.widget.Toast.LENGTH_SHORT).show()
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) {
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        if (!searching) {
+                            if (frequentApps.isNotEmpty()) {
+                                item(contentType = "frequent") {
+                                    FrequentAppsCard(
+                                        apps = frequentApps,
+                                        columns = columns,
+                                        badges = badges,
+                                        badgeShowCount = badgeShowCount,
+                                        badgeScale = badgeScale,
+                                        showLabels = showLabels,
+                                        iconSize = drawerIconSize,
+                                        onAppClick = onAppClick,
+                                        onAppLongClick = onAppLongClick,
+                                    )
+                                }
                             }
-                        }
-                    }
-                    if (apps.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }, contentType = { "header" }) {
-                            ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
-                        }
-                        appCells(apps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
-                            onAppLongClick, dragController, onDragOutStart, onDropOnHome, onDropOnDock, haptics, locked)
-                    }
-                    if (settingResults.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }, contentType = { "header" }) {
-                            ExpressiveSectionTitle(stringResource(R.string.search_section_settings))
-                        }
-                        items(items = settingResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
-                            contentType = { "setting" }) { setting ->
-                            ExpressiveActionRow(label = setting.title, description = "") {
-                                runCatching {
-                                    context.startActivity(
-                                        android.content.Intent(setting.action)
-                                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            items(items = folders, key = { "folder-${it.id}" }, contentType = { "folder" }) { folder ->
+                                DrawerFolderTile(
+                                    folder = folder,
+                                    showLabel = showLabels,
+                                    tileSize = drawerIconSize,
+                                    badgeCount = folder.apps.sumOf { badges[it.badgeKey] ?: 0 },
+                                    badgeShowCount = badgeShowCount,
+                                    badgeScale = badgeScale,
+                                    onClick = { onFolderClick(folder) },
+                                )
+                            }
+                            items(items = apps, key = { it.key }, contentType = { "app" }) { app ->
+                                AppListRow(
+                                    app = app,
+                                    badgeCount = badges[app.badgeKey] ?: 0,
+                                    badgeShowCount = badgeShowCount,
+                                    badgeScale = badgeScale,
+                                    showLabels = showLabels,
+                                    onAppClick = onAppClick,
+                                    onAppLongClick = onAppLongClick,
+                                    dragController = dragController,
+                                    onDragOutStart = onDragOutStart,
+                                    onDropOnHome = onDropOnHome,
+                                    onDropOnDock = onDropOnDock,
+                                    haptics = haptics,
+                                    locked = locked,
+                                )
+                            }
+                        } else {
+                            calc?.let { c ->
+                                item(contentType = "calc") {
+                                    val copiedMsg = stringResource(R.string.search_calc_copied)
+                                    CalcResultCard(c) {
+                                        val clip = context.getSystemService(ClipboardManager::class.java)
+                                        clip?.setPrimaryClip(ClipData.newPlainText("result", c.result))
+                                        Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                            if (apps.isNotEmpty()) {
+                                item(contentType = "header") {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
+                                }
+                                items(items = apps, key = { it.key }, contentType = { "app" }) { app ->
+                                    AppListRow(
+                                        app = app,
+                                        badgeCount = badges[app.badgeKey] ?: 0,
+                                        badgeShowCount = badgeShowCount,
+                                        badgeScale = badgeScale,
+                                        showLabels = showLabels,
+                                        onAppClick = onAppClick,
+                                        onAppLongClick = onAppLongClick,
+                                        dragController = dragController,
+                                        onDragOutStart = onDragOutStart,
+                                        onDropOnHome = onDropOnHome,
+                                        onDropOnDock = onDropOnDock,
+                                        haptics = haptics,
+                                        locked = locked,
+                                    )
+                                }
+                            }
+                            if (settingResults.isNotEmpty()) {
+                                item(contentType = "header") {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_settings))
+                                }
+                                items(items = settingResults, key = { it.id }, contentType = { "setting" }) { setting ->
+                                    ExpressiveActionRow(label = setting.title, description = "") {
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(setting.action)
+                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            if (contactResults.isNotEmpty()) {
+                                item(contentType = "header") {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_contacts))
+                                }
+                                items(items = contactResults, key = { it.id }, contentType = { "contact" }) { contact ->
+                                    ContactResultRow(contact)
+                                }
+                            }
+                            if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty()) {
+                                item(contentType = "empty") {
+                                    Text(
+                                        text = stringResource(R.string.search_no_results),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 24.dp),
                                     )
                                 }
                             }
                         }
                     }
-                    if (contactResults.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }, contentType = { "header" }) {
-                            ExpressiveSectionTitle(stringResource(R.string.search_section_contacts))
-                        }
-                        items(items = contactResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
-                            contentType = { "contact" }) { contact ->
-                            ContactResultRow(contact)
-                        }
-                    }
-                    // No app, setting, contact or calculator hit: say so — a silently empty grid
-                    // under the search box was indistinguishable from a stuck drawer.
-                    if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }, contentType = { "empty" }) {
-                            Text(
-                                text = stringResource(R.string.search_no_results),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 24.dp),
-                            )
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columns),
+                        state = gridState,
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp)
+                            .onSizeChanged { gridWidthPx = it.width },
+                    ) {
+                        if (!searching) {
+                            if (frequentApps.isNotEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }, contentType = { "frequent" }) {
+                                    FrequentAppsCard(
+                                        apps = frequentApps,
+                                        columns = columns,
+                                        badges = badges,
+                                        badgeShowCount = badgeShowCount,
+                                        badgeScale = badgeScale,
+                                        showLabels = showLabels,
+                                        iconSize = drawerIconSize,
+                                        onAppClick = onAppClick,
+                                        onAppLongClick = onAppLongClick,
+                                    )
+                                }
+                            }
+                            items(items = folders, key = { "folder-${it.id}" }, contentType = { "folder" }) { folder ->
+                                DrawerFolderTile(
+                                    folder = folder,
+                                    showLabel = showLabels,
+                                    tileSize = drawerIconSize,
+                                    badgeCount = folder.apps.sumOf { badges[it.badgeKey] ?: 0 },
+                                    badgeShowCount = badgeShowCount,
+                                    badgeScale = badgeScale,
+                                    onClick = { onFolderClick(folder) },
+                                )
+                            }
+                            appCells(apps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
+                                onAppLongClick, dragController, onDragOutStart, onDropOnHome, onDropOnDock, haptics, locked)
+                        } else {
+                            calc?.let { c ->
+                                item(span = { GridItemSpan(maxLineSpan) }, contentType = { "calc" }) {
+                                    val copiedMsg = stringResource(R.string.search_calc_copied)
+                                    CalcResultCard(c) {
+                                        val clip = context.getSystemService(ClipboardManager::class.java)
+                                        clip?.setPrimaryClip(ClipData.newPlainText("result", c.result))
+                                        Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                            if (apps.isNotEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }, contentType = { "header" }) {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
+                                }
+                                appCells(apps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
+                                    onAppLongClick, dragController, onDragOutStart, onDropOnHome, onDropOnDock, haptics, locked)
+                            }
+                            if (settingResults.isNotEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }, contentType = { "header" }) {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_settings))
+                                }
+                                items(items = settingResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
+                                    contentType = { "setting" }) { setting ->
+                                    ExpressiveActionRow(label = setting.title, description = "") {
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(setting.action)
+                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            if (contactResults.isNotEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }, contentType = { "header" }) {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_contacts))
+                                }
+                                items(items = contactResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
+                                    contentType = { "contact" }) { contact ->
+                                    ContactResultRow(contact)
+                                }
+                            }
+                            if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }, contentType = { "empty" }) {
+                                    Text(
+                                        text = stringResource(R.string.search_no_results),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 24.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
+
+                if (drawerIndexBarEnabled && !searching) {
+                    val coroutineScope = rememberCoroutineScope()
+                    val alignModifier = when (azIndexPosition) {
+                        LauncherSettings.AZ_POSITION_VERTICAL_LEFT -> Modifier.align(Alignment.CenterStart)
+                        LauncherSettings.AZ_POSITION_HORIZONTAL_TOP -> Modifier.align(Alignment.TopCenter)
+                        LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM -> Modifier.align(Alignment.BottomCenter)
+                        else -> Modifier.align(Alignment.CenterEnd)
+                    }
+                    DrawerIndexBar(
+                        position = azIndexPosition,
+                        onLetterSelected = { char ->
+                            val headerOffset = (if (frequentApps.isNotEmpty()) 1 else 0) + folders.size
+                            val matchIdx = if (char == '#') {
+                                0
+                            } else {
+                                apps.indexOfFirst {
+                                    val firstChar = it.label.firstOrNull()?.uppercaseChar() ?: ' '
+                                    firstChar >= char
+                                }.coerceAtLeast(0)
+                            }
+                            val targetIndex = (headerOffset + matchIdx).coerceIn(0, (headerOffset + apps.size).coerceAtLeast(0))
+                            coroutineScope.launch {
+                                if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) {
+                                    listState.scrollToItem(targetIndex)
+                                } else {
+                                    gridState.scrollToItem(targetIndex)
+                                }
+                            }
+                        },
+                        modifier = alignModifier,
+                    )
+                }
             }
+        }
+    }
+}
+}
+
+@Composable
+private fun DrawerIndexBar(
+    position: String,
+    onLetterSelected: (Char) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val alphabet = remember { listOf('#') + ('A'..'Z').toList() }
+    var selectedLetter by remember { mutableStateOf<Char?>(null) }
+    var barSize by remember { mutableStateOf(IntSize.Zero) }
+
+    fun updateSelection(offset: Offset) {
+        val count = alphabet.size
+        val isVertical = position == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || position == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
+        val fraction = if (isVertical) {
+            if (barSize.height > 0) (offset.y / barSize.height).coerceIn(0f, 1f) else 0f
+        } else {
+            if (barSize.width > 0) (offset.x / barSize.width).coerceIn(0f, 1f) else 0f
+        }
+        val idx = (fraction * count).toInt().coerceIn(0, count - 1)
+        val char = alphabet[idx]
+        if (selectedLetter != char) {
+            selectedLetter = char
+            onLetterSelected(char)
+        }
+    }
+
+    Box(modifier = modifier) {
+        val isVertical = position == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || position == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
+        if (isVertical) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(vertical = 12.dp, horizontal = 4.dp)
+                    .onSizeChanged { barSize = it }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = { offset ->
+                                updateSelection(offset)
+                                tryAwaitRelease()
+                                selectedLetter = null
+                            },
+                        )
+                    }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { offset -> updateSelection(offset) },
+                            onDragEnd = { selectedLetter = null },
+                            onDragCancel = { selectedLetter = null },
+                            onDrag = { change, _ -> updateSelection(change.position) },
+                        )
+                    },
+                verticalArrangement = Arrangement.SpaceEvenly,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                alphabet.forEach { char ->
+                    Text(
+                        text = char.toString(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = if (selectedLetter == char) FontWeight.ExtraBold else FontWeight.Medium,
+                        ),
+                        color = if (selectedLetter == char) Accent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .onSizeChanged { barSize = it }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = { offset ->
+                                updateSelection(offset)
+                                tryAwaitRelease()
+                                selectedLetter = null
+                            },
+                        )
+                    }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { offset -> updateSelection(offset) },
+                            onDragEnd = { selectedLetter = null },
+                            onDragCancel = { selectedLetter = null },
+                            onDrag = { change, _ -> updateSelection(change.position) },
+                        )
+                    },
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                alphabet.forEach { char ->
+                    Text(
+                        text = char.toString(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = if (selectedLetter == char) FontWeight.ExtraBold else FontWeight.Medium,
+                        ),
+                        color = if (selectedLetter == char) Accent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
+            }
+        }
+
+        selectedLetter?.let { letter ->
+            Surface(
+                shape = CircleShape,
+                color = Accent,
+                contentColor = Color.White,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .size(48.dp)
+                    .align(Alignment.Center),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = letter.toString(),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppListRow(
+    app: AppItem,
+    badgeCount: Int,
+    badgeShowCount: Boolean,
+    badgeScale: Float,
+    showLabels: Boolean,
+    onAppClick: (AppItem) -> Unit,
+    onAppLongClick: (AppItem, Rect) -> Unit,
+    dragController: HomeDragController,
+    onDragOutStart: () -> Unit,
+    onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
+    onDropOnDock: (AppItem) -> Unit,
+    haptics: HapticFeedback,
+    locked: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { bounds = it.boundsInRoot() }
+            .pointerInput(app.key, locked) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val slop = viewConfiguration.touchSlop
+                    var outcome = 0
+                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            val c = ev.changes.firstOrNull { it.id == down.id }
+                            if (c == null) {
+                                outcome = 2
+                                return@withTimeoutOrNull
+                            }
+                            if (!c.pressed) {
+                                outcome = 1
+                                return@withTimeoutOrNull
+                            }
+                            if (c.isConsumed || (c.position - down.position).getDistance() > slop) {
+                                outcome = 2
+                                return@withTimeoutOrNull
+                            }
+                        }
+                    }
+                    when (outcome) {
+                        1 -> {
+                            onAppClick(app)
+                            return@awaitEachGesture
+                        }
+                        2 -> return@awaitEachGesture
+                    }
+                    if (locked) return@awaitEachGesture
+                    dragController.start(app, DragSource.Drawer, bounds.topLeft + down.position)
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    try {
+                        val completed = drag(down.id) { change ->
+                            change.consume()
+                            if (!dragController.moving && (change.position - down.position).getDistance() > slop) {
+                                dragController.beginMove()
+                                onDragOutStart()
+                            }
+                            if (dragController.moving) {
+                                dragController.update(bounds.topLeft + change.position)
+                            }
+                        }
+                        if (completed && dragController.moving) {
+                            val root = dragController.rootPosition
+                            when {
+                                dragController.isOverDock(root) && dragController.dockHasSpace ->
+                                    onDropOnDock(app)
+                                dragController.isOverGrid(root) -> {
+                                    val (page, cx, cy) = dragController.cellAt(root)
+                                    onDropOnHome(app, page, cx, cy)
+                                }
+                            }
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        } else if (completed) {
+                            onAppLongClick(app, bounds)
+                        }
+                    } finally {
+                        dragController.stop()
+                    }
+                }
+            }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppIcon(
+            appItem = app,
+            labelColor = Color.Transparent,
+            showLabel = false,
+            iconSize = 44.dp,
+            badgeCount = badgeCount,
+            badgeShowCount = badgeShowCount,
+            badgeScale = badgeScale,
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = app.label,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = LocalAppLabelLines.current,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = app.packageName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -574,6 +1047,7 @@ private fun DrawerFolderTile(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .aquamorphicTouch()
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {

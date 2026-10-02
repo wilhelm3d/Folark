@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -20,7 +21,7 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "home_items",
-    indices = [Index(value = ["containerId", "page", "cellX", "cellY"], unique = true)],
+    indices = [Index(value = ["screenType", "containerId", "page", "cellX", "cellY"], unique = true)],
 )
 data class HomeItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -42,6 +43,8 @@ data class HomeItemEntity(
     val widgetProvider: String? = null,
     /** Non-null → a built-in launcher widget (see [BUILTIN_SMARTSPACE]) occupying spanX×spanY cells. */
     val builtinType: String? = null,
+    /** Whether this item is on the OUTER or INNER screen. Defaults to OUTER for backwards compatibility. */
+    @ColumnInfo(defaultValue = "OUTER") val screenType: String = "OUTER",
 ) {
     /** Matches AppItem.key so app entities can be resolved against the live app list. */
     val key: String get() = "$packageName/$className/$userSerial"
@@ -73,5 +76,17 @@ data class HomeItemEntity(
 
         /** [builtinType] of the people widget (conversations grouped by person, as quiet tiles). */
         const val BUILTIN_PEOPLE = "people"
+
+        /** [builtinType] of the Nothing OS Dot-Matrix clock widget. */
+        const val BUILTIN_NOTHING_CLOCK = "nothing_clock"
+
+        /** [builtinType] of the Samsung One UI weather & briefing card widget. */
+        const val BUILTIN_SAMSUNG_WEATHER = "samsung_weather"
+
+        /** [builtinType] of the Samsung One UI briefing card notification widget. */
+        const val BUILTIN_NOTIFICATION_WIDGET = "notification_widget"
+
+        /** [builtinType] of the Pro Interactive Notification List Widget. */
+        const val BUILTIN_INTERACTIVE_NOTIFICATIONS = "interactive_notifications"
     }
 }

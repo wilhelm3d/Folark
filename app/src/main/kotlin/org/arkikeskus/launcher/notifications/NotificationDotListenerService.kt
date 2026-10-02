@@ -42,6 +42,7 @@ import org.arkikeskus.launcher.data.PersonEventKind
 import org.arkikeskus.launcher.data.ReplyAction
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.StatusNotification
+import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 
 /**
@@ -149,6 +150,13 @@ class NotificationDotListenerService : NotificationListenerService() {
         connected = true
         settingsReady = false
         badgeRepository.registerCanceller { key -> runCatching { cancelNotification(key) } }
+        badgeRepository.registerAllCanceller { excludeKeys -> 
+            runCatching {
+                val activeKeys = activeNotifications.map { it.key }
+                val toCancel = activeKeys.filter { it !in excludeKeys }
+                toCancel.forEach { cancelNotification(it) }
+            }
+        }
         if (!receiverRegistered) {
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_PACKAGE_ADDED)
@@ -174,7 +182,7 @@ class NotificationDotListenerService : NotificationListenerService() {
                 heldLoaded = true
             }
             combine(
-                settingsRepository.settings, settingsRepository.pinnedPeople, settingsRepository.peopleAliases,
+                settingsRepository.settings(ScreenType.OUTER), settingsRepository.pinnedPeople, settingsRepository.peopleAliases,
             ) { s, pinned, aliases ->
                 val pins = pinned.map { it.key }.toSet()
                 Triple(s.peopleBatchEnabled, BatchSchedule.parse(s.peopleBatchTimes), pins + aliases.filterValues { it in pins }.keys)
@@ -198,8 +206,10 @@ class NotificationDotListenerService : NotificationListenerService() {
         settingsJob?.cancel()
         settingsJob = null
         badgeRepository.clearCanceller()
+        badgeRepository.clearAllCanceller()
         badgeRepository.setBadges(emptyMap())
         badgeRepository.setIcons(emptyList())
+        badgeRepository.setAllNotifications(emptyList())
         badgeRepository.setPeople(emptyList())
         alertedKeys.clear()
         // Aggressive OEM battery managers (Samsung, Xiaomi, …) can unbind the listener; ask the system
@@ -265,6 +275,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         val iconCounts = HashMap<String, Int>()
         val visual = LinkedHashMap<String, StatusNotification>()
         val openable = HashMap<String, StatusNotification>()
+        val allNotifs = ArrayList<StatusNotification>()
         val people = ArrayList<PersonEntry>()
         val now = System.currentTimeMillis()
         val activeKeys = active.filterNotNull().map { it.key }.toSet()
@@ -300,6 +311,11 @@ class NotificationDotListenerService : NotificationListenerService() {
                 val smallIcon = sbn.notification?.smallIcon ?: continue
                 iconCounts[key] = (iconCounts[key] ?: 0) + 1
                 val flags = sbn.notification?.flags ?: 0
+                val extras = sbn.notification?.extras
+                val title = extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+                val text = extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+                val color = if (sbn.notification?.color != Notification.COLOR_DEFAULT) sbn.notification?.color else null
+                val actions = sbn.notification?.actions?.toList() ?: emptyList()
                 val entry = StatusNotification(
                     key = sbn.key,
                     packageName = sbn.packageName,
@@ -308,9 +324,22 @@ class NotificationDotListenerService : NotificationListenerService() {
                     userSerial = serial,
                     contentIntent = sbn.notification?.contentIntent,
                     autoCancel = (flags and Notification.FLAG_AUTO_CANCEL) != 0,
-                    preferSmallIcon = sbn.notification?.extras
-                        ?.getBoolean(Notification.EXTRA_PREFER_SMALL_ICON) == true,
+                    preferSmallIcon = extras?.getBoolean(Notification.EXTRA_PREFER_SMALL_ICON) == true,
+                    title = title,
+                    text = text,
+                    color = color,
+                    actions = actions,
                 )
+                
+                val isSilent = if (ranking != null && ranking.getRanking(sbn.key, tmp)) {
+                    tmp.importance < NotificationManager.IMPORTANCE_DEFAULT
+                } else false
+                val isOngoing = sbn.isOngoing
+
+                if (!isSilent && !isOngoing) {
+                    allNotifs.add(entry)
+                }
+
                 val curVisual = visual[key]
                 if (curVisual == null || sbn.postTime > curVisual.postTime) visual[key] = entry
                 if (entry.contentIntent != null) {
@@ -334,6 +363,7 @@ class NotificationDotListenerService : NotificationListenerService() {
                 )
             }.sortedByDescending { it.postTime },
         )
+        badgeRepository.setAllNotifications(allNotifs.sortedByDescending { it.postTime })
         // Migration: earlier betas snoozed in Android. Those existing snoozes cannot be released
         // through the public listener API; keep showing them until Android delivers them.
         if (heldUntil.isNotEmpty()) {

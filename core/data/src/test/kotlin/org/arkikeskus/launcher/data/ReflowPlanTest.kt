@@ -90,4 +90,13 @@ class ReflowPlanTest {
         assertThat(Triple(second.page, second.cellX, second.cellY)).isEqualTo(Triple(0, 1, 0))
         assertNoOverlaps(plan)
     }
+
+    @Test
+    fun `reflows 8x8 grid correctly without overlaps`() {
+        val items = (1L..65L).map { app(it) } // 8x8 = 64 slots on page 0, 65th on page 1
+        val plan = HomeLayoutRepository.reflowPlan(items, columns = 8, gridRows = 8)
+        assertThat(plan.count { it.page == 0 }).isEqualTo(64)
+        assertThat(plan.last().page).isEqualTo(1)
+        assertNoOverlaps(plan)
+    }
 }

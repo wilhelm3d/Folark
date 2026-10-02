@@ -11,5 +11,14 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:ui"))
-    implementation(project(":feature:backup"))
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.google.truth)
+    testImplementation(libs.androidx.datastore.preferences)
+    testImplementation(libs.androidx.test.core.ktx)
+    testImplementation(libs.androidx.room.runtime)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.coil.core)
 }

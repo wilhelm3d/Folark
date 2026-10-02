@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.IconEpochs
 import javax.inject.Inject
 import javax.inject.Provider
@@ -81,6 +82,13 @@ class LauncherAppsSource @Inject constructor(
         return installVerdict(runCatching { um.getUserForSerialNumber(userSerial) }) { user ->
             runCatching { launcherApps.getApplicationInfo(packageName, 0, user) }
         }
+    }
+
+    /** Forces global icon epoch bump, clears icon pack and Coil memory caches. */
+    fun invalidateCachesAndReload() {
+        _iconEpochs.update { it.bumpGlobal() }
+        iconPacks.clearCache()
+        runCatching { imageLoader.get().memoryCache?.clear() }
     }
 
     fun appsFlow(): Flow<List<AppItem>> = callbackFlow {
@@ -160,6 +168,14 @@ class LauncherAppsSource @Inject constructor(
      */
     fun launch(appItem: AppItem): Result<Unit> = runCatching {
         launcherApps.startMainActivity(appItem.componentName, appItem.user, null, null)
+    }
+
+    fun launchAppPair(pair: AppPair): Result<Unit> = runCatching {
+        val um = context.getSystemService(UserManager::class.java)
+        val user1 = um?.getUserForSerialNumber(pair.app1UserSerial) ?: Process.myUserHandle()
+        val user2 = um?.getUserForSerialNumber(pair.app2UserSerial) ?: Process.myUserHandle()
+        launcherApps.startMainActivity(pair.app1ComponentName, user1, null, null)
+        launcherApps.startMainActivity(pair.app2ComponentName, user2, null, null)
     }
 
     /**

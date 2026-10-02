@@ -42,6 +42,7 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.ui.DragSource
 import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.aquamorphicTouch
 import org.arkikeskus.launcher.ui.component.iconSizeForCell
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
@@ -131,6 +132,7 @@ fun Dock(
                         // Hide the in-dock copy only once it's moving; HomeScreen draws the floating
                         // copy. While merely lifted (menu showing) it stays visible.
                         .graphicsLayer { alpha = if (isDragging && dragController.moving) 0f else 1f }
+                        .aquamorphicTouch()
                         // One unified gesture (like Workspace): quick tap launches; a still long-press
                         // lifts → drag (reorder / drop onto home) or, with no movement, opens the menu.
                         // A single detector avoids the tap-vs-long-press conflict that fired both.

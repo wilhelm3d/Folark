@@ -7,6 +7,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 /**
@@ -17,13 +18,30 @@ import androidx.compose.ui.platform.LocalContext
 fun LauncherTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    amoledDark: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        darkTheme -> DarkColorScheme
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val base = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (darkTheme && amoledDark) {
+                base.copy(
+                    background = Color.Black,
+                    surface = Color.Black,
+                )
+            } else base
+        }
+        darkTheme -> {
+            if (amoledDark) {
+                DarkColorScheme.copy(
+                    background = Color.Black,
+                    surface = Color.Black,
+                )
+            } else {
+                DarkColorScheme
+            }
+        }
         else -> LightColorScheme
     }
     val launcherColors = if (darkTheme) DarkLauncherColors else LightLauncherColors

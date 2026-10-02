@@ -17,6 +17,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -27,14 +31,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -47,6 +57,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -91,12 +102,16 @@ import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.LauncherIcons
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.AppLabel
+import org.arkikeskus.launcher.ui.component.aquamorphicTouch
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
 import org.arkikeskus.launcher.ui.component.iconSizeForCell
 import org.arkikeskus.launcher.ui.component.labelBlockHeight
 import org.arkikeskus.launcher.ui.component.labelFontFactor
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -126,8 +141,12 @@ fun Workspace(
     badgeScale: Float,
     showLabels: Boolean,
     labelColor: Color = Color.White,
+    glassBlurRadius: Float = 25f,
+    glassDarkTint: Float = 0.45f,
     showPageIndicator: Boolean,
     locked: Boolean,
+    isDualPage: Boolean = false,
+    pageBounceEnabled: Boolean = true,
     homeSignals: Flow<Boolean>,
     /** The page HOME returns to and the launcher opens on; null until settings have been read. */
     homePage: Int? = null,
@@ -335,7 +354,6 @@ fun Workspace(
     } else {
         52.dp
     }
-    val moveThresholdPx = with(density) { 16.dp.toPx() }
     // Page flips only when the dragged icon is pushed right against the screen edge.
     val edgePx = with(density) { 20.dp.toPx() }
 
@@ -601,16 +619,17 @@ fun Workspace(
     }
 
     // Publish the grid metrics so a dock→home drop can map the finger's root position to a cell.
-    LaunchedEffect(columns, rows) {
+    LaunchedEffect(columns, rows, isDualPage) {
         dragController.columns = columns
         dragController.rows = rows
+        dragController.isDualPage = isDualPage
     }
-    LaunchedEffect(pagerState, pageCount) {
+    LaunchedEffect(pagerState, pageCount, isDualPage) {
         // Allow the always-present trailing page (index == pageCount) so a drawer/dock drop can land on
         // a BRAND-NEW page. Clamping to pageCount-1 made cellAt() report the last existing page, so an
         // app dragged from the drawer onto a new page always saved to the front page instead.
         snapshotFlow { pagerState.currentPage }
-            .collect { dragController.currentPage = it.coerceIn(0, pageCount) }
+            .collect { dragController.currentPage = if (isDualPage) it * 2 else it.coerceIn(0, pageCount) }
     }
     // Cross-page flip for a drawer→home / dock→home drag. The in-home icon and folder/shortcut drags
     // run their own edge-flip (they own grid-local coords); a drawer/dock drag is owned by another
@@ -636,6 +655,35 @@ fun Workspace(
         }
     }
 
+    val overscrollPx by remember {
+        derivedStateOf {
+            if (!pageBounceEnabled || pagerState.pageCount <= 0) 0f
+            else {
+                val currentPage = pagerState.currentPage
+                val offset = pagerState.currentPageOffsetFraction
+                val totalPages = pagerState.pageCount
+                when {
+                    currentPage == 0 && offset < 0f -> {
+                        (-offset * 160f).coerceAtMost(60f)
+                    }
+                    currentPage == totalPages - 1 && offset > 0f -> {
+                        (-offset * 160f).coerceAtLeast(-60f)
+                    }
+                    else -> 0f
+                }
+            }
+        }
+    }
+
+    val animatedOverscrollPx by animateFloatAsState(
+        targetValue = overscrollPx,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "workspace_page_bounce",
+    )
+
     Box(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             HorizontalPager(
@@ -652,12 +700,17 @@ fun Workspace(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        compositingStrategy = CompositingStrategy.Offscreen
+                        translationX = animatedOverscrollPx
+                    }
                     .onSizeChanged { gridSize = it }
                     .onGloballyPositioned { dragController.gridBounds = it.boundsInRoot() },
             ) { page ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                         // Drop placeholder, drawn (not composed) so moving it across cells during a
                         // drag never triggers recomposition — keeps the drag smooth.
                         .drawBehind {
@@ -784,6 +837,7 @@ fun Workspace(
                                         .graphicsLayer {
                                             alpha = if ((draggingLocal as? PlacedFolder)?.id == entry.id && localMoving) 0f else 1f
                                         }
+                                        .aquamorphicTouch()
                                         .localEntryDrag(
                                             entry = entry,
                                             rowId = entry.id,
@@ -803,6 +857,8 @@ fun Workspace(
                                         badgeScale = badgeScale,
                                         labelColor = labelColor,
                                         size = cellIconSize,
+                                        glassBlurRadius = glassBlurRadius,
+                                        glassDarkTint = glassDarkTint,
                                     )
                                 }
                             }
@@ -1056,6 +1112,7 @@ fun Workspace(
                                         .graphicsLayer {
                                             alpha = if ((draggingLocal as? PlacedShortcut)?.rowId == entry.rowId && localMoving) 0f else 1f
                                         }
+                                        .aquamorphicTouch()
                                         // Removable: drag up to the "Poista" zone to take it off home
                                         // (no in-place menu — the remove zone replaces it).
                                         .localEntryDrag(
@@ -1259,10 +1316,18 @@ fun Workspace(
                                         when (space.type) {
                                             HomeItemEntity.BUILTIN_NOTIFICATIONS ->
                                                 NotificationsWidget(modifier = Modifier.fillMaxSize())
+                                            HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET ->
+                                                SamsungNotificationWidget(modifier = Modifier.fillMaxSize())
                                             HomeItemEntity.BUILTIN_BATTERY ->
                                                 BatteryWidget(modifier = Modifier.fillMaxSize())
                                             HomeItemEntity.BUILTIN_PEOPLE ->
                                                 PeopleWidget(modifier = Modifier.fillMaxSize())
+                                            HomeItemEntity.BUILTIN_NOTHING_CLOCK ->
+                                                NothingClockWidget(modifier = Modifier.fillMaxSize())
+                                            HomeItemEntity.BUILTIN_SAMSUNG_WEATHER ->
+                                                SamsungWeatherWidget(modifier = Modifier.fillMaxSize())
+                                            HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS ->
+                                                InteractiveNotificationWidget(modifier = Modifier.fillMaxSize())
                                             else -> SmartspaceWidget(modifier = Modifier.fillMaxSize())
                                         }
                                     }
@@ -1274,30 +1339,21 @@ fun Workspace(
                     if (ew != null && ew.page == page) {
                         val ctxE = LocalContext.current
                         // A built-in widget (appWidgetId == null) has no provider info: it resizes freely
-                        // within the grid (with a sane minimum width) and has nothing to reconfigure.
+                        // within the grid (with minSpanX = 1, minSpanY = 1) and has nothing to reconfigure.
                         val info = remember(ew.appWidgetId) {
                             ew.appWidgetId?.let { AppWidgetManager.getInstance(ctxE).getAppWidgetInfo(it) }
                         }
-                        // A built-in's min/default spans depend on its type (the notifications row is
-                        // usable narrower than the smartspace clock).
-                        val builtinType = remember(ew.rowId) {
-                            if (ew.appWidgetId == null) builtins.firstOrNull { it.rowId == ew.rowId }?.type else null
-                        }
                         val range = remember(ew.rowId, columns, rows, cellW, cellH) {
                             if (ew.appWidgetId == null) {
-                                val minSpanX = when (builtinType) {
-                                    HomeItemEntity.BUILTIN_NOTIFICATIONS -> NOTIFICATIONS_MIN_SPAN_X
-                                    HomeItemEntity.BUILTIN_BATTERY -> BATTERY_SPAN
-                                    HomeItemEntity.BUILTIN_PEOPLE -> PEOPLE_MIN_SPAN_X
-                                    else -> SMARTSPACE_MIN_SPAN_X
-                                }
                                 WidgetResizeRange(
-                                    minX = minSpanX.coerceAtMost(columns), minY = 1,
+                                    minX = 1, minY = 1,
                                     maxX = columns, maxY = rows,
                                     horizontal = true, vertical = true,
                                 )
                             } else {
-                                info?.let { widgetResizeRange(it, ctxE, columns, rows, cellW / density.density, cellH / density.density) }?.takeIf { it.isResizable }
+                                info?.let { widgetResizeRange(it, ctxE, columns, rows, cellW / density.density, cellH / density.density) }
+                                    ?.copy(minX = 1, minY = 1)
+                                    ?.takeIf { it.isResizable }
                             }
                         }
                         val reconfigurable = remember(ew.appWidgetId) { info?.let { isReconfigurableWidget(it) } ?: false }
@@ -1379,11 +1435,12 @@ fun Workspace(
                 }
             }
 
-            if (showPageIndicator && pageCount > 1) {
+            val indicatorCount = if (isDualPage) ((pageCount + 1) / 2).coerceAtLeast(1) else pageCount
+            if (showPageIndicator && indicatorCount > 1) {
                 PageDots(
-                    count = pageCount,
+                    count = indicatorCount,
                     current = pagerState.currentPage,
-                    home = homeIndex,
+                    home = if (isDualPage) homeIndex / 2 else homeIndex,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
@@ -1422,6 +1479,8 @@ fun Workspace(
                         badgeScale = badgeScale,
                         labelColor = labelColor,
                         size = cellIconSize,
+                        glassBlurRadius = glassBlurRadius,
+                        glassDarkTint = glassDarkTint,
                     )
                     is PlacedShortcut -> ShortcutIconContent(dl, showLabels, labelColor, cellIconSize)
                     else -> Unit
@@ -1433,9 +1492,8 @@ fun Workspace(
 
 /** Launcher3-style widget edit frame: a touch-consuming scrim (so the resize gesture can't leak into
  *  the drawer swipe-up or page scroll), a body-drag layer (move within the page, or drop on the top
- *  Remove pill to delete), a border, edge handles on the resizable axes (each edge moves, opposite edge
- *  fixed, 0.66-cell hysteresis snap, clamped to provider min/max + grid + a free-rect check, committed
- *  on release), and a gear (reconfigure) button. */
+ *  Remove pill to delete), a border with glowing accent stroke (1.5.dp), animated drag handle pills/dots
+ *  on resizable axes and corners, a floating dimension chip above the widget, and a gear (reconfigure) button. */
 @Composable
 private fun WidgetEditOverlay(
     widget: EditingItem,
@@ -1459,20 +1517,15 @@ private fun WidgetEditOverlay(
     canMoveNext: Boolean,
     onMoveToPage: (targetPage: Int, spanX: Int, spanY: Int) -> Unit,
 ) {
-    var cx by remember(widget.rowId) { mutableStateOf(widget.cellX) }
-    var cy by remember(widget.rowId) { mutableStateOf(widget.cellY) }
-    var sx by remember(widget.rowId) { mutableStateOf(widget.spanX) }
-    var sy by remember(widget.rowId) { mutableStateOf(widget.spanY) }
-    // Last bounds the repository ACCEPTED. A rejected commit (a collision canFit's plan couldn't
-    // foresee) resets the frame here — before this, the overlay silently kept showing the rejected
-    // geometry while the widget itself stayed put.
-    var okX by remember(widget.rowId) { mutableStateOf(widget.cellX) }
-    var okY by remember(widget.rowId) { mutableStateOf(widget.cellY) }
-    var okSx by remember(widget.rowId) { mutableStateOf(widget.spanX) }
-    var okSy by remember(widget.rowId) { mutableStateOf(widget.spanY) }
-    // The gesture blocks below are keyed on the row id, so they outlive the recompositions an edit
-    // itself causes (a resize pushes icons aside → new entries). Read the collision checks through
-    // state: the captured lambdas kept judging moves/resizes against the layout at edit-mode entry.
+    var cx by remember(widget.rowId) { mutableIntStateOf(widget.cellX) }
+    var cy by remember(widget.rowId) { mutableIntStateOf(widget.cellY) }
+    var sx by remember(widget.rowId) { mutableIntStateOf(widget.spanX) }
+    var sy by remember(widget.rowId) { mutableIntStateOf(widget.spanY) }
+    var okX by remember(widget.rowId) { mutableIntStateOf(widget.cellX) }
+    var okY by remember(widget.rowId) { mutableIntStateOf(widget.cellY) }
+    var okSx by remember(widget.rowId) { mutableIntStateOf(widget.spanX) }
+    var okSy by remember(widget.rowId) { mutableIntStateOf(widget.spanY) }
+
     val currentCanFit by rememberUpdatedState(canFit)
     var previewing by remember(widget.rowId) { mutableStateOf(false) }
     val cancelPreview by rememberUpdatedState(onCancelPreview)
@@ -1509,6 +1562,7 @@ private fun WidgetEditOverlay(
         }
     }
     val primary = MaterialTheme.colorScheme.primary
+    val borderColor = if (blocked) MaterialTheme.colorScheme.error else primary
     val handlePx = with(density) { 48.dp.toPx() }
     val widthLabel = stringResource(R.string.widget_resize_width)
     val heightLabel = stringResource(R.string.widget_resize_height)
@@ -1525,14 +1579,28 @@ private fun WidgetEditOverlay(
         return true
     }
 
-    // Scrim: consumes a tap (exit) and, by being the topmost interactive layer, keeps the resize-handle
-    // drags from ever reaching the root swipe-up detector or the pager.
+    // Scrim: consumes a tap (exit)
     Box(Modifier.fillMaxSize().pointerInput(widget.rowId) { detectTapGestures { onExit() } })
 
+    val left = cx * cellW
+    val top = cy * cellH
+    val right = (cx + sx) * cellW
+    val bottom = (cy + sy) * cellH
+
+    // Bounding Box Frame with glowing 1.5.dp accent stroke and rounded corners
     Box(
-        Modifier.offset { IntOffset((cx * cellW).roundToInt(), (cy * cellH).roundToInt()) }
+        Modifier
+            .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
             .size(with(density) { (sx * cellW).toDp() }, with(density) { (sy * cellH).toDp() })
-            .border(2.dp, if (blocked) MaterialTheme.colorScheme.error else primary, RoundedCornerShape(24.dp))
+            .drawBehind {
+                drawRoundRect(
+                    color = borderColor.copy(alpha = 0.25f),
+                    size = size,
+                    cornerRadius = CornerRadius(24.dp.toPx()),
+                    style = Stroke(width = 4.dp.toPx())
+                )
+            }
+            .border(1.5.dp, borderColor, RoundedCornerShape(24.dp))
             .semantics {
                 stateDescription = sizeLabel
                 customActions = buildList {
@@ -1550,33 +1618,87 @@ private fun WidgetEditOverlay(
                 onLift(widget.copy(cellX = cx, cellY = cy, spanX = sx, spanY = sy), root, fraction, owner)
             },
     )
+
+    // Floating cell dimension chip neatly positioned above the widget
+    val chipCenterX = (left + right) / 2f
+    val chipY = (top - with(density) { 36.dp.toPx() }).coerceAtLeast(with(density) { 8.dp.toPx() })
+    Surface(
+        modifier = Modifier
+            .offset { IntOffset((chipCenterX - with(density) { 32.dp.toPx() }).roundToInt(), chipY.roundToInt()) }
+            .shadow(6.dp, CircleShape),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, borderColor.copy(alpha = 0.4f)),
+    ) {
+        Text(
+            text = "$sx × $sy",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+
     if (range != null) {
-        val left = cx * cellW; val top = cy * cellH; val right = (cx + sx) * cellW; val bottom = (cy + sy) * cellH
-        var accX by remember(widget.rowId) { mutableStateOf(0f) }
-        var accY by remember(widget.rowId) { mutableStateOf(0f) }
-        // 0.66-cell hysteresis (Launcher3 getSpanIncrement): a step fires only past 66% of a cell.
-        fun step(acc: Float, cell: Float): Int { val f = acc / cell; return if (kotlin.math.abs(f) > 0.66f) f.roundToInt() else 0 }
-        fun hMod(centerX: Float, centerY: Float, label: String, onDrag: (Offset) -> Unit) = Modifier
-            .offset { IntOffset((centerX - handlePx / 2).roundToInt(), (centerY - handlePx / 2).roundToInt()) }
-            .size(with(density) { handlePx.toDp() })
-            .drawBehind { drawCircle(primary, radius = 7.dp.toPx()) }
-            .semantics { contentDescription = label }
-            .pointerInput(widget.rowId, cellW, cellH, range, committing) {
-                if (committing) return@pointerInput
-                detectDragGestures(
-                    onDragEnd = { accX = 0f; accY = 0f; blocked = false; commitBounds() },
-                    onDragCancel = {
-                        accX = 0f; accY = 0f; blocked = false
-                        cx = okX; cy = okY; sx = okSx; sy = okSy
-                        previewing = false
-                        cancelPreview()
+        var accX by remember(widget.rowId) { mutableFloatStateOf(0f) }
+        var accY by remember(widget.rowId) { mutableFloatStateOf(0f) }
+
+        fun step(acc: Float, cell: Float): Int {
+            val f = acc / cell
+            return if (abs(f) > 0.66f) f.roundToInt() else 0
+        }
+
+        @Composable
+        fun ResizeHandlePill(
+            centerX: Float,
+            centerY: Float,
+            label: String,
+            onDrag: (Offset) -> Unit,
+        ) {
+            var active by remember { mutableStateOf(false) }
+            val scale by animateFloatAsState(
+                targetValue = if (active) 1.35f else 1.0f,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "handlePillScale",
+            )
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset((centerX - handlePx / 2).roundToInt(), (centerY - handlePx / 2).roundToInt()) }
+                    .size(with(density) { handlePx.toDp() })
+                    .semantics { contentDescription = label }
+                    .pointerInput(widget.rowId, cellW, cellH, range, committing) {
+                        if (committing) return@pointerInput
+                        detectDragGestures(
+                            onDragStart = { active = true },
+                            onDragEnd = {
+                                active = false
+                                accX = 0f; accY = 0f; blocked = false
+                                commitBounds()
+                            },
+                            onDragCancel = {
+                                active = false
+                                accX = 0f; accY = 0f; blocked = false
+                                cx = okX; cy = okY; sx = okSx; sy = okSy
+                                previewing = false
+                                cancelPreview()
+                            },
+                        ) { ch, d -> ch.consume(); onDrag(d) }
                     },
-                ) { ch, d -> ch.consume(); onDrag(d) }
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .size(with(density) { (14.dp * scale) })
+                        .shadow(4.dp, CircleShape),
+                    shape = CircleShape,
+                    color = borderColor,
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.surface),
+                ) {}
             }
-        // Each accepted step previews the new bounds into the workspace (onPreviewBounds), so the
-        // hosted widget CONTENT resizes with the frame mid-drag instead of jumping on release.
+        }
+
+        // Edge Handles
         if (range.horizontal) {
-            Box(hMod(right, (top + bottom) / 2f, widthLabel) { d ->
+            ResizeHandlePill(right, (top + bottom) / 2f, widthLabel) { d ->
                 accX += d.x
                 val s = step(accX, cellW)
                 if (s != 0) {
@@ -1584,8 +1706,8 @@ private fun WidgetEditOverlay(
                     if (n != sx && preview(cx, cy, n, sy)) { sx = n; showPreview(cx, cy, sx, sy) }
                     accX = 0f
                 }
-            })
-            Box(hMod(left, (top + bottom) / 2f, widthLabel) { d ->
+            }
+            ResizeHandlePill(left, (top + bottom) / 2f, widthLabel) { d ->
                 accX += d.x
                 val s = step(accX, cellW)
                 if (s != 0) {
@@ -1597,10 +1719,10 @@ private fun WidgetEditOverlay(
                     }
                     accX = 0f
                 }
-            })
+            }
         }
         if (range.vertical) {
-            Box(hMod((left + right) / 2f, bottom, heightLabel) { d ->
+            ResizeHandlePill((left + right) / 2f, bottom, heightLabel) { d ->
                 accY += d.y
                 val s = step(accY, cellH)
                 if (s != 0) {
@@ -1608,8 +1730,8 @@ private fun WidgetEditOverlay(
                     if (n != sy && preview(cx, cy, sx, n)) { sy = n; showPreview(cx, cy, sx, sy) }
                     accY = 0f
                 }
-            })
-            Box(hMod((left + right) / 2f, top, heightLabel) { d ->
+            }
+            ResizeHandlePill((left + right) / 2f, top, heightLabel) { d ->
                 accY += d.y
                 val s = step(accY, cellH)
                 if (s != 0) {
@@ -1621,7 +1743,99 @@ private fun WidgetEditOverlay(
                     }
                     accY = 0f
                 }
-            })
+            }
+        }
+
+        // Corner Handles
+        if (range.horizontal && range.vertical) {
+            ResizeHandlePill(left, top, "$widthLabel $heightLabel") { d ->
+                accX += d.x; accY += d.y
+                val sxStep = step(accX, cellW)
+                val syStep = step(accY, cellH)
+                var changed = false
+                var newX = cx; var newW = sx; var newY = cy; var newH = sy
+                if (sxStep != 0) {
+                    resizeWidgetStartEdge(cx, sx, sxStep, range.minX, range.maxX)?.let { (x, width) ->
+                        newX = x; newW = width; changed = true
+                    }
+                    accX = 0f
+                }
+                if (syStep != 0) {
+                    resizeWidgetStartEdge(cy, sy, syStep, range.minY, range.maxY)?.let { (y, height) ->
+                        newY = y; newH = height; changed = true
+                    }
+                    accY = 0f
+                }
+                if (changed && preview(newX, newY, newW, newH)) {
+                    cx = newX; sx = newW; cy = newY; sy = newH
+                    showPreview(cx, cy, sx, sy)
+                }
+            }
+            ResizeHandlePill(right, top, "$widthLabel $heightLabel") { d ->
+                accX += d.x; accY += d.y
+                val sxStep = step(accX, cellW)
+                val syStep = step(accY, cellH)
+                var changed = false
+                var newW = sx; var newY = cy; var newH = sy
+                if (sxStep != 0) {
+                    val n = (sx + sxStep).coerceIn(range.minX, range.maxX)
+                    if (n != sx) { newW = n; changed = true }
+                    accX = 0f
+                }
+                if (syStep != 0) {
+                    resizeWidgetStartEdge(cy, sy, syStep, range.minY, range.maxY)?.let { (y, height) ->
+                        newY = y; newH = height; changed = true
+                    }
+                    accY = 0f
+                }
+                if (changed && preview(cx, newY, newW, newH)) {
+                    sx = newW; cy = newY; sy = newH
+                    showPreview(cx, cy, sx, sy)
+                }
+            }
+            ResizeHandlePill(left, bottom, "$widthLabel $heightLabel") { d ->
+                accX += d.x; accY += d.y
+                val sxStep = step(accX, cellW)
+                val syStep = step(accY, cellH)
+                var changed = false
+                var newX = cx; var newW = sx; var newH = sy
+                if (sxStep != 0) {
+                    resizeWidgetStartEdge(cx, sx, sxStep, range.minX, range.maxX)?.let { (x, width) ->
+                        newX = x; newW = width; changed = true
+                    }
+                    accX = 0f
+                }
+                if (syStep != 0) {
+                    val n = (sy + syStep).coerceIn(range.minY, range.maxY)
+                    if (n != sy) { newH = n; changed = true }
+                    accY = 0f
+                }
+                if (changed && preview(newX, cy, newW, newH)) {
+                    cx = newX; sx = newW; sy = newH
+                    showPreview(cx, cy, sx, sy)
+                }
+            }
+            ResizeHandlePill(right, bottom, "$widthLabel $heightLabel") { d ->
+                accX += d.x; accY += d.y
+                val sxStep = step(accX, cellW)
+                val syStep = step(accY, cellH)
+                var changed = false
+                var newW = sx; var newH = sy
+                if (sxStep != 0) {
+                    val n = (sx + sxStep).coerceIn(range.minX, range.maxX)
+                    if (n != sx) { newW = n; changed = true }
+                    accX = 0f
+                }
+                if (syStep != 0) {
+                    val n = (sy + syStep).coerceIn(range.minY, range.maxY)
+                    if (n != sy) { newH = n; changed = true }
+                    accY = 0f
+                }
+                if (changed && preview(cx, cy, newW, newH)) {
+                    sx = newW; sy = newH
+                    showPreview(cx, cy, sx, sy)
+                }
+            }
         }
     }
 
@@ -1648,8 +1862,6 @@ private fun WidgetEditOverlay(
         }
     }
 
-    // Page-move arrows (bottom-centre): move this widget to the previous / next home page (commits to
-    // the first free cell there). Placed away from the resize handles + gear so they never overlap.
     if (canMovePrev || canMoveNext) {
         val arrowY = (rows * cellH - handlePx - with(density) { 16.dp.toPx() })
         val centerX = columns * cellW / 2f

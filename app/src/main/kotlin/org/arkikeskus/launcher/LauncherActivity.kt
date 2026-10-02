@@ -2,26 +2,41 @@ package org.arkikeskus.launcher
 
 import android.appwidget.AppWidgetHost
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
 import org.arkikeskus.launcher.feature.home.APPWIDGET_HOST_ID
 import org.arkikeskus.launcher.feature.home.LocalAppWidgetHost
 import org.arkikeskus.launcher.feature.home.LocalOrphanWidgetConfigResult
 import org.arkikeskus.launcher.feature.home.LocalWidgetConfigLauncher
+import org.arkikeskus.launcher.feature.home.LockAccessibilityService
+import org.arkikeskus.launcher.launcher.system.FoldStateMonitor
+import org.arkikeskus.launcher.model.FoldState
+import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.LauncherShell
 import org.arkikeskus.launcher.ui.LauncherShellViewModel
+import org.arkikeskus.launcher.ui.component.LocalFoldState
 import org.arkikeskus.launcher.ui.component.LocalIconEpochs
+import org.arkikeskus.launcher.ui.component.LocalScreenType
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class LauncherActivity : ComponentActivity() {
@@ -39,6 +54,9 @@ class LauncherActivity : ComponentActivity() {
      *  onPause (the flag stays true until onStop). */
     private var wasForeground = false
 
+    @Inject lateinit var foldStateMonitor: FoldStateMonitor
+    @Inject lateinit var settingsRepository: SettingsRepository
+
     // Use the Activity context (not applicationContext) for the host — Launcher3 does the same; a
     // collection widget's RemoteViewsAdapter and the host's listener callbacks register against this.
     private val appWidgetHost by lazy { AppWidgetHost(this, APPWIDGET_HOST_ID) }
@@ -47,21 +65,91 @@ class LauncherActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val initBounds = windowManager.currentWindowMetrics.bounds
+        val initMaxDim = maxOf(initBounds.width(), initBounds.height())
+        val initIsInner = foldStateMonitor.isInnerDisplay(this)
+        Log.d(
+            "FolarkFoldDiagnostics",
+            "LauncherActivity onCreate: bounds=${initBounds.width()}x${initBounds.height()}, maxDimension=$initMaxDim, isInnerDisplay=$initIsInner"
+        )
+        runCatching {
+            val lp = window.attributes
+            runCatching {
+                val fieldMax = lp.javaClass.getField("preferredMaxDisplayRefreshRate")
+                fieldMax.setFloat(lp, 165f)
+            }
+            runCatching {
+                val fieldMin = lp.javaClass.getField("preferredMinDisplayRefreshRate")
+                fieldMin.setFloat(lp, 120f)
+            }
+            window.attributes = lp
+        }
+        runCatching {
+            window.setSustainedPerformanceMode(true)
+        }
         setContent {
-            LauncherTheme {
-                // Icon re-fetch epochs above EVERY icon surface (home, dock, drawer, folder sheets):
-                // a package update bumps its epoch, which re-keys and re-fetches that icon everywhere
-                // — including AsyncImages already on screen, which only re-load on a model change.
+            val foldState by foldStateMonitor.foldStateFlow(this, lifecycleScope).collectAsStateWithLifecycle()
+            val screenType = foldState.screenType
+            val settings by settingsRepository.settings(screenType).collectAsStateWithLifecycle(initialValue = LauncherSettings())
+
+            val bounds = windowManager.currentWindowMetrics.bounds
+            val maxDimension = maxOf(bounds.width(), bounds.height())
+            val isInner = foldStateMonitor.isInnerDisplay(this)
+            Log.d(
+                "FolarkFoldDiagnostics",
+                "LauncherActivity setContent: bounds=${bounds.width()}x${bounds.height()}, maxDimension=$maxDimension, isInnerDisplay=$isInner, foldState=$foldState, screenType=$screenType"
+            )
+
+            var previousFoldState by remember { mutableStateOf(foldState) }
+            LaunchedEffect(foldState) {
+                val currentBounds = windowManager.currentWindowMetrics.bounds
+                val maxDim = maxOf(currentBounds.width(), currentBounds.height())
+                val isInnerDisp = foldStateMonitor.isInnerDisplay(this@LauncherActivity)
+                Log.d(
+                    "FolarkFoldDiagnostics",
+                    "LauncherActivity LaunchedEffect(foldState): bounds=${currentBounds.width()}x${currentBounds.height()}, maxDimension=$maxDim, isInnerDisplay=$isInnerDisp, foldState=$foldState, screenType=${foldState.screenType}"
+                )
+                if (previousFoldState != foldState) {
+                    val wasClosed = previousFoldState == FoldState.CLOSED
+                    val isNowClosed = foldState == FoldState.CLOSED
+                    if (wasClosed && !isNowClosed) {
+                        when (settings.unfoldAction) {
+                            LauncherSettings.ACTION_SEARCH -> {}
+                            LauncherSettings.ACTION_DRAWER -> {}
+                        }
+                    } else if (!wasClosed && isNowClosed) {
+                        when (settings.foldAction) {
+                            LauncherSettings.ACTION_PAGE_0 -> {}
+                            LauncherSettings.ACTION_LOCK -> {
+                                runCatching { LockAccessibilityService.lock() }
+                            }
+                        }
+                    }
+                    previousFoldState = foldState
+                }
+            }
+
+            LaunchedEffect(settings.allowLandscape) {
+                requestedOrientation = if (settings.allowLandscape) {
+                    ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                }
+            }
+
+            LauncherTheme(amoledDark = settings.amoledDark) {
                 val iconEpochs by hiltViewModel<LauncherShellViewModel>().iconEpochs.collectAsStateWithLifecycle()
                 CompositionLocalProvider(
                     LocalAppWidgetHost provides appWidgetHost,
                     LocalWidgetConfigLauncher provides ::startWidgetConfig,
                     LocalOrphanWidgetConfigResult provides orphanConfigResult,
                     LocalIconEpochs provides iconEpochs,
+                    LocalScreenType provides foldState.screenType,
+                    LocalFoldState provides foldState,
                 ) {
                     LauncherShell(
                         homeSignals = homeSignals,
-                        onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
+                        onOpenSettings = { startActivity(Intent(this@LauncherActivity, SettingsActivity::class.java)) },
                     )
                 }
             }
@@ -96,7 +184,7 @@ class LauncherActivity : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == WIDGET_CONFIG_REQUEST) {
-            val ok = resultCode == android.app.Activity.RESULT_OK
+            val ok = resultCode == RESULT_OK
             val cb = pendingConfigCallback
             pendingConfigCallback = null
             if (cb != null) cb(ok) else orphanConfigResult.value = ok

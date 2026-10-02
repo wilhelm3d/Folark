@@ -8,7 +8,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.IconEpochs
 import org.arkikeskus.launcher.model.IconRequest
@@ -81,9 +87,31 @@ fun AppIcon(
     badgeCount: Int = 0,
     badgeShowCount: Boolean = true,
     badgeScale: Float = 1f,
+    aquamorphicTouchEnabled: Boolean = true,
+    launching: Boolean = false,
 ) {
+    var isLaunchingLocal by remember { mutableStateOf(false) }
+    val isLaunchingEffective = launching || isLaunchingLocal
+
+    if (isLaunchingLocal) {
+        LaunchedEffect(Unit) {
+            delay(300)
+            isLaunchingLocal = false
+        }
+    }
+
     Column(
-        modifier = modifier,
+        modifier = Modifier
+            .aquamorphicTouch(
+                enabled = aquamorphicTouchEnabled,
+                onTap = {
+                    if (aquamorphicTouchEnabled) {
+                        isLaunchingLocal = true
+                    }
+                },
+            )
+            .appLaunchZoom(launching = isLaunchingEffective)
+            .then(modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(contentAlignment = Alignment.TopEnd) {

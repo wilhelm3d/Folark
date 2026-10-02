@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "b2d1305bf379b87eae92dde6feed36f9",
+    "identityHash": "fdf4ea41eeabf42b8ae6dc0261950752",
     "entities": [
       {
         "tableName": "home_items",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `containerId` INTEGER NOT NULL, `folderName` TEXT, `packageName` TEXT NOT NULL, `className` TEXT NOT NULL, `userSerial` INTEGER NOT NULL, `shortcutId` TEXT, `page` INTEGER NOT NULL, `cellX` INTEGER NOT NULL, `cellY` INTEGER NOT NULL, `spanX` INTEGER NOT NULL, `spanY` INTEGER NOT NULL, `appWidgetId` INTEGER, `widgetProvider` TEXT, `builtinType` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `containerId` INTEGER NOT NULL, `folderName` TEXT, `packageName` TEXT NOT NULL, `className` TEXT NOT NULL, `userSerial` INTEGER NOT NULL, `shortcutId` TEXT, `page` INTEGER NOT NULL, `cellX` INTEGER NOT NULL, `cellY` INTEGER NOT NULL, `spanX` INTEGER NOT NULL, `spanY` INTEGER NOT NULL, `appWidgetId` INTEGER, `widgetProvider` TEXT, `builtinType` TEXT, `screenType` TEXT NOT NULL DEFAULT 'OUTER')",
         "fields": [
           {
             "fieldPath": "id",
@@ -92,6 +92,13 @@
             "fieldPath": "builtinType",
             "columnName": "builtinType",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "screenType",
+            "columnName": "screenType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'OUTER'"
           }
         ],
         "primaryKey": {
@@ -102,23 +109,24 @@
         },
         "indices": [
           {
-            "name": "index_home_items_containerId_page_cellX_cellY",
+            "name": "index_home_items_screenType_containerId_page_cellX_cellY",
             "unique": true,
             "columnNames": [
+              "screenType",
               "containerId",
               "page",
               "cellX",
               "cellY"
             ],
             "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_home_items_containerId_page_cellX_cellY` ON `${TABLE_NAME}` (`containerId`, `page`, `cellX`, `cellY`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_home_items_screenType_containerId_page_cellX_cellY` ON `${TABLE_NAME}` (`screenType`, `containerId`, `page`, `cellX`, `cellY`)"
           }
         ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b2d1305bf379b87eae92dde6feed36f9')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fdf4ea41eeabf42b8ae6dc0261950752')"
     ]
   }
 }

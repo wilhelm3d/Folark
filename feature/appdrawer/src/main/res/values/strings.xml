@@ -9,6 +9,7 @@
     <string name="hide_app">Piilota sovellus</string>
     <string name="rename">Muokkaa nimeä</string>
     <string name="uninstall">Poista sovellus</string>
+    <string name="folder_default_name">Kansio</string>
     <string name="folder_name_label">Kansion nimi</string>
     <string name="folder_add_apps">Lisää sovelluksia</string>
     <string name="folder_delete">Poista kansio</string>

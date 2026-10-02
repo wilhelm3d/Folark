@@ -103,7 +103,7 @@ class WeatherRepository @Inject constructor(
         val version = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull() ?: "?"
-        "ARK-launcher/$version"
+        "Folark/$version"
     }
 
     private fun fetch(lat: Double, lon: Double): CurrentWeather? {

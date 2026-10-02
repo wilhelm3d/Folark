@@ -30,7 +30,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +39,7 @@ import org.arkikeskus.launcher.feature.appdrawer.AppDrawerScreen
 import org.arkikeskus.launcher.feature.home.HomeScreen
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalIconPack
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import kotlin.math.roundToInt
 
@@ -61,7 +62,15 @@ fun LauncherShell(
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val iconStyle by hiltViewModel<LauncherShellViewModel>().iconStyle.collectAsStateWithLifecycle()
+    val viewModel = hiltViewModel<LauncherShellViewModel>()
+    val screenType = LocalScreenType.current
+    LaunchedEffect(screenType) {
+        viewModel.setScreenType(screenType)
+    }
+    val iconStyle by viewModel.iconStyle.collectAsStateWithLifecycle()
+    val drawerHeightFraction by viewModel.drawerHeightFraction.collectAsStateWithLifecycle()
+    val drawerWidthFraction by viewModel.drawerWidthFraction.collectAsStateWithLifecycle()
+    val drawerAlignment by viewModel.drawerAlignment.collectAsStateWithLifecycle()
     // Bounds keep a high-initial-velocity settle (the fling-carried spring below) from overshooting
     // past the ends — an overshoot past 1 would briefly translate the drawer above the screen top.
     val progress = remember { Animatable(0f).apply { updateBounds(0f, 1f) } }
@@ -73,7 +82,7 @@ fun LauncherShell(
     // controller and the floating icon below can travel between them.
     val dragController = rememberHomeDragController()
     var isDraggingDrawer by remember { mutableStateOf(false) }
-    var dragProgress by remember { mutableStateOf(0f) }
+    var dragProgress by remember { mutableFloatStateOf(0f) }
     val currentProgress by remember {
         derivedStateOf { if (isDraggingDrawer) dragProgress else progress.value }
     }
@@ -86,7 +95,6 @@ fun LauncherShell(
     val draggingFromDrawer by remember {
         derivedStateOf { dragController.moving && dragController.source == DragSource.Drawer }
     }
-    val drawerMounted by remember { derivedStateOf { drawerOpen || draggingFromDrawer } }
     // Smoothly cross-fade the drawer out as a drag-out begins (instead of a hard cut), then reset.
     val dragOutAlpha = remember { Animatable(1f) }
     LaunchedEffect(draggingFromDrawer) {
@@ -110,8 +118,9 @@ fun LauncherShell(
             isDraggingDrawer = true
             dragProgress = progress.value
         }
+        val effectiveDrawerHeightPx = shellHeightPx.coerceAtLeast(1f)
         // Swipe up (negative dy) increases progress; clamp to [0, 1].
-        val target = (dragProgress - dyPx / shellHeightPx).coerceIn(0f, 1f)
+        val target = (dragProgress - dyPx / effectiveDrawerHeightPx).coerceIn(0f, 1f)
         dragProgress = target
         dragJob?.cancel()
         dragJob = scope.launch { progress.snapTo(target) }
@@ -120,6 +129,7 @@ fun LauncherShell(
     fun settleDrawer(velocityPxPerSec: Float) {
         val currentVal = if (isDraggingDrawer) dragProgress else progress.value
         isDraggingDrawer = false
+        val effectiveDrawerHeightPx = shellHeightPx.coerceAtLeast(1f)
         // Launcher3-style: a fling (release speed past the threshold) snaps to the direction of the
         // fling regardless of distance; otherwise settle by how far it was dragged. Velocity is px/s.
         val flingThreshold = 600f
@@ -134,7 +144,7 @@ fun LauncherShell(
             // Carry the finger's release velocity into the spring (converted to progress units/s;
             // downward px velocity = negative progress velocity). Starting the spring from rest made a
             // fling-to-close visibly hesitate before accelerating — the "drawer lags coming down" feel.
-            progress.animateTo(target, settleSpring, initialVelocity = -velocityPxPerSec / shellHeightPx)
+            progress.animateTo(target, settleSpring, initialVelocity = -velocityPxPerSec / effectiveDrawerHeightPx)
         }
     }
 
@@ -149,6 +159,7 @@ fun LauncherShell(
             .onGloballyPositioned { shellOrigin = it.positionInRoot() },
     ) {
         HomeScreen(
+            screenType = screenType,
             onOpenDrawer = { animateProgress(1f) },
             onDrawerDrag = { dragDrawer(it) },
             onDrawerSettle = { settleDrawer(it) },
@@ -175,6 +186,9 @@ fun LauncherShell(
             // scroll-to-top reset must NOT fire then — it could dispose the dragged item's node and kill
             // the in-flight gesture. It runs when the drag completes (this flips false), drawer hidden.
             drawerOpen = drawerOpen || draggingFromDrawer,
+            drawerHeightFraction = drawerHeightFraction,
+            drawerWidthFraction = drawerWidthFraction,
+            drawerAlignment = drawerAlignment,
             // First movement of a drag-out reveals home/dock to drop onto. The drawer is hidden
             // with alpha rather than translated, so its (still-mounted) gesture keeps reporting
             // accurate local coordinates; progress is snapped shut so it's closed after the drop.

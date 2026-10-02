@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.home
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,12 +20,20 @@ internal fun widgetContentColor(): Color =
 
 @Composable
 internal fun widgetSurfaceColor(): Color =
-    if (LocalTonalWidgets.current) MaterialTheme.colorScheme.surfaceContainer else Color.Black.copy(alpha = 0.30f)
+    if (LocalTonalWidgets.current) MaterialTheme.colorScheme.surfaceContainer else Color.Black.copy(alpha = 0.15f)
 
 @Composable
 internal fun WidgetSurface(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-    Surface(modifier, shape = RoundedCornerShape(24.dp),
-        color = widgetSurfaceColor(), contentColor = widgetContentColor()) {
+    Surface(
+        modifier = modifier.border(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.2f),
+            shape = RoundedCornerShape(24.dp),
+        ),
+        shape = RoundedCornerShape(24.dp),
+        color = widgetSurfaceColor(),
+        contentColor = widgetContentColor(),
+    ) {
         Box(content = content)
     }
 }

@@ -2,6 +2,7 @@ package org.arkikeskus.launcher.feature.home
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
@@ -11,17 +12,20 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.RemoteViews
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -29,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.drawable.toBitmap
@@ -38,11 +43,22 @@ import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.ui.LauncherIcons
 
-private data class WidgetGroup(val packageName: String, val label: String, val widgets: List<WidgetOption>)
-private data class WidgetOption(val choice: WidgetChoice, val label: String)
+private data class WidgetGroup(
+    val packageName: String,
+    val label: String,
+    val appIcon: Bitmap? = null,
+    val widgets: List<WidgetOption>,
+)
+
+private data class WidgetOption(
+    val choice: WidgetChoice,
+    val label: String,
+    val appIcon: Bitmap? = null,
+)
+
 private data class WidgetPreviewData(val remote: RemoteViews? = null, val bitmap: Bitmap? = null)
 
-/** Searchable preview gallery. Keep the source composed (transparent) until its pointer is released. */
+/** Searchable preview gallery with M3 Expressive layout, segmented tabs, and liquid glass cards. */
 @Composable
 fun WidgetPickerScreen(
     dragController: WidgetDragController,
@@ -56,6 +72,8 @@ fun WidgetPickerScreen(
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     var failed by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Built-in Expressive, 1 = Installed App Widgets
+
     val groups by produceState<List<WidgetGroup>?>(null, context) {
         value = withContext(Dispatchers.IO) {
             runCatching {
@@ -67,41 +85,79 @@ fun WidgetPickerScreen(
                         val label = runCatching {
                             pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
                         }.getOrDefault(pkg)
-                        WidgetGroup(pkg, label, providers.map { provider ->
-                            WidgetOption(WidgetChoice.App(provider), runCatching { provider.loadLabel(pm) }.getOrDefault(label))
-                        }.sortedBy { it.label.lowercase() })
+                        val icon = runCatching {
+                            pm.getApplicationIcon(pkg).toBitmap(96, 96)
+                        }.getOrNull()
+                        WidgetGroup(
+                            pkg,
+                            label,
+                            icon,
+                            providers.map { provider ->
+                                val widgetIcon = runCatching { provider.loadIcon(context, 0)?.toBitmap(96, 96) }.getOrNull() ?: icon
+                                WidgetOption(
+                                    WidgetChoice.App(provider),
+                                    runCatching { provider.loadLabel(pm) }.getOrDefault(label),
+                                    widgetIcon,
+                                )
+                            }.sortedBy { it.label.lowercase() },
+                        )
                     }.sortedBy { it.label.lowercase() }
             }.getOrElse { failed = true; emptyList() }
         }
     }
+
     val builtinTitle = stringResource(R.string.widget_builtin_section)
     val builtins = listOf(
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_SMARTSPACE), stringResource(R.string.smartspace_widget_name)),
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_BATTERY), stringResource(R.string.battery_widget_name)),
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_NOTIFICATIONS), stringResource(R.string.notifications_widget_name)),
+        WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET), stringResource(R.string.samsung_notification_widget_name)),
+        WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS), "Pro Interactive Notifications"),
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_PEOPLE), stringResource(R.string.people_widget_name)),
+        WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_NOTHING_CLOCK), stringResource(R.string.nothing_clock_widget_name)),
+        WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_SAMSUNG_WEATHER), stringResource(R.string.samsung_weather_widget_name)),
     )
-    val all = listOf(WidgetGroup("builtin", builtinTitle, builtins)) + groups.orEmpty()
-    val visible = all.mapNotNull { group ->
-        val widgets = if (group.label.contains(query.trim(), true)) group.widgets
-            else group.widgets.filter { it.label.contains(query.trim(), true) }
+
+    val trimmedQuery = query.trim()
+
+    val filteredBuiltins = if (trimmedQuery.isEmpty()) builtins else builtins.filter {
+        it.label.contains(trimmedQuery, ignoreCase = true)
+    }
+
+    val filteredAppGroups = groups.orEmpty().mapNotNull { group ->
+        val matchesGroup = group.label.contains(trimmedQuery, ignoreCase = true)
+        val widgets = if (matchesGroup) group.widgets else group.widgets.filter {
+            it.label.contains(trimmedQuery, ignoreCase = true)
+        }
         group.copy(widgets = widgets).takeIf { widgets.isNotEmpty() }
     }
+
     val dragging = dragController.moving
+
     Surface(
-        modifier.graphicsLayer { alpha = if (dragging) 0f else 1f },
+        modifier = modifier.graphicsLayer { alpha = if (dragging) 0f else 1f },
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.widget_picker_title), style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.weight(1f).padding(8.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.widget_picker_title),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.weight(1f),
+                )
                 IconButton(onClick = onDismiss) {
                     Icon(painterResource(LauncherIcons.Close), stringResource(R.string.widget_picker_close))
                 }
             }
+
+            // M3 Search bar for instant filtering
             OutlinedTextField(
-                value = query, onValueChange = { query = it }, singleLine = true,
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
                 placeholder = { Text(stringResource(R.string.widget_search)) },
                 leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
                 trailingIcon = if (query.isEmpty()) null else ({
@@ -109,33 +165,116 @@ fun WidgetPickerScreen(
                         Icon(painterResource(LauncherIcons.Close), stringResource(R.string.widget_search_clear))
                     }
                 }),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
             )
-            Text(stringResource(R.string.widget_picker_hint), style = MaterialTheme.typography.bodySmall,
+
+            // Segmented Category Tabs
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Surface(
+                    onClick = { selectedTab = 0 },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedTab == 0) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Box(Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Built-in Expressive",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (selectedTab == 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Surface(
+                    onClick = { selectedTab = 1 },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedTab == 1) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Box(Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Installed Apps",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (selectedTab == 1) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Text(
+                stringResource(R.string.widget_picker_hint),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp),
+            )
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 userScrollEnabled = !dragging,
             ) {
-                if (groups == null) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                if (failed) item { Text(stringResource(R.string.widget_picker_load_failed)) }
-                if (visible.isEmpty() && groups != null) item { Text(stringResource(R.string.widget_search_none)) }
-                visible.forEach { group ->
-                    item(key = "header:" + group.packageName) {
-                        Text(group.label, style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    items(group.widgets, key = {
-                        when (val choice = it.choice) {
-                            is WidgetChoice.App -> choice.provider.provider.flattenToString()
-                            is WidgetChoice.Builtin -> "builtin:" + choice.type
+                if (selectedTab == 1 && groups == null) {
+                    item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                }
+                if (failed && selectedTab == 1) {
+                    item { Text(stringResource(R.string.widget_picker_load_failed)) }
+                }
+
+                if (selectedTab == 0) {
+                    if (filteredBuiltins.isEmpty()) {
+                        item { Text(stringResource(R.string.widget_search_none)) }
+                    } else {
+                        items(filteredBuiltins, key = {
+                            when (val choice = it.choice) {
+                                is WidgetChoice.Builtin -> "builtin:" + choice.type
+                                else -> it.label
+                            }
+                        }) { option ->
+                            WidgetCard(option, groupLabel = builtinTitle, dragController, columns, rows, onPick)
                         }
-                    }) { option ->
-                        WidgetCard(option, dragController, columns, rows, onPick)
+                    }
+                } else {
+                    if (filteredAppGroups.isEmpty() && groups != null) {
+                        item { Text(stringResource(R.string.widget_search_none)) }
+                    } else {
+                        filteredAppGroups.forEach { group ->
+                            item(key = "header:" + group.packageName) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(top = 8.dp),
+                                ) {
+                                    if (group.appIcon != null) {
+                                        Image(
+                                            bitmap = group.appIcon.asImageBitmap(),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)),
+                                        )
+                                    }
+                                    Text(
+                                        group.label,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                            items(group.widgets, key = {
+                                when (val choice = it.choice) {
+                                    is WidgetChoice.App -> choice.provider.provider.flattenToString()
+                                    is WidgetChoice.Builtin -> "builtin:" + choice.type
+                                }
+                            }) { option ->
+                                WidgetCard(option, groupLabel = group.label, dragController, columns, rows, onPick)
+                            }
+                        }
                     }
                 }
             }
@@ -145,7 +284,11 @@ fun WidgetPickerScreen(
 
 @Composable
 private fun WidgetCard(
-    option: WidgetOption, controller: WidgetDragController, columns: Int, rows: Int,
+    option: WidgetOption,
+    groupLabel: String?,
+    controller: WidgetDragController,
+    columns: Int,
+    rows: Int,
     onPick: (WidgetChoice, Int, Int) -> Unit,
 ) {
     val context = LocalContext.current
@@ -154,24 +297,83 @@ private fun WidgetCard(
         is WidgetChoice.Builtin -> when (choice.type) {
             HomeItemEntity.BUILTIN_BATTERY -> 1 to 1
             HomeItemEntity.BUILTIN_NOTIFICATIONS -> columns to 1
+            HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET -> columns to 2
+            HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS -> columns to 4
             HomeItemEntity.BUILTIN_PEOPLE -> columns to PEOPLE_DEFAULT_SPAN_Y
+            HomeItemEntity.BUILTIN_NOTHING_CLOCK -> columns to 2
+            HomeItemEntity.BUILTIN_SAMSUNG_WEATHER -> columns to 2
             else -> columns to 2
         }
     }
-    // A default larger than the grid shrinks to it, as the old add path and Launcher3 do
-    // (min(span, numColumns)) — refusing it made such widgets impossible to add at all.
     val sx = defaultX.coerceIn(1, columns.coerceAtLeast(1))
     val sy = defaultY.coerceIn(1, rows.coerceAtLeast(1))
     var snapshot by remember(option.choice) { mutableStateOf<(() -> Bitmap?)?>(null) }
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (option.appIcon != null) {
+                    Image(
+                        bitmap = option.appIcon.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)),
+                    )
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_widgets),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+
+                Column(Modifier.weight(1f)) {
+                    Text(option.label, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    if (groupLabel != null && groupLabel != option.label) {
+                        Text(
+                            groupLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Text(
+                        text = "${sx}×${sy}",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
             Box(
-                // The ratio alone bounds the height. A heightIn() in front of aspectRatio() does not: a
-                // tall footprint (1×1, 3×4) measured past its slot and drew over the title row below.
                 Modifier.fillMaxWidth()
                     .aspectRatio((sx * controller.cellWidthDp / (sy * controller.cellHeightDp)).coerceIn(1.5f, 3f))
                     .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .widgetDragGesture(option.choice, true, controller) { root, fraction, owner ->
                         controller.start(WidgetDrag(null, option.choice, sx, sy, fraction, snapshot?.invoke()), root, owner)
                     },
@@ -180,15 +382,21 @@ private fun WidgetCard(
                 WidgetPreview(option.choice, Modifier.fillMaxSize().padding(12.dp),
                     sx * controller.cellWidthDp, sy * controller.cellHeightDp, onSnapshot = { snapshot = it })
             }
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(option.label, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        stringResource(R.string.widget_size, sx, sy),
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                FilledTonalButton(
+                    onClick = { onPick(option.choice, sx, sy) },
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(LauncherIcons.Add),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp).padding(end = 4.dp),
                     )
-                }
-                FilledTonalButton(onClick = { onPick(option.choice, sx, sy) }) {
                     Text(stringResource(R.string.widget_add))
                 }
             }
@@ -212,9 +420,6 @@ internal fun WidgetPreview(
                     provider.provider, provider.profile, AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN,
                 )
             }.getOrNull() else null
-            // RemoteViews(pkg, layout) resolves the package in THIS profile and throws when it is absent:
-            // a provider uninstalled since the list loaded, or any work-profile widget. Fall back to the
-            // preview image instead of taking the HOME process down.
             val remote = generated ?: if (Build.VERSION.SDK_INT >= 31 && provider.previewLayout != 0 &&
                 provider.profile == Process.myUserHandle()
             ) runCatching { RemoteViews(provider.provider.packageName, provider.previewLayout) }.getOrNull() else null
@@ -291,6 +496,22 @@ private fun BuiltinWidgetPreview(type: String, modifier: Modifier) {
                     Text(stringResource(R.string.people_widget_name), style = MaterialTheme.typography.labelMedium)
                     Text(stringResource(R.string.people_widget_desc), style = MaterialTheme.typography.bodySmall)
                 }
+                HomeItemEntity.BUILTIN_NOTHING_CLOCK -> {
+                    Text("10:42", style = MaterialTheme.typography.displayMedium)
+                    Text(stringResource(R.string.nothing_clock_widget_name), style = MaterialTheme.typography.labelMedium)
+                }
+                HomeItemEntity.BUILTIN_SAMSUNG_WEATHER -> {
+                    Text("21°C", style = MaterialTheme.typography.displayMedium)
+                    Text(stringResource(R.string.samsung_weather_widget_name), style = MaterialTheme.typography.labelMedium)
+                }
+                HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET -> {
+                    Text("Notifications", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.samsung_notification_widget_name), style = MaterialTheme.typography.labelMedium)
+                }
+                HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS -> {
+                    Text("Interactive Notifications", style = MaterialTheme.typography.titleMedium)
+                    Text("Pro Interactive Notifications", style = MaterialTheme.typography.labelMedium)
+                }
                 else -> {
                     Text("9.41", style = MaterialTheme.typography.displayMedium)
                     Text(stringResource(R.string.smartspace_widget_name), style = MaterialTheme.typography.labelMedium)
@@ -300,16 +521,7 @@ private fun BuiltinWidgetPreview(type: String, modifier: Modifier) {
     }
 }
 
-/**
- * Measure at the real home footprint, then scale into the card without clipping its text.
- *
- * The child is a provider's preview layout — foreign code rendered inside the HOME process. Guarding
- * `RemoteViews.apply` is not enough: a layout that inflates fine can still throw while measuring
- * (circular RelativeLayout rules), laying out or drawing (a hardware bitmap on a software canvas).
- * Any such failure stops rendering the child and reports [onRenderFailed] so the card falls back to
- * the preview image; it must never reach the launcher's crash handler.
- */
-internal class WidgetPreviewContainer(context: android.content.Context) : FrameLayout(context) {
+internal class WidgetPreviewContainer(context: Context) : FrameLayout(context) {
     var onRenderFailed: (() -> Unit)? = null
     var widgetWidth = 1
     var widgetHeight = 1
@@ -357,7 +569,6 @@ internal class WidgetPreviewContainer(context: android.content.Context) : FrameL
     override fun dispatchDraw(canvas: Canvas) {
         val checkpoint = canvas.save()
         guarded { super.dispatchDraw(canvas) }
-        // A child that threw mid-draw leaves its own save()s open on the shared canvas.
         canvas.restoreToCount(checkpoint)
     }
 }

@@ -1,11 +1,11 @@
 package org.arkikeskus.launcher.feature.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.AppLabel
+import org.arkikeskus.launcher.ui.component.LiquidGlassContainer
 import org.arkikeskus.launcher.ui.component.NotificationBadge
 
 /**
@@ -34,6 +35,8 @@ fun FolderIcon(
     badgeScale: Float = 1f,
     labelColor: Color = Color.White,
     size: Dp = 52.dp,
+    glassBlurRadius: Float = 25f,
+    glassDarkTint: Float = 0.45f,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -42,17 +45,23 @@ fun FolderIcon(
             // with linearly scaled icons inverted the margin below ~45dp tiles (6–7 columns on a
             // narrow screen), squeezing the 2×2 preview asymmetrically out of its card.
             val scale = size / 52.dp
-            Box(
-                modifier = Modifier
-                    .size(size)
-                    .background(Color.White.copy(alpha = 0.22f), RoundedCornerShape(15.dp))
-                    .padding(6.dp * scale),
-                contentAlignment = Alignment.Center,
+            LiquidGlassContainer(
+                blurRadiusDp = glassBlurRadius,
+                darkTintAlpha = glassDarkTint,
+                shape = RoundedCornerShape(15.dp),
+                modifier = Modifier.size(size),
             ) {
-                val mini = 17.dp * scale
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp * scale)) {
-                    PreviewRow(apps.getOrNull(0), apps.getOrNull(1), mini, gap = 2.dp * scale)
-                    PreviewRow(apps.getOrNull(2), apps.getOrNull(3), mini, gap = 2.dp * scale)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(6.dp * scale),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val mini = 17.dp * scale
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp * scale)) {
+                        PreviewRow(apps.getOrNull(0), apps.getOrNull(1), mini, gap = 2.dp * scale)
+                        PreviewRow(apps.getOrNull(2), apps.getOrNull(3), mini, gap = 2.dp * scale)
+                    }
                 }
             }
             NotificationBadge(count = badgeCount, showCount = badgeShowCount, scale = badgeScale)

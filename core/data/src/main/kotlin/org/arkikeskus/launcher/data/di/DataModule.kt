@@ -84,9 +84,17 @@ object DataModule {
             // pre-v5 dev versions (1–4, which never shipped a migration) so an old test install resets
             // instead of crashing; v5 onward is migrated, so the user's home layout survives upgrades.
             .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2, 3, 4)
-            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             .build()
 
     @Provides
     fun provideHomeItemDao(database: LauncherDatabase): HomeItemDao = database.homeItemDao()
+}
+
+private val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE home_items ADD COLUMN screenType TEXT NOT NULL DEFAULT 'OUTER'")
+        db.execSQL("DROP INDEX IF EXISTS index_home_items_containerId_page_cellX_cellY")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_home_items_screenType_containerId_page_cellX_cellY ON home_items (screenType, containerId, page, cellX, cellY)")
+    }
 }

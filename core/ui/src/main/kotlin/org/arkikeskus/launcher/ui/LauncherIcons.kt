@@ -25,4 +25,5 @@ object LauncherIcons {
     @DrawableRes val Unpin: Int = R.drawable.ic_push_pin_off
     @DrawableRes val Link: Int = R.drawable.ic_link
     @DrawableRes val LinkOff: Int = R.drawable.ic_link_off
+    @DrawableRes val Search: Int = R.drawable.ic_search
 }

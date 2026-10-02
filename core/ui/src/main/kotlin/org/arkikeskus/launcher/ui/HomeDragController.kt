@@ -109,8 +109,22 @@ class HomeDragController {
 
     fun isOverRemove(p: Offset): Boolean = !removeBounds.isEmpty && removeBounds.contains(p)
 
+    var isDualPage by mutableStateOf(false)
+
     /** Home cell (page, cellX, cellY) under [p] (root coords) — for a dock/drawer→home drop. */
     fun cellAt(p: Offset): Triple<Int, Int, Int> {
+        if (isDualPage && gridBounds.width > 0f) {
+            val halfW = gridBounds.width / 2f
+            val localX = p.x - gridBounds.left
+            val isRightHalf = localX >= halfW
+            val effectivePage = if (isRightHalf) currentPage + 1 else currentPage
+            val xInPage = if (isRightHalf) localX - halfW else localX
+            val cellW = if (columns > 0) halfW / columns else 1f
+            val cellH = if (rows > 0 && gridBounds.height > 0f) gridBounds.height / rows else 1f
+            val cx = (xInPage / cellW).toInt().coerceIn(0, columns - 1)
+            val cy = ((p.y - gridBounds.top) / cellH).toInt().coerceIn(0, rows - 1)
+            return Triple(effectivePage, cx, cy)
+        }
         val cellW = if (columns > 0 && gridBounds.width > 0f) gridBounds.width / columns else 1f
         val cellH = if (rows > 0 && gridBounds.height > 0f) gridBounds.height / rows else 1f
         val cx = ((p.x - gridBounds.left) / cellW).toInt().coerceIn(0, columns - 1)

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home_open_drawer_hint">Pyyhkäise ylös avataksesi sovellukset</string>
-    <string name="onboarding_title">Tervetuloa ARK-launcheriin</string>
-    <string name="onboarding_text">Aseta ARK-launcher oletuslauncheriksi aloittaaksesi. Sen jälkeen pyyhkäise ylös avataksesi sovellukset ja paina tyhjää kohtaa pitkään päästäksesi asetuksiin.</string>
+    <string name="onboarding_title">Tervetuloa Folarkiin</string>
+    <string name="onboarding_text">Aseta Folark oletuslauncheriksi aloittaaksesi. Sen jälkeen pyyhkäise ylös avataksesi sovellukset ja paina tyhjää kohtaa pitkään päästäksesi asetuksiin.</string>
     <string name="onboarding_set_default">Aseta oletuslauncheriksi</string>
-    <string name="widget_builtin_section">ARK-launcher</string>
+    <string name="widget_builtin_section">Folark</string>
     <string name="smartspace_widget_name">Kello ja kalenteri</string>
     <string name="smartspace_allow_calendar">Salli kalenterin käyttö napauttamalla</string>
     <string name="smartspace_no_title">(Ei otsikkoa)</string>
@@ -98,6 +98,15 @@
     <string name="widget_unavailable">Widget ei käytettävissä</string>
     <string name="widget_restore_tap">Napauta ottaaksesi käyttöön</string>
     <string name="widget_resize">Muuta kokoa</string>
+    <string name="nothing_clock_widget_name">Nothing-kello</string>
+    <string name="nothing_clock_widget_desc">Minimalistinen dot-matrix kello ja akku</string>
+    <string name="samsung_weather_widget_name">Samsung Sää &amp; Päivän katsaus</string>
+    <string name="samsung_weather_widget_desc">Sääennuste ja päivittäinen tervehdys</string>
+    <string name="samsung_notification_widget_name">Samsung Ilmoituskortti</string>
+    <string name="samsung_notification_widget_desc">Aktiiviset ilmoitukset One UI -korttityylillä</string>
+    <string name="samsung_greeting_morning">Hyvää huomenta</string>
+    <string name="samsung_greeting_afternoon">Hyvää iltapäivää</string>
+    <string name="samsung_greeting_evening">Hyvää iltaa</string>
     <string name="widget_reconfigure">Widgetin asetukset</string>
     <string name="widget_move_prev_page">Siirrä edelliselle sivulle</string>
     <string name="widget_move_next_page">Siirrä seuraavalle sivulle</string>
@@ -121,7 +130,7 @@
     <string name="status_wifi_band_24">2,4</string>
     <string name="status_wifi_band_5">5</string>
     <string name="status_wifi_band_6">6</string>
-    <string name="lock_service_label">ARK-launcher: näytön lukitus</string>
+    <string name="lock_service_label">Folark: näytön lukitus</string>
     <string name="lock_service_description">Käytetään ainoastaan näytön lukitsemiseen, kun kotinäytön tyhjää aluetta kaksoisnapautetaan. Palvelu ei lue näytön sisältöä eikä vastaanota esteettömyystapahtumia.</string>
     <string name="double_tap_lock_needs_service">Näytön lukitus vaatii esteettömyysluvan — myönnä se kohdasta Asetukset ▸ Eleet</string>
     <string name="widget_picker_close">Sulje widgettivalitsin</string>

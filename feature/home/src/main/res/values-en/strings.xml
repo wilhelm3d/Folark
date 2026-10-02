@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home_open_drawer_hint">Swipe up to open apps</string>
-    <string name="onboarding_title">Welcome to ARK-launcher</string>
-    <string name="onboarding_text">Set ARK-launcher as your default launcher to get started. Then swipe up to open your apps, and long-press an empty spot to reach settings.</string>
+    <string name="onboarding_title">Welcome to Folark</string>
+    <string name="onboarding_text">Set Folark as your default launcher to get started. Then swipe up to open your apps, and long-press an empty spot to reach settings.</string>
     <string name="onboarding_set_default">Set as default launcher</string>
-    <string name="widget_builtin_section">ARK-launcher</string>
+    <string name="widget_builtin_section">Folark</string>
     <string name="smartspace_widget_name">Clock &amp; calendar</string>
     <string name="smartspace_allow_calendar">Tap to allow calendar access</string>
     <string name="smartspace_no_title">(No title)</string>
@@ -98,6 +98,15 @@
     <string name="widget_unavailable">Widget unavailable</string>
     <string name="widget_restore_tap">Tap to set up</string>
     <string name="widget_resize">Resize</string>
+    <string name="nothing_clock_widget_name">Nothing Clock</string>
+    <string name="nothing_clock_widget_desc">Minimalist dot-matrix clock and battery</string>
+    <string name="samsung_weather_widget_name">Samsung Weather &amp; Briefing</string>
+    <string name="samsung_weather_widget_desc">Weather forecast and daily greeting</string>
+    <string name="samsung_notification_widget_name">Samsung Notification Card</string>
+    <string name="samsung_notification_widget_desc">Active notifications in One UI card style</string>
+    <string name="samsung_greeting_morning">Good morning</string>
+    <string name="samsung_greeting_afternoon">Good afternoon</string>
+    <string name="samsung_greeting_evening">Good evening</string>
     <string name="widget_reconfigure">Widget settings</string>
     <string name="widget_move_prev_page">Move to previous page</string>
     <string name="widget_move_next_page">Move to next page</string>
@@ -121,7 +130,7 @@
     <string name="status_wifi_band_24">2.4</string>
     <string name="status_wifi_band_5">5</string>
     <string name="status_wifi_band_6">6</string>
-    <string name="lock_service_label">ARK-launcher: screen lock</string>
+    <string name="lock_service_label">Folark: screen lock</string>
     <string name="lock_service_description">Used only to lock the screen when you double-tap empty space on the home screen. The service does not read screen content or receive accessibility events.</string>
     <string name="double_tap_lock_needs_service">Screen lock needs the accessibility permission — grant it in Settings ▸ Gestures</string>
     <string name="widget_picker_close">Close widget picker</string>

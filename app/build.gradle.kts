@@ -76,10 +76,10 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:model"))
     implementation(project(":core:ui"))
+    implementation(project(":core:launcher"))
     implementation(project(":feature:home"))
     implementation(project(":feature:appdrawer"))
     implementation(project(":feature:settings"))
-    implementation(project(":feature:backup"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

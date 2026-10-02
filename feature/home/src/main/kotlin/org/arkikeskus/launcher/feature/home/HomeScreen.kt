@@ -50,7 +50,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -88,7 +88,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -98,12 +98,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.Density
 import org.arkikeskus.launcher.model.WidgetPlacement
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.FoldState
+import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.AppActionPopup
 import org.arkikeskus.launcher.ui.AppActions
 import org.arkikeskus.launcher.ui.AppShortcuts
@@ -119,7 +124,10 @@ import org.arkikeskus.launcher.ui.rememberHomeDragController
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
+import org.arkikeskus.launcher.ui.component.rememberParallaxOffset
+import org.arkikeskus.launcher.ui.component.LocalFoldState
 import org.arkikeskus.launcher.ui.component.LocalIconPack
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -139,8 +147,11 @@ fun HomeScreen(
     onDrawerSettle: (Float) -> Unit = {},
     dragController: HomeDragController = rememberHomeDragController(),
     viewModel: HomeViewModel = hiltViewModel(),
+    screenType: ScreenType = LocalScreenType.current,
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(screenType) { viewModel.setScreenType(screenType) }
+    CompositionLocalProvider(LocalScreenType provides screenType) {
+        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val settings = uiState.settings
     // True briefly after a heads-up notification, while the system transiently shows its own status bar
     // over ours; used to blank the themed bar so they don't overlap.
@@ -417,7 +428,7 @@ fun HomeScreen(
     // Shared drag state spanning the workspace, dock and drawer (Launcher3-style drag layer/controller).
     // Created by LauncherShell and passed in so the app drawer can drag onto home; falls back to a
     // local one when HomeScreen is used standalone (previews/tests).
-    SideEffect {
+    LaunchedEffect(uiState.dockApps.size, settings.dockEnabled, settings.dockColumns) {
         dragController.dockItemCount = uiState.dockApps.size
         dragController.dockHasSpace = settings.dockEnabled && uiState.dockApps.size < settings.dockColumns
     }
@@ -446,9 +457,36 @@ fun HomeScreen(
     val badgeShowCount = settings.notificationDotCount
     val badgeScale = settings.notificationDotScale
 
+    fun executeAction(action: String) {
+        when (action) {
+            LauncherSettings.GESTURE_NOTIFICATIONS -> NotificationShade.expand(context)
+            LauncherSettings.GESTURE_DRAWER -> onOpenDrawer()
+            LauncherSettings.GESTURE_SEARCH -> onOpenDrawer()
+            LauncherSettings.GESTURE_LOCK -> {
+                if (!LockAccessibilityService.lock()) {
+                    widgetMessage(R.string.double_tap_lock_needs_service)
+                }
+            }
+            LauncherSettings.GESTURE_NONE -> {}
+        }
+    }
+
+    val foldState = LocalFoldState.current
+    val isHalfOpenedTabletop = foldState == FoldState.HALF_OPENED && settings.halfOpenedModeEnabled
+    val wallpaperScale = if (screenType == ScreenType.OUTER) settings.outerWallpaperScale else settings.innerWallpaperScale
+
+    val systemDensity = LocalDensity.current
+    val dpiDensity = remember(systemDensity, settings.dpiWorkspace) {
+        Density(
+            density = systemDensity.density * settings.dpiWorkspace,
+            fontScale = systemDensity.fontScale * settings.dpiWorkspace,
+        )
+    }
+
     // All app icons on home (workspace, dock, folders) honour the themed-icons setting and the
     // user's app-label text-size multiplier.
     CompositionLocalProvider(
+        LocalDensity provides dpiDensity,
         LocalTonalWidgets provides settings.widgetTonalBackground,
         LocalThemedIcons provides settings.useThemedIcons,
         LocalIconPack provides settings.iconPackPackage,
@@ -460,25 +498,35 @@ fun HomeScreen(
         // Pinning LTR keeps render + touch consistent; the drawer/settings keep their natural RTL.
         LocalLayoutDirection provides LayoutDirection.Ltr,
     ) {
+        val parallaxOffset = rememberParallaxOffset(enabled = settings.parallaxWallpaper)
     Box(
         modifier = modifier
             .fillMaxSize()
+            .graphicsLayer {
+                translationX = parallaxOffset.x
+                translationY = parallaxOffset.y
+            }
+            .then(if (isHalfOpenedTabletop) Modifier.padding(bottom = 120.dp) else Modifier)
             // Root-level, Initial-pass swipe detector: a flick up/down anywhere on home (over icons,
             // folders, shortcuts or the dock — not just empty space) drives the drawer/notifications.
             .pixelHomeSwipe(
                 // All home gestures pause while the first-run intro covers the screen — this
                 // detector runs in the Initial pass on the ROOT, so it would otherwise catch a
                 // vertical swipe before the intro overlay could swallow it.
-                swipeUpForDrawer = settings.swipeUpForDrawer && !showOnboarding,
-                swipeDownForNotifications = settings.swipeDownForNotifications && !showOnboarding,
+                swipeUpAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.swipeUpAction,
+                swipeDownAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.swipeDownAction,
                 dragController = dragController,
                 onDrawerDrag = onDrawerDrag,
                 onDrawerSettle = onDrawerSettle,
-                onOpenNotifications = { NotificationShade.expand(context) },
+                onAction = ::executeAction,
                 // Left-edge action: a right-drag on the leftmost page launches the configured app.
                 leftEdgeEnabled = settings.leftSwipeAppKey.isNotBlank() && !showOnboarding,
                 atLeftEdge = { dragController.currentPage == 0 },
                 onLeftEdgeAction = viewModel::onLeftSwipe,
+                // Right-edge action: a left-drag on the rightmost page launches the configured app.
+                rightEdgeEnabled = settings.rightSwipeAppKey.isNotBlank() && !showOnboarding,
+                atRightEdge = { dragController.currentPage == (uiState.pageCount - 1).coerceAtLeast(0) },
+                onRightEdgeAction = viewModel::onRightSwipe,
             ),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -530,6 +578,7 @@ fun HomeScreen(
                 )
             }
             val lockNeedsServiceMsg = stringResource(R.string.double_tap_lock_needs_service)
+            val isDualPage = screenType == ScreenType.INNER && settings.innerDualPageWorkspace
             Workspace(
                 pageCount = uiState.pageCount,
                 columns = settings.homeColumns,
@@ -540,8 +589,12 @@ fun HomeScreen(
                 badgeScale = badgeScale,
                 showLabels = settings.showHomeLabels,
                 labelColor = Color(settings.appLabelColor),
+                glassBlurRadius = settings.glassBlurRadius,
+                glassDarkTint = settings.glassDarkTint,
                 showPageIndicator = settings.showPageIndicator,
                 locked = settings.desktopLocked,
+                isDualPage = isDualPage,
+                pageBounceEnabled = settings.pageBounceEnabled,
                 homeSignals = homeSignals,
                 homePage = if (uiState.loaded) uiState.homePage else null,
                 pageRequests = pageRequests,
@@ -563,12 +616,13 @@ fun HomeScreen(
                 onEmptyAreaDoubleTap = {
                     // `settings` is this composition's value; Workspace reads the latest lambda via
                     // rememberUpdatedState, so a toggled setting takes effect without a restart.
-                    if (settings.doubleTapToLock && !LockAccessibilityService.lock()) {
-                        android.widget.Toast.makeText(
-                            context,
-                            lockNeedsServiceMsg,
-                            android.widget.Toast.LENGTH_SHORT,
-                        ).show()
+                    val action = when {
+                        settings.doubleTapAction != LauncherSettings.GESTURE_NONE -> settings.doubleTapAction
+                        settings.doubleTapToLock -> LauncherSettings.GESTURE_LOCK
+                        else -> LauncherSettings.GESTURE_NONE
+                    }
+                    if (action != LauncherSettings.GESTURE_NONE) {
+                        executeAction(action)
                     }
                 },
                 onRemoveWidget = { rowId, appWidgetId ->
@@ -610,6 +664,17 @@ fun HomeScreen(
             // Show the dock whenever it's enabled — even with no favorites yet — so a fresh install
             // can be populated by dragging apps onto it (there is no "add to dock" menu item).
             if (settings.dockEnabled) {
+                val dockAlignModifier = if (screenType == ScreenType.INNER) {
+                    when (settings.innerDockAlignment) {
+                        LauncherSettings.DOCK_ALIGNMENT_LEFT -> Modifier.fillMaxWidth(0.6f).align(Alignment.Start)
+                        LauncherSettings.DOCK_ALIGNMENT_RIGHT -> Modifier.fillMaxWidth(0.6f).align(Alignment.End)
+                        LauncherSettings.DOCK_ALIGNMENT_FLOATING -> Modifier.fillMaxWidth(0.75f).align(Alignment.CenterHorizontally).padding(bottom = 8.dp)
+                        else -> Modifier.fillMaxWidth(0.8f).align(Alignment.CenterHorizontally)
+                    }
+                } else {
+                    Modifier.fillMaxWidth()
+                }
+
                 Dock(
                     apps = uiState.dockApps,
                     badges = badges,
@@ -625,8 +690,7 @@ fun HomeScreen(
                     onMoveToHome = { app, page, cellX, cellY -> viewModel.moveToHome(app, page, cellX, cellY) },
                     onRemoveFromDock = { viewModel.removeFromDock(it) },
                     onAppMenu = { app, anchor -> menuTarget = AppMenuTarget(app, anchor, DragSource.Dock, anchor.y > windowHeightPx / 2) },
-                    modifier = Modifier
-                        .fillMaxWidth()
+                    modifier = dockAlignModifier
                         .navigationBarsPadding()
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                 )
@@ -741,6 +805,7 @@ fun HomeScreen(
             ),
             onDismiss = { menuTarget = null },
             onPinShortcut = { item -> viewModel.pinShortcut(item) },
+            onRename = { newLabel -> viewModel.setCustomAppLabel(menu.app.key, newLabel) },
         )
     }
 
@@ -820,8 +885,8 @@ fun HomeScreen(
     renameTarget?.let { app ->
         RenameDialog(
             initialName = app.label,
-            onConfirm = { viewModel.setCustomLabel(app.key, it) },
-            onReset = { viewModel.setCustomLabel(app.key, null) },
+            onConfirm = { viewModel.setCustomAppLabel(app.key, it) },
+            onReset = { viewModel.setCustomAppLabel(app.key, "") },
             onDismiss = { renameTarget = null },
         )
     }
@@ -834,11 +899,13 @@ fun HomeScreen(
         if (openFolderId != null && openFolder == null) openFolderId = null
     }
     if (openFolder != null) {
-        FolderSheet(
+        FolderDialog(
             folder = openFolder,
             badges = badges,
             badgeShowCount = badgeShowCount,
             badgeScale = badgeScale,
+            glassBlurRadius = settings.glassBlurRadius,
+            glassDarkTint = settings.glassDarkTint,
             onRename = { viewModel.renameFolder(openFolder.id, it) },
             onAppClick = { viewModel.launch(it) },
             onRemoveFromFolder = { viewModel.removeFromFolder(it, openFolder.id) },
@@ -846,71 +913,6 @@ fun HomeScreen(
         )
     }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-private fun FolderSheet(
-    folder: PlacedFolder,
-    badges: Map<String, Int>,
-    badgeShowCount: Boolean,
-    badgeScale: Float,
-    onRename: (String) -> Unit,
-    onAppClick: (AppItem) -> Unit,
-    onRemoveFromFolder: (AppItem) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
-        ) {
-            var name by remember(folder.id) { mutableStateOf(folder.name) }
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it; onRename(it) },
-                singleLine = true,
-                label = { Text(stringResource(R.string.folder_name_label)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.folder_long_press_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 320.dp),
-            ) {
-                items(items = folder.apps, key = { it.key }) { app ->
-                    AppIcon(
-                        appItem = app,
-                        labelColor = MaterialTheme.colorScheme.onSurface,
-                        showLabel = true,
-                        maxLabelLines = 2,
-                        badgeCount = badges[app.badgeKey] ?: 0,
-                        badgeShowCount = badgeShowCount,
-                        badgeScale = badgeScale,
-                        modifier = Modifier
-                            .combinedClickable(
-                                onClick = {
-                                    onAppClick(app)
-                                    onDismiss()
-                                },
-                                onLongClick = { onRemoveFromFolder(app) },
-                            )
-                            .padding(vertical = 10.dp, horizontal = 4.dp),
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -924,8 +926,8 @@ private fun FolderSheet(
  * from anywhere on the home surface reliably "catches" and drives the drawer (the root cause of the
  * old bug: the detector lived on the page background, so icons/dock won the gesture first).
  *
- * - Swipe up (with [swipeUpForDrawer]) → finger-following drawer via [onDrawerDrag] / [onDrawerSettle].
- * - Swipe down (with [swipeDownForNotifications]) → [onOpenNotifications] (one-shot).
+ * - Swipe up (with [swipeUpAction]) → finger-following drawer via [onDrawerDrag] / [onDrawerSettle].
+ * - Swipe down (with [swipeDownAction]) → [onAction] (one-shot).
  * - A real long-press drag — an app/dock item ([HomeDragController.isDragging]) or a folder/shortcut
  *   ([HomeDragController.localGestureActive] / [HomeDragController.localDragging]) — is never stolen;
  *   the detector bails out so the drag owns the gesture.
@@ -936,22 +938,28 @@ private fun FolderSheet(
  */
 @Composable
 private fun Modifier.pixelHomeSwipe(
-    swipeUpForDrawer: Boolean,
-    swipeDownForNotifications: Boolean,
+    swipeUpAction: String,
+    swipeDownAction: String,
     dragController: HomeDragController,
     onDrawerDrag: (Float) -> Unit,
     onDrawerSettle: (Float) -> Unit,
-    onOpenNotifications: () -> Unit,
+    onAction: (String) -> Unit,
     leftEdgeEnabled: Boolean = false,
     atLeftEdge: () -> Boolean = { false },
     onLeftEdgeAction: () -> Unit = {},
+    rightEdgeEnabled: Boolean = false,
+    atRightEdge: () -> Boolean = { false },
+    onRightEdgeAction: () -> Unit = {},
 ): Modifier {
+    val latestSwipeUpAction by rememberUpdatedState(swipeUpAction)
+    val latestSwipeDownAction by rememberUpdatedState(swipeDownAction)
     val latestOnDrawerDrag by rememberUpdatedState(onDrawerDrag)
     val latestOnDrawerSettle by rememberUpdatedState(onDrawerSettle)
-    val latestOnOpenNotifications by rememberUpdatedState(onOpenNotifications)
+    val latestOnAction by rememberUpdatedState(onAction)
     val latestOnLeftEdgeAction by rememberUpdatedState(onLeftEdgeAction)
+    val latestOnRightEdgeAction by rememberUpdatedState(onRightEdgeAction)
 
-    return pointerInput(swipeUpForDrawer, swipeDownForNotifications, leftEdgeEnabled, dragController) {
+    return pointerInput(swipeUpAction, swipeDownAction, leftEdgeEnabled, rightEdgeEnabled, dragController) {
         val touchSlop = viewConfiguration.touchSlop
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -967,8 +975,7 @@ private fun Modifier.pixelHomeSwipe(
             if (dragController.isOverDock(down.position)) return@awaitEachGesture
             val velocityTracker = VelocityTracker()
             velocityTracker.addPosition(down.uptimeMillis, down.position)
-            // 0 = undecided, 1 = drawer up-drag, 2 = left-edge action (right-drag on page 0),
-            // 3 = notification shade opened (swallow the rest of the gesture so it can't reach the pager)
+            // 0 = undecided, 1 = drawer up-drag, 2 = left-edge action, 3 = notification shade, 4 = right-edge action
             var mode = 0
             var lastY = down.position.y
 
@@ -990,10 +997,11 @@ private fun Modifier.pixelHomeSwipe(
                         val finalDy = change.position.y - lastY
                         if (finalDy != 0f) latestOnDrawerDrag(finalDy)
                         latestOnDrawerSettle(velocityTracker.calculateVelocity().y)
+                        mode = 0
                     } else if (mode == 2) {
-                        // Left-edge action: commit only when dragged far enough right (a short drag
-                        // cancels, so the gesture can be aborted by releasing early).
                         if (change.position.x - down.position.x > size.width * 0.25f) latestOnLeftEdgeAction()
+                    } else if (mode == 4) {
+                        if (down.position.x - change.position.x > size.width * 0.25f) latestOnRightEdgeAction()
                     }
                     break
                 }
@@ -1004,20 +1012,28 @@ private fun Modifier.pixelHomeSwipe(
                 if (mode == 0) {
                     when {
                         abs(dy) > touchSlop && abs(dy) > abs(dx) -> when {
-                            dy < 0f && swipeUpForDrawer -> {
-                                mode = 1
-                                change.consume()
-                                latestOnDrawerDrag(dy) // jump to the finger, including the slop moved
-                                lastY = change.position.y
+                            dy < 0f -> {
+                                val action = latestSwipeUpAction
+                                if ((action == LauncherSettings.GESTURE_DRAWER || action == LauncherSettings.GESTURE_SEARCH) &&
+                                    down.position.y > size.height * 0.15f
+                                ) {
+                                    mode = 1
+                                    change.consume()
+                                    latestOnDrawerDrag(dy) // jump to the finger, including the slop moved
+                                    lastY = change.position.y
+                                } else {
+                                    break
+                                }
                             }
-                            dy > 0f && swipeDownForNotifications -> {
-                                // Open the shade, then keep consuming the rest of the gesture (mode 3)
-                                // until the finger lifts. Without this, the finger's continued sideways
-                                // drift after the shade opens leaks to the HorizontalPager, which nudges
-                                // a page and snaps back — the intermittent "little jump sideways".
-                                mode = 3
-                                change.consume()
-                                latestOnOpenNotifications()
+                            dy > 0f -> {
+                                val action = latestSwipeDownAction
+                                if (action != LauncherSettings.GESTURE_NONE) {
+                                    mode = 3
+                                    change.consume()
+                                    latestOnAction(action)
+                                } else {
+                                    break
+                                }
                             }
                             else -> {
                                 break
@@ -1026,12 +1042,12 @@ private fun Modifier.pixelHomeSwipe(
                         // Horizontal gesture.
                         abs(dx) > touchSlop && abs(dx) >= abs(dy) -> {
                             if (leftEdgeEnabled && dx > 0f && atLeftEdge()) {
-                                // Right-drag on the leftmost page → the configurable left-edge action.
-                                // Consume so the pager doesn't overscroll; commit on release past slop.
                                 mode = 2
                                 change.consume()
+                            } else if (rightEdgeEnabled && dx < 0f && atRightEdge()) {
+                                mode = 4
+                                change.consume()
                             } else {
-                                // Other horizontal → don't consume; leave it to the HorizontalPager.
                                 break
                             }
                         }
@@ -1041,10 +1057,12 @@ private fun Modifier.pixelHomeSwipe(
                     latestOnDrawerDrag(change.position.y - lastY)
                     lastY = change.position.y
                 } else {
-                    // mode == 2 (left-edge drag) or mode == 3 (shade opened): keep consuming so the
-                    // pager never grabs the rest of the gesture.
+                    // mode >= 2: keep consuming so pager never grabs the rest of the gesture.
                     change.consume()
                 }
+            }
+            if (mode == 1) {
+                latestOnDrawerSettle(velocityTracker.calculateVelocity().y)
             }
         }
     }

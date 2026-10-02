@@ -9,6 +9,7 @@ import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,6 +67,7 @@ import org.arkikeskus.launcher.data.smartspace.CurrentWeather
 import org.arkikeskus.launcher.data.smartspace.NextEventPicker
 import org.arkikeskus.launcher.data.smartspace.WeatherCodes
 import org.arkikeskus.launcher.data.smartspace.WeatherRepository
+import org.arkikeskus.launcher.model.ScreenType
 import kotlin.math.roundToInt
 import java.util.Date
 import javax.inject.Inject
@@ -81,7 +83,7 @@ class SmartspaceViewModel @Inject constructor(
     val hasLocationPermission = MutableStateFlow(weatherRepository.hasPermission())
 
     /** Weather slot enabled in Settings ▸ Home (the permission gate is separate). */
-    val showWeather: StateFlow<Boolean> = settingsRepository.settings
+    val showWeather: StateFlow<Boolean> = settingsRepository.settings(ScreenType.OUTER)
         .map { it.showWeather }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
@@ -97,7 +99,7 @@ class SmartspaceViewModel @Inject constructor(
         // Gate on the PERSISTED setting, not the StateFlow: at process start the stateIn initial
         // value (true) would fire one location read + network query even with weather turned off.
         viewModelScope.launch {
-            if (settingsRepository.settings.first().showWeather) weatherRepository.refresh()
+            if (settingsRepository.settings(ScreenType.OUTER).first().showWeather) weatherRepository.refresh()
         }
     }
 
@@ -222,6 +224,7 @@ fun SmartspaceWidget(
             // A soft translucent card behind the text so the widget reads as one element on any
             // wallpaper (user feedback; same idiom as the dock background and the restore tiles).
             .background(widgetSurfaceColor(), RoundedCornerShape(24.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
             .padding(horizontal = (22 * scale).dp, vertical = (10 * scale).dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,

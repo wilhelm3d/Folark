@@ -44,10 +44,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
+import kotlinx.coroutines.flow.flatMapLatest
+import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,7 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.toBitmap
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -97,6 +101,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
 import org.arkikeskus.launcher.data.NotificationWidgetLayout
@@ -129,6 +134,7 @@ private const val FRESH_MS = 15 * 60 * 1000L
 /** The pale tint an unread-but-old tile settles at; it never goes grey until dismissed. */
 private const val FADED_STRENGTH = 0.35f
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PeopleWidgetViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -138,6 +144,9 @@ class PeopleWidgetViewModel @Inject constructor(
     private val contacts: ContactDataSource,
     private val permissions: PermissionChecker,
 ) : ViewModel() {
+
+    private val _screenType = MutableStateFlow(ScreenType.OUTER)
+    fun setScreenType(type: ScreenType) { _screenType.value = type }
 
     /**
      * One tile: a person who is pinned, has live notifications, or both. [contact] is the contacts
@@ -188,9 +197,10 @@ class PeopleWidgetViewModel @Inject constructor(
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     }.getOrDefault(false)
 
-    val privacy: StateFlow<String> = settingsRepository.settings
-        .map { it.peoplePrivacy }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.PRIVACY_ALL)
+    val privacy: StateFlow<String> = _screenType.flatMapLatest { screenType ->
+        settingsRepository.settings(screenType)
+            .map { it.peoplePrivacy }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.PRIVACY_ALL)
 
     /** The user's "same person" links (alias key → target key); tiles with links can be split again. */
     val aliases: StateFlow<Map<String, String>> = settingsRepository.peopleAliases
@@ -212,7 +222,9 @@ class PeopleWidgetViewModel @Inject constructor(
 
     /** Live groups with the user's aliases applied, app groups dropped when the setting is off. */
     private val liveGroups: Flow<List<PersonTileState>> = combine(
-        badgeRepository.people, settingsRepository.peopleAliases, settingsRepository.settings.map { it.peopleShowApps },
+        badgeRepository.people, settingsRepository.peopleAliases, _screenType.flatMapLatest { screenType ->
+            settingsRepository.settings(screenType).map { it.peopleShowApps }
+        },
     ) { grouped, aliases, showApps ->
         PeopleGrouping.merge(grouped, aliases).filter { showApps || it.newest.kind != PersonEventKind.APP }
     }
@@ -346,8 +358,11 @@ class PeopleWidgetViewModel @Inject constructor(
 fun PeopleWidget(
     modifier: Modifier = Modifier,
     viewModel: PeopleWidgetViewModel = hiltViewModel(),
+    screenType: ScreenType = LocalScreenType.current,
 ) {
-    val context = LocalContext.current
+    LaunchedEffect(screenType) { viewModel.setScreenType(screenType) }
+    CompositionLocalProvider(LocalScreenType provides screenType) {
+        val context = LocalContext.current
     val hasAccess by viewModel.hasAccess.collectAsStateWithLifecycle()
     val tiles by viewModel.tiles.collectAsStateWithLifecycle()
     val privacy by viewModel.privacy.collectAsStateWithLifecycle()
@@ -427,6 +442,7 @@ fun PeopleWidget(
                                 .size(width = tile, height = rowHeight)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(widgetSurfaceColor())
+                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
                                 // The hidden tiles are one tap away in the widget's own list — the
                                 // shade wouldn't do: batch-held messages and quiet pinned people
                                 // aren't in it.
@@ -511,6 +527,7 @@ fun PeopleWidget(
             onDismiss = { replyFor = null },
         )
     }
+    }
 }
 
 /** The narrowest a tile gets; the widget width decides how many columns that makes. */
@@ -530,6 +547,7 @@ private fun HintCard(text: String, interaction: MutableInteractionSource, onClic
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .background(widgetSurfaceColor(), RoundedCornerShape(24.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
             .then(
                 if (onClick != null) Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick)
                 else Modifier,
@@ -569,6 +587,11 @@ private fun PersonTile(
     val shape = RoundedCornerShape(20.dp)
     // An old-but-unread tile keeps a thin border in the full color, so "pale" still reads as "new".
     val outlined = tile.hasContent && strength < 0.6f
+    val borderModifier = if (outlined) {
+        Modifier.border(1.5.dp, liveBg, shape)
+    } else {
+        Modifier.border(1.dp, Color.White.copy(alpha = 0.2f), shape)
+    }
 
     val offsetX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
@@ -614,7 +637,7 @@ private fun PersonTile(
             )
             .clip(shape)
             .background(bg)
-            .then(if (outlined) Modifier.border(1.5.dp, liveBg, shape) else Modifier)
+            .then(borderModifier)
             .combinedClickable(
                 interactionSource = interaction, indication = null,
                 onClick = onOpen, onLongClick = { onLongPress(center) },
