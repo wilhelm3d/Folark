@@ -32,6 +32,7 @@ class SearchAggregator @Inject constructor(
             apps = all.filterIsInstance<SearchResult.App>().map { it.app },
             settings = all.filterIsInstance<SearchResult.Setting>(),
             contacts = all.filterIsInstance<SearchResult.Contact>(),
+            shortcuts = all.filterIsInstance<SearchResult.Shortcut>(),
         )
     }
 }

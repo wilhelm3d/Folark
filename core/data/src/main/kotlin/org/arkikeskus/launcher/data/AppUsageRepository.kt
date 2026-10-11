@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +24,8 @@ data class UsageStat(val score: Float, val lastUsed: Long)
 class AppUsageRepository @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) {
-    val usage: Flow<Map<String, UsageStat>> = dataStore.data.map { parse(it[Keys.APP_USAGE]) }
+    // Only when the usage counts themselves change (not on every write to the shared store).
+    val usage: Flow<Map<String, UsageStat>> = dataStore.data.map { it[Keys.APP_USAGE] }.distinctUntilChanged().map { parse(it) }
 
     /** Records a launch of [key] now: decays its stored score to now, then adds 1. */
     suspend fun recordLaunch(key: String) {

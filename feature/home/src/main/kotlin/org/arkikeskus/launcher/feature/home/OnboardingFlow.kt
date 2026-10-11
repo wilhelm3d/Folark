@@ -80,6 +80,7 @@ private val AURORA_AMBER = Color(0xFFB5530F)
 @Composable
 fun OnboardingFlow(
     onFinish: () -> Unit,
+    onRestored: () -> Unit,
     onContactsGranted: () -> Unit,
     onPhoneGranted: () -> Unit,
     modifier: Modifier = Modifier,
@@ -120,7 +121,7 @@ fun OnboardingFlow(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) { p ->
                 when (p) {
-                    0 -> WelcomePage()
+                    0 -> WelcomePage(onRestored)
                     1 -> GesturesPage()
                     else -> PermissionsPage(onContactsGranted, onPhoneGranted)
                 }
@@ -195,7 +196,7 @@ private fun AuroraBackground() {
 }
 
 @Composable
-private fun WelcomePage() {
+private fun WelcomePage(onRestored: () -> Unit) {
     val context = LocalContext.current
     var isDefault by remember { mutableStateOf(DefaultLauncher.isDefault(context)) }
     val setDefault = rememberLauncherForActivityResult(
@@ -238,6 +239,9 @@ private fun WelcomePage() {
                 Text(stringResource(R.string.onboarding_set_default), color = Color.White)
             }
         }
+        // Reinstalled? Put everything back from a backup instead of starting over.
+        Spacer(Modifier.height(36.dp))
+        IntroRestoreButton(onRestored = onRestored)
     }
 }
 

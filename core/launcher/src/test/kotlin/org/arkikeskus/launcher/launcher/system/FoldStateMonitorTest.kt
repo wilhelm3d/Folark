@@ -158,7 +158,7 @@ class FoldStateMonitorTest {
     }
 
     @Test
-    @Config(qualifiers = "w1080dp-h2520dp")
+    @Config(qualifiers = "w360dp-h840dp-xxhdpi")
     fun `isInnerDisplay returns false on outer cover screen 1080x2520`() {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
@@ -184,7 +184,7 @@ class FoldStateMonitorTest {
     }
 
     @Test
-    @Config(qualifiers = "w1080dp-h2520dp")
+    @Config(qualifiers = "w360dp-h840dp-xxhdpi")
     fun `computeFoldState returns CLOSED on outer cover display even if previousFoldState was OPENED`() {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
@@ -213,7 +213,7 @@ class FoldStateMonitorTest {
     }
 
     @Test
-    @Config(qualifiers = "w1080dp-h2520dp")
+    @Config(qualifiers = "w360dp-h840dp-xxhdpi")
     fun `computeFoldState with activity and null foldingFeature returns CLOSED on outer display`() {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
@@ -239,7 +239,7 @@ class FoldStateMonitorTest {
     }
 
     @Test
-    @Config(qualifiers = "w1080dp-h2520dp")
+    @Config(qualifiers = "w360dp-h840dp-xxhdpi")
     fun `foldStateFlow initial value on frame 1 is CLOSED and OUTER on outer display`() = runTest {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
@@ -264,5 +264,22 @@ class FoldStateMonitorTest {
 
         assertThat(flow.value).isEqualTo(FoldState.OPENED)
         assertThat(flow.value.screenType).isEqualTo(ScreenType.INNER)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h880dp-xxhdpi")
+    fun `a folding feature marks a phone-sized window as the inner display (clamshell)`() {
+        // A flip phone's inner panel is 1080 px wide like a book foldable's cover screen, so only
+        // the hinge can tell them apart.
+        val activity = Robolectric.buildActivity(Activity::class.java).get()
+        val monitor = FoldStateMonitor()
+
+        assertThat(monitor.computeFoldState(null, null, activity)).isEqualTo(FoldState.CLOSED)
+        assertThat(
+            monitor.computeFoldState(FakeFoldingFeature(FoldingFeature.State.FLAT), null, activity),
+        ).isEqualTo(FoldState.OPENED)
+        assertThat(
+            monitor.computeFoldState(FakeFoldingFeature(FoldingFeature.State.HALF_OPENED), null, activity),
+        ).isEqualTo(FoldState.HALF_OPENED)
     }
 }

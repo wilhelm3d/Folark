@@ -51,9 +51,15 @@ class CalendarRepository @Inject constructor(
     fun hasPermission(): Boolean =
         context.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
+    /** A refresh is queued and hasn't started: more requests until then are covered by it. */
+    private val refreshQueued = java.util.concurrent.atomic.AtomicBoolean(false)
+
     fun refresh() {
+        if (!refreshQueued.compareAndSet(false, true)) return
         scope.launch(Dispatchers.IO) {
             refreshMutex.withLock {
+                // Changes from here on queue another run, which will read them.
+                refreshQueued.set(false)
                 if (!hasPermission()) {
                     _events.value = emptyList() // a revoked permission really does clear the data
                     return@withLock

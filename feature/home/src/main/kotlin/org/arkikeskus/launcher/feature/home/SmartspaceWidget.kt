@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +57,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -68,6 +70,7 @@ import org.arkikeskus.launcher.data.smartspace.NextEventPicker
 import org.arkikeskus.launcher.data.smartspace.WeatherCodes
 import org.arkikeskus.launcher.data.smartspace.WeatherRepository
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.ui.component.LocalScreenType
 import kotlin.math.roundToInt
 import java.util.Date
 import javax.inject.Inject
@@ -79,13 +82,17 @@ class SmartspaceViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
+    private val _screenType = MutableStateFlow(ScreenType.OUTER)
+    fun setScreenType(type: ScreenType) { _screenType.value = type }
+
     val hasCalendarPermission = MutableStateFlow(calendarRepository.hasPermission())
     val hasLocationPermission = MutableStateFlow(weatherRepository.hasPermission())
 
     /** Weather slot enabled in Settings ▸ Home (the permission gate is separate). */
-    val showWeather: StateFlow<Boolean> = settingsRepository.settings(ScreenType.OUTER)
-        .map { it.showWeather }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val showWeather: StateFlow<Boolean> = _screenType.flatMapLatest { screenType ->
+        settingsRepository.settings(screenType).map { it.showWeather }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     val weather: StateFlow<CurrentWeather?> =
         combine(weatherRepository.weather, showWeather) { w, on -> if (on) w else null }
@@ -99,7 +106,7 @@ class SmartspaceViewModel @Inject constructor(
         // Gate on the PERSISTED setting, not the StateFlow: at process start the stateIn initial
         // value (true) would fire one location read + network query even with weather turned off.
         viewModelScope.launch {
-            if (settingsRepository.settings(ScreenType.OUTER).first().showWeather) weatherRepository.refresh()
+            if (settingsRepository.settings(_screenType.value).first().showWeather) weatherRepository.refresh()
         }
     }
 
@@ -129,8 +136,10 @@ class SmartspaceViewModel @Inject constructor(
 @Composable
 fun SmartspaceWidget(
     modifier: Modifier = Modifier,
+    screenType: ScreenType = LocalScreenType.current,
     viewModel: SmartspaceViewModel = hiltViewModel(),
 ) {
+    LaunchedEffect(screenType) { viewModel.setScreenType(screenType) }
     val context = LocalContext.current
     val hasPermission by viewModel.hasCalendarPermission.collectAsStateWithLifecycle()
     val nextEvent by viewModel.nextEvent.collectAsStateWithLifecycle()
@@ -139,12 +148,7 @@ fun SmartspaceWidget(
     val weather by viewModel.weather.collectAsStateWithLifecycle()
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(60_000 - now % 60_000)
-        }
-    }
+    MinuteTicker { now = it }
     LifecycleResumeEffect(Unit) {
         now = System.currentTimeMillis()
         viewModel.refresh()
@@ -224,7 +228,7 @@ fun SmartspaceWidget(
             // A soft translucent card behind the text so the widget reads as one element on any
             // wallpaper (user feedback; same idiom as the dock background and the restore tiles).
             .background(widgetSurfaceColor(), RoundedCornerShape(24.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.2f * LocalWidgetBackgroundAlpha.current), RoundedCornerShape(24.dp))
             .padding(horizontal = (22 * scale).dp, vertical = (10 * scale).dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -286,7 +290,7 @@ fun SmartspaceWidget(
                         overflow = TextOverflow.Ellipsis,
                         // The city is the variable-length part — it alone gives way (ellipsis) when
                         // the merged row runs out of width; fill=false keeps the card content-hugging.
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(1f, fill = false).motoWeatherTap(),
                     )
                     MiddleDot(scale, shadow)
                 }
@@ -326,6 +330,7 @@ fun SmartspaceWidget(
                     style = TextStyle(fontSize = (16 * scale).sp, shadow = shadow),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.motoWeatherTap(),
                 )
             }
             Text(

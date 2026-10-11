@@ -15,6 +15,15 @@ package org.arkikeskus.launcher.model
  * [epoch] is the app's [IconEpochs] token. It's part of the model/cache key so a package update
  * re-renders that app's icon immediately — including icons already on screen, whose AsyncImage only
  * re-fetches when the model changes.
+ *
+ * [customIcon] is the user's own choice for this one app — "packPackage|drawableName", empty for
+ * none. It wins over everything else, and is part of the model/cache key like the rest.
+ *
+ * [sizePx] is the edge the icon is rasterized at (see [iconRasterSize]; 0 = the fetcher's default).
+ * In the key too, so a folder's thumbnail and a large home icon each cache a bitmap of their own
+ * size instead of sharing one that is too big for the first and too soft for the second.
+ *
+ * [shape] is the icon shape (LauncherSettings.ICON_SHAPE_*; empty = the system's), in the key too.
  */
 data class IconRequest(
     val app: AppItem,
@@ -22,4 +31,15 @@ data class IconRequest(
     val dark: Boolean = false,
     val iconPack: String = "",
     val epoch: Int = 0,
+    val customIcon: String = "",
+    val sizePx: Int = 0,
+    val shape: String = "",
 )
+
+/** The few sizes icons are rasterized at — steps, so near-equal sizes share one cached bitmap. */
+private val ICON_RASTER_SIZES = intArrayOf(48, 72, 96, 128, 168, 224, 288)
+
+/** The rasterization edge for an icon shown [displayPx] pixels wide: the next step up (never
+ *  upscaled until the largest step). */
+fun iconRasterSize(displayPx: Int): Int =
+    ICON_RASTER_SIZES.firstOrNull { it >= displayPx } ?: ICON_RASTER_SIZES.last()

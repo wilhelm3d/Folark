@@ -20,9 +20,13 @@ import android.provider.Settings
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import org.arkikeskus.launcher.model.SystemFlags
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,8 +47,10 @@ class SystemFlagsMonitor @Inject constructor(
     private val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
 
+    // The callbacks only say "something changed"; the flags themselves (about ten calls into the
+    // system) are read on a background thread, and a burst of changes is read once.
     val flags: Flow<SystemFlags> = callbackFlow {
-        fun emit() = trySend(current()).let { }
+        fun emit() = trySend(Unit).let { }
 
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) = emit()
@@ -78,7 +84,10 @@ class SystemFlagsMonitor @Inject constructor(
             context.contentResolver.unregisterContentObserver(observer)
             context.unregisterReceiver(receiver)
         }
-    }.distinctUntilChanged()
+    }.conflate()
+        .map { current() }
+        .flowOn(Dispatchers.IO)
+        .distinctUntilChanged()
 
     private fun current(): SystemFlags {
         val ringer = audioManager?.ringerMode ?: AudioManager.RINGER_MODE_NORMAL

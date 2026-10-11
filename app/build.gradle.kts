@@ -20,8 +20,13 @@ android {
 
     defaultConfig {
         applicationId = "org.arkikeskus.launcher"
-        versionCode = 48
-        versionName = "0.8.1"
+        versionCode = 50
+        versionName = "1.6.0"
+    }
+
+    // English only: also drops the translations that come with libraries, so no screen mixes languages.
+    androidResources {
+        localeFilters += listOf("en")
     }
 
     // F-Droid rejects the Play "Dependency metadata" signing block AGP adds by default.
@@ -52,11 +57,20 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
+            isDebuggable = false
+            isMinifyEnabled = true
+            vcsInfo {
+                include = false
+            }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
+            isDebuggable = false
             isMinifyEnabled = true
-            // The git-revision file AGP embeds would tie reproducibility to the exact checkout.
             vcsInfo {
                 include = false
             }
@@ -66,6 +80,8 @@ android {
             )
             if (keystorePropsFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
@@ -83,6 +99,9 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
+    // Applies src/main/baseline-prof.txt (and the libraries' own profiles) on installs that do not
+    // come with a cloud profile — F-Droid and sideloaded builds.
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)

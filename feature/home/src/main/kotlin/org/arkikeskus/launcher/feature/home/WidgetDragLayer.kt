@@ -26,12 +26,14 @@ internal fun List<HomeEntry>.widgetRects() = mapIndexed { index, e ->
         is PlacedWidget -> e.spanX to e.spanY
         is PendingWidget -> e.spanX to e.spanY
         is PlacedBuiltin -> e.spanX to e.spanY
+        is PlacedWidgetStack -> e.spanX to e.spanY
         else -> 1 to 1
     }
     val id = when (e) {
         is PlacedWidget -> e.rowId
         is PendingWidget -> e.rowId
         is PlacedBuiltin -> e.rowId
+        is PlacedWidgetStack -> e.rowId
         else -> -(index.toLong() + 1)
     }
     ReorderPlanner.Rect(id, e.page, e.cellX, e.cellY, span.first, span.second)
@@ -47,13 +49,25 @@ internal fun BuiltinWidget(type: String, modifier: Modifier = Modifier) {
         HomeItemEntity.BUILTIN_NOTHING_CLOCK -> NothingClockWidget(modifier)
         HomeItemEntity.BUILTIN_SAMSUNG_WEATHER -> SamsungWeatherWidget(modifier)
         HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS -> InteractiveNotificationWidget(modifier)
+        HomeItemEntity.BUILTIN_MEDIA -> NowPlayingWidget(modifier)
+        HomeItemEntity.BUILTIN_TOP_APPS -> TopAppsWidget(modifier)
+        HomeItemEntity.BUILTIN_STATS -> DeviceStatsWidget(modifier)
+        HomeItemEntity.BUILTIN_NOTE -> NoteWidget(modifier)
+        HomeItemEntity.BUILTIN_WEATHER_DAY, HomeItemEntity.BUILTIN_WEATHER_BIG -> WeatherDayWidget(modifier)
         else -> SmartspaceWidget(modifier)
     }
 }
 
 /** Only this small overlay reads the per-frame position in composition. */
 @Composable
-internal fun WidgetDragLayer(state: WidgetDragController, home: HomeDragController, cellW: Float, cellH: Float) {
+internal fun WidgetDragLayer(
+    state: WidgetDragController,
+    home: HomeDragController,
+    cellW: Float,
+    cellH: Float,
+    /** Left edge of a page within the grid (non-zero only when two pages sit side by side). */
+    pageLeft: (Int) -> Float = { 0f },
+) {
     val drag = state.active ?: return
     if (!state.moving) return
     val density = LocalDensity.current
@@ -63,7 +77,7 @@ internal fun WidgetDragLayer(state: WidgetDragController, home: HomeDragControll
     if (target != null) {
         Box(
             Modifier
-                .offset { IntOffset((target.cellX * cellW).roundToInt(), (target.cellY * cellH).roundToInt()) }
+                .offset { IntOffset((pageLeft(target.page) + target.cellX * cellW).roundToInt(), (target.cellY * cellH).roundToInt()) }
                 .size(with(density) { (drag.spanX * cellW).toDp() }, with(density) { (drag.spanY * cellH).toDp() })
                 .padding(4.dp)
                 .background(color.copy(alpha = 0.16f), RoundedCornerShape(24.dp))

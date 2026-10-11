@@ -10,13 +10,17 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
+import java.util.concurrent.atomic.AtomicReferenceArray
 import javax.inject.Singleton
 
 /** A person the user pinned to the people widget: a quiet tile that stays put between messages.
@@ -45,9 +49,44 @@ class SettingsRepository @Inject constructor(
 
     val settings: Flow<LauncherSettings> get() = settings(ScreenType.OUTER)
 
+    /** The one-off store repair below has run in this process (it used to run on every collection). */
+    @Volatile
+    private var storeRepaired = false
+    private val repairLock = Mutex()
+
     fun settings(screenType: ScreenType = ScreenType.OUTER): Flow<LauncherSettings> = dataStore.data.onStart {
         // 0.7 imports unknown numeric backup keys as Long. Repair them before the first typed
         // read when a newer backup was restored in 0.7 and the installation then upgraded.
+        if (!storeRepaired) repairLock.withLock {
+            if (!storeRepaired) {
+                repairStore()
+                storeRepaired = true
+            }
+        }
+    }.map { p -> settingsFor(p, screenType) }
+        // Unrelated writes to the store (app-usage counts, held notifications) must not make every
+        // collector rebuild its state.
+        .distinctUntilChanged()
+
+    /** The settings last built per screen, with the store snapshot they came from. */
+    private class SettingsMemo(val prefs: Preferences, val settings: LauncherSettings)
+    private val settingsMemo = AtomicReferenceArray<SettingsMemo?>(ScreenType.entries.size)
+
+    /**
+     * Every collector of [settings] gets the same store snapshot after a write; the settings are
+     * built from it once and shared (building reads a few hundred keys).
+     */
+    private fun settingsFor(p: Preferences, screenType: ScreenType): LauncherSettings {
+        val hit = settingsMemo.get(screenType.ordinal)
+        if (hit != null && hit.prefs === p) return hit.settings
+        return readSettings(p, screenType).also { settingsMemo.set(screenType.ordinal, SettingsMemo(p, it)) }
+    }
+
+    /** One stored value as a flow: emits only when that value changes, then parses it. */
+    private fun <K, T> keyFlow(key: Preferences.Key<K>, parse: (K?) -> T): Flow<T> =
+        dataStore.data.map { it[key] }.distinctUntilChanged().map { parse(it) }
+
+    private suspend fun repairStore() {
         dataStore.edit { p ->
             for (key in listOf(Keys.homePage(ScreenType.OUTER), Keys.homePageCount(ScreenType.OUTER), Keys.homePage(ScreenType.INNER), Keys.homePageCount(ScreenType.INNER))) {
                 val raw = p.asMap()[key] ?: continue
@@ -56,8 +95,11 @@ class SettingsRepository @Inject constructor(
                         ?.coerceIn(0L, HomeLayoutRepository.MAX_PAGES.toLong())?.toInt() ?: 0
                 }
             }
+            splitProfilesOnce(p)
         }
-    }.map { p ->
+    }
+
+    private fun readSettings(p: Preferences, screenType: ScreenType): LauncherSettings = p.let {
         // Clamp the numeric values on read as well as on write: a stale/garbage value left in the
         // store during development (e.g. homeColumns = 0) must never reach the layout math, where a
         // zero column count would spin firstFreeCell() in an infinite loop.
@@ -68,14 +110,28 @@ class SettingsRepository @Inject constructor(
             homeRows = (p[Keys.homeRows(screenType)] ?: HomeLayoutRepository.ROWS).coerceIn(MIN_ROWS, MAX_ROWS),
             drawerColumns = (p[Keys.drawerColumns(screenType)] ?: if (screenType == ScreenType.INNER) 6 else 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
             drawerRows = (p[Keys.drawerRows(screenType)] ?: 6).coerceIn(MIN_DRAWER_ROWS, MAX_DRAWER_ROWS),
-            showDrawerSearch = p[Keys.showDrawerSearch(screenType)] ?: p[Keys.SHOW_DRAWER_SEARCH] ?: true,
-            showDockLabels = p[Keys.showDockLabels(screenType)] ?: p[Keys.SHOW_DOCK_LABELS] ?: false,
-            showHomeLabels = p[Keys.showHomeLabels(screenType)] ?: p[Keys.SHOW_HOME_LABELS] ?: true,
-            showDrawerLabels = p[Keys.showDrawerLabels(screenType)] ?: p[Keys.SHOW_DRAWER_LABELS] ?: true,
-            showFrequentApps = p[Keys.showFrequentApps(screenType)] ?: p[Keys.SHOW_FREQUENT_APPS] ?: false,
+            showDrawerSearch = p[Keys.showDrawerSearch(screenType)] ?: true,
+            showDockLabels = p[Keys.showDockLabels(screenType)] ?: false,
+            showHomeLabels = p[Keys.showHomeLabels(screenType)] ?: true,
+            showDrawerLabels = p[Keys.showDrawerLabels(screenType)] ?: true,
+            showFrequentApps = p[Keys.showFrequentApps(screenType)] ?: false,
             drawerSearchPosition = (p[Keys.drawerSearchPosition(screenType)] ?: LauncherSettings.SEARCH_TOP)
                 .let { if (it == LauncherSettings.SEARCH_BOTTOM) it else LauncherSettings.SEARCH_TOP },
             drawerIndexBarEnabled = p[Keys.drawerIndexBarEnabled(screenType)] ?: true,
+            azIndexScale = (p[Keys.azIndexScale(screenType)] ?: 1f).coerceIn(LauncherSettings.MIN_AZ_INDEX_SCALE, LauncherSettings.MAX_AZ_INDEX_SCALE),
+            drawerHandleStyle = if (p[Keys.drawerHandleStyle(screenType)] == LauncherSettings.DRAWER_HANDLE_ARROW) {
+                LauncherSettings.DRAWER_HANDLE_ARROW
+            } else LauncherSettings.DRAWER_HANDLE_BAR,
+            drawerBottomSpace = (p[Keys.drawerBottomSpace(screenType)] ?: 0).coerceIn(0, LauncherSettings.MAX_DRAWER_BOTTOM_SPACE),
+            drawerLetterHeaders = p[Keys.drawerLetterHeaders(screenType)] ?: false,
+            drawerLargeLetterPopup = p[Keys.drawerLargeLetterPopup(screenType)] ?: true,
+            drawerSwipeTabs = p[Keys.drawerSwipeTabs(screenType)] ?: true,
+            drawerFlickClose = p[Keys.drawerFlickClose(screenType)] ?: false,
+            forceThemedIcons = p[Keys.FORCE_THEMED_ICONS] ?: false,
+            themedIconStyle = (p[Keys.THEMED_ICON_STYLE] ?: LauncherSettings.THEMED_STYLE_CLASSIC)
+                .let { if (it in LauncherSettings.THEMED_STYLES) it else LauncherSettings.THEMED_STYLE_CLASSIC },
+            drawerCornerRadius = (p[Keys.drawerCornerRadius(screenType)] ?: LauncherSettings.DRAWER_CORNER_AUTO)
+                .coerceIn(LauncherSettings.DRAWER_CORNER_AUTO, LauncherSettings.MAX_DRAWER_CORNER_RADIUS),
             azIndexPosition = (p[Keys.azIndexPosition(screenType)] ?: LauncherSettings.AZ_POSITION_VERTICAL_RIGHT).let {
                 if (it == LauncherSettings.AZ_POSITION_VERTICAL_LEFT ||
                     it == LauncherSettings.AZ_POSITION_HORIZONTAL_TOP ||
@@ -96,48 +152,46 @@ class SettingsRepository @Inject constructor(
                         it == LauncherSettings.DRAWER_STYLE_STANDARD_GRID) it
                     else LauncherSettings.DRAWER_STYLE_STANDARD_GRID
                 },
-            drawerThemeTint = (p[Keys.drawerThemeTint(screenType)] ?: LauncherSettings.DRAWER_THEME_DEFAULT_DARK)
-                .let {
-                    if (it == LauncherSettings.DRAWER_THEME_OBSIDIAN_BLACK ||
-                        it == LauncherSettings.DRAWER_THEME_ACCENT_TINT ||
-                        it == LauncherSettings.DRAWER_THEME_MONOCHROME ||
-                        it == LauncherSettings.DRAWER_THEME_DEFAULT_DARK) it
-                    else LauncherSettings.DRAWER_THEME_DEFAULT_DARK
-                },
-            drawerAccentColor = p[Keys.drawerAccentColor(screenType)] ?: 0xFF00B0FF.toInt(),
+            drawerThemeTint = (p[Keys.drawerThemeTint(screenType)] ?: LauncherSettings.DRAWER_THEME_SYSTEM)
+                .let { if (it in LauncherSettings.DRAWER_THEMES) it else LauncherSettings.DRAWER_THEME_SYSTEM },
+            drawerAccentColor = p[Keys.drawerAccentColor(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_ACCENT,
+            drawerCustomColor = p[Keys.drawerCustomColor(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_CUSTOM_COLOR,
+            drawerGlassEnabled = p[Keys.drawerGlassEnabled(screenType)] ?: false,
+            drawerPanelOpacity = (p[Keys.drawerPanelOpacity(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_PANEL_OPACITY)
+                .coerceIn(LauncherSettings.MIN_DRAWER_PANEL_OPACITY, LauncherSettings.MAX_DRAWER_PANEL_OPACITY),
             drawerHeightFraction = (p[Keys.drawerHeightFraction(screenType)] ?: 1.0f).coerceIn(0.4f, 1.0f),
             drawerWidthFraction = (p[Keys.drawerWidthFraction(screenType)] ?: 1.0f).coerceIn(0.4f, 1.0f),
             drawerAlignment = (p[Keys.drawerAlignment(screenType)] ?: LauncherSettings.DRAWER_ALIGNMENT_CENTER).let {
                 if (it == LauncherSettings.DRAWER_ALIGNMENT_LEFT || it == LauncherSettings.DRAWER_ALIGNMENT_RIGHT) it else LauncherSettings.DRAWER_ALIGNMENT_CENTER
             },
-            parallaxWallpaper = p[Keys.parallaxWallpaper(screenType)] ?: p[Keys.PARALLAX_WALLPAPER] ?: false,
+            parallaxWallpaper = p[Keys.parallaxWallpaper(screenType)] ?: false,
             drawerLayoutMode = (p[Keys.drawerLayoutMode(screenType)] ?: LauncherSettings.DRAWER_LAYOUT_GRID).let {
                 if (it == LauncherSettings.DRAWER_LAYOUT_LIST) it else LauncherSettings.DRAWER_LAYOUT_GRID
             },
-            dockBackgroundOpacity = (p[Keys.dockBackgroundOpacity(screenType)] ?: p[Keys.DOCK_OPACITY] ?: 0.35f).coerceIn(0f, 1f),
-            showPageIndicator = p[Keys.showPageIndicator(screenType)] ?: p[Keys.SHOW_PAGE_INDICATOR] ?: true,
-            showNotificationDots = p[Keys.SHOW_NOTIF_DOTS] ?: true,
-            notificationDotCount = p[Keys.NOTIF_DOT_COUNT] ?: true,
-            notificationDotScale = (p[Keys.NOTIF_DOT_SCALE] ?: 1.0f).coerceIn(MIN_DOT_SCALE, MAX_DOT_SCALE),
-            useThemedIcons = p[Keys.USE_THEMED_ICONS] ?: false,
-            iconPackPackage = p[Keys.ICON_PACK] ?: "",
+            dockBackgroundOpacity = (p[Keys.dockBackgroundOpacity(screenType)] ?: 0.35f).coerceIn(0f, 1f),
+            showPageIndicator = p[Keys.showPageIndicator(screenType)] ?: true,
+            showNotificationDots = p[Keys.showNotificationDots(screenType)] ?: true,
+            notificationDotCount = p[Keys.notificationDotCount(screenType)] ?: true,
+            notificationDotScale = (p[Keys.notificationDotScale(screenType)] ?: 1.0f).coerceIn(MIN_DOT_SCALE, MAX_DOT_SCALE),
+            useThemedIcons = p[Keys.useThemedIcons(screenType)] ?: false,
+            iconPackPackage = p[Keys.iconPackPackage(screenType)] ?: "",
             searchContacts = p[Keys.SEARCH_CONTACTS] ?: false,
-            leftSwipeAppKey = p[Keys.leftSwipeAppKey(screenType)] ?: p[Keys.LEFT_SWIPE_APP_KEY] ?: "",
+            leftSwipeAppKey = p[Keys.leftSwipeAppKey(screenType)] ?: "",
             rightSwipeAppKey = p[Keys.rightSwipeAppKey(screenType)] ?: "",
             desktopLocked = p[Keys.DESKTOP_LOCKED] ?: false,
-            drawerOpensAtTop = p[Keys.drawerOpensAtTop(screenType)] ?: p[Keys.DRAWER_OPENS_AT_TOP] ?: true,
-            appLabelTextScale = (p[Keys.appLabelTextScale(screenType)] ?: p[Keys.APP_LABEL_SCALE] ?: 1.0f).coerceIn(MIN_LABEL_SCALE, MAX_LABEL_SCALE),
-            twoLineHomeLabels = p[Keys.twoLineHomeLabels(screenType)] ?: p[Keys.TWO_LINE_HOME_LABELS] ?: false,
-            twoLineDrawerLabels = p[Keys.twoLineDrawerLabels(screenType)] ?: p[Keys.TWO_LINE_DRAWER_LABELS] ?: true,
-            appLabelColor = p[Keys.appLabelColor(screenType)] ?: p[Keys.APP_LABEL_COLOR] ?: 0xFFFFFFFF.toInt(),
-            showStatusBar = p[Keys.showStatusBar(screenType)] ?: p[Keys.SHOW_STATUS_BAR] ?: false,
-            showWeather = p[Keys.SHOW_WEATHER] ?: true,
-            hideSystemStatusBar = p[Keys.hideSystemStatusBar(screenType)] ?: p[Keys.HIDE_SYSTEM_STATUS_BAR] ?: false,
-            statusBarScrimOpacity = (p[Keys.statusBarScrimOpacity(screenType)] ?: p[Keys.STATUS_BAR_SCRIM] ?: 0.6f).coerceIn(0f, 1f),
-            widgetTonalBackground = p[Keys.WIDGET_TONAL_BACKGROUND] ?: false,
-            notificationWidgetCountStyle = (p[Keys.NOTIF_WIDGET_COUNT_STYLE] ?: LauncherSettings.COUNT_NUMBER)
+            drawerOpensAtTop = p[Keys.drawerOpensAtTop(screenType)] ?: true,
+            appLabelTextScale = (p[Keys.appLabelTextScale(screenType)] ?: 1.0f).coerceIn(MIN_LABEL_SCALE, MAX_LABEL_SCALE),
+            twoLineHomeLabels = p[Keys.twoLineHomeLabels(screenType)] ?: false,
+            twoLineDrawerLabels = p[Keys.twoLineDrawerLabels(screenType)] ?: true,
+            appLabelColor = p[Keys.appLabelColor(screenType)] ?: 0xFFFFFFFF.toInt(),
+            showStatusBar = p[Keys.showStatusBar(screenType)] ?: false,
+            showWeather = p[Keys.showWeather(screenType)] ?: true,
+            hideSystemStatusBar = p[Keys.hideSystemStatusBar(screenType)] ?: false,
+            statusBarScrimOpacity = (p[Keys.statusBarScrimOpacity(screenType)] ?: 0.6f).coerceIn(0f, 1f),
+            widgetTonalBackground = p[Keys.widgetTonalBackground(screenType)] ?: false,
+            notificationWidgetCountStyle = (p[Keys.notificationWidgetCountStyle(screenType)] ?: LauncherSettings.COUNT_NUMBER)
                 .let { if (it == LauncherSettings.COUNT_DOT || it == LauncherSettings.COUNT_NONE) it else LauncherSettings.COUNT_NUMBER },
-            doubleTapToLock = p[Keys.doubleTapToLock(screenType)] ?: p[Keys.DOUBLE_TAP_LOCK] ?: false,
+            doubleTapToLock = p[Keys.doubleTapToLock(screenType)] ?: false,
             peoplePrivacy = (p[Keys.PEOPLE_PRIVACY] ?: LauncherSettings.PRIVACY_ALL).let {
                 if (it == LauncherSettings.PRIVACY_SENDER || it == LauncherSettings.PRIVACY_COUNT) it
                 else LauncherSettings.PRIVACY_ALL
@@ -149,20 +203,19 @@ class SettingsRepository @Inject constructor(
             peopleBatchTimes = (p[Keys.PEOPLE_BATCH_TIMES] ?: LauncherSettings.DEFAULT_BATCH_TIMES)
                 .let { BatchSchedule.parse(it) }
                 .let { if (it.isEmpty()) LauncherSettings.DEFAULT_BATCH_TIMES else BatchSchedule.format(it) },
-            workspaceDensity = (p[Keys.workspaceDensity(screenType)] ?: LauncherSettings.DENSITY_NORMAL).let {
-                if (it == LauncherSettings.DENSITY_COMPACT || it == LauncherSettings.DENSITY_SPACIOUS) it else LauncherSettings.DENSITY_NORMAL
-            },
             allowLandscape = p[Keys.allowLandscape(screenType)] ?: false,
             swipeDownAction = (p[Keys.swipeDownAction(screenType)] ?: LauncherSettings.GESTURE_NOTIFICATIONS).let {
-                if (it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_NONE) it else LauncherSettings.GESTURE_NOTIFICATIONS
+                if (it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_NONE || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NOTIFICATIONS
             },
             doubleTapAction = (p[Keys.doubleTapAction(screenType)] ?: LauncherSettings.GESTURE_NONE).let {
-                if (it == LauncherSettings.GESTURE_NOTIFICATIONS || it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK) it else LauncherSettings.GESTURE_NONE
+                if (it == LauncherSettings.GESTURE_NOTIFICATIONS || it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NONE
             },
             swipeUpAction = (p[Keys.swipeUpAction(screenType)] ?: LauncherSettings.GESTURE_DRAWER).let {
                 if (it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_NONE) it else LauncherSettings.GESTURE_DRAWER
             },
             halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
+            splitLaunchEnabled = p[Keys.SPLIT_LAUNCH_ENABLED] ?: true,
+            floatingLaunchEnabled = p[Keys.FLOATING_LAUNCH_ENABLED] ?: true,
             amoledDark = p[Keys.amoledDark(screenType)] ?: false,
             foldAction = (p[Keys.foldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
                 if (it == LauncherSettings.ACTION_PAGE_0 || it == LauncherSettings.ACTION_LOCK) it else LauncherSettings.ACTION_STAY
@@ -170,10 +223,9 @@ class SettingsRepository @Inject constructor(
             unfoldAction = (p[Keys.unfoldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
                 if (it == LauncherSettings.ACTION_SEARCH || it == LauncherSettings.ACTION_DRAWER) it else LauncherSettings.ACTION_STAY
             },
-            innerTaskbarEnabled = p[Keys.innerTaskbarEnabled(screenType)] ?: true,
             outerWallpaperScale = (p[Keys.OUTER_WALLPAPER_SCALE] ?: 1.0f).coerceIn(1.0f, 2.5f),
             innerWallpaperScale = (p[Keys.INNER_WALLPAPER_SCALE] ?: 1.0f).coerceIn(1.0f, 2.5f),
-            foldTransitionStyle = (p[Keys.foldTransitionStyle(screenType)] ?: p[Keys.FOLD_TRANSITION_STYLE] ?: LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP).let {
+            foldTransitionStyle = (p[Keys.foldTransitionStyle(screenType)] ?: LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP).let {
                 if (it == LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP ||
                     it == LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE ||
                     it == LauncherSettings.TRANSITION_CROSSFADE ||
@@ -184,6 +236,113 @@ class SettingsRepository @Inject constructor(
             aquamorphicTouchEnabled = p[Keys.aquamorphicTouchEnabled(screenType)] ?: true,
             appLaunchZoomEnabled = p[Keys.appLaunchZoomEnabled(screenType)] ?: true,
             pageBounceEnabled = p[Keys.pageBounceEnabled(screenType)] ?: true,
+            iconSizeScale = (p[Keys.iconSizeScale(screenType)] ?: 1.0f)
+                .coerceIn(LauncherSettings.MIN_ICON_SIZE_SCALE, LauncherSettings.MAX_ICON_SIZE_SCALE),
+            folderShape = (p[Keys.folderShape(screenType)] ?: LauncherSettings.FOLDER_SHAPE_SQUIRCLE)
+                .let { if (it in LauncherSettings.FOLDER_SHAPES) it else LauncherSettings.FOLDER_SHAPE_SQUIRCLE },
+            folderTheme = (p[Keys.folderTheme(screenType)] ?: LauncherSettings.FOLDER_THEME_GLASS)
+                .let { if (it in LauncherSettings.FOLDER_THEMES) it else LauncherSettings.FOLDER_THEME_GLASS },
+            folderPreview = (p[Keys.folderPreview(screenType)] ?: LauncherSettings.FOLDER_PREVIEW_GRID_2)
+                .let { if (it in LauncherSettings.FOLDER_PREVIEWS) it else LauncherSettings.FOLDER_PREVIEW_GRID_2 },
+            folderOpenColumns = (p[Keys.folderOpenColumns(screenType)] ?: 4)
+                .coerceIn(LauncherSettings.MIN_FOLDER_OPEN_COLUMNS, LauncherSettings.MAX_FOLDER_OPEN_COLUMNS),
+            folderOpenSize = (p[Keys.folderOpenSize(screenType)] ?: LauncherSettings.FOLDER_OPEN_MEDIUM)
+                .let { if (it in LauncherSettings.FOLDER_OPEN_SIZES) it else LauncherSettings.FOLDER_OPEN_MEDIUM },
+            folderTapFirstApp = p[Keys.folderTapFirstApp(screenType)] ?: false,
+            popupTheme = (p[Keys.popupTheme(screenType)] ?: LauncherSettings.POPUP_THEME_CLASSIC).let { if (it in LauncherSettings.POPUP_THEMES) it else LauncherSettings.POPUP_THEME_CLASSIC },
+            stackAutoRotateSeconds = (p[Keys.stackAutoRotateSeconds(screenType)] ?: 0).coerceIn(0, LauncherSettings.MAX_STACK_AUTO_ROTATE_SECONDS),
+            stackCornerRadius = (p[Keys.stackCornerRadius(screenType)] ?: 24).coerceIn(0, LauncherSettings.MAX_STACK_CORNER_RADIUS),
+            stackIndicator = (p[Keys.stackIndicator(screenType)] ?: LauncherSettings.STACK_INDICATOR_DOTS).let { if (it in LauncherSettings.STACK_INDICATORS) it else LauncherSettings.STACK_INDICATOR_DOTS },
+            stackShowPill = p[Keys.stackShowPill(screenType)] ?: false,
+            dotShape = (p[Keys.dotShape(screenType)] ?: LauncherSettings.DOT_SHAPE_CIRCLE).let { if (it in LauncherSettings.DOT_SHAPES) it else LauncherSettings.DOT_SHAPE_CIRCLE },
+            dotColor = (p[Keys.dotColor(screenType)] ?: LauncherSettings.DOT_COLOR_RED).let { if (it in LauncherSettings.DOT_COLORS) it else LauncherSettings.DOT_COLOR_RED },
+            dotPosition = (p[Keys.dotPosition(screenType)] ?: LauncherSettings.DOT_POSITION_TOP_END).let { if (it in LauncherSettings.DOT_POSITIONS) it else LauncherSettings.DOT_POSITION_TOP_END },
+            homeWallpaperDim = (p[Keys.homeWallpaperDim(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_DIM),
+            homeWallpaperBlur = (p[Keys.homeWallpaperBlur(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_BLUR),
+            homeBackgroundImage = p[Keys.homeBackgroundImage(screenType)] ?: "",
+            iconSwipeUpAction = (p[Keys.iconSwipeUpAction(screenType)] ?: LauncherSettings.ICON_SWIPE_NONE).let { if (it in LauncherSettings.ICON_SWIPES) it else LauncherSettings.ICON_SWIPE_NONE },
+            autoRemoveEmptyPages = p[Keys.autoRemoveEmptyPages(screenType)] ?: false,
+            newPageOnDrag = p[Keys.newPageOnDrag(screenType)] ?: false,
+            drawerFolderTabs = p[Keys.drawerFolderTabs(screenType)] ?: false,
+            floatingWindowSize = (p[Keys.FLOATING_WINDOW_SIZE] ?: LauncherSettings.FLOATING_SIZE_MEDIUM)
+                .let { if (it in LauncherSettings.FLOATING_SIZES) it else LauncherSettings.FLOATING_SIZE_MEDIUM },
+            mediaWidgetTheme = (p[Keys.MEDIA_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+            appsWidgetTheme = (p[Keys.APPS_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+            statsWidgetTheme = (p[Keys.STATS_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+            noteWidgetTheme = (p[Keys.NOTE_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+            mediaWidgetArtwork = p[Keys.MEDIA_WIDGET_ARTWORK] ?: true,
+            appsWidgetLabels = p[Keys.APPS_WIDGET_LABELS] ?: false,
+            statsShowBattery = p[Keys.STATS_SHOW_BATTERY] ?: true,
+            statsShowStorage = p[Keys.STATS_SHOW_STORAGE] ?: true,
+            statsShowMemory = p[Keys.STATS_SHOW_MEMORY] ?: true,
+            statsShowBluetooth = p[Keys.STATS_SHOW_BLUETOOTH] ?: true,
+            noteWidgetTextSize = (p[Keys.NOTE_WIDGET_TEXT_SIZE] ?: LauncherSettings.FOLDER_OPEN_MEDIUM)
+                .let { if (it in LauncherSettings.FOLDER_OPEN_SIZES) it else LauncherSettings.FOLDER_OPEN_MEDIUM },
+            noteWidgetText = p[Keys.NOTE_WIDGET_TEXT] ?: "",
+            searchShortcuts = p[Keys.SEARCH_SHORTCUTS] ?: true,
+            searchWeb = p[Keys.SEARCH_WEB] ?: true,
+            animationSpeed = (p[Keys.ANIMATION_SPEED] ?: 1f).coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED),
+            appOpenAnimation = (p[Keys.APP_OPEN_ANIMATION] ?: LauncherSettings.APP_OPEN_ICON)
+                .let { if (it in LauncherSettings.APP_OPENS) it else LauncherSettings.APP_OPEN_ICON },
+            folderOpenAnimation = (p[Keys.FOLDER_OPEN_ANIMATION] ?: LauncherSettings.FOLDER_ANIM_SHEET)
+                .let { if (it in LauncherSettings.FOLDER_ANIMS) it else LauncherSettings.FOLDER_ANIM_SHEET },
+            pageScrollEffect = (p[Keys.PAGE_SCROLL_EFFECT] ?: LauncherSettings.PAGE_EFFECT_SLIDE)
+                .let { if (it in LauncherSettings.PAGE_EFFECTS) it else LauncherSettings.PAGE_EFFECT_SLIDE },
+            taskbarEnabled = p[Keys.TASKBAR_ENABLED] ?: false,
+            taskbarPinnedApps = p[Keys.TASKBAR_PINNED]?.split("\n")?.filter { it.isNotEmpty() },
+            taskbarRecentCount = (p[Keys.TASKBAR_RECENTS] ?: 4).coerceIn(0, 6),
+            taskbarIconSize = (p[Keys.TASKBAR_ICON_SIZE] ?: 48).coerceIn(32, 72),
+            taskbarIconSpacing = (p[Keys.TASKBAR_SPACING] ?: 8).coerceIn(0, 24),
+            taskbarBottomOffset = (p[Keys.TASKBAR_BOTTOM] ?: 12).coerceIn(0, 64),
+            taskbarTheme = (p[Keys.TASKBAR_THEME] ?: LauncherSettings.TASKBAR_THEME_CLEAR).let {
+                if (it in LauncherSettings.TASKBAR_THEMES) it else LauncherSettings.TASKBAR_THEME_CLEAR
+            },
+            taskbarOpacity = (p[Keys.TASKBAR_OPACITY] ?: 0.8f).coerceIn(0.1f, 1f),
+            taskbarHandles = p[Keys.TASKBAR_HANDLES] ?: LauncherSettings.TASKBAR_HANDLES_BOTH,
+            taskbarOnHome = p[Keys.TASKBAR_ON_HOME] ?: true,
+            taskbarKeepOpen = p[Keys.TASKBAR_KEEP_OPEN] ?: false,
+            taskbarMediaEnabled = p[Keys.TASKBAR_MEDIA] ?: true,
+            taskbarMediaShowPaused = p[Keys.TASKBAR_MEDIA_PAUSED] ?: true,
+            taskbarMediaPosition = p[Keys.TASKBAR_MEDIA_POSITION] ?: LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE,
+            taskbarMediaTap = p[Keys.TASKBAR_MEDIA_TAP] ?: LauncherSettings.TASKBAR_MEDIA_TAP_OPEN,
+            taskbarMediaControls = p[Keys.TASKBAR_MEDIA_CONTROLS] ?: true,
+            taskbarMediaShape = p[Keys.TASKBAR_MEDIA_SHAPE] ?: LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE,
+            taskbarMediaBadge = p[Keys.TASKBAR_MEDIA_BADGE] ?: true,
+            taskbarSystemDrag = p[Keys.TASKBAR_SYSTEM_DRAG] ?: true,
+            taskbarRecentsButton = p[Keys.TASKBAR_RECENTS_BUTTON] ?: LauncherSettings.TASKBAR_RECENTS_SYSTEM,
+            taskbarQuickSwitch = p[Keys.TASKBAR_QUICK_SWITCH] ?: true,
+            taskbarSplitControls = p[Keys.TASKBAR_SPLIT_CONTROLS] ?: true,
+            taskbarSplitSide = p[Keys.TASKBAR_SPLIT_SIDE] ?: LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT,
+            taskbarThreeApp = p[Keys.TASKBAR_THREE_APP] ?: true,
+            settingsStyle = p[Keys.SETTINGS_STYLE] ?: LauncherSettings.SETTINGS_STYLE_STUDIO,
+            iconShape = (p[Keys.ICON_SHAPE] ?: LauncherSettings.ICON_SHAPE_SYSTEM)
+                .let { if (it in LauncherSettings.ICON_SHAPES) it else LauncherSettings.ICON_SHAPE_SYSTEM },
+            motoWeatherTap = p[Keys.MOTO_WEATHER_TAP] ?: true,
+            showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
+            weatherWidgetAnimated = p[Keys.WEATHER_WIDGET_ANIMATED] ?: true,
+            clockWidgetDarkText = p[Keys.CLOCK_WIDGET_DARK_TEXT] ?: false,
+            clockWidgetGlassEffect = p[Keys.CLOCK_WIDGET_GLASS_EFFECT] ?: true,
+            clockMinuteColor = (p[Keys.CLOCK_MINUTE_COLOR] ?: LauncherSettings.CLOCK_MINUTE_STYLE).let {
+                if (it in LauncherSettings.CLOCK_MINUTE_COLORS) it else LauncherSettings.CLOCK_MINUTE_STYLE
+            },
+            clockMinuteOpacity = (p[Keys.CLOCK_MINUTE_OPACITY] ?: 1f).coerceIn(0.1f, 1f),
+            batterySaverMode = when (p[Keys.BATTERY_SAVER_MODE]) {
+                LauncherSettings.BATTERY_SAVER_OFF -> LauncherSettings.BATTERY_SAVER_OFF
+                LauncherSettings.BATTERY_SAVER_ON -> LauncherSettings.BATTERY_SAVER_ON
+                else -> LauncherSettings.BATTERY_SAVER_AUTO
+            },
+            clockWidgetStyle = (p[Keys.CLOCK_WIDGET_STYLE] ?: LauncherSettings.CLOCK_STYLE_CLASSIC)
+                .let { if (it in LauncherSettings.CLOCK_STYLES) it else LauncherSettings.CLOCK_STYLE_CLASSIC },
+            appFontFamily = (p[Keys.appFontFamily(screenType)] ?: LauncherSettings.FONT_FAMILY_DEFAULT).let {
+                if (it in LauncherSettings.FONT_FAMILIES) it else LauncherSettings.FONT_FAMILY_DEFAULT
+            },
+            appFontBold = p[Keys.appFontBold(screenType)] ?: false,
+            appFontSizeScale = (p[Keys.appFontSizeScale(screenType)] ?: 1.0f).coerceIn(0.7f, 1.4f),
+            widgetBackgroundOpacity = (p[Keys.WIDGET_BACKGROUND_OPACITY] ?: 0f).coerceIn(0f, 1f),
             dpiWorkspace = (p[Keys.dpiWorkspace(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
             dpiAppDrawer = (p[Keys.dpiAppDrawer(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
             dpiSettings = (p[Keys.dpiSettings(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
@@ -195,7 +354,7 @@ class SettingsRepository @Inject constructor(
         )
     }
 
-    val appPairs: Flow<List<AppPair>> = dataStore.data.map { p -> parseAppPairs(p[Keys.APP_PAIRS]) }
+    val appPairs: Flow<List<AppPair>> = keyFlow(Keys.APP_PAIRS) { parseAppPairs(it) }
 
     suspend fun saveAppPair(pair: AppPair) = edit { p ->
         val current = parseAppPairs(p[Keys.APP_PAIRS]).toMutableList()
@@ -224,6 +383,11 @@ class SettingsRepository @Inject constructor(
                 app2Package = parts[7],
                 app2ClassName = parts[8],
                 app2UserSerial = parts[9].toLongOrNull() ?: 0L,
+                // Optional third (floating) app — absent in pairs saved by older versions.
+                app3Key = parts.getOrNull(10).orEmpty(),
+                app3Package = parts.getOrNull(11).orEmpty(),
+                app3ClassName = parts.getOrNull(12).orEmpty(),
+                app3UserSerial = parts.getOrNull(13)?.toLongOrNull() ?: 0L,
             )
         } ?: emptyList()
 
@@ -240,23 +404,181 @@ class SettingsRepository @Inject constructor(
                 p.app2Package,
                 p.app2ClassName,
                 p.app2UserSerial.toString(),
+                p.app3Key,
+                p.app3Package,
+                p.app3ClassName,
+                p.app3UserSerial.toString(),
             ).joinToString("\t")
         }
 
     suspend fun setFoldAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.foldAction(screenType)] = value }
     suspend fun setUnfoldAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.unfoldAction(screenType)] = value }
-    suspend fun setInnerTaskbarEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.innerTaskbarEnabled(screenType)] = value }
     suspend fun setOuterWallpaperScale(value: Float) = edit { it[Keys.OUTER_WALLPAPER_SCALE] = value.coerceIn(1.0f, 2.5f) }
     suspend fun setInnerWallpaperScale(value: Float) = edit { it[Keys.INNER_WALLPAPER_SCALE] = value.coerceIn(1.0f, 2.5f) }
     suspend fun setFoldTransitionStyle(value: String, screenType: ScreenType = ScreenType.OUTER) = edit {
         it[Keys.foldTransitionStyle(screenType)] = value
-        if (screenType == ScreenType.OUTER) {
-            it[Keys.FOLD_TRANSITION_STYLE] = value
-        }
     }
     suspend fun setAquamorphicTouchEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.aquamorphicTouchEnabled(screenType)] = value }
     suspend fun setAppLaunchZoomEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.appLaunchZoomEnabled(screenType)] = value }
     suspend fun setPageBounceEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.pageBounceEnabled(screenType)] = value }
+    suspend fun setIconSizeScale(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.iconSizeScale(screenType)] =
+            value.coerceIn(LauncherSettings.MIN_ICON_SIZE_SCALE, LauncherSettings.MAX_ICON_SIZE_SCALE)
+    }
+    suspend fun setFolderShape(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.folderShape(screenType)] = value }
+    suspend fun setFolderTheme(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.folderTheme(screenType)] = value }
+    suspend fun setFolderPreview(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.folderPreview(screenType)] = value }
+    suspend fun setFolderOpenColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.folderOpenColumns(screenType)] =
+            value.coerceIn(LauncherSettings.MIN_FOLDER_OPEN_COLUMNS, LauncherSettings.MAX_FOLDER_OPEN_COLUMNS)
+    }
+    suspend fun setFolderOpenSize(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.folderOpenSize(screenType)] = value }
+    suspend fun setFolderTapFirstApp(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.folderTapFirstApp(screenType)] = value }
+    suspend fun setPopupTheme(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.popupTheme(screenType)] = value }
+    suspend fun setStackAutoRotateSeconds(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.stackAutoRotateSeconds(screenType)] = value.coerceIn(0, LauncherSettings.MAX_STACK_AUTO_ROTATE_SECONDS)
+    }
+    suspend fun setStackCornerRadius(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.stackCornerRadius(screenType)] = value.coerceIn(0, LauncherSettings.MAX_STACK_CORNER_RADIUS) }
+    suspend fun setStackIndicator(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.stackIndicator(screenType)] = value }
+    suspend fun setStackShowPill(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.stackShowPill(screenType)] = value }
+    suspend fun setDotShape(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dotShape(screenType)] = value }
+    suspend fun setDotColor(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dotColor(screenType)] = value }
+    suspend fun setDotPosition(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dotPosition(screenType)] = value }
+    suspend fun setHomeWallpaperDim(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeWallpaperDim(screenType)] = value.coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_DIM) }
+    suspend fun setHomeWallpaperBlur(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeWallpaperBlur(screenType)] = value.coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_BLUR) }
+    suspend fun setHomeBackgroundImage(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeBackgroundImage(screenType)] = value }
+    suspend fun setIconSwipeUpAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.iconSwipeUpAction(screenType)] = value }
+    suspend fun setNewPageOnDrag(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.newPageOnDrag(screenType)] = value }
+    suspend fun setAutoRemoveEmptyPages(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.autoRemoveEmptyPages(screenType)] = value }
+    suspend fun setDrawerFolderTabs(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerFolderTabs(screenType)] = value }
+    suspend fun setFloatingWindowSize(value: String) = edit { it[Keys.FLOATING_WINDOW_SIZE] = value }
+    suspend fun setSearchShortcuts(value: Boolean) = edit { it[Keys.SEARCH_SHORTCUTS] = value }
+    suspend fun setSearchWeb(value: Boolean) = edit { it[Keys.SEARCH_WEB] = value }
+    suspend fun setAnimationSpeed(value: Float) = edit {
+        it[Keys.ANIMATION_SPEED] = value.coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED)
+    }
+    suspend fun setAppOpenAnimation(value: String) = edit { it[Keys.APP_OPEN_ANIMATION] = value }
+    suspend fun setFolderOpenAnimation(value: String) = edit { it[Keys.FOLDER_OPEN_ANIMATION] = value }
+    suspend fun setPageScrollEffect(value: String) = edit { it[Keys.PAGE_SCROLL_EFFECT] = value }
+    suspend fun setWidgetBackgroundOpacity(value: Float) = edit { it[Keys.WIDGET_BACKGROUND_OPACITY] = value.coerceIn(0f, 1f) }
+    /** The place typed in for the weather ("name<TAB>latitude<TAB>longitude"); "" = use the device's location. */
+    val weatherLocation: Flow<String> = keyFlow(Keys.WEATHER_LOCATION) { it ?: "" }
+    suspend fun setWeatherLocation(value: String) = edit { it[Keys.WEATHER_LOCATION] = value }
+    suspend fun setBatterySaverMode(value: String) = edit { it[Keys.BATTERY_SAVER_MODE] = value }
+    suspend fun setClockWidgetStyle(value: String) = edit { it[Keys.CLOCK_WIDGET_STYLE] = value }
+    suspend fun setClockWidgetDarkText(value: Boolean) = edit { it[Keys.CLOCK_WIDGET_DARK_TEXT] = value }
+    suspend fun setClockWidgetGlassEffect(value: Boolean) = edit { it[Keys.CLOCK_WIDGET_GLASS_EFFECT] = value }
+    suspend fun setClockMinuteColor(value: String) = edit { it[Keys.CLOCK_MINUTE_COLOR] = value }
+    suspend fun setClockMinuteOpacity(value: Float) = edit { it[Keys.CLOCK_MINUTE_OPACITY] = value.coerceIn(0.1f, 1f) }
+    suspend fun setAppFontFamily(value: String, st: ScreenType) = edit { it[Keys.appFontFamily(st)] = value }
+    suspend fun setAppFontBold(value: Boolean, st: ScreenType) = edit { it[Keys.appFontBold(st)] = value }
+    suspend fun setAppFontSizeScale(value: Float, st: ScreenType) = edit { it[Keys.appFontSizeScale(st)] = value.coerceIn(0.7f, 1.4f) }
+    suspend fun setWeatherWidgetAnimated(value: Boolean) = edit { it[Keys.WEATHER_WIDGET_ANIMATED] = value }
+    suspend fun setTaskbarEnabled(value: Boolean) = edit { it[Keys.TASKBAR_ENABLED] = value }
+    /** Null goes back to the inner dock's apps. */
+    suspend fun setTaskbarPinned(keys: List<String>?) = edit { p ->
+        p.remove(Keys.TASKBAR_PINNED)
+        if (keys != null) p[Keys.TASKBAR_PINNED] = keys.distinct().joinToString("\n")
+    }
+    suspend fun setTaskbarRecentCount(value: Int) = edit { it[Keys.TASKBAR_RECENTS] = value.coerceIn(0, 6) }
+    suspend fun setTaskbarIconSize(value: Int) = edit { it[Keys.TASKBAR_ICON_SIZE] = value.coerceIn(32, 72) }
+    suspend fun setTaskbarIconSpacing(value: Int) = edit { it[Keys.TASKBAR_SPACING] = value.coerceIn(0, 24) }
+    suspend fun setTaskbarBottomOffset(value: Int) = edit { it[Keys.TASKBAR_BOTTOM] = value.coerceIn(0, 64) }
+    suspend fun setTaskbarTheme(value: String) = edit { it[Keys.TASKBAR_THEME] = value }
+    suspend fun setTaskbarOpacity(value: Float) = edit { it[Keys.TASKBAR_OPACITY] = value.coerceIn(0.1f, 1f) }
+    suspend fun setTaskbarHandles(value: String) = edit { it[Keys.TASKBAR_HANDLES] = value }
+    suspend fun setTaskbarOnHome(value: Boolean) = edit { it[Keys.TASKBAR_ON_HOME] = value }
+    suspend fun setTaskbarKeepOpen(value: Boolean) = edit { it[Keys.TASKBAR_KEEP_OPEN] = value }
+    suspend fun setTaskbarMediaEnabled(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA] = value }
+    suspend fun setTaskbarMediaShowPaused(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA_PAUSED] = value }
+    suspend fun setTaskbarMediaPosition(value: String) = edit { it[Keys.TASKBAR_MEDIA_POSITION] = value }
+    suspend fun setTaskbarMediaTap(value: String) = edit { it[Keys.TASKBAR_MEDIA_TAP] = value }
+    suspend fun setTaskbarMediaControls(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA_CONTROLS] = value }
+    suspend fun setTaskbarMediaShape(value: String) = edit { it[Keys.TASKBAR_MEDIA_SHAPE] = value }
+    suspend fun setTaskbarMediaBadge(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA_BADGE] = value }
+    suspend fun setTaskbarSystemDrag(value: Boolean) = edit { it[Keys.TASKBAR_SYSTEM_DRAG] = value }
+    suspend fun setTaskbarRecentsButton(value: String) = edit { it[Keys.TASKBAR_RECENTS_BUTTON] = value }
+    suspend fun setTaskbarQuickSwitch(value: Boolean) = edit { it[Keys.TASKBAR_QUICK_SWITCH] = value }
+    suspend fun setTaskbarSplitControls(value: Boolean) = edit { it[Keys.TASKBAR_SPLIT_CONTROLS] = value }
+    suspend fun setTaskbarSplitSide(value: String) = edit { it[Keys.TASKBAR_SPLIT_SIDE] = value }
+    suspend fun setTaskbarThreeApp(value: Boolean) = edit { it[Keys.TASKBAR_THREE_APP] = value }
+    suspend fun setSettingsStyle(value: String) = edit { it[Keys.SETTINGS_STYLE] = value }
+    suspend fun setIconShape(value: String) = edit { it[Keys.ICON_SHAPE] = value }
+    suspend fun setMotoWeatherTap(value: Boolean) = edit { it[Keys.MOTO_WEATHER_TAP] = value }
+    suspend fun setShowPrivateSpace(value: Boolean) = edit { it[Keys.SHOW_PRIVATE_SPACE] = value }
+
+    /** Per-widget look, home row id → "cornerRadius,padding,opacity" (see the home screen's WidgetLook). */
+    val widgetLooks: Flow<Map<String, String>> = keyFlow(Keys.WIDGET_LOOKS) { parseLabels(it) }
+
+    /** Sets (or, for a null/blank [look], clears) the look of the widget in home row [rowId]. */
+    suspend fun setWidgetLook(rowId: Long, look: String?) = edit { p ->
+        val current = parseLabels(p[Keys.WIDGET_LOOKS]).toMutableMap()
+        if (look.isNullOrBlank()) current.remove(rowId.toString()) else current[rowId.toString()] = look
+        p[Keys.WIDGET_LOOKS] = current.entries.joinToString("\n") { "${it.key}\t${it.value}" }
+    }
+    suspend fun setMediaWidgetTheme(value: String) = edit { it[Keys.MEDIA_WIDGET_THEME] = value }
+    suspend fun setAppsWidgetTheme(value: String) = edit { it[Keys.APPS_WIDGET_THEME] = value }
+    suspend fun setStatsWidgetTheme(value: String) = edit { it[Keys.STATS_WIDGET_THEME] = value }
+    suspend fun setNoteWidgetTheme(value: String) = edit { it[Keys.NOTE_WIDGET_THEME] = value }
+    suspend fun setMediaWidgetArtwork(value: Boolean) = edit { it[Keys.MEDIA_WIDGET_ARTWORK] = value }
+    suspend fun setAppsWidgetLabels(value: Boolean) = edit { it[Keys.APPS_WIDGET_LABELS] = value }
+    suspend fun setStatsShowBattery(value: Boolean) = edit { it[Keys.STATS_SHOW_BATTERY] = value }
+    suspend fun setStatsShowStorage(value: Boolean) = edit { it[Keys.STATS_SHOW_STORAGE] = value }
+    suspend fun setStatsShowMemory(value: Boolean) = edit { it[Keys.STATS_SHOW_MEMORY] = value }
+    suspend fun setStatsShowBluetooth(value: Boolean) = edit { it[Keys.STATS_SHOW_BLUETOOTH] = value }
+    suspend fun setNoteWidgetTextSize(value: String) = edit { it[Keys.NOTE_WIDGET_TEXT_SIZE] = value }
+    /** The quick-note widget's text; capped so a pasted wall of text cannot bloat every settings read. */
+    suspend fun setNoteWidgetText(value: String) = edit { it[Keys.NOTE_WIDGET_TEXT] = value.take(4000) }
+
+    /**
+     * Applies a launcher-wide theme preset to [screenType]: one tap sets the drawer, folders,
+     * long-press menus, notification dots, widget-stack indicator and dock together. Every value
+     * stays an ordinary setting afterwards and can be changed on its own.
+     */
+    suspend fun applyThemePreset(preset: String, screenType: ScreenType) = edit { p ->
+        fun put(drawer: String, glass: Boolean, folder: String, popup: String, dot: String, indicator: String, dock: Float, amoled: Boolean) {
+            p[Keys.drawerThemeTint(screenType)] = drawer
+            p[Keys.drawerGlassEnabled(screenType)] = glass
+            p[Keys.folderTheme(screenType)] = folder
+            p[Keys.popupTheme(screenType)] = popup
+            p[Keys.dotColor(screenType)] = dot
+            p[Keys.stackIndicator(screenType)] = indicator
+            p[Keys.dockBackgroundOpacity(screenType)] = dock
+            p[Keys.amoledDark(screenType)] = amoled
+        }
+        when (preset) {
+            LauncherSettings.THEME_PRESET_GLASS -> put(
+                LauncherSettings.DRAWER_THEME_SYSTEM, true, LauncherSettings.FOLDER_THEME_GLASS,
+                LauncherSettings.POPUP_THEME_MATERIAL, LauncherSettings.DOT_COLOR_ACCENT,
+                LauncherSettings.STACK_INDICATOR_DOTS, 0.35f, false,
+            )
+            LauncherSettings.THEME_PRESET_DARK -> put(
+                LauncherSettings.DRAWER_THEME_OBSIDIAN_BLACK, false, LauncherSettings.FOLDER_THEME_DARK,
+                LauncherSettings.POPUP_THEME_DARK, LauncherSettings.DOT_COLOR_RED,
+                LauncherSettings.STACK_INDICATOR_DOTS, 0.6f, true,
+            )
+            LauncherSettings.THEME_PRESET_LIGHT -> put(
+                LauncherSettings.DRAWER_THEME_LIGHT, false, LauncherSettings.FOLDER_THEME_LIGHT,
+                LauncherSettings.POPUP_THEME_LIGHT, LauncherSettings.DOT_COLOR_RED,
+                LauncherSettings.STACK_INDICATOR_DOTS, 0.5f, false,
+            )
+            LauncherSettings.THEME_PRESET_MONO -> put(
+                LauncherSettings.DRAWER_THEME_MONOCHROME, false, LauncherSettings.FOLDER_THEME_DARK,
+                LauncherSettings.POPUP_THEME_DARK, LauncherSettings.DOT_COLOR_WHITE,
+                LauncherSettings.STACK_INDICATOR_BAR, 0.4f, false,
+            )
+        }
+    }
+
+    /** Hand-picked icons, app key → "packPackage|drawableName" (both displays). */
+    val customIcons: Flow<Map<String, String>> = keyFlow(Keys.CUSTOM_ICONS) { parseLabels(it) }
+
+    /** Sets (or, for a null/blank [icon], clears) the hand-picked icon of the app [key]. */
+    suspend fun setCustomIcon(key: String, icon: String?) = edit { p ->
+        val current = parseLabels(p[Keys.CUSTOM_ICONS]).toMutableMap()
+        if (icon.isNullOrBlank()) current.remove(key) else current[key] = icon
+        p[Keys.CUSTOM_ICONS] = current.entries.joinToString("\n") { "${it.key}\t${it.value}" }
+    }
     suspend fun setDpiWorkspace(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiWorkspace(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }
     suspend fun setDpiAppDrawer(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiAppDrawer(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }
     suspend fun setDpiSettings(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiSettings(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }
@@ -285,8 +607,8 @@ class SettingsRepository @Inject constructor(
     // "key\tdeliverAtEpochMs" per line. Device-local: a notification key means nothing elsewhere.
 
     /** Notification key → local delivery time. Notification text is never persisted. */
-    val heldNotifications: Flow<Map<String, Long>> = dataStore.data.map { p ->
-        p[Keys.PEOPLE_HELD]?.split("\n")?.filter { it.isNotEmpty() }?.mapNotNull { line ->
+    val heldNotifications: Flow<Map<String, Long>> = keyFlow(Keys.PEOPLE_HELD) { raw ->
+        raw?.split("\n")?.filter { it.isNotEmpty() }?.mapNotNull { line ->
             val i = line.indexOf('\t')
             val until = if (i > 0) line.substring(i + 1).toLongOrNull() else null
             if (until == null) null else line.substring(0, i) to until
@@ -301,7 +623,7 @@ class SettingsRepository @Inject constructor(
     // One link per line: "aliasKey\ttargetKey" (both PeopleGrouping.personKey values).
 
     /** alias key → target key. Single-hop: a target is never itself an alias (see [linkPerson]). */
-    val peopleAliases: Flow<Map<String, String>> = dataStore.data.map { p -> parseAliases(p[Keys.PEOPLE_ALIASES]) }
+    val peopleAliases: Flow<Map<String, String>> = keyFlow(Keys.PEOPLE_ALIASES) { parseAliases(it) }
 
     /** Links [alias] to [target]: an existing link on [alias] is replaced, links that pointed at
      *  [alias] follow it to the new target, and a target that is itself an alias resolves first. */
@@ -337,7 +659,7 @@ class SettingsRepository @Inject constructor(
     // normalized at the write point like folder names, so a plain split round-trips.
 
     /** People pinned to the people widget, in pin order. */
-    val pinnedPeople: Flow<List<PinnedPerson>> = dataStore.data.map { p -> parsePinned(p[Keys.PINNED_PEOPLE]) }
+    val pinnedPeople: Flow<List<PinnedPerson>> = keyFlow(Keys.PINNED_PEOPLE) { parsePinned(it) }
 
     /** Pins [person] (replacing an earlier pin with the same key, keeping its position). */
     suspend fun pinPerson(person: PinnedPerson) = edit { p ->
@@ -374,13 +696,13 @@ class SettingsRepository @Inject constructor(
     val dockFavorites: Flow<List<String>> get() = dockFavorites(ScreenType.OUTER)
 
     /** Ordered list of dock favorite app keys (see AppItem.key). */
-    fun dockFavorites(screenType: ScreenType = ScreenType.OUTER): Flow<List<String>> = dataStore.data.map { p ->
-        p[Keys.dockFavorites(screenType)]?.split("\n")?.filter { it.isNotEmpty() } ?: emptyList()
+    fun dockFavorites(screenType: ScreenType = ScreenType.OUTER): Flow<List<String>> = keyFlow(Keys.dockFavorites(screenType)) { raw ->
+        raw?.split("\n")?.filter { it.isNotEmpty() } ?: emptyList()
     }
 
     /** App keys hidden from the app drawer (see AppItem.key). */
-    val hiddenApps: Flow<Set<String>> = dataStore.data.map { p ->
-        p[Keys.HIDDEN_APPS]?.split("\n")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+    val hiddenApps: Flow<Set<String>> = keyFlow(Keys.HIDDEN_APPS) { raw ->
+        raw?.split("\n")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
     }
 
     suspend fun setAppHidden(key: String, hidden: Boolean) = edit { p ->
@@ -390,7 +712,7 @@ class SettingsRepository @Inject constructor(
     }
 
     /** User-chosen custom app labels (AppItem.key / componentName -> label), applied over the system label. */
-    val customLabels: Flow<Map<String, String>> = dataStore.data.map { p -> parseLabels(p[Keys.CUSTOM_LABELS]) }
+    val customLabels: Flow<Map<String, String>> = keyFlow(Keys.CUSTOM_LABELS) { parseLabels(it) }
 
     /** Sets (or, for a blank [label], clears) the custom label for an app by its [componentName] or key. */
     suspend fun setCustomAppLabel(componentName: String, label: String) = edit { p ->
@@ -414,7 +736,7 @@ class SettingsRepository @Inject constructor(
     // never contain a tab; folder names are normalized in serializeFolders, so a plain split
     // round-trips cleanly.
 
-    val drawerFolders: Flow<List<DrawerFolder>> = dataStore.data.map { p -> parseFolders(p[Keys.DRAWER_FOLDERS]) }
+    val drawerFolders: Flow<List<DrawerFolder>> = keyFlow(Keys.DRAWER_FOLDERS) { parseFolders(it) }
 
     /** Creates an empty drawer folder, returns its new id. */
     suspend fun createDrawerFolder(name: String): Long {
@@ -470,12 +792,13 @@ class SettingsRepository @Inject constructor(
     suspend fun setHomeRows(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeRows(screenType)] = value.coerceIn(MIN_ROWS, MAX_ROWS) }
     suspend fun setDrawerColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerColumns(screenType)] = value.coerceIn(MIN_COLUMNS, MAX_COLUMNS) }
     suspend fun setDrawerRows(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerRows(screenType)] = value.coerceIn(MIN_DRAWER_ROWS, MAX_DRAWER_ROWS) }
-    suspend fun setWorkspaceDensity(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.workspaceDensity(screenType)] = value }
     suspend fun setAllowLandscape(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.allowLandscape(screenType)] = value }
     suspend fun setSwipeDownAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.swipeDownAction(screenType)] = value }
     suspend fun setDoubleTapAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.doubleTapAction(screenType)] = value }
     suspend fun setSwipeUpAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.swipeUpAction(screenType)] = value }
     suspend fun setHalfOpenedModeEnabled(value: Boolean) = edit { it[Keys.HALF_OPENED_ENABLED] = value }
+    suspend fun setSplitLaunchEnabled(value: Boolean) = edit { it[Keys.SPLIT_LAUNCH_ENABLED] = value }
+    suspend fun setFloatingLaunchEnabled(value: Boolean) = edit { it[Keys.FLOATING_LAUNCH_ENABLED] = value }
     suspend fun setAmoledDark(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.amoledDark(screenType)] = value }
     suspend fun setShowDrawerSearch(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showDrawerSearch(screenType)] = value }
     suspend fun setSwipeUpForDrawer(value: Boolean) = edit { it[Keys.SWIPE_UP_DRAWER] = value }
@@ -486,24 +809,116 @@ class SettingsRepository @Inject constructor(
     suspend fun setShowFrequentApps(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showFrequentApps(screenType)] = value }
     suspend fun setDrawerSearchPosition(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerSearchPosition(screenType)] = value }
     suspend fun setDrawerIndexBarEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerIndexBarEnabled(screenType)] = value }
+    suspend fun setAzIndexScale(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.azIndexScale(screenType)] = value.coerceIn(LauncherSettings.MIN_AZ_INDEX_SCALE, LauncherSettings.MAX_AZ_INDEX_SCALE)
+    }
+    suspend fun setDrawerBottomSpace(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.drawerBottomSpace(screenType)] = value.coerceIn(0, LauncherSettings.MAX_DRAWER_BOTTOM_SPACE)
+    }
+    suspend fun setDrawerLetterHeaders(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerLetterHeaders(screenType)] = value }
+    suspend fun setDrawerLargeLetterPopup(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerLargeLetterPopup(screenType)] = value }
+    suspend fun setDrawerSwipeTabs(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerSwipeTabs(screenType)] = value }
+    suspend fun setDrawerFlickClose(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerFlickClose(screenType)] = value }
+    suspend fun setThemedIconStyle(value: String) = edit { it[Keys.THEMED_ICON_STYLE] = value }
+    suspend fun setForceThemedIcons(value: Boolean) = edit { it[Keys.FORCE_THEMED_ICONS] = value }
+    suspend fun setDrawerHandleStyle(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerHandleStyle(screenType)] = value }
+    suspend fun setDrawerCornerRadius(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.drawerCornerRadius(screenType)] = value.coerceIn(LauncherSettings.DRAWER_CORNER_AUTO, LauncherSettings.MAX_DRAWER_CORNER_RADIUS)
+    }
     suspend fun setAzIndexPosition(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.azIndexPosition(screenType)] = value }
     suspend fun setDrawerBackgroundBlur(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerBackgroundBlur(screenType)] = value.coerceIn(0f, 25f) }
     suspend fun setDrawerScrimOpacity(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerScrimOpacity(screenType)] = value.coerceIn(0f, 1f) }
     suspend fun setGlassBlurRadius(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.glassBlurRadius(screenType)] = value.coerceIn(0f, 50f) }
     suspend fun setGlassDarkTint(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.glassDarkTint(screenType)] = value.coerceIn(0f, 0.9f) }
     suspend fun flushDataStore() = edit { }
+    /** Switches the drawer style. The accent follows the new style's default only while the
+     *  current accent is still a style default — a colour the user picked themselves is kept. */
     suspend fun setDrawerStyle(value: String, screenType: ScreenType = ScreenType.OUTER) = edit {
         it[Keys.drawerStyle(screenType)] = value
-        val defaultAccent = when (value) {
-            LauncherSettings.DRAWER_STYLE_ONE_UI -> 0xFF0A84FF.toInt()
-            LauncherSettings.DRAWER_STYLE_MOTO -> 0xFF00BFA5.toInt()
-            LauncherSettings.DRAWER_STYLE_NOTHING_OS -> 0xFFFF3B30.toInt()
-            else -> 0xFF00B0FF.toInt()
+        val current = it[Keys.drawerAccentColor(screenType)]
+        if (current == null || current in LauncherSettings.STYLE_DEFAULT_ACCENTS) {
+            it[Keys.drawerAccentColor(screenType)] = LauncherSettings.defaultAccentForStyle(value)
         }
-        it[Keys.drawerAccentColor(screenType)] = defaultAccent
     }
     suspend fun setDrawerThemeTint(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerThemeTint(screenType)] = value }
-    suspend fun setDrawerAccentColor(argb: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerAccentColor(screenType)] = argb }
+    /** Colours are stored opaque: a pasted hex with zero alpha would make the accent/background invisible. */
+    suspend fun setDrawerAccentColor(argb: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerAccentColor(screenType)] = argb or OPAQUE }
+    suspend fun setDrawerCustomColor(argb: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerCustomColor(screenType)] = argb or OPAQUE }
+    suspend fun setDrawerGlassEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerGlassEnabled(screenType)] = value }
+    suspend fun setDrawerPanelOpacity(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.drawerPanelOpacity(screenType)] =
+            value.coerceIn(LauncherSettings.MIN_DRAWER_PANEL_OPACITY, LauncherSettings.MAX_DRAWER_PANEL_OPACITY)
+    }
+
+    /** Copies every per-display setting of [from] onto [to] in one write — the explicit way to make
+     *  both displays match, now that the profiles never inherit from each other. Layout data (dock
+     *  favourites, home pages) is deliberately not copied: icons live per display. */
+    @Suppress("UNCHECKED_CAST")
+    suspend fun copyProfile(from: ScreenType, to: ScreenType) = edit { p ->
+        if (from == to) return@edit
+        val snapshot = p.asMap()
+        for (name in PROFILE_KEY_NAMES) {
+            val sourceName = profileKeyName(name, from)
+            val targetName = profileKeyName(name, to)
+            when (val value = snapshot.entries.firstOrNull { it.key.name == sourceName }?.value) {
+                is Boolean -> p[booleanPreferencesKey(targetName)] = value
+                is Int -> p[intPreferencesKey(targetName)] = value
+                is Float -> p[floatPreferencesKey(targetName)] = value
+                is String -> p[stringPreferencesKey(targetName)] = value
+                // Unset on the source means "default" there, so the target returns to its default too.
+                else -> {
+                    val stale = snapshot.keys.firstOrNull { it.name == targetName }
+                    if (stale != null) p.remove(stale as Preferences.Key<Any>)
+                }
+            }
+        }
+    }
+
+    suspend fun copyDockFavorites(from: ScreenType, to: ScreenType) = edit { p ->
+        if (from == to) return@edit
+        p[Keys.dockFavorites(to)] = p[Keys.dockFavorites(from)] ?: ""
+    }
+
+    /**
+     * One-time split of the two display profiles. Older builds let the inner profile read the outer
+     * display's value whenever it had none of its own, so changing a cover-screen setting silently
+     * changed the inner screen as well. This freezes what the inner profile inherited at that
+     * moment into its own keys; from then on each display only ever reads and writes its own.
+     */
+    private fun splitProfilesOnce(p: MutablePreferences) {
+        if (p[Keys.PROFILES_SPLIT] == true) return
+        val all = p.asMap()
+        for (name in INHERITED_KEY_NAMES) {
+            val innerName = name + INNER_SUFFIX
+            if (all.keys.any { it.name == innerName }) continue
+            when (val value = all.entries.firstOrNull { it.key.name == name }?.value) {
+                is Boolean -> p[booleanPreferencesKey(innerName)] = value
+                is Int -> p[intPreferencesKey(innerName)] = value
+                is Float -> p[floatPreferencesKey(innerName)] = value
+                is String -> p[stringPreferencesKey(innerName)] = value
+                else -> Unit
+            }
+        }
+        // Two legacy keys used a different name than today's outer key.
+        p[Keys.FOLD_TRANSITION_STYLE]?.let { legacy ->
+            for (type in ScreenType.entries) {
+                if (p[Keys.foldTransitionStyle(type)] == null) p[Keys.foldTransitionStyle(type)] = legacy
+            }
+        }
+        p[Keys.DOUBLE_TAP_LOCK]?.let { legacy ->
+            for (type in ScreenType.entries) {
+                if (p[Keys.doubleTapToLock(type)] == null) p[Keys.doubleTapToLock(type)] = legacy
+            }
+        }
+        for (type in ScreenType.entries) {
+            if (p[Keys.doubleTapToLock(type)] == true) {
+                if (p[Keys.doubleTapAction(type)] == null || p[Keys.doubleTapAction(type)] == LauncherSettings.GESTURE_NONE) {
+                    p[Keys.doubleTapAction(type)] = LauncherSettings.GESTURE_LOCK
+                }
+            }
+        }
+        p[Keys.PROFILES_SPLIT] = true
+    }
     suspend fun setDrawerHeightFraction(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerHeightFraction(screenType)] = value.coerceIn(0.4f, 1.0f) }
     suspend fun setDrawerWidthFraction(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerWidthFraction(screenType)] = value.coerceIn(0.4f, 1.0f) }
     suspend fun setDrawerAlignment(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerAlignment(screenType)] = value }
@@ -511,18 +926,18 @@ class SettingsRepository @Inject constructor(
     suspend fun setDrawerLayoutMode(mode: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerLayoutMode(screenType)] = mode }
     suspend fun setDockBackgroundOpacity(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dockBackgroundOpacity(screenType)] = value.coerceIn(0f, 1f) }
     suspend fun setShowPageIndicator(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showPageIndicator(screenType)] = value }
-    suspend fun setShowNotificationDots(value: Boolean) = edit { it[Keys.SHOW_NOTIF_DOTS] = value }
-    suspend fun setNotificationDotCount(value: Boolean) = edit { it[Keys.NOTIF_DOT_COUNT] = value }
-    suspend fun setNotificationDotScale(value: Float) =
-        edit { it[Keys.NOTIF_DOT_SCALE] = value.coerceIn(MIN_DOT_SCALE, MAX_DOT_SCALE) }
-    suspend fun setUseThemedIcons(value: Boolean) = edit { it[Keys.USE_THEMED_ICONS] = value }
+    suspend fun setShowNotificationDots(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showNotificationDots(screenType)] = value }
+    suspend fun setNotificationDotCount(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.notificationDotCount(screenType)] = value }
+    suspend fun setNotificationDotScale(value: Float, screenType: ScreenType = ScreenType.OUTER) =
+        edit { it[Keys.notificationDotScale(screenType)] = value.coerceIn(MIN_DOT_SCALE, MAX_DOT_SCALE) }
+    suspend fun setUseThemedIcons(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.useThemedIcons(screenType)] = value }
 
     /** Sets (or clears, for blank) the selected third-party icon pack package. */
-    suspend fun setIconPackPackage(pkg: String) = edit { it[Keys.ICON_PACK] = pkg.trim() }
+    suspend fun setIconPackPackage(pkg: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.iconPackPackage(screenType)] = pkg.trim() }
 
     /** Count indicator style of the built-in notifications widget (see LauncherSettings.COUNT_*). */
-    suspend fun setWidgetTonalBackground(value: Boolean) = edit { it[Keys.WIDGET_TONAL_BACKGROUND] = value }
-    suspend fun setNotificationWidgetCountStyle(style: String) = edit { it[Keys.NOTIF_WIDGET_COUNT_STYLE] = style }
+    suspend fun setWidgetTonalBackground(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.widgetTonalBackground(screenType)] = value }
+    suspend fun setNotificationWidgetCountStyle(style: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.notificationWidgetCountStyle(screenType)] = style }
     suspend fun setSearchContacts(value: Boolean) = edit { it[Keys.SEARCH_CONTACTS] = value }
 
     /** Sets (or, for a blank/null [key], clears) the app launched by the left-edge home swipe. */
@@ -556,7 +971,7 @@ class SettingsRepository @Inject constructor(
     /** Shows/hides the home status bar (clock + battery + signal). */
     suspend fun setShowStatusBar(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showStatusBar(screenType)] = value }
 
-    suspend fun setShowWeather(value: Boolean) = edit { it[Keys.SHOW_WEATHER] = value }
+    suspend fun setShowWeather(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showWeather(screenType)] = value }
 
     /** Hides/shows the system status bar while the launcher is foreground (immersive home). */
     suspend fun setHideSystemStatusBar(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.hideSystemStatusBar(screenType)] = value }
@@ -626,7 +1041,6 @@ class SettingsRepository @Inject constructor(
         fun dockFavorites(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "dock_favorites" else "dock_favorites_inner")
         fun homePage(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "home_page" else "home_page_inner")
         fun homePageCount(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "home_page_count" else "home_page_count_inner")
-        fun workspaceDensity(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "workspace_density" else "workspace_density_inner")
         fun amoledDark(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "amoled_dark" else "amoled_dark_inner")
         fun allowLandscape(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "allow_landscape" else "allow_landscape_inner")
         fun swipeDownAction(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "swipe_down_action" else "swipe_down_action_inner")
@@ -634,9 +1048,18 @@ class SettingsRepository @Inject constructor(
         fun swipeUpAction(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "swipe_up_action" else "swipe_up_action_inner")
         fun foldAction(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "fold_action" else "fold_action_inner")
         fun unfoldAction(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "unfold_action" else "unfold_action_inner")
-        fun innerTaskbarEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "inner_taskbar_enabled" else "inner_taskbar_enabled_inner")
         fun drawerSearchPosition(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "drawer_search_position" else "drawer_search_position_inner")
         fun drawerIndexBarEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_index_bar_enabled" else "drawer_index_bar_enabled_inner")
+        fun azIndexScale(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "az_index_scale" else "az_index_scale_inner")
+        fun drawerBottomSpace(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "drawer_bottom_space" else "drawer_bottom_space_inner")
+        fun drawerLetterHeaders(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_letter_headers" else "drawer_letter_headers_inner")
+        fun drawerLargeLetterPopup(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_large_letter_popup" else "drawer_large_letter_popup_inner")
+        fun drawerSwipeTabs(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_swipe_tabs" else "drawer_swipe_tabs_inner")
+        fun drawerFlickClose(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_flick_close" else "drawer_flick_close_inner")
+        val THEMED_ICON_STYLE = stringPreferencesKey("themed_icon_style")
+        val FORCE_THEMED_ICONS = booleanPreferencesKey("force_themed_icons")
+        fun drawerHandleStyle(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "drawer_handle_style" else "drawer_handle_style_inner")
+        fun drawerCornerRadius(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "drawer_corner_radius" else "drawer_corner_radius_inner")
         fun azIndexPosition(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "az_index_position" else "az_index_position_inner")
         fun drawerBackgroundBlur(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "drawer_background_blur" else "drawer_background_blur_inner")
         fun drawerScrimOpacity(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "drawer_scrim_opacity" else "drawer_scrim_opacity_inner")
@@ -645,6 +1068,9 @@ class SettingsRepository @Inject constructor(
         fun drawerStyle(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "drawer_style" else "drawer_style_inner")
         fun drawerThemeTint(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "drawer_theme_tint" else "drawer_theme_tint_inner")
         fun drawerAccentColor(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "drawer_accent_color" else "drawer_accent_color_inner")
+        fun drawerCustomColor(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "drawer_custom_color" else "drawer_custom_color_inner")
+        fun drawerGlassEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_glass_enabled" else "drawer_glass_enabled_inner")
+        fun drawerPanelOpacity(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "drawer_panel_opacity" else "drawer_panel_opacity_inner")
         fun drawerHeightFraction(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "drawer_height_fraction" else "drawer_height_fraction_inner")
         fun drawerWidthFraction(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "drawer_width_fraction" else "drawer_width_fraction_inner")
         fun drawerAlignment(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "drawer_alignment" else "drawer_alignment_inner")
@@ -675,12 +1101,108 @@ class SettingsRepository @Inject constructor(
         fun statusBarScrimOpacity(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "status_bar_scrim" else "status_bar_scrim_inner")
         fun showPageIndicator(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "show_page_indicator" else "show_page_indicator_inner")
 
+        fun showNotificationDots(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "show_notif_dots" else "show_notif_dots_inner")
+        fun notificationDotCount(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "notif_dot_count" else "notif_dot_count_inner")
+        fun notificationDotScale(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "notif_dot_scale" else "notif_dot_scale_inner")
+        fun useThemedIcons(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "use_themed_icons" else "use_themed_icons_inner")
+        fun iconPackPackage(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "icon_pack_package" else "icon_pack_package_inner")
+        fun widgetTonalBackground(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "widget_tonal_background" else "widget_tonal_background_inner")
+        fun notificationWidgetCountStyle(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "notif_widget_count_style" else "notif_widget_count_style_inner")
+        fun showWeather(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "show_weather" else "show_weather_inner")
+
         fun aquamorphicTouchEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "aquamorphic_touch_enabled" else "aquamorphic_touch_enabled_inner")
         fun foldTransitionStyle(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "fold_transition_style_outer" else "fold_transition_style_inner")
         fun appLaunchZoomEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "app_launch_zoom_enabled" else "app_launch_zoom_enabled_inner")
         fun pageBounceEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "page_bounce_enabled" else "page_bounce_enabled_inner")
+        fun iconSizeScale(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "icon_size_scale" else "icon_size_scale_inner")
+        fun folderShape(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "folder_shape" else "folder_shape_inner")
+        fun folderTheme(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "folder_theme" else "folder_theme_inner")
+        fun folderPreview(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "folder_preview" else "folder_preview_inner")
+        fun folderOpenColumns(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "folder_open_columns" else "folder_open_columns_inner")
+        fun folderOpenSize(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "folder_open_size" else "folder_open_size_inner")
+        fun folderTapFirstApp(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "folder_tap_first_app" else "folder_tap_first_app_inner")
+        val CUSTOM_ICONS = stringPreferencesKey("custom_icons")
+        fun popupTheme(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "popup_theme" else "popup_theme_inner")
+        fun stackAutoRotateSeconds(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "stack_auto_rotate_seconds" else "stack_auto_rotate_seconds_inner")
+        fun stackCornerRadius(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "stack_corner_radius" else "stack_corner_radius_inner")
+        fun stackIndicator(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "stack_indicator" else "stack_indicator_inner")
+        fun stackShowPill(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "stack_show_pill" else "stack_show_pill_inner")
+        fun dotShape(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "dot_shape" else "dot_shape_inner")
+        fun dotColor(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "dot_color" else "dot_color_inner")
+        fun dotPosition(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "dot_position" else "dot_position_inner")
+        fun homeWallpaperDim(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "home_wallpaper_dim" else "home_wallpaper_dim_inner")
+        fun homeWallpaperBlur(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "home_wallpaper_blur" else "home_wallpaper_blur_inner")
+        fun homeBackgroundImage(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "home_background_image" else "home_background_image_inner")
+        fun iconSwipeUpAction(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "icon_swipe_up_action" else "icon_swipe_up_action_inner")
+        fun newPageOnDrag(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "new_page_on_drag" else "new_page_on_drag_inner")
+        fun autoRemoveEmptyPages(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "auto_remove_empty_pages" else "auto_remove_empty_pages_inner")
+        fun drawerFolderTabs(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_folder_tabs" else "drawer_folder_tabs_inner")
+        fun appFontFamily(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "app_font_family" else "app_font_family_inner")
+        fun appFontBold(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "app_font_bold" else "app_font_bold_inner")
+        fun appFontSizeScale(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "app_font_size_scale" else "app_font_size_scale_inner")
+        val FLOATING_WINDOW_SIZE = stringPreferencesKey("floating_window_size")
+        val SEARCH_SHORTCUTS = booleanPreferencesKey("search_shortcuts")
+        val SEARCH_WEB = booleanPreferencesKey("search_web")
+        val ANIMATION_SPEED = floatPreferencesKey("animation_speed")
+        val APP_OPEN_ANIMATION = stringPreferencesKey("app_open_animation")
+        val FOLDER_OPEN_ANIMATION = stringPreferencesKey("folder_open_animation")
+        val PAGE_SCROLL_EFFECT = stringPreferencesKey("page_scroll_effect")
+        val WIDGET_BACKGROUND_OPACITY = floatPreferencesKey("widget_background_opacity")
+        val WEATHER_LOCATION = stringPreferencesKey("weather_location")
+        val BATTERY_SAVER_MODE = stringPreferencesKey("battery_saver_mode")
+        val CLOCK_WIDGET_STYLE = stringPreferencesKey("clock_widget_style")
+        val CLOCK_WIDGET_DARK_TEXT = booleanPreferencesKey("clock_widget_dark_text")
+        val CLOCK_WIDGET_GLASS_EFFECT = booleanPreferencesKey("clock_widget_glass_effect")
+        val CLOCK_MINUTE_COLOR = stringPreferencesKey("clock_minute_color")
+        val CLOCK_MINUTE_OPACITY = floatPreferencesKey("clock_minute_opacity")
+        val WEATHER_WIDGET_ANIMATED = booleanPreferencesKey("weather_widget_animated")
+        val TASKBAR_ENABLED = booleanPreferencesKey("taskbar_enabled")
+        val TASKBAR_PINNED = stringPreferencesKey("taskbar_pinned")
+        val TASKBAR_RECENTS = intPreferencesKey("taskbar_recents")
+        val TASKBAR_ICON_SIZE = intPreferencesKey("taskbar_icon_size")
+        val TASKBAR_SPACING = intPreferencesKey("taskbar_spacing")
+        val TASKBAR_BOTTOM = intPreferencesKey("taskbar_bottom")
+        val TASKBAR_THEME = stringPreferencesKey("taskbar_theme")
+        val TASKBAR_OPACITY = floatPreferencesKey("taskbar_opacity")
+        val TASKBAR_HANDLES = stringPreferencesKey("taskbar_handles")
+        val TASKBAR_ON_HOME = booleanPreferencesKey("taskbar_on_home")
+        val TASKBAR_KEEP_OPEN = booleanPreferencesKey("taskbar_keep_open")
+        val TASKBAR_MEDIA = booleanPreferencesKey("taskbar_media")
+        val TASKBAR_MEDIA_PAUSED = booleanPreferencesKey("taskbar_media_paused")
+        val TASKBAR_MEDIA_POSITION = stringPreferencesKey("taskbar_media_position")
+        val TASKBAR_MEDIA_TAP = stringPreferencesKey("taskbar_media_tap")
+        val TASKBAR_MEDIA_CONTROLS = booleanPreferencesKey("taskbar_media_controls")
+        val TASKBAR_MEDIA_SHAPE = stringPreferencesKey("taskbar_media_shape")
+        val TASKBAR_MEDIA_BADGE = booleanPreferencesKey("taskbar_media_badge")
+        val TASKBAR_SYSTEM_DRAG = booleanPreferencesKey("taskbar_system_drag")
+        val TASKBAR_RECENTS_BUTTON = stringPreferencesKey("taskbar_recents_button")
+        val TASKBAR_QUICK_SWITCH = booleanPreferencesKey("taskbar_quick_switch")
+        val TASKBAR_SPLIT_CONTROLS = booleanPreferencesKey("taskbar_split_controls")
+        val TASKBAR_SPLIT_SIDE = stringPreferencesKey("taskbar_split_side")
+        val TASKBAR_THREE_APP = booleanPreferencesKey("taskbar_three_app")
+        val SETTINGS_STYLE = stringPreferencesKey("settings_style")
+        val ICON_SHAPE = stringPreferencesKey("icon_shape")
+        val MOTO_WEATHER_TAP = booleanPreferencesKey("moto_weather_tap")
+        val SHOW_PRIVATE_SPACE = booleanPreferencesKey("show_private_space")
+        val WIDGET_LOOKS = stringPreferencesKey("widget_looks")
+        val MEDIA_WIDGET_THEME = stringPreferencesKey("media_widget_theme")
+        val APPS_WIDGET_THEME = stringPreferencesKey("apps_widget_theme")
+        val STATS_WIDGET_THEME = stringPreferencesKey("stats_widget_theme")
+        val NOTE_WIDGET_THEME = stringPreferencesKey("note_widget_theme")
+        val MEDIA_WIDGET_ARTWORK = booleanPreferencesKey("media_widget_artwork")
+        val APPS_WIDGET_LABELS = booleanPreferencesKey("apps_widget_labels")
+        val STATS_SHOW_BATTERY = booleanPreferencesKey("stats_show_battery")
+        val STATS_SHOW_STORAGE = booleanPreferencesKey("stats_show_storage")
+        val STATS_SHOW_MEMORY = booleanPreferencesKey("stats_show_memory")
+        val STATS_SHOW_BLUETOOTH = booleanPreferencesKey("stats_show_bluetooth")
+        val NOTE_WIDGET_TEXT_SIZE = stringPreferencesKey("note_widget_text_size")
+        val NOTE_WIDGET_TEXT = stringPreferencesKey("note_widget_text")
 
+        /** Set once the inner profile stopped inheriting from the outer one (see splitProfilesOnce). */
+        val PROFILES_SPLIT = booleanPreferencesKey("profiles_split_done")
         val HALF_OPENED_ENABLED = booleanPreferencesKey("half_opened_mode_enabled")
+        val SPLIT_LAUNCH_ENABLED = booleanPreferencesKey("split_launch_enabled")
+        val FLOATING_LAUNCH_ENABLED = booleanPreferencesKey("floating_launch_enabled")
         val OUTER_WALLPAPER_SCALE = floatPreferencesKey("outer_wallpaper_scale")
         val INNER_WALLPAPER_SCALE = floatPreferencesKey("inner_wallpaper_scale")
         val FOLD_TRANSITION_STYLE = stringPreferencesKey("fold_transition_style")
@@ -732,6 +1254,47 @@ class SettingsRepository @Inject constructor(
     }
 
     companion object {
+        private const val OPAQUE = 0xFF000000.toInt()
+        private const val INNER_SUFFIX = "_inner"
+
+        /** Outer-profile key names the inner profile used to fall back to (see splitProfilesOnce). */
+        internal val INHERITED_KEY_NAMES = listOf(
+            "show_drawer_search", "show_dock_labels", "show_home_labels", "show_drawer_labels",
+            "show_frequent_apps", "parallax_wallpaper", "dock_opacity", "show_page_indicator",
+            "left_swipe_app_key", "drawer_opens_at_top", "app_label_scale", "two_line_home_labels",
+            "two_line_drawer_labels", "app_label_color", "show_status_bar", "hide_system_status_bar",
+            "status_bar_scrim", "show_notif_dots", "notif_dot_count", "notif_dot_scale",
+            "use_themed_icons", "icon_pack_package", "widget_tonal_background",
+            "notif_widget_count_style", "show_weather",
+        )
+
+        /** Base names of every per-display setting [copyProfile] transfers (outer name; the inner
+         *  key appends "_inner"). Layout data — dock favourites and home pages — is not listed. */
+        internal val PROFILE_KEY_NAMES = INHERITED_KEY_NAMES + listOf(
+            // The home grid size is left out on purpose: shrinking it needs a reflow of the placed
+            // icons, which only the settings stepper performs.
+            "dock_enabled", "dock_columns", "drawer_columns", "drawer_rows",
+            "workspace_density", "amoled_dark", "allow_landscape", "swipe_down_action", "double_tap_action",
+            "swipe_up_action", "drawer_search_position", "drawer_index_bar_enabled", "az_index_position", "az_index_scale", "drawer_corner_radius", "drawer_handle_style", "drawer_bottom_space", "drawer_letter_headers", "drawer_large_letter_popup", "drawer_swipe_tabs", "drawer_flick_close",
+            "drawer_background_blur", "drawer_scrim_opacity", "glass_blur_radius", "glass_dark_tint",
+            "drawer_style", "drawer_theme_tint", "drawer_accent_color", "drawer_custom_color",
+            "drawer_glass_enabled", "drawer_panel_opacity", "drawer_height_fraction", "drawer_width_fraction",
+            "drawer_alignment", "drawer_layout_mode", "dpi_workspace", "dpi_app_drawer", "dpi_settings",
+            "right_swipe_app_key", "double_tap_to_lock", "aquamorphic_touch_enabled",
+            "app_launch_zoom_enabled", "page_bounce_enabled", "fold_transition_style",
+            "icon_size_scale", "folder_shape", "folder_theme", "folder_preview", "folder_open_columns",
+            "folder_open_size", "folder_tap_first_app",
+            "popup_theme", "new_page_on_drag", "stack_auto_rotate_seconds", "stack_corner_radius", "stack_indicator", "stack_show_pill", "dot_shape", "dot_color", "dot_position", "home_wallpaper_dim", "home_wallpaper_blur", "icon_swipe_up_action", "auto_remove_empty_pages", "drawer_folder_tabs",
+        )
+
+        /** The stored key name of [base] for [type]. The fold transition is the one key whose outer
+         *  name carries a suffix too. */
+        internal fun profileKeyName(base: String, type: ScreenType): String = when {
+            base == "fold_transition_style" -> if (type == ScreenType.OUTER) "fold_transition_style_outer" else "fold_transition_style_inner"
+            type == ScreenType.OUTER -> base
+            else -> base + INNER_SUFFIX
+        }
+
         /** Valid range for the home/dock/drawer column counts (mirrors the settings steppers). */
         const val MIN_COLUMNS = 3
         const val MAX_COLUMNS = 8
@@ -749,50 +1312,5 @@ class SettingsRepository @Inject constructor(
         /** Valid range for the app-label text-size slider. */
         const val MIN_LABEL_SCALE = 0.8f
         const val MAX_LABEL_SCALE = 1.6f
-
-        /** Preference keys whose value must be restored as Float (JSON loses the Int/Float distinction). */
-        val FLOAT_KEYS = setOf("dock_opacity", "notif_dot_scale", "app_label_scale", "status_bar_scrim", "outer_wallpaper_scale", "inner_wallpaper_scale", "drawer_background_blur", "drawer_scrim_opacity", "drawer_background_blur_inner", "drawer_scrim_opacity_inner", "glass_blur_radius", "glass_blur_radius_inner", "glass_dark_tint", "glass_dark_tint_inner", "dpi_workspace", "dpi_app_drawer", "dpi_settings", "dpi_workspace_inner", "dpi_app_drawer_inner", "dpi_settings_inner", "drawer_height_fraction", "drawer_width_fraction", "drawer_height_fraction_inner", "drawer_width_fraction_inner")
-        val INT_KEYS = setOf(
-            "dock_columns", "home_columns", "home_rows", "drawer_columns", "drawer_rows", "app_label_color",
-            "home_page", "home_page_count",
-            "dock_columns_inner", "home_columns_inner", "home_rows_inner", "drawer_columns_inner", "drawer_rows_inner",
-            "home_page_inner", "home_page_count_inner"
-        )
-
-        /** Known boolean/string preference keys. importRaw writes a known key ONLY with its
-         *  registered type — a wrong-typed value in an edited/corrupted backup would otherwise be
-         *  stored under the same key name and crash every settings read with a ClassCastException. */
-        val BOOLEAN_KEYS = setOf(
-            "dock_enabled", "show_drawer_search", "swipe_up_drawer", "swipe_down_notif",
-            "show_dock_labels", "show_home_labels", "show_drawer_labels", "show_page_indicator",
-            "show_notif_dots", "notif_dot_count", "use_themed_icons", "search_contacts",
-            "desktop_locked", "show_frequent_apps", "drawer_opens_at_top", "show_status_bar",
-            "show_weather", "hide_system_status_bar", "double_tap_lock", "widget_tonal_background",
-            "two_line_home_labels", "two_line_drawer_labels", "people_batch_enabled", "people_show_apps",
-            "dock_enabled_inner", "amoled_dark", "amoled_dark_inner", "inner_taskbar_enabled", "inner_taskbar_enabled_inner",
-            "aquamorphic_touch_enabled", "aquamorphic_touch_enabled_inner",
-            "app_launch_zoom_enabled", "app_launch_zoom_enabled_inner",
-            "page_bounce_enabled", "page_bounce_enabled_inner"
-        )
-        val STRING_KEYS = setOf(
-            "dock_favorites", "hidden_apps", "custom_labels", "drawer_folders",
-            "notif_widget_count_style", "icon_pack_package", "left_swipe_app_key",
-            "people_privacy", "pinned_people", "people_aliases", "people_batch_times",
-            "dock_favorites_inner", "app_pairs", "fold_action", "fold_action_inner", "unfold_action", "unfold_action_inner",
-            "fold_transition_style", "fold_transition_style_outer", "fold_transition_style_inner",
-            "drawer_alignment", "drawer_alignment_inner", "drawer_layout_mode", "drawer_layout_mode_inner", "az_index_position", "az_index_position_inner"
-        )
-
-        /** Device-local bookkeeping keys excluded from an exported backup and never imported.
-         *  The `drive_*`/`update_*` names are ≤0.7.11 leftovers (the Drive backup and in-app
-         *  updater were removed in 0.7.12): upgraded devices still carry them in the DataStore and
-         *  old backup files still contain them, so the names must stay blocked here. */
-        val DEVICE_LOCAL_KEYS = setOf(
-            "drive_backup_enabled", "drive_last_backup_time", "drive_last_backup_hash",
-            "drive_failure_count", "local_last_backup_time",
-            "drive_interval_days", "drive_wifi_only", "drive_charging_only",
-            "auto_update_enabled", "update_last_check", "update_last_notified_version",
-            "default_layout_seeded", "onboarding_done", "first_run_fresh", "people_held_notifications",
-        )
     }
 }

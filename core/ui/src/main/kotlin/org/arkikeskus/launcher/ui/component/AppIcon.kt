@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.IconEpochs
 import org.arkikeskus.launcher.model.IconRequest
+import org.arkikeskus.launcher.model.iconRasterSize
 
 /**
  * Whether [AppIcon]s under this subtree render as Material You themed (monochrome) icons. Provided per
@@ -44,6 +45,10 @@ val LocalThemedIcons = compositionLocalOf { false }
  * use the pack's icon and unmapped ones are masked to its style; overrides [LocalThemedIcons].
  */
 val LocalIconPack = compositionLocalOf { "" }
+
+/** Icon shape under this subtree (LauncherSettings.ICON_SHAPE_*; "" = the system's), fed into the
+ *  Coil request like [LocalIconPack]. */
+val LocalIconShape = compositionLocalOf { "" }
 
 /**
  * Icon re-fetch tokens (see [IconEpochs]), provided once at the shell root. [AppIcon] folds the
@@ -69,6 +74,24 @@ val LocalAppLabelScale = compositionLocalOf { 1f }
 val LocalAppLabelLines = compositionLocalOf { 1 }
 
 /**
+ * The user's hand-picked icons, app key → "packPackage|drawableName" (see IconRequest.customIcon).
+ * Provided once at the shell root so every [AppIcon] — home, dock, drawer, folders — shows the pick.
+ */
+val LocalCustomIcons = compositionLocalOf<Map<String, String>> { emptyMap() }
+
+/**
+ * The per-display icon-size multiplier (Settings ▸ Grid): the surfaces multiply their preferred icon
+ * size by it before fitting the icon into a cell.
+ */
+val LocalIconSizeScale = compositionLocalOf { 1f }
+
+/** The per-display "bouncy touch" switch (Settings ▸ Appearance); every [AppIcon] under it follows. */
+val LocalAquamorphicTouch = compositionLocalOf { true }
+
+/** The per-display "app launch zoom" switch (Settings ▸ Appearance). */
+val LocalAppLaunchZoom = compositionLocalOf { true }
+
+/**
  * An app icon plus optional label. The icon is loaded via Coil (see AppIconFetcher), so it is
  * cached and loaded off the main thread. Caller supplies [labelColor] (white on wallpaper, the
  * theme on-surface color inside the drawer). When [badgeCount] > 0 a notification badge is drawn at
@@ -87,7 +110,7 @@ fun AppIcon(
     badgeCount: Int = 0,
     badgeShowCount: Boolean = true,
     badgeScale: Float = 1f,
-    aquamorphicTouchEnabled: Boolean = true,
+    aquamorphicTouchEnabled: Boolean = LocalAquamorphicTouch.current,
     launching: Boolean = false,
 ) {
     var isLaunchingLocal by remember { mutableStateOf(false) }
@@ -110,11 +133,11 @@ fun AppIcon(
                     }
                 },
             )
-            .appLaunchZoom(launching = isLaunchingEffective)
+            .appLaunchZoom(launching = isLaunchingEffective, enabled = LocalAppLaunchZoom.current)
             .then(modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(contentAlignment = Alignment.TopEnd) {
+        Box(contentAlignment = badgeAlignment()) {
             AsyncImage(
                 model = IconRequest(
                     appItem,
@@ -122,6 +145,9 @@ fun AppIcon(
                     dark = isSystemInDarkTheme(),
                     iconPack = LocalIconPack.current,
                     epoch = LocalIconEpochs.current.of(appItem.packageName),
+                    customIcon = LocalCustomIcons.current[appItem.key].orEmpty(),
+                    sizePx = iconRasterSize(with(LocalDensity.current) { iconSize.roundToPx() }),
+                    shape = LocalIconShape.current,
                 ),
                 contentDescription = appItem.label,
                 modifier = Modifier.size(iconSize),

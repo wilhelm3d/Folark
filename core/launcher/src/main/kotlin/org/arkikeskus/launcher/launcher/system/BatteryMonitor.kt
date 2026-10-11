@@ -14,12 +14,19 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import org.arkikeskus.launcher.model.BatteryStatus
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.shareIn
 
 /** Streams battery percent + charging state from the sticky ACTION_BATTERY_CHANGED broadcast. */
 @Singleton
 class BatteryMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    private val sharing = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     val status: Flow<BatteryStatus> = callbackFlow {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
@@ -39,6 +46,9 @@ class BatteryMonitor @Inject constructor(
         sticky?.let { trySend(parse(it)) }
         awaitClose { context.unregisterReceiver(receiver) }
     }.distinctUntilChanged()
+        // One receiver however many widgets show the battery (the clock, the status bar, the
+        // battery widget each ask), kept for a few seconds across a screen change.
+        .shareIn(sharing, SharingStarted.WhileSubscribed(5_000L), replay = 1)
 
     private fun parse(intent: Intent): BatteryStatus {
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)

@@ -29,6 +29,9 @@
          BLUETOOTH receiver-permission pre-S, so without this the status-bar Bluetooth flag never
          refreshes there. Android 12+ needs no permission for adapter state. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <!-- Device-status widget: battery level of connected Bluetooth devices (Android 12+ runtime
+         permission, asked only when the user taps the widget's "Allow" hint). Nothing is scanned. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!-- ACCESS_WIFI_STATE would otherwise IMPLY a required android.hardware.wifi feature and let
          stores filter out Wi-Fi-less devices; every Wi-Fi indicator degrades gracefully without it. -->
@@ -39,9 +42,23 @@
          silently blocks those cross-app intents (e.g. uninstall opens nothing). -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Android 15+: lets the default launcher see Private Space, to show it in the drawer as a
+         locked section (Settings ▸ App drawer ▸ Private Space). -->
+    <uses-permission android:name="android.permission.ACCESS_HIDDEN_PROFILES" />
+
     <!-- Required so the system package installer honors our ACTION_DELETE uninstall request; without
          it the uninstaller silently rejects the call ("does not have REQUEST_DELETE_PACKAGES"). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Usage access (granted by the user in Android's settings): the taskbar's recent apps. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <!-- Only usable after `adb shell pm grant <package> android.permission.DUMP`: the taskbar's split
+         screen (finding the opened app's task and sending Android's split-screen command). -->
+    <uses-permission android:name="android.permission.DUMP" tools:ignore="ProtectedPermissions" />
+
+    <!-- Only usable after `adb shell pm grant <package> android.permission.WRITE_SECURE_SETTINGS`:
+         Settings ▸ Permissions ▸ System controls (keeping Folark's accessibility service on, the
+         top refresh rate, the system animation speed). -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
     <!-- See which apps expose a launcher activity (for the app drawer). -->
     <queries>
@@ -71,6 +88,7 @@
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize|stateHidden"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
             android:theme="@style/Theme.ArkikeskusLauncher.Starting">
             <intent-filter>
@@ -84,6 +102,7 @@
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
             android:label="@string/settings_label"
             android:theme="@style/Theme.ArkikeskusLauncher" />

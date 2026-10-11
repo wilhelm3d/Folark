@@ -97,6 +97,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -218,7 +219,7 @@ class PeopleWidgetViewModel @Inject constructor(
                 appRepository.launchClassName(first.packageName, first.user)
             }
         }
-    }
+    }.flowOn(Dispatchers.Default) // a system call per app with several entries: not on the main thread
 
     /** Live groups with the user's aliases applied, app groups dropped when the setting is off. */
     private val liveGroups: Flow<List<PersonTileState>> = combine(
@@ -368,12 +369,7 @@ fun PeopleWidget(
     val privacy by viewModel.privacy.collectAsStateWithLifecycle()
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(60_000 - now % 60_000)
-        }
-    }
+    MinuteTicker { now = it }
     LifecycleResumeEffect(Unit) {
         now = System.currentTimeMillis()
         viewModel.refresh()

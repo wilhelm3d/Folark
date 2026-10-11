@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.data.smartspace.WeatherCodes
 import java.text.SimpleDateFormat
@@ -40,14 +41,14 @@ fun SamsungWeatherWidget(
     val context = LocalContext.current
     val weather by viewModel.weather.collectAsStateWithLifecycle()
     val noIndication = remember { MutableInteractionSource() }
+    // Ask for fresh weather whenever home comes back (the repository rate-limits itself).
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(60_000)
-        }
-    }
+    MinuteTicker { now = it }
 
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = when (hour) {

@@ -73,6 +73,11 @@ object DataModule {
             add(AppIconKeyer())
             add(AppIconFetcher.Factory(source))
         }
+        .memoryCache {
+            coil3.memory.MemoryCache.Builder()
+                .maxSizePercent(context, 0.20)
+                .build()
+        }
         .build()
 
     @Provides

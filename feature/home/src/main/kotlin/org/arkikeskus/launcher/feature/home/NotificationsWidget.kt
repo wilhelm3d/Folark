@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import androidx.compose.ui.Alignment
@@ -60,6 +61,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
@@ -118,7 +121,7 @@ class NotificationsWidgetViewModel @Inject constructor(
                 appRepository.launchClassName(first.packageName, first.user)
             }
         }
-    }
+    }.flowOn(Dispatchers.Default) // a system call per app with several entries: not on the main thread
 
     val slots: StateFlow<List<Slot>> = combine(badgeRepository.icons, appsByBadgeKey) { notifs, byBadgeKey ->
         notifs.map { Slot(it, byBadgeKey["${it.packageName}/${it.userSerial}"]) }
@@ -194,7 +197,7 @@ fun NotificationsWidget(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .background(widgetSurfaceColor(), RoundedCornerShape(24.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.2f * LocalWidgetBackgroundAlpha.current), RoundedCornerShape(24.dp))
                     .clickable(interactionSource = noIndication, indication = null) {
                         openNotificationListenerSettings(context)
                     }
@@ -213,12 +216,15 @@ fun NotificationsWidget(
                     verticalArrangement = Arrangement.spacedBy(spacing),
                     modifier = Modifier
                         .background(widgetSurfaceColor(), RoundedCornerShape(24.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.2f * LocalWidgetBackgroundAlpha.current), RoundedCornerShape(24.dp))
                         .padding(horizontal = (12 * scale).dp, vertical = (8 * scale).dp),
                 ) {
                     shown.forEach { slot ->
-                        NotificationSlot(slot, iconSize, countStyle, scale, noIndication) {
-                            viewModel.open(slot)
+                        // Keyed: a new notification at the front doesn't make every slot start over.
+                        key(slot.notification.key) {
+                            NotificationSlot(slot, iconSize, countStyle, scale, noIndication) {
+                                viewModel.open(slot)
+                            }
                         }
                     }
                     if (overflow > 0) {
@@ -302,11 +308,8 @@ private fun NotificationSlot(
 /** Rasterises the notification's small icon at the slot size; null on any failure (slot skipped). */
 @Composable
 private fun rememberNotifSmallIcon(n: StatusNotification, size: Dp): ImageBitmap? {
-    val context = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
-    return remember(n.key, n.postTime, px) {
-        runCatching { n.icon.loadDrawable(context)?.toBitmap(width = px, height = px)?.asImageBitmap() }.getOrNull()
-    }
+    return rememberNotificationIcon(n.icon, n.key + "@" + n.postTime, px)
 }
 
 /** Opens the system notification-access screen, deep-linked to this app when supported. */

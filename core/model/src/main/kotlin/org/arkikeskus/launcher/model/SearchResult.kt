@@ -26,6 +26,17 @@ sealed interface SearchResult {
         override val id: String get() = "contact:$contactId"
     }
 
+    /** An app shortcut ("New tab", "Compose") published by [packageName]; started through LauncherApps. */
+    data class Shortcut(
+        val packageName: String,
+        val shortcutId: String,
+        val userSerial: Long,
+        val label: String,
+        val appLabel: String,
+    ) : SearchResult {
+        override val id: String get() = "shortcut:$packageName/$shortcutId/$userSerial"
+    }
+
     data class Calculation(val expression: String, val result: String) : SearchResult {
         override val id: String get() = "calc"
     }
@@ -37,4 +48,5 @@ data class SearchResults(
     val apps: List<AppItem> = emptyList(),
     val settings: List<SearchResult.Setting> = emptyList(),
     val contacts: List<SearchResult.Contact> = emptyList(),
+    val shortcuts: List<SearchResult.Shortcut> = emptyList(),
 )

@@ -11,5 +11,5 @@ class AppIconKeyer : Keyer<IconRequest> {
     // The epoch (bumped per package on update, globally on icon-pack change — see IconEpochs) keeps a
     // version change from serving the pre-update icon out of the cache.
     override fun key(data: IconRequest, options: Options): String =
-        "appicon:${data.app.key}:t=${data.themed}:d=${data.dark}:p=${data.iconPack}:e=${data.epoch}"
+        "appicon:${data.app.key}:t=${data.themed}:d=${data.dark}:p=${data.iconPack}:e=${data.epoch}:c=${data.customIcon}:s=${data.sizePx}:sh=${data.shape}"
 }

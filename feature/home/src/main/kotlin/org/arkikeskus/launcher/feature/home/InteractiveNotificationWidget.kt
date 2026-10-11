@@ -27,6 +27,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -72,12 +73,14 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
 
     fun invokeAction(pendingIntent: PendingIntent?, packageName: String? = null, context: Context? = null) {
         if (pendingIntent != null) {
-            try {
-                pendingIntent.send()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                launchFallback(packageName, context)
+            // Sent the way a tap in the shade sends it: Android 14+ otherwise blocks the app from
+            // opening its screen, since the launcher's right to start an activity isn't passed on.
+            val sent = if (context != null) {
+                sendNotificationIntent(context, pendingIntent)
+            } else {
+                runCatching { pendingIntent.send() }.isSuccess
             }
+            if (!sent) launchFallback(packageName, context)
         } else {
             launchFallback(packageName, context)
         }
@@ -110,14 +113,11 @@ fun InteractiveNotificationWidget(
         notifications.groupBy { it.packageName }
     }
 
+    // Seamless: no border and no background, only the notifications over the wallpaper.
     Surface(
-        modifier = modifier.border(
-            width = 0.5.dp,
-            color = Color.White.copy(alpha = 0.3f),
-            shape = RoundedCornerShape(24.dp)
-        ),
+        modifier = modifier,
         shape = RoundedCornerShape(24.dp),
-        color = Color.Black.copy(alpha = 0.1f),
+        color = Color.Transparent,
         contentColor = Color.White
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -129,21 +129,21 @@ fun InteractiveNotificationWidget(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Notifications",
+                    text = stringResource(R.string.notifications_widget_name),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 if (notifications.isNotEmpty()) {
                     TextButton(onClick = { viewModel.clearAllUnpinned() }) {
-                        Text("Clear All", color = Color.White)
+                        Text(stringResource(R.string.notifications_clear_all), color = Color.White)
                     }
                 }
             }
 
             if (notifications.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No notifications", color = Color.White.copy(alpha = 0.6f))
+                    Text(stringResource(R.string.notifications_empty), color = Color.White.copy(alpha = 0.6f))
                 }
             } else {
                 LazyColumn(
@@ -341,9 +341,6 @@ fun InteractiveNotificationItem(
 
 @Composable
 private fun rememberNotifSmallIcon(n: StatusNotification, size: Dp): ImageBitmap? {
-    val context = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
-    return remember(n.key, n.postTime, px) {
-        runCatching { n.icon.loadDrawable(context)?.toBitmap(width = px, height = px)?.asImageBitmap() }.getOrNull()
-    }
+    return rememberNotificationIcon(n.icon, n.key + "@" + n.postTime, px)
 }

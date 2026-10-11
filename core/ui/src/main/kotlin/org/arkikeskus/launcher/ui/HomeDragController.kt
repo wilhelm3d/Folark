@@ -109,6 +109,35 @@ class HomeDragController {
 
     fun isOverRemove(p: Offset): Boolean = !removeBounds.isEmpty && removeBounds.contains(p)
 
+    // The "Split" drop target next to the remove zone (bounds published by HomeScreen while it is
+    // shown; [splitEnabled] mirrors the setting, so a stale rect can never catch a drop).
+    var splitBounds by mutableStateOf(Rect.Zero)
+    var splitEnabled by mutableStateOf(false)
+
+    /**
+     * The app waiting for a split-screen partner — set by a drop on the split target or by the
+     * "Open in split screen" menu entry on any surface. HomeScreen shows the partner picker for it
+     * and clears it.
+     */
+    var splitRequest by mutableStateOf<AppItem?>(null)
+
+    /** The home app icon under a root position, or null — published by the workspace so the root
+     *  swipe detector can tell a swipe that starts on an icon from one on empty space. */
+    var appAt: ((Offset) -> AppItem?)? = null
+
+    /** The app whose icon the user wants to change — set from a long-press menu on any surface;
+     *  HomeScreen shows the icon picker for it and clears it. */
+    var iconPickRequest by mutableStateOf<AppItem?>(null)
+
+    fun isOverSplit(p: Offset): Boolean = splitEnabled && !splitBounds.isEmpty && splitBounds.contains(p)
+
+    /** A drop of [app] at [p]: true (and the partner picker opens) when it landed on the split target. */
+    fun dropOnSplit(app: AppItem, p: Offset): Boolean {
+        if (!isOverSplit(p)) return false
+        splitRequest = app
+        return true
+    }
+
     var isDualPage by mutableStateOf(false)
 
     /** Home cell (page, cellX, cellY) under [p] (root coords) — for a dock/drawer→home drop. */

@@ -28,9 +28,20 @@ class IconPack(
     /** The pack's drawable for [component], or null if the pack doesn't map it. */
     fun getIcon(component: ComponentName): Drawable? {
         val name = componentMap["${component.packageName}/${component.className}"] ?: return null
-        val id = res.getIdentifier(name, "drawable", packageName).takeIf { it != 0 } ?: return null
+        return getDrawable(name)
+    }
+
+    /** The pack's drawable called [name], or null if it has none — for a hand-picked icon. */
+    fun getDrawable(name: String): Drawable? {
+        // getIdentifier is a slow lookup by name; each name is looked up once.
+        val id = ids.getOrPut(name) { res.getIdentifier(name, "drawable", packageName) }.takeIf { it != 0 } ?: return null
         return runCatching { ResourcesCompat.getDrawable(res, id, null) }.getOrNull()
     }
+
+    private val ids = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    /** Every drawable the pack maps to some app, by name — what the icon picker offers. */
+    fun drawableNames(): List<String> = componentMap.values.distinct().sorted()
 }
 
 /**

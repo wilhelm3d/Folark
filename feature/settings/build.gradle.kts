@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:ui"))
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.compose.material.icons.extended)
 
     testImplementation(libs.junit)

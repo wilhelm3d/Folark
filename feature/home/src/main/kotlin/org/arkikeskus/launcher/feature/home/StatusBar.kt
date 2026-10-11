@@ -395,14 +395,8 @@ private fun FlagItem(@DrawableRes res: Int, tint: Color, desc: String) {
 /** Rasterises a notification's small icon (an [android.graphics.drawable.Icon]) into a tintable bitmap;
  *  null on any failure so it is simply skipped. */
 @Composable
-private fun rememberNotifIcon(n: StatusNotification): ImageBitmap? {
-    val context = LocalContext.current
-    return remember(n.key, n.postTime) {
-        runCatching {
-            n.icon.loadDrawable(context)?.toBitmap(width = 42, height = 42)?.asImageBitmap()
-        }.getOrNull()
-    }
-}
+private fun rememberNotifIcon(n: StatusNotification): ImageBitmap? =
+    rememberNotificationIcon(n.icon, n.key + "@" + n.postTime, 42)
 
 /** Current time, formatted per the device's 12/24h setting, refreshed periodically AND re-formatted
  *  live when the user flips the system 12/24-hour, time-zone or locale setting (the formatter was
@@ -435,11 +429,7 @@ private fun rememberClock(): String {
     }
     val fmt = remember(formatEpoch) { android.text.format.DateFormat.getTimeFormat(context) }
     var time by remember(fmt) { mutableStateOf(fmt.format(Date())) }
-    LaunchedEffect(fmt) {
-        while (true) {
-            time = fmt.format(Date())
-            delay(15_000)
-        }
-    }
+    // On the minute (it used to check every 15 seconds and could show the new minute late).
+    MinuteTicker { time = fmt.format(Date(it)) }
     return time
 }

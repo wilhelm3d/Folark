@@ -43,4 +43,6 @@ Android launcherin teeman asetukset.zip
 
 .artifacts/
 *.py
+*.txt
+*.apk
 

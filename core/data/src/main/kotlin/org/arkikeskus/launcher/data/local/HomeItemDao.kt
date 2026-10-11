@@ -74,8 +74,12 @@ interface HomeItemDao {
     @Query("SELECT COUNT(*) FROM home_items WHERE containerId = :containerId AND page = :page AND screenType = :screenType")
     suspend fun countOnPage(containerId: Long, page: Int, screenType: String): Int
 
-    /** Ids of the folder rows on [page] of [containerId]; their children live under those ids. */
-    @Query("SELECT id FROM home_items WHERE containerId = :containerId AND page = :page AND folderName IS NOT NULL AND screenType = :screenType")
+    /** Ids of the container rows (folders and widget stacks) on [page] of [containerId]; their
+     *  children live under those ids. */
+    @Query(
+        "SELECT id FROM home_items WHERE containerId = :containerId AND page = :page " +
+            "AND (folderName IS NOT NULL OR builtinType = 'widget_stack') AND screenType = :screenType",
+    )
     suspend fun folderIdsOnPage(containerId: Long, page: Int, screenType: String): List<Long>
 
     @Query("DELETE FROM home_items WHERE containerId IN (:containerIds) AND screenType = :screenType")

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -23,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -34,11 +37,17 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.feature.appdrawer.AppDrawerScreen
 import org.arkikeskus.launcher.feature.home.HomeScreen
+import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalHomeCovered
+import org.arkikeskus.launcher.ui.component.LocalBatterySaver
+import org.arkikeskus.launcher.ui.component.WindowBlurBehind
 import org.arkikeskus.launcher.ui.component.LocalIconPack
+import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import kotlin.math.roundToInt
@@ -59,6 +68,7 @@ fun LauncherShell(
     homeSignals: Flow<Boolean>,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    shellCommands: Flow<String> = emptyFlow(),
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -68,6 +78,7 @@ fun LauncherShell(
         viewModel.setScreenType(screenType)
     }
     val iconStyle by viewModel.iconStyle.collectAsStateWithLifecycle()
+    val shellSettings by viewModel.settings.collectAsStateWithLifecycle()
     val drawerHeightFraction by viewModel.drawerHeightFraction.collectAsStateWithLifecycle()
     val drawerWidthFraction by viewModel.drawerWidthFraction.collectAsStateWithLifecycle()
     val drawerAlignment by viewModel.drawerAlignment.collectAsStateWithLifecycle()
@@ -76,7 +87,7 @@ fun LauncherShell(
     val progress = remember { Animatable(0f).apply { updateBounds(0f, 1f) } }
     var shellHeightPx by remember { mutableFloatStateOf(1f) }
     var shellOrigin by remember { mutableStateOf(Offset.Zero) }
-    val settleSpring = spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)
+    val settleSpring = remember { spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow) }
 
     // The shared drag state. Created here so both the home screen and the app drawer feed the same
     // controller and the floating icon below can travel between them.
@@ -152,12 +163,56 @@ fun LauncherShell(
         homeSignals.collect { animateProgress(0f) }
     }
 
+    // Fold/unfold actions from the activity ("open the drawer / search after unfolding").
+    LaunchedEffect(shellCommands) {
+        shellCommands.collect { command ->
+            when (command) {
+                LauncherSettings.ACTION_DRAWER, LauncherSettings.ACTION_SEARCH -> animateProgress(1f)
+                else -> Unit
+            }
+        }
+    }
+
+    // Liquid Glass backdrop: blur the wallpaper behind the launcher window as the drawer opens.
+    // While an icon is dragged out of the drawer the home screen must be sharp again.
+    val glassDrawer = shellSettings.drawerGlassEnabled
+    // The home screen can carry a resting blur of its own (Settings ▸ Appearance); the drawer then
+    // deepens it from there to its own radius as it opens.
+    val batterySaver = LocalBatterySaver.current
+    val homeBlurDp = if (batterySaver) 0f else shellSettings.homeWallpaperBlur
+    val drawerBlurDp = if (batterySaver) 0f else maxOf(shellSettings.drawerBackgroundBlur * 2f, homeBlurDp)
+    // The drawer (almost) fully open: what is underneath can stop animating.
+    val homeCovered by remember { derivedStateOf { currentProgress > 0.97f } }
+    WindowBlurBehind(maxRadiusDp = drawerBlurDp) {
+        val progress = if (draggingFromDrawer) 0f else currentProgress
+        if (drawerBlurDp <= 0f) 0f else (homeBlurDp + (drawerBlurDp - homeBlurDp) * progress) / drawerBlurDp
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .onSizeChanged { shellHeightPx = it.height.toFloat().coerceAtLeast(1f) }
             .onGloballyPositioned { shellOrigin = it.positionInRoot() },
     ) {
+        // Behind the home screen: this display's own background picture (drawn over the system
+        // wallpaper, which a launcher cannot swap per display without re-theming the whole system),
+        // then the dim layer that keeps icons and labels readable on a busy wallpaper.
+        if (shellSettings.homeBackgroundImage.isNotBlank()) {
+            AsyncImage(
+                model = java.io.File(shellSettings.homeBackgroundImage),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (shellSettings.homeWallpaperDim > 0f) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = shellSettings.homeWallpaperDim)),
+            )
+        }
+        CompositionLocalProvider(LocalHomeCovered provides homeCovered) {
         HomeScreen(
             screenType = screenType,
             onOpenDrawer = { animateProgress(1f) },
@@ -166,8 +221,21 @@ fun LauncherShell(
             onOpenSettings = onOpenSettings,
             homeSignals = homeSignals,
             dragController = dragController,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                // Under a glass drawer the home screen recedes (fades and shrinks slightly), so its
+                // icons and labels don't show through the translucent panel and clash with the grid.
+                .graphicsLayer {
+                    if (glassDrawer && !draggingFromDrawer) {
+                        val p = currentProgress
+                        alpha = 1f - p
+                        val scale = 1f - 0.05f * p
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                },
         )
+        }
 
         // Always compose AppDrawerScreen at fillMaxSize to keep it pre-composed, pre-measured, and pre-laid out.
         // When closed, it is translated completely off-screen (translationY = size.height).
@@ -182,30 +250,16 @@ fun LauncherShell(
             },
             dragController = dragController,
             homeSignals = homeSignals,
-            // "In use" rather than raw openness: a drag-out snaps progress to 0 mid-gesture, and the
-            // scroll-to-top reset must NOT fire then — it could dispose the dragged item's node and kill
-            // the in-flight gesture. It runs when the drag completes (this flips false), drawer hidden.
             drawerOpen = drawerOpen || draggingFromDrawer,
             drawerHeightFraction = drawerHeightFraction,
             drawerWidthFraction = drawerWidthFraction,
             drawerAlignment = drawerAlignment,
-            // First movement of a drag-out reveals home/dock to drop onto. The drawer is hidden
-            // with alpha rather than translated, so its (still-mounted) gesture keeps reporting
-            // accurate local coordinates; progress is snapped shut so it's closed after the drop.
+            drawerProgress = { currentProgress },
             onDragOutStart = {
                 isDraggingDrawer = false
                 scope.launch { progress.snapTo(0f) }
             },
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    if (draggingFromDrawer) {
-                        alpha = dragOutAlpha.value
-                    } else {
-                        val ty = (1f - currentProgress) * size.height
-                        translationY = ty
-                    }
-                },
+            modifier = Modifier.fillMaxSize(),
         )
 
         // Single floating icon for any in-progress drag (home, dock or drawer), drawn above every
@@ -234,6 +288,7 @@ fun LauncherShell(
                 // their CompositionLocal scopes, so without this it reverts to the plain system icon).
                 CompositionLocalProvider(
                     LocalIconPack provides iconStyle.iconPack,
+                    LocalIconShape provides iconStyle.shape,
                     LocalThemedIcons provides iconStyle.themed,
                 ) {
                     AppIcon(

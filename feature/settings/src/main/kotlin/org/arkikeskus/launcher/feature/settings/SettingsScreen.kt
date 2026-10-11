@@ -49,12 +49,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CallToAction
+import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Dock
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.Gesture
@@ -64,8 +68,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Smartphone
+import androidx.compose.material.icons.rounded.TabletAndroid
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -88,6 +92,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -109,10 +114,16 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.DefaultLauncher
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.badgeAlignment
+import org.arkikeskus.launcher.ui.component.LocalBadgeStyle
+import org.arkikeskus.launcher.ui.component.BadgeStyle
 import org.arkikeskus.launcher.ui.component.LocalIconPack
+import org.arkikeskus.launcher.data.MotoLinks
+import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import org.arkikeskus.launcher.ui.component.NotificationBadge
+import org.arkikeskus.launcher.ui.component.supportsWindowBlur
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.DarkExpressivePalette
 import org.arkikeskus.launcher.ui.expressive.LightExpressivePalette
@@ -120,50 +131,75 @@ import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import java.util.UUID
 import kotlin.math.roundToInt
 
+/** Minimum window width (dp) for the two-pane settings layout — the large-screen breakpoint. */
+private const val TWO_PANE_MIN_WIDTH_DP = 600
+
+/** Which colour the colour-picker dialog is editing. */
+private enum class ColorTarget(@StringRes val titleRes: Int) {
+    DRAWER_ACCENT(R.string.settings_drawer_accent_color),
+    DRAWER_BACKGROUND(R.string.settings_drawer_custom_color),
+    APP_LABEL(R.string.settings_label_color),
+}
+
 private enum class SettingsCategory(
     val titleRes: Int,
     val subtitleRes: Int,
     val icon: ImageVector,
+    /** False for categories whose settings are all shared by both displays. */
+    val perDisplay: Boolean = true,
 ) {
-    DISPLAY_PROFILES(
-        R.string.settings_display_screen_profiles,
-        R.string.settings_category_display_profiles_desc,
-        Icons.Rounded.Smartphone,
+    APPEARANCE(
+        R.string.settings_appearance,
+        R.string.settings_category_appearance_desc,
+        Icons.Rounded.Palette,
     ),
     GRID_DPI(
         R.string.settings_grid_dpi,
         R.string.settings_category_grid_dpi_desc,
         Icons.Rounded.GridOn,
     ),
+    APP_DRAWER(
+        R.string.settings_app_drawer_customization,
+        R.string.settings_category_app_drawer_desc,
+        Icons.Rounded.Apps,
+    ),
     DOCK_TASKBAR(
         R.string.settings_dock_taskbar,
         R.string.settings_category_dock_taskbar_desc,
         Icons.Rounded.Dock,
     ),
-    APP_DRAWER(
-        R.string.settings_app_drawer_customization,
-        R.string.settings_category_app_drawer_desc,
-        Icons.Rounded.Apps,
+    TASKBAR(
+        R.string.settings_taskbar_category,
+        R.string.settings_category_taskbar_desc,
+        Icons.Rounded.CallToAction,
+        perDisplay = false,
     ),
     GESTURES(
         R.string.settings_gestures,
         R.string.settings_category_gestures_desc,
         Icons.Rounded.Gesture,
     ),
-    APPEARANCE(
-        R.string.settings_appearance,
-        R.string.settings_category_appearance_desc,
-        Icons.Rounded.Palette,
-    ),
     NOTIFICATIONS(
         R.string.settings_notifications,
         R.string.settings_category_notifications_desc,
         Icons.Rounded.Notifications,
     ),
+    DISPLAY_PROFILES(
+        R.string.settings_display_screen_profiles,
+        R.string.settings_category_display_profiles_desc,
+        Icons.Rounded.Smartphone,
+    ),
     PERMISSIONS(
         R.string.settings_permissions,
         R.string.settings_category_permissions_desc,
         Icons.Rounded.Shield,
+        perDisplay = false,
+    ),
+    BACKUP(
+        R.string.settings_backup,
+        R.string.settings_category_backup_desc,
+        Icons.Rounded.SettingsBackupRestore,
+        perDisplay = false,
     ),
 }
 
@@ -173,14 +209,20 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     screenType: ScreenType = LocalScreenType.current,
 ) {
-    LaunchedEffect(screenType) { viewModel.setScreenType(screenType) }
+    // The display profile being edited. It follows the display the settings are open on (and snaps
+    // back to it when the phone is folded/unfolded), but either profile can be picked by hand, so
+    // the inner screen can be set up from the cover screen and vice versa. `screenType` stays the
+    // PHYSICAL display: it alone decides the layout (two-pane vs. phone) and the settings UI scale.
+    var editingProfile by rememberSaveable { mutableStateOf<ScreenType?>(null) }
+    LaunchedEffect(screenType) { editingProfile = null }
+    val profile = editingProfile ?: screenType
+    LaunchedEffect(profile) { viewModel.setScreenType(profile) }
     CompositionLocalProvider(LocalScreenType provides screenType) {
         val s by viewModel.settings.collectAsStateWithLifecycle()
     val allApps by viewModel.apps.collectAsStateWithLifecycle()
     val hiddenKeys by viewModel.hiddenKeys.collectAsStateWithLifecycle()
     val iconPacks by viewModel.iconPacks.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val applySuccessMsg = stringResource(R.string.settings_apply_all_success)
     val previewIcon = rememberLauncherIconBitmap()
 
     var showHiddenManager by remember { mutableStateOf(false) }
@@ -198,13 +240,27 @@ fun SettingsScreen(
     var showFoldActionPicker by remember { mutableStateOf(false) }
     var showUnfoldActionPicker by remember { mutableStateOf(false) }
     var showFoldTransitionPicker by remember { mutableStateOf(false) }
+    var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
+    var showCopyProfile by remember { mutableStateOf(false) }
+    val profileSwitcher: @Composable () -> Unit = {
+        DisplayProfileSwitcher(
+            selected = profile,
+            active = screenType,
+            onSelect = { editingProfile = it },
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+    }
 
-    var selectedTabletCategory by rememberSaveable { mutableStateOf(SettingsCategory.DISPLAY_PROFILES) }
+    var selectedTabletCategory by rememberSaveable { mutableStateOf(SettingsCategory.APPEARANCE) }
     var selectedOuterCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
     val mainScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
+    // Own scroll position for a category page: sharing the overview's state opened every category
+    // scrolled to wherever the overview list happened to be.
+    val subpageScrollState = remember(selectedOuterCategory) { ScrollState(0) }
+    val detailScrollState = remember(selectedTabletCategory) { ScrollState(0) }
     var isDefaultLauncher by remember { mutableStateOf(DefaultLauncher.isDefault(context)) }
     val setDefaultLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -215,7 +271,16 @@ fun SettingsScreen(
         notifAccessGranted = isNotificationAccessGranted(context)
         onPauseOrDispose { }
     }
-    val palette = if (isSystemInDarkTheme()) DarkExpressivePalette else LightExpressivePalette
+    val studio = s.settingsStyle == LauncherSettings.SETTINGS_STYLE_STUDIO
+    val palette = when {
+        studio -> StudioExpressivePalette
+        isSystemInDarkTheme() -> DarkExpressivePalette
+        else -> LightExpressivePalette
+    }
+    val previewApps = remember(allApps) { allApps.take(PREVIEW_APP_COUNT) }
+    // Two panes need the room, whichever display this is: a flip phone's inner screen is the inner
+    // display but only phone-wide, and a 280dp sidebar would leave its detail pane unusable.
+    val twoPane = LocalConfiguration.current.screenWidthDp >= TWO_PANE_MIN_WIDTH_DP
 
     val physicalSettings by remember(viewModel, screenType) {
         viewModel.settingsForScreen(screenType)
@@ -232,7 +297,10 @@ fun SettingsScreen(
     CompositionLocalProvider(
         LocalDensity provides dpiDensity,
         LocalExpressivePalette provides palette,
+        LocalSettingsStudio provides studio,
+        LocalPreviewApps provides previewApps,
         LocalIconPack provides s.iconPackPackage,
+        LocalIconShape provides s.iconShape,
         LocalThemedIcons provides s.useThemedIcons,
     ) {
         if (showHiddenManager) {
@@ -253,6 +321,7 @@ fun SettingsScreen(
                 onSaveAppPair = viewModel::saveAppPair,
                 onDeleteAppPair = viewModel::deleteAppPair,
                 onLaunchAppPair = { viewModel.launchAppPair(it) },
+                onAddAppPairToHome = { viewModel.addAppPairToHome(it) },
                 onBack = { showAppPairsManager = false },
                 modifier = modifier.fillMaxSize(),
             )
@@ -261,8 +330,8 @@ fun SettingsScreen(
 
         Box(modifier = modifier.fillMaxSize()) {
             Surface(modifier = Modifier.fillMaxSize(), color = palette.bg) {
-                if (screenType == ScreenType.INNER) {
-                    // Tablet Master-Detail Two-Pane Layout when Unfolded (ScreenType.INNER active)
+                if (twoPane) {
+                    // Master-detail two-pane layout on a wide window (an unfolded book foldable)
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -286,7 +355,7 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 12.dp, end = 4.dp),
                             )
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            profileSwitcher()
 
                             SettingsCategory.entries.forEach { category ->
                                 val isSelected = selectedTabletCategory == category
@@ -328,33 +397,37 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .verticalScroll(mainScrollState)
+                                .verticalScroll(detailScrollState)
                                 .padding(bottom = 28.dp),
                         ) {
+                            if (selectedTabletCategory.perDisplay) profileSwitcher()
                             when (selectedTabletCategory) {
                                 SettingsCategory.DISPLAY_PROFILES -> DisplayProfilesSection(
                                     s = s,
                                     viewModel = viewModel,
-                                    screenType = screenType,
+                                    screenType = profile,
                                     onFoldAction = { showFoldActionPicker = true },
                                     onUnfoldAction = { showUnfoldActionPicker = true },
                                     onFoldTransition = { showFoldTransitionPicker = true },
                                     onAppPairs = { showAppPairsManager = true },
+                                    onCopyProfile = { showCopyProfile = true },
                                 )
-                                SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = screenType)
-                                SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = screenType, previewIcon = previewIcon)
+                                SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = profile, onPickColor = { colorTarget = it })
+                                SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
+                                SettingsCategory.TASKBAR -> TaskbarSection(s = s, viewModel = viewModel)
                                 SettingsCategory.APP_DRAWER -> AppDrawerSection(
                                     s = s,
                                     viewModel = viewModel,
-                                    screenType = screenType,
+                                    screenType = profile,
                                     hiddenCount = hiddenKeys.size,
                                     onShowHidden = { showHiddenManager = true },
                                     onLayoutMode = { showDrawerLayoutPicker = true },
+                                    onPickColor = { colorTarget = it },
                                 )
                                 SettingsCategory.GESTURES -> GesturesSection(
                                     s = s,
                                     viewModel = viewModel,
-                                    screenType = screenType,
+                                    screenType = profile,
                                     allApps = allApps,
                                     onSwipeUp = { showSwipeUpPicker = true },
                                     onSwipeDown = { showSwipeDownPicker = true },
@@ -364,7 +437,7 @@ fun SettingsScreen(
                                 SettingsCategory.APPEARANCE -> AppearanceSection(
                                     s = s,
                                     viewModel = viewModel,
-                                    screenType = screenType,
+                                    screenType = profile,
                                     iconPacks = iconPacks,
                                     onIconPack = { showIconPackPicker = true },
                                     onCountStyle = { showCountStylePicker = true },
@@ -372,18 +445,19 @@ fun SettingsScreen(
                                     onBatchTimes = { showBatchTimesEditor = true },
                                     onFoldTransition = { showFoldTransitionPicker = true },
                                 )
-                                SettingsCategory.NOTIFICATIONS -> NotificationsSection(s = s, viewModel = viewModel, screenType = screenType, previewIcon = previewIcon)
+                                SettingsCategory.NOTIFICATIONS -> NotificationsSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
                                 SettingsCategory.PERMISSIONS -> PermissionsSection(
                                     isDefaultLauncher = isDefaultLauncher,
                                     notifAccessGranted = notifAccessGranted,
                                     onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
                                     onNotifAccess = { openNotificationAccess(context) },
                                 )
+                                SettingsCategory.BACKUP -> BackupSection()
                             }
                         }
                     }
                 } else {
-                    // Phone Settings Layout for Folded State (ScreenType.OUTER)
+                    // Single-column layout for narrow windows: cover screens and flip-phone inner screens
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -446,9 +520,10 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .verticalScroll(mainScrollState)
-                                    .padding(bottom = 80.dp),
+                                    .padding(bottom = 28.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
+                                profileSwitcher()
                                 val queryLower = searchQuery.trim().lowercase()
                                 val filteredCategories = if (queryLower.isBlank()) {
                                     SettingsCategory.entries
@@ -559,33 +634,38 @@ fun SettingsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .verticalScroll(mainScrollState)
-                                    .padding(bottom = 80.dp),
+                                    .verticalScroll(subpageScrollState)
+                                    .padding(bottom = 28.dp),
                             ) {
+                                // Categories that hold only shared settings don't offer a profile choice.
+                                if (activeCategory.perDisplay) profileSwitcher()
                                 when (activeCategory) {
                                     SettingsCategory.DISPLAY_PROFILES -> DisplayProfilesSection(
                                         s = s,
                                         viewModel = viewModel,
-                                        screenType = screenType,
+                                        screenType = profile,
                                         onFoldAction = { showFoldActionPicker = true },
                                         onUnfoldAction = { showUnfoldActionPicker = true },
                                         onFoldTransition = { showFoldTransitionPicker = true },
                                         onAppPairs = { showAppPairsManager = true },
+                                        onCopyProfile = { showCopyProfile = true },
                                     )
-                                    SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = screenType)
-                                    SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = screenType, previewIcon = previewIcon)
+                                    SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = profile, onPickColor = { colorTarget = it })
+                                    SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
+                                    SettingsCategory.TASKBAR -> TaskbarSection(s = s, viewModel = viewModel)
                                     SettingsCategory.APP_DRAWER -> AppDrawerSection(
                                         s = s,
                                         viewModel = viewModel,
-                                        screenType = screenType,
+                                        screenType = profile,
                                         hiddenCount = hiddenKeys.size,
                                         onShowHidden = { showHiddenManager = true },
                                         onLayoutMode = { showDrawerLayoutPicker = true },
+                                        onPickColor = { colorTarget = it },
                                     )
                                     SettingsCategory.GESTURES -> GesturesSection(
                                         s = s,
                                         viewModel = viewModel,
-                                        screenType = screenType,
+                                        screenType = profile,
                                         allApps = allApps,
                                         onSwipeUp = { showSwipeUpPicker = true },
                                         onSwipeDown = { showSwipeDownPicker = true },
@@ -595,7 +675,7 @@ fun SettingsScreen(
                                     SettingsCategory.APPEARANCE -> AppearanceSection(
                                         s = s,
                                         viewModel = viewModel,
-                                        screenType = screenType,
+                                        screenType = profile,
                                         iconPacks = iconPacks,
                                         onIconPack = { showIconPackPicker = true },
                                         onCountStyle = { showCountStylePicker = true },
@@ -603,13 +683,14 @@ fun SettingsScreen(
                                         onBatchTimes = { showBatchTimesEditor = true },
                                         onFoldTransition = { showFoldTransitionPicker = true },
                                     )
-                                    SettingsCategory.NOTIFICATIONS -> NotificationsSection(s = s, viewModel = viewModel, screenType = screenType, previewIcon = previewIcon)
+                                    SettingsCategory.NOTIFICATIONS -> NotificationsSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
                                     SettingsCategory.PERMISSIONS -> PermissionsSection(
                                         isDefaultLauncher = isDefaultLauncher,
                                         notifAccessGranted = notifAccessGranted,
                                         onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
                                         onNotifAccess = { openNotificationAccess(context) },
                                     )
+                                    SettingsCategory.BACKUP -> BackupSection()
                                 }
                             }
                         }
@@ -617,31 +698,6 @@ fun SettingsScreen(
                 }
             }
 
-            ExtendedFloatingActionButton(
-                onClick = {
-                    viewModel.applyAllSettings {
-                        Toast.makeText(context, applySuccessMsg, Toast.LENGTH_SHORT).show()
-                    }
-                },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Done,
-                        contentDescription = null,
-                    )
-                },
-                text = {
-                    Text(
-                        text = stringResource(R.string.settings_apply_all),
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                containerColor = Accent,
-                contentColor = Color.White,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(24.dp)
-                    .safeDrawingPadding(),
-            )
         }
 
         // Dialogs & Pickers
@@ -651,7 +707,7 @@ fun SettingsScreen(
                 noneRes = R.string.settings_left_edge_none,
                 apps = allApps,
                 onPick = { key ->
-                    viewModel.setLeftSwipeAppKey(key, screenType)
+                    viewModel.setLeftSwipeAppKey(key, profile)
                     showLeftSwipePicker = false
                 },
                 onDismiss = { showLeftSwipePicker = false },
@@ -663,7 +719,7 @@ fun SettingsScreen(
                 noneRes = R.string.settings_right_edge_none,
                 apps = allApps,
                 onPick = { key ->
-                    viewModel.setRightSwipeAppKey(key, screenType)
+                    viewModel.setRightSwipeAppKey(key, profile)
                     showRightSwipePicker = false
                 },
                 onDismiss = { showRightSwipePicker = false },
@@ -674,7 +730,7 @@ fun SettingsScreen(
                 packs = iconPacks,
                 selected = s.iconPackPackage,
                 onPick = { pkg ->
-                    viewModel.setIconPack(pkg)
+                    viewModel.setIconPack(pkg, profile)
                     showIconPackPicker = false
                 },
                 onDismiss = { showIconPackPicker = false },
@@ -690,7 +746,7 @@ fun SettingsScreen(
                 ),
                 selected = s.notificationWidgetCountStyle,
                 onPick = {
-                    viewModel.setNotificationWidgetCountStyle(it)
+                    viewModel.setNotificationWidgetCountStyle(it, profile)
                     showCountStylePicker = false
                 },
                 onDismiss = { showCountStylePicker = false },
@@ -705,7 +761,7 @@ fun SettingsScreen(
                 ),
                 selected = s.drawerLayoutMode,
                 onPick = {
-                    viewModel.setDrawerLayoutMode(it, screenType)
+                    viewModel.setDrawerLayoutMode(it, profile)
                     showDrawerLayoutPicker = false
                 },
                 onDismiss = { showDrawerLayoutPicker = false },
@@ -740,9 +796,9 @@ fun SettingsScreen(
         if (showSwipeDownPicker) {
             ChoicePicker(
                 title = R.string.settings_swipe_down_action,
-                options = gestureOptions(),
+                options = gestureOptions(context),
                 selected = s.swipeDownAction,
-                onPick = { viewModel.setSwipeDownAction(it, screenType); showSwipeDownPicker = false },
+                onPick = { viewModel.setSwipeDownAction(it, profile); showSwipeDownPicker = false },
                 onDismiss = { showSwipeDownPicker = false },
             )
         }
@@ -756,7 +812,7 @@ fun SettingsScreen(
                     LauncherSettings.GESTURE_NONE to R.string.settings_gesture_none,
                 ),
                 selected = s.swipeUpAction,
-                onPick = { viewModel.setSwipeUpAction(it, screenType); showSwipeUpPicker = false },
+                onPick = { viewModel.setSwipeUpAction(it, profile); showSwipeUpPicker = false },
                 onDismiss = { showSwipeUpPicker = false },
             )
         }
@@ -769,7 +825,7 @@ fun SettingsScreen(
                     LauncherSettings.ACTION_LOCK to R.string.settings_action_lock,
                 ),
                 selected = s.foldAction,
-                onPick = { viewModel.setFoldAction(it, screenType); showFoldActionPicker = false },
+                onPick = { viewModel.setFoldAction(it, profile); showFoldActionPicker = false },
                 onDismiss = { showFoldActionPicker = false },
             )
         }
@@ -782,8 +838,61 @@ fun SettingsScreen(
                     LauncherSettings.ACTION_DRAWER to R.string.settings_action_drawer,
                 ),
                 selected = s.unfoldAction,
-                onPick = { viewModel.setUnfoldAction(it, screenType); showUnfoldActionPicker = false },
+                onPick = { viewModel.setUnfoldAction(it, profile); showUnfoldActionPicker = false },
                 onDismiss = { showUnfoldActionPicker = false },
+            )
+        }
+        colorTarget?.let { target ->
+            ColorPickerDialog(
+                title = stringResource(target.titleRes),
+                initial = when (target) {
+                    ColorTarget.DRAWER_ACCENT -> s.drawerAccentColor
+                    ColorTarget.DRAWER_BACKGROUND -> s.drawerCustomColor
+                    ColorTarget.APP_LABEL -> s.appLabelColor
+                },
+                onConfirm = { argb ->
+                    when (target) {
+                        ColorTarget.DRAWER_ACCENT -> viewModel.setDrawerAccentColor(argb, profile)
+                        ColorTarget.DRAWER_BACKGROUND -> {
+                            viewModel.setDrawerCustomColor(argb, profile)
+                            viewModel.setDrawerThemeTint(LauncherSettings.DRAWER_THEME_CUSTOM, profile)
+                        }
+                        ColorTarget.APP_LABEL -> viewModel.setAppLabelColor(argb, profile)
+                    }
+                    colorTarget = null
+                },
+                onDismiss = { colorTarget = null },
+            )
+        }
+        if (showCopyProfile) {
+            val source = if (profile == ScreenType.OUTER) ScreenType.INNER else ScreenType.OUTER
+            val copiedMsg = stringResource(R.string.settings_copy_profile_done)
+            AlertDialog(
+                onDismissRequest = { showCopyProfile = false },
+                containerColor = palette.surfaceHi,
+                title = { Text(stringResource(R.string.settings_copy_profile), color = palette.text) },
+                text = {
+                    Text(
+                        stringResource(
+                            if (profile == ScreenType.OUTER) R.string.settings_copy_profile_to_outer
+                            else R.string.settings_copy_profile_to_inner,
+                        ),
+                        color = palette.dim,
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showCopyProfile = false
+                        viewModel.copyProfile(from = source, to = profile) {
+                            Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    }) { Text(stringResource(R.string.settings_copy_profile_confirm), color = Accent) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showCopyProfile = false }) {
+                        Text(stringResource(R.string.settings_cancel), color = palette.dim)
+                    }
+                },
             )
         }
         if (showFoldTransitionPicker) {
@@ -798,7 +907,7 @@ fun SettingsScreen(
                     LauncherSettings.TRANSITION_SLIDE to R.string.settings_transition_slide,
                 ),
                 selected = s.foldTransitionStyle,
-                onPick = { viewModel.setFoldTransitionStyle(it, screenType); showFoldTransitionPicker = false },
+                onPick = { viewModel.setFoldTransitionStyle(it, profile); showFoldTransitionPicker = false },
                 onDismiss = { showFoldTransitionPicker = false },
             )
         }
@@ -912,17 +1021,79 @@ private fun gestureLabel(action: String): String = stringResource(
         LauncherSettings.GESTURE_SEARCH -> R.string.settings_gesture_search
         LauncherSettings.GESTURE_LOCK -> R.string.settings_gesture_lock
         LauncherSettings.GESTURE_NONE -> R.string.settings_gesture_none
+        LauncherSettings.GESTURE_MOTO_NOTE -> R.string.settings_gesture_moto_note
+        LauncherSettings.GESTURE_MOTO_VAULT -> R.string.settings_gesture_moto_vault
+        LauncherSettings.GESTURE_MOTO_READY_FOR -> R.string.settings_gesture_moto_ready_for
+        LauncherSettings.GESTURE_MOTO_GAMES -> R.string.settings_gesture_moto_games
+        LauncherSettings.GESTURE_MOTO_WEATHER -> R.string.settings_gesture_moto_weather
+        LauncherSettings.GESTURE_MOTO_STYLES -> R.string.settings_gesture_moto_styles
         else -> R.string.settings_gesture_notifications
     }
 )
 
-private fun gestureOptions(): List<Pair<String, Int>> = listOf(
+/** Home gesture choices: Folark's own, then the Motorola screens this phone has, then none. */
+private fun gestureOptions(context: android.content.Context): List<Pair<String, Int>> = listOf(
     LauncherSettings.GESTURE_NOTIFICATIONS to R.string.settings_gesture_notifications,
     LauncherSettings.GESTURE_DRAWER to R.string.settings_gesture_drawer,
     LauncherSettings.GESTURE_SEARCH to R.string.settings_gesture_search,
     LauncherSettings.GESTURE_LOCK to R.string.settings_gesture_lock,
+) + listOf(
+    LauncherSettings.GESTURE_MOTO_NOTE to R.string.settings_gesture_moto_note,
+    LauncherSettings.GESTURE_MOTO_VAULT to R.string.settings_gesture_moto_vault,
+    LauncherSettings.GESTURE_MOTO_READY_FOR to R.string.settings_gesture_moto_ready_for,
+    LauncherSettings.GESTURE_MOTO_GAMES to R.string.settings_gesture_moto_games,
+    LauncherSettings.GESTURE_MOTO_WEATHER to R.string.settings_gesture_moto_weather,
+    LauncherSettings.GESTURE_MOTO_STYLES to R.string.settings_gesture_moto_styles,
+).filter { (gesture, _) -> MotoLinks.gestureAvailable(context, gesture) } + listOf(
     LauncherSettings.GESTURE_NONE to R.string.settings_gesture_none,
 )
+
+/** Gestures page: what a double tap on empty home space does (any home gesture, Motorola's too). */
+@Composable
+private fun DoubleTapActionRow(s: LauncherSettings, viewModel: SettingsViewModel, screenType: ScreenType) {
+    val context = LocalContext.current
+    var serviceEnabled by remember { mutableStateOf(lockServiceEnabled(context)) }
+    LifecycleResumeEffect(Unit) {
+        serviceEnabled = lockServiceEnabled(context)
+        onPauseOrDispose { }
+    }
+    fun openAccessibilitySettings() {
+        runCatching {
+            context.startActivity(
+                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+    var picking by remember { mutableStateOf(false) }
+    ExpressiveActionItem(
+        title = stringResource(R.string.settings_double_tap_action),
+        description = gestureLabel(s.doubleTapAction),
+        onClick = { picking = true },
+    )
+    if (s.doubleTapAction == LauncherSettings.GESTURE_LOCK && !serviceEnabled) {
+        ExpressiveActionItem(
+            title = stringResource(R.string.settings_double_tap_lock_grant),
+            description = stringResource(R.string.settings_double_tap_lock_grant_desc),
+            onClick = { openAccessibilitySettings() },
+        )
+    }
+    if (picking) {
+        ChoicePicker(
+            title = R.string.settings_double_tap_action,
+            options = remember { gestureOptions(context) },
+            selected = s.doubleTapAction,
+            onPick = { choice ->
+                viewModel.setDoubleTapAction(choice, screenType)
+                if (choice == LauncherSettings.GESTURE_LOCK && !lockServiceEnabled(context)) {
+                    openAccessibilitySettings()
+                }
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
+    }
+}
 
 @Composable
 private fun BatchTimesEditor(initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
@@ -1084,8 +1255,6 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-private const val LOCK_SERVICE_CLASS = "org.arkikeskus.launcher.feature.home.LockAccessibilityService"
-
 private fun lockServiceEnabled(context: Context): Boolean {
     val enabled = Settings.Secure.getString(
         context.contentResolver,
@@ -1166,8 +1335,9 @@ private fun StatusBarToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
     )
 }
 
+/** The taskbar over other apps: it is drawn by the accessibility service, so that must be allowed. */
 @Composable
-private fun DoubleTapLockToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
+internal fun TaskbarToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
     val context = LocalContext.current
     var serviceEnabled by remember { mutableStateOf(lockServiceEnabled(context)) }
     LifecycleResumeEffect(Unit) {
@@ -1183,7 +1353,8 @@ private fun DoubleTapLockToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Uni
         }
     }
     ExpressiveSwitchRow(
-        title = stringResource(R.string.settings_double_tap_lock),
+        title = stringResource(R.string.settings_taskbar),
+        subtitle = stringResource(R.string.settings_taskbar_desc),
         checked = enabled,
         onCheckedChange = { wantOn ->
             onSetEnabled(wantOn)
@@ -1193,51 +1364,25 @@ private fun DoubleTapLockToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Uni
     if (enabled && !serviceEnabled) {
         ExpressiveActionItem(
             title = stringResource(R.string.settings_double_tap_lock_grant),
-            description = stringResource(R.string.settings_double_tap_lock_grant_desc),
+            description = stringResource(R.string.settings_taskbar_grant_desc),
             onClick = { openAccessibilitySettings() },
         )
     }
 }
 
-@Composable
-private fun LabelColorRow(selected: Int, onPick: (Int) -> Unit) {
-    val p = LocalExpressivePalette.current
-    val swatches = remember {
-        listOf(
-            0xFFFFFFFF, 0xFF000000, 0xFFBDBDBD, 0xFFEF5350,
-            0xFFFFA726, 0xFFFFEE58, 0xFF66BB6A, 0xFF42A5F5, 0xFFAB47BC,
-        ).map { it.toInt() }
-    }
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(
-            text = stringResource(R.string.settings_label_color),
-            color = p.text,
-            fontSize = 15.5.sp,
-            fontWeight = FontWeight.Medium,
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-        ) {
-            swatches.forEach { c ->
-                val isSel = c == selected
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(c))
-                        .border(
-                            width = if (isSel) 3.dp else 1.dp,
-                            color = if (isSel) Accent else p.faint,
-                            shape = CircleShape,
-                        )
-                        .clickable { onPick(c) },
-                )
-            }
-        }
-    }
-}
+private val LABEL_COLOR_PRESETS = listOf(
+    0xFFFFFFFF, 0xFF000000, 0xFFBDBDBD, 0xFFEF5350,
+    0xFFFFA726, 0xFFFFEE58, 0xFF66BB6A, 0xFF42A5F5, 0xFFAB47BC,
+).map { it.toInt() }
+
+private val DRAWER_ACCENT_PRESETS = listOf(
+    0xFF00B0FF, 0xFF0A84FF, 0xFF00BCD4, 0xFF00BFA5, 0xFF00C853,
+    0xFFFFAB00, 0xFFE2714A, 0xFFFF3B30, 0xFFFF1744, 0xFFAA00FF,
+).map { it.toInt() }
+
+private val DRAWER_BACKGROUND_PRESETS = listOf(
+    0xFF1B2A41, 0xFF0F2B2A, 0xFF2A1B3D, 0xFF3A1F1F, 0xFF2B2B2B, 0xFFE9EEF7, 0xFFF7EFE5,
+).map { it.toInt() }
 
 @Composable
 private fun HiddenAppsManager(
@@ -1325,7 +1470,7 @@ private fun rememberLauncherIconBitmap(): ImageBitmap? {
 private fun BadgePreview(icon: ImageBitmap?, showDots: Boolean, showCount: Boolean, scale: Float) {
     Box(
         modifier = Modifier.padding(bottom = 6.dp, top = 4.dp),
-        contentAlignment = Alignment.TopEnd,
+        contentAlignment = badgeAlignment(),
     ) {
         if (icon != null) {
             Image(bitmap = icon, contentDescription = null, modifier = Modifier.size(52.dp))
@@ -1399,9 +1544,12 @@ private fun AppPairsManager(
     onSaveAppPair: (AppPair) -> Unit,
     onDeleteAppPair: (String) -> Unit,
     onLaunchAppPair: (AppPair) -> Unit,
+    onAddAppPairToHome: (AppPair) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // System Back returns to Settings instead of closing it.
+    BackHandler(onBack = onBack)
     val palette = LocalExpressivePalette.current
     var showCreator by remember { mutableStateOf(false) }
 
@@ -1444,6 +1592,7 @@ private fun AppPairsManager(
                         pair = pair,
                         apps = apps,
                         onLaunch = { onLaunchAppPair(pair) },
+                        onAddToHome = { onAddAppPairToHome(pair) },
                         onDelete = { onDeleteAppPair(pair.id) },
                     )
                 }
@@ -1455,7 +1604,7 @@ private fun AppPairsManager(
         AppPairCreatorDialog(
             apps = apps,
             onDismiss = { showCreator = false },
-            onConfirm = { name, app1, app2 ->
+            onConfirm = { name, app1, app2, app3 ->
                 val pair = AppPair(
                     id = UUID.randomUUID().toString(),
                     name = name,
@@ -1467,6 +1616,10 @@ private fun AppPairsManager(
                     app2Package = app2.packageName,
                     app2ClassName = app2.className,
                     app2UserSerial = app2.userSerial,
+                    app3Key = app3?.key.orEmpty(),
+                    app3Package = app3?.packageName.orEmpty(),
+                    app3ClassName = app3?.className.orEmpty(),
+                    app3UserSerial = app3?.userSerial ?: 0L,
                 )
                 onSaveAppPair(pair)
                 showCreator = false
@@ -1480,11 +1633,15 @@ private fun AppPairRow(
     pair: AppPair,
     apps: List<AppItem>,
     onLaunch: () -> Unit,
+    onAddToHome: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val palette = LocalExpressivePalette.current
+    val context = LocalContext.current
+    val addedMessage = stringResource(R.string.settings_app_pair_added_home)
     val app1 = apps.firstOrNull { it.key == pair.app1Key }
     val app2 = apps.firstOrNull { it.key == pair.app2Key }
+    val app3 = if (pair.hasThirdApp) apps.firstOrNull { it.key == pair.app3Key } else null
 
     Surface(
         color = palette.surfaceHi,
@@ -1501,11 +1658,23 @@ private fun AppPairRow(
                 if (app2 != null) AppIcon(appItem = app2, labelColor = Color.Transparent, showLabel = false, iconSize = 36.dp)
                 Column {
                     Text(pair.name, fontWeight = FontWeight.Bold, color = palette.text)
-                    Text("${app1?.label ?: ""} & ${app2?.label ?: ""}", fontSize = 12.sp, color = palette.faint)
+                    Text(
+                        "${app1?.label ?: ""} & ${app2?.label ?: ""}" + (app3?.let { " + ${it.label}" } ?: ""),
+                        fontSize = 12.sp,
+                        color = palette.faint,
+                    )
                 }
             }
-            TextButton(onClick = onDelete) {
-                Text("Delete", color = Color.Red)
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = {
+                    onAddToHome()
+                    android.widget.Toast.makeText(context, addedMessage, android.widget.Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(stringResource(R.string.settings_app_pair_add_home), color = Accent)
+                }
+                TextButton(onClick = onDelete) {
+                    Text(stringResource(R.string.settings_delete), color = Color.Red)
+                }
             }
         }
     }
@@ -1515,13 +1684,16 @@ private fun AppPairRow(
 private fun AppPairCreatorDialog(
     apps: List<AppItem>,
     onDismiss: () -> Unit,
-    onConfirm: (String, AppItem, AppItem) -> Unit,
+    onConfirm: (String, AppItem, AppItem, AppItem?) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var selectedApp1 by remember { mutableStateOf<AppItem?>(null) }
     var selectedApp2 by remember { mutableStateOf<AppItem?>(null) }
+    // Optional: a third app that opens in a floating window over the split pair.
+    var selectedApp3 by remember { mutableStateOf<AppItem?>(null) }
     var showApp1Picker by remember { mutableStateOf(false) }
     var showApp2Picker by remember { mutableStateOf(false) }
+    var showApp3Picker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1544,22 +1716,28 @@ private fun AppPairCreatorDialog(
                     description = selectedApp2?.label ?: "Tap to choose",
                     onClick = { showApp2Picker = true },
                 )
+                ExpressiveActionItem(
+                    title = stringResource(R.string.settings_select_app_3),
+                    description = selectedApp3?.label ?: stringResource(R.string.settings_select_app_3_none),
+                    // Tapping again with an app chosen clears it: the third app is optional.
+                    onClick = { if (selectedApp3 != null) selectedApp3 = null else showApp3Picker = true },
+                )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (name.isNotBlank() && selectedApp1 != null && selectedApp2 != null) {
-                        onConfirm(name, selectedApp1!!, selectedApp2!!)
+                        onConfirm(name, selectedApp1!!, selectedApp2!!, selectedApp3)
                     }
                 },
                 enabled = name.isNotBlank() && selectedApp1 != null && selectedApp2 != null,
             ) {
-                Text("Save")
+                Text(stringResource(R.string.settings_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
         },
     )
 
@@ -1575,6 +1753,12 @@ private fun AppPairCreatorDialog(
             showApp2Picker = false
         }
     }
+    if (showApp3Picker) {
+        AppPickerDialog(apps = apps, onDismiss = { showApp3Picker = false }) {
+            selectedApp3 = it
+            showApp3Picker = false
+        }
+    }
 }
 
 @Composable
@@ -1585,7 +1769,7 @@ private fun AppPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Choose App") },
+        title = { Text(stringResource(R.string.settings_choose_app)) },
         text = {
             LazyColumn(modifier = Modifier.height(300.dp)) {
                 items(apps, key = { it.key }) { app ->
@@ -1605,7 +1789,7 @@ private fun AppPickerDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
         },
     )
 }
@@ -1619,25 +1803,54 @@ private fun DisplayProfilesSection(
     onUnfoldAction: () -> Unit,
     onFoldTransition: () -> Unit,
     onAppPairs: () -> Unit,
+    onCopyProfile: () -> Unit,
 ) {
+    val inner = screenType == ScreenType.INNER
     ExpressiveCategoryContainer(
-        title = stringResource(R.string.settings_display_screen_profiles),
-        icon = Icons.Rounded.Smartphone,
-        subtitle = stringResource(R.string.settings_category_display_profiles_desc),
+        title = stringResource(if (inner) R.string.settings_profile_inner else R.string.settings_profile_outer),
+        icon = if (inner) Icons.Rounded.TabletAndroid else Icons.Rounded.Smartphone,
+        subtitle = stringResource(
+            if (inner) R.string.settings_profile_inner_hint else R.string.settings_profile_outer_hint,
+        ),
     ) {
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_inner_dual_page),
-            subtitle = stringResource(R.string.settings_inner_dual_page_desc),
-            checked = s.innerDualPageWorkspace,
-            onCheckedChange = { viewModel.setInnerDualPageWorkspace(it, screenType) },
-        )
-        ExpressiveRowDivider()
+        // Each display only lists what can actually happen on it: the inner screen's layout
+        // options and the action that runs when arriving on that display.
+        if (inner) {
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_inner_dual_page),
+                subtitle = stringResource(R.string.settings_inner_dual_page_desc),
+                checked = s.innerDualPageWorkspace,
+                onCheckedChange = { viewModel.setInnerDualPageWorkspace(it, screenType) },
+            )
+            ExpressiveRowDivider()
 
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_inner_sidebar_drawer),
-            subtitle = stringResource(R.string.settings_inner_sidebar_drawer_desc),
-            checked = s.innerSidebarAppDrawer,
-            onCheckedChange = { viewModel.setInnerSidebarAppDrawer(it, screenType) },
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_inner_sidebar_drawer),
+                subtitle = stringResource(R.string.settings_inner_sidebar_drawer_desc),
+                checked = s.innerSidebarAppDrawer,
+                onCheckedChange = { viewModel.setInnerSidebarAppDrawer(it, screenType) },
+            )
+            ExpressiveRowDivider()
+
+            ExpressiveActionItem(
+                title = stringResource(R.string.settings_unfold_action),
+                description = unfoldActionLabel(s.unfoldAction),
+                onClick = onUnfoldAction,
+            )
+            ExpressiveRowDivider()
+        } else {
+            ExpressiveActionItem(
+                title = stringResource(R.string.settings_fold_action),
+                description = foldActionLabel(s.foldAction),
+                onClick = onFoldAction,
+            )
+            ExpressiveRowDivider()
+        }
+
+        ExpressiveActionItem(
+            title = stringResource(R.string.settings_fold_transition),
+            description = transitionLabel(s.foldTransitionStyle),
+            onClick = onFoldTransition,
         )
         ExpressiveRowDivider()
 
@@ -1649,48 +1862,24 @@ private fun DisplayProfilesSection(
         ExpressiveRowDivider()
 
         ExpressiveActionItem(
-            title = stringResource(R.string.settings_fold_action),
-            description = foldActionLabel(s.foldAction),
-            onClick = onFoldAction,
+            title = stringResource(R.string.settings_copy_profile),
+            description = stringResource(
+                if (inner) R.string.settings_copy_profile_from_outer else R.string.settings_copy_profile_from_inner,
+            ),
+            onClick = onCopyProfile,
         )
-        ExpressiveRowDivider()
+    }
 
-        ExpressiveActionItem(
-            title = stringResource(R.string.settings_unfold_action),
-            description = unfoldActionLabel(s.unfoldAction),
-            onClick = onUnfoldAction,
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveActionItem(
-            title = stringResource(R.string.settings_fold_transition),
-            description = transitionLabel(s.foldTransitionStyle),
-            onClick = onFoldTransition,
-        )
-        ExpressiveRowDivider()
-
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_foldable_shared),
+        icon = Icons.Rounded.Devices,
+        sharedByBothDisplays = true,
+    ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_half_opened_mode),
+            subtitle = stringResource(R.string.settings_half_opened_mode_desc),
             checked = s.halfOpenedModeEnabled,
             onCheckedChange = viewModel::setHalfOpenedModeEnabled,
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_outer_wallpaper_scale),
-            value = s.outerWallpaperScale,
-            onValueChange = viewModel::setOuterWallpaperScale,
-            valueRange = 1f..2.5f,
-            valueDisplay = "%.1fx".format(s.outerWallpaperScale),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_inner_wallpaper_scale),
-            value = s.innerWallpaperScale,
-            onValueChange = viewModel::setInnerWallpaperScale,
-            valueRange = 1f..2.5f,
-            valueDisplay = "%.1fx".format(s.innerWallpaperScale),
         )
         ExpressiveRowDivider()
 
@@ -1699,6 +1888,26 @@ private fun DisplayProfilesSection(
             description = stringResource(R.string.settings_app_pairs_desc),
             onClick = onAppPairs,
         )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_launch),
+            subtitle = stringResource(R.string.settings_split_launch_desc),
+            checked = s.splitLaunchEnabled,
+            onCheckedChange = viewModel::setSplitLaunchEnabled,
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_floating_launch),
+            subtitle = stringResource(R.string.settings_floating_launch_desc),
+            checked = s.floatingLaunchEnabled,
+            onCheckedChange = viewModel::setFloatingLaunchEnabled,
+        )
+        ExpressiveRowDivider()
+
+        FloatingSizeRow(s = s, viewModel = viewModel)
+        MotoPopupGestureRow()
     }
 }
 
@@ -1707,6 +1916,7 @@ private fun GridAndDpiSection(
     s: LauncherSettings,
     viewModel: SettingsViewModel,
     screenType: ScreenType = LocalScreenType.current,
+    onPickColor: (ColorTarget) -> Unit,
 ) {
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_grid_dpi),
@@ -1728,36 +1938,6 @@ private fun GridAndDpiSection(
             min = 4,
             max = 8,
             onValueChange = { viewModel.setHomeRows(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveStepperRow(
-            title = stringResource(R.string.settings_columns) + " (" + stringResource(R.string.settings_drawer) + ")",
-            value = s.drawerColumns,
-            min = 3,
-            max = 8,
-            onValueChange = { viewModel.setDrawerColumns(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveStepperRow(
-            title = stringResource(R.string.settings_rows) + " (" + stringResource(R.string.settings_drawer) + ")",
-            value = s.drawerRows,
-            min = 3,
-            max = 8,
-            onValueChange = { viewModel.setDrawerRows(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_workspace_density),
-            options = listOf(
-                LauncherSettings.DENSITY_COMPACT to stringResource(R.string.settings_density_compact),
-                LauncherSettings.DENSITY_NORMAL to stringResource(R.string.settings_density_normal),
-                LauncherSettings.DENSITY_SPACIOUS to stringResource(R.string.settings_density_spacious),
-            ),
-            selected = s.workspaceDensity,
-            onSelect = { viewModel.setWorkspaceDensity(it, screenType) },
         )
         ExpressiveRowDivider()
 
@@ -1784,7 +1964,26 @@ private fun GridAndDpiSection(
         )
         ExpressiveRowDivider()
 
-        LabelColorRow(selected = s.appLabelColor, onPick = { viewModel.setAppLabelColor(it, screenType) })
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_icon_size),
+            value = s.iconSizeScale,
+            onValueChange = { viewModel.setIconSizeScale(it, screenType) },
+            valueRange = LauncherSettings.MIN_ICON_SIZE_SCALE..LauncherSettings.MAX_ICON_SIZE_SCALE,
+            valueDisplay = "%d%%".format((s.iconSizeScale * 100).roundToInt()),
+            subtitle = stringResource(R.string.settings_icon_size_desc),
+        )
+        ExpressiveRowDivider()
+
+        AutoRemovePagesRow(s = s, viewModel = viewModel, screenType = screenType)
+        ExpressiveRowDivider()
+
+        ColorSwatchRow(
+            title = stringResource(R.string.settings_label_color),
+            presets = LABEL_COLOR_PRESETS,
+            selected = s.appLabelColor,
+            onPick = { viewModel.setAppLabelColor(it, screenType) },
+            onCustom = { onPickColor(ColorTarget.APP_LABEL) },
+        )
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
@@ -1811,6 +2010,79 @@ private fun GridAndDpiSection(
             onValueChange = { viewModel.setDpiSettings(it, screenType) },
             valueRange = LauncherSettings.MIN_DPI_SCALE..LauncherSettings.MAX_DPI_SCALE,
             valueDisplay = "%d%%".format((s.dpiSettings * 100).roundToInt()),
+        )
+    }
+
+    // ---- Home folders: the closed tile, and the folder when opened ------------------------------
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_folders),
+        icon = Icons.Rounded.Folder,
+        subtitle = stringResource(R.string.settings_folders_desc),
+    ) {
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_folder_theme),
+            options = listOf(
+                LauncherSettings.FOLDER_THEME_GLASS to stringResource(R.string.settings_folder_theme_glass),
+                LauncherSettings.FOLDER_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
+                LauncherSettings.FOLDER_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
+                LauncherSettings.FOLDER_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
+            ),
+            selected = s.folderTheme,
+            onSelect = { viewModel.setFolderTheme(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_folder_shape),
+            options = listOf(
+                LauncherSettings.FOLDER_SHAPE_SQUIRCLE to stringResource(R.string.settings_folder_shape_squircle),
+                LauncherSettings.FOLDER_SHAPE_CIRCLE to stringResource(R.string.settings_folder_shape_circle),
+                LauncherSettings.FOLDER_SHAPE_SQUARE to stringResource(R.string.settings_folder_shape_square),
+            ),
+            selected = s.folderShape,
+            onSelect = { viewModel.setFolderShape(it, screenType) },
+        )
+        FolderStylePreview(s)
+        ExpressiveRowDivider()
+
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_folder_preview),
+            options = listOf(
+                LauncherSettings.FOLDER_PREVIEW_GRID_2 to stringResource(R.string.settings_folder_preview_grid2),
+                LauncherSettings.FOLDER_PREVIEW_GRID_3 to stringResource(R.string.settings_folder_preview_grid3),
+                LauncherSettings.FOLDER_PREVIEW_COVER to stringResource(R.string.settings_folder_preview_cover),
+            ),
+            selected = s.folderPreview,
+            onSelect = { viewModel.setFolderPreview(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_folder_open_size),
+            options = listOf(
+                LauncherSettings.FOLDER_OPEN_SMALL to stringResource(R.string.settings_folder_open_small),
+                LauncherSettings.FOLDER_OPEN_MEDIUM to stringResource(R.string.settings_folder_open_medium),
+                LauncherSettings.FOLDER_OPEN_LARGE to stringResource(R.string.settings_folder_open_large),
+            ),
+            selected = s.folderOpenSize,
+            onSelect = { viewModel.setFolderOpenSize(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveStepperRow(
+            title = stringResource(R.string.settings_folder_open_columns),
+            value = s.folderOpenColumns,
+            min = LauncherSettings.MIN_FOLDER_OPEN_COLUMNS,
+            max = LauncherSettings.MAX_FOLDER_OPEN_COLUMNS,
+            onValueChange = { viewModel.setFolderOpenColumns(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_folder_tap_first),
+            subtitle = stringResource(R.string.settings_folder_tap_first_desc),
+            checked = s.folderTapFirstApp,
+            onCheckedChange = { viewModel.setFolderTapFirstApp(it, screenType) },
         )
     }
 }
@@ -1859,26 +2131,21 @@ private fun DockAndTaskbarSection(
         ExpressiveRowDivider()
 
         DockPreview(opacity = s.dockBackgroundOpacity, icon = previewIcon)
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_inner_taskbar),
-            checked = s.innerTaskbarEnabled,
-            onCheckedChange = { viewModel.setInnerTaskbarEnabled(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_inner_dock_alignment),
-            options = listOf(
-                LauncherSettings.DOCK_ALIGNMENT_CENTER to stringResource(R.string.settings_dock_align_center),
-                LauncherSettings.DOCK_ALIGNMENT_LEFT to stringResource(R.string.settings_dock_align_left),
-                LauncherSettings.DOCK_ALIGNMENT_RIGHT to stringResource(R.string.settings_dock_align_right),
-                LauncherSettings.DOCK_ALIGNMENT_FLOATING to stringResource(R.string.settings_dock_align_floating),
-            ),
-            selected = s.innerDockAlignment,
-            onSelect = { viewModel.setInnerDockAlignment(it, screenType) },
-        )
+        // Dock alignment only exists on the wide inner screen; the cover screen's dock is full width.
+        if (screenType == ScreenType.INNER) {
+            ExpressiveRowDivider()
+            ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_inner_dock_alignment),
+                options = listOf(
+                    LauncherSettings.DOCK_ALIGNMENT_CENTER to stringResource(R.string.settings_dock_align_center),
+                    LauncherSettings.DOCK_ALIGNMENT_LEFT to stringResource(R.string.settings_dock_align_left),
+                    LauncherSettings.DOCK_ALIGNMENT_RIGHT to stringResource(R.string.settings_dock_align_right),
+                    LauncherSettings.DOCK_ALIGNMENT_FLOATING to stringResource(R.string.settings_dock_align_floating),
+                ),
+                selected = s.innerDockAlignment,
+                onSelect = { viewModel.setInnerDockAlignment(it, screenType) },
+            )
+        }
     }
 }
 
@@ -1890,12 +2157,120 @@ private fun AppDrawerSection(
     hiddenCount: Int,
     onShowHidden: () -> Unit,
     onLayoutMode: () -> Unit,
+    onPickColor: (ColorTarget) -> Unit,
 ) {
     val context = LocalContext.current
+    val palette = LocalExpressivePalette.current
+
+    // ---- Look: colours, style and Liquid Glass, with a live miniature on top -------------------
     ExpressiveCategoryContainer(
-        title = stringResource(R.string.settings_app_drawer_customization),
-        icon = Icons.Rounded.Apps,
-        subtitle = stringResource(R.string.settings_category_app_drawer_desc),
+        title = stringResource(R.string.settings_drawer_look),
+        icon = Icons.Rounded.Palette,
+        subtitle = stringResource(R.string.settings_drawer_look_desc),
+    ) {
+        DrawerPreview(s = s)
+        ExpressiveRowDivider()
+
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_drawer_style),
+            options = listOf(
+                LauncherSettings.DRAWER_STYLE_STANDARD_GRID to stringResource(R.string.settings_drawer_style_standard_grid),
+                LauncherSettings.DRAWER_STYLE_ONE_UI to stringResource(R.string.settings_drawer_style_one_ui),
+                LauncherSettings.DRAWER_STYLE_NOTHING_OS to stringResource(R.string.settings_drawer_style_nothing_os),
+                LauncherSettings.DRAWER_STYLE_MOTO to stringResource(R.string.settings_drawer_style_moto),
+            ),
+            selected = s.drawerStyle,
+            onSelect = { viewModel.setDrawerStyle(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_drawer_theme_tint),
+            options = LauncherSettings.DRAWER_THEMES.map { it to drawerThemeLabel(it) },
+            selected = s.drawerThemeTint,
+            onSelect = { theme ->
+                // "Custom" needs a colour first: open the picker, which also selects the theme.
+                if (theme == LauncherSettings.DRAWER_THEME_CUSTOM && s.drawerThemeTint != theme) {
+                    viewModel.setDrawerThemeTint(theme, screenType)
+                    onPickColor(ColorTarget.DRAWER_BACKGROUND)
+                } else {
+                    viewModel.setDrawerThemeTint(theme, screenType)
+                }
+            },
+        )
+        if (s.drawerThemeTint == LauncherSettings.DRAWER_THEME_CUSTOM) {
+            ExpressiveRowDivider()
+            ColorSwatchRow(
+                title = stringResource(R.string.settings_drawer_custom_color),
+                presets = DRAWER_BACKGROUND_PRESETS,
+                selected = s.drawerCustomColor,
+                onPick = { viewModel.setDrawerCustomColor(it, screenType) },
+                onCustom = { onPickColor(ColorTarget.DRAWER_BACKGROUND) },
+            )
+        }
+        // Monochrome and Material You bring their own accent, so the accent row would do nothing.
+        val themeOwnsAccent = s.drawerThemeTint == LauncherSettings.DRAWER_THEME_MONOCHROME ||
+            s.drawerThemeTint == LauncherSettings.DRAWER_THEME_MATERIAL_YOU
+        ExpressiveRowDivider()
+        if (themeOwnsAccent) {
+            Text(
+                text = stringResource(R.string.settings_drawer_accent_from_theme),
+                color = palette.dim,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+        } else {
+            ColorSwatchRow(
+                title = stringResource(R.string.settings_drawer_accent_color),
+                presets = DRAWER_ACCENT_PRESETS,
+                selected = s.drawerAccentColor,
+                onPick = { viewModel.setDrawerAccentColor(it, screenType) },
+                onCustom = { onPickColor(ColorTarget.DRAWER_ACCENT) },
+            )
+        }
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_glass),
+            subtitle = stringResource(R.string.settings_drawer_glass_desc),
+            checked = s.drawerGlassEnabled,
+            onCheckedChange = { viewModel.setDrawerGlassEnabled(it, screenType) },
+        )
+        if (s.drawerGlassEnabled) {
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_drawer_panel_opacity),
+                value = s.drawerPanelOpacity,
+                valueRange = LauncherSettings.MIN_DRAWER_PANEL_OPACITY..LauncherSettings.MAX_DRAWER_PANEL_OPACITY,
+                onValueChange = { viewModel.setDrawerPanelOpacity(it, screenType) },
+                valueDisplay = "%d%%".format((s.drawerPanelOpacity * 100).roundToInt()),
+            )
+        }
+        ExpressiveRowDivider()
+
+        val blurSupported = remember(context) { supportsWindowBlur(context) }
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_drawer_blur),
+            value = s.drawerBackgroundBlur / LauncherSettings.MAX_DRAWER_BLUR,
+            onValueChange = { viewModel.setDrawerBackgroundBlur(it * LauncherSettings.MAX_DRAWER_BLUR, screenType) },
+            valueDisplay = "%d%%".format((s.drawerBackgroundBlur / LauncherSettings.MAX_DRAWER_BLUR * 100).roundToInt()),
+            subtitle = if (blurSupported) null else stringResource(R.string.settings_drawer_blur_unsupported),
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_drawer_scrim),
+            value = s.drawerScrimOpacity,
+            onValueChange = { viewModel.setDrawerScrimOpacity(it, screenType) },
+            valueDisplay = "%d%%".format((s.drawerScrimOpacity * 100).roundToInt()),
+        )
+    }
+
+    // ---- Layout ------------------------------------------------------------------------------
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_drawer_layout),
+        icon = Icons.Rounded.GridOn,
     ) {
         ExpressiveActionItem(
             title = stringResource(R.string.settings_drawer_layout_mode),
@@ -1910,20 +2285,11 @@ private fun AppDrawerSection(
         ExpressiveRowDivider()
 
         ExpressiveStepperRow(
-            title = stringResource(R.string.settings_columns) + " (" + stringResource(R.string.settings_drawer) + ")",
+            title = stringResource(R.string.settings_columns),
             value = s.drawerColumns,
             min = 3,
             max = 8,
             onValueChange = { viewModel.setDrawerColumns(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveStepperRow(
-            title = stringResource(R.string.settings_rows) + " (" + stringResource(R.string.settings_drawer) + ")",
-            value = s.drawerRows,
-            min = 3,
-            max = 8,
-            onValueChange = { viewModel.setDrawerRows(it, screenType) },
         )
         ExpressiveRowDivider()
 
@@ -1964,127 +2330,88 @@ private fun AppDrawerSection(
                 selected = s.azIndexPosition,
                 onSelect = { viewModel.setAzIndexPosition(it, screenType) },
             )
-        }
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_drawer_blur),
-            value = s.drawerBackgroundBlur / 25f,
-            onValueChange = { viewModel.setDrawerBackgroundBlur(it * 25f, screenType) },
-            valueDisplay = "%d%%".format((s.drawerBackgroundBlur / 25f * 100).toInt()),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_drawer_scrim),
-            value = s.drawerScrimOpacity,
-            onValueChange = { viewModel.setDrawerScrimOpacity(it, screenType) },
-            valueDisplay = "%d%%".format((s.drawerScrimOpacity * 100).toInt()),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_glass_blur_radius),
-            value = s.glassBlurRadius,
-            valueRange = 0f..50f,
-            onValueChange = { viewModel.setGlassBlurRadius(it, screenType) },
-            valueDisplay = "%ddp".format(s.glassBlurRadius.roundToInt()),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_glass_dark_tint),
-            value = s.glassDarkTint,
-            valueRange = 0f..0.9f,
-            onValueChange = { viewModel.setGlassDarkTint(it, screenType) },
-            valueDisplay = "%d%%".format((s.glassDarkTint * 100).roundToInt()),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_drawer_styles_and_themes),
-            options = listOf(
-                LauncherSettings.DRAWER_STYLE_STANDARD_GRID to stringResource(R.string.settings_drawer_style_standard_grid),
-                LauncherSettings.DRAWER_STYLE_ONE_UI to stringResource(R.string.settings_drawer_style_one_ui),
-                LauncherSettings.DRAWER_STYLE_NOTHING_OS to stringResource(R.string.settings_drawer_style_nothing_os),
-                LauncherSettings.DRAWER_STYLE_MOTO to stringResource(R.string.settings_drawer_style_moto),
-            ),
-            selected = s.drawerStyle,
-            onSelect = { viewModel.setDrawerStyle(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_drawer_theme_tint),
-            options = listOf(
-                LauncherSettings.DRAWER_THEME_DEFAULT_DARK to stringResource(R.string.settings_drawer_theme_default_dark),
-                LauncherSettings.DRAWER_THEME_OBSIDIAN_BLACK to stringResource(R.string.settings_drawer_theme_obsidian_black),
-                LauncherSettings.DRAWER_THEME_ACCENT_TINT to stringResource(R.string.settings_drawer_theme_accent_tint),
-                LauncherSettings.DRAWER_THEME_MONOCHROME to stringResource(R.string.settings_drawer_theme_monochrome),
-            ),
-            selected = s.drawerThemeTint,
-            onSelect = { viewModel.setDrawerThemeTint(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.settings_drawer_accent_color),
-                color = LocalExpressivePalette.current.text,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_az_index_size),
+                value = s.azIndexScale,
+                valueRange = LauncherSettings.MIN_AZ_INDEX_SCALE..LauncherSettings.MAX_AZ_INDEX_SCALE,
+                onValueChange = { viewModel.setAzIndexScale((it * 20f).roundToInt() / 20f, screenType) },
+                valueDisplay = "%d%%".format((s.azIndexScale * 100).roundToInt()),
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                val presets = listOf(
-                    0xFF00BCD4.toInt() to stringResource(R.string.settings_drawer_accent_teal_cyan),
-                    0xFF00B0FF.toInt() to stringResource(R.string.settings_drawer_accent_electric_blue),
-                    0xFF00C853.toInt() to stringResource(R.string.settings_drawer_accent_emerald_green),
-                    0xFFAA00FF.toInt() to stringResource(R.string.settings_drawer_accent_purple),
-                    0xFFFF1744.toInt() to stringResource(R.string.settings_drawer_accent_rose),
-                    0xFFFFAB00.toInt() to stringResource(R.string.settings_drawer_accent_gold),
-                )
-                for ((colorInt, label) in presets) {
-                    val selected = s.drawerAccentColor == colorInt
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(colorInt))
-                            .clickable { viewModel.setDrawerAccentColor(colorInt, screenType) }
-                            .then(
-                                if (selected) Modifier.border(3.dp, LocalExpressivePalette.current.text, CircleShape)
-                                else Modifier
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (selected) {
-                            Box(
-                                modifier = Modifier
-                                    .size(12.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
-                        }
-                    }
-                }
-            }
         }
         ExpressiveRowDivider()
 
+        // A sidebar drawer (inner display) is always full height, so the height slider is moot there.
+        val sidebar = screenType == ScreenType.INNER && s.innerSidebarAppDrawer
+        if (!sidebar) {
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_drawer_height),
+                value = s.drawerHeightFraction,
+                valueRange = 0.4f..1.0f,
+                onValueChange = { viewModel.setDrawerHeightFraction(it, screenType) },
+                valueDisplay = "%d%%".format((s.drawerHeightFraction * 100).roundToInt()),
+            )
+            ExpressiveRowDivider()
+        }
+
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_drawer_handle),
+            options = listOf(
+                LauncherSettings.DRAWER_HANDLE_BAR to stringResource(R.string.settings_drawer_handle_bar),
+                LauncherSettings.DRAWER_HANDLE_ARROW to stringResource(R.string.settings_drawer_handle_arrow),
+            ),
+            selected = s.drawerHandleStyle,
+            onSelect = { viewModel.setDrawerHandleStyle(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
         ExpressiveSliderRow(
-            title = stringResource(R.string.settings_drawer_height),
-            value = s.drawerHeightFraction,
-            valueRange = 0.4f..1.0f,
-            onValueChange = { viewModel.setDrawerHeightFraction(it, screenType) },
-            valueDisplay = "%d%%".format((s.drawerHeightFraction * 100).toInt()),
+            title = stringResource(R.string.settings_drawer_bottom_space),
+            subtitle = stringResource(R.string.settings_drawer_bottom_space_desc),
+            value = s.drawerBottomSpace.toFloat(),
+            valueRange = 0f..LauncherSettings.MAX_DRAWER_BOTTOM_SPACE.toFloat(),
+            onValueChange = { viewModel.setDrawerBottomSpace((it / 4f).roundToInt() * 4, screenType) },
+            valueDisplay = "%d dp".format(s.drawerBottomSpace),
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_letter_headers),
+            checked = s.drawerLetterHeaders,
+            onCheckedChange = { viewModel.setDrawerLetterHeaders(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_letter_popup),
+            subtitle = stringResource(R.string.settings_drawer_letter_popup_desc),
+            checked = s.drawerLargeLetterPopup,
+            onCheckedChange = { viewModel.setDrawerLargeLetterPopup(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_swipe_tabs),
+            subtitle = stringResource(R.string.settings_drawer_swipe_tabs_desc),
+            checked = s.drawerSwipeTabs,
+            onCheckedChange = { viewModel.setDrawerSwipeTabs(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_flick_close),
+            subtitle = stringResource(R.string.settings_drawer_flick_close_desc),
+            checked = s.drawerFlickClose,
+            onCheckedChange = { viewModel.setDrawerFlickClose(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_drawer_corner),
+            value = s.drawerCornerRadius.toFloat(),
+            valueRange = LauncherSettings.DRAWER_CORNER_AUTO.toFloat()..LauncherSettings.MAX_DRAWER_CORNER_RADIUS.toFloat(),
+            onValueChange = { viewModel.setDrawerCornerRadius(it.roundToInt(), screenType) },
+            valueDisplay = if (s.drawerCornerRadius < 0) stringResource(R.string.settings_drawer_corner_auto) else "%d dp".format(s.drawerCornerRadius),
         )
         ExpressiveRowDivider()
 
@@ -2093,7 +2420,7 @@ private fun AppDrawerSection(
             value = s.drawerWidthFraction,
             valueRange = 0.4f..1.0f,
             onValueChange = { viewModel.setDrawerWidthFraction(it, screenType) },
-            valueDisplay = "%d%%".format((s.drawerWidthFraction * 100).toInt()),
+            valueDisplay = "%d%%".format((s.drawerWidthFraction * 100).roundToInt()),
         )
         ExpressiveRowDivider()
 
@@ -2107,8 +2434,13 @@ private fun AppDrawerSection(
             selected = s.drawerAlignment,
             onSelect = { viewModel.setDrawerAlignment(it, screenType) },
         )
-        ExpressiveRowDivider()
+    }
 
+    // ---- Content & behaviour -------------------------------------------------------------------
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_drawer_content),
+        icon = Icons.Rounded.Apps,
+    ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_frequent_apps),
             checked = s.showFrequentApps,
@@ -2141,6 +2473,7 @@ private fun AppDrawerSection(
             title = stringResource(R.string.settings_hidden_apps),
             description = pluralStringResource(R.plurals.settings_hidden_apps_desc, hiddenCount, hiddenCount),
             onClick = onShowHidden,
+            shared = true,
         )
         ExpressiveRowDivider()
 
@@ -2150,13 +2483,31 @@ private fun AppDrawerSection(
             title = stringResource(R.string.settings_new_drawer_folder),
             description = stringResource(R.string.settings_new_drawer_folder_desc),
             trailingIcon = Icons.Rounded.Add,
+            shared = true,
             onClick = {
                 viewModel.createDrawerFolder(newFolderName)
                 Toast.makeText(context, folderCreatedMsg, Toast.LENGTH_SHORT).show()
             },
         )
+        ExpressiveRowDivider()
+
+        DrawerExtrasRows(s = s, viewModel = viewModel, screenType = screenType)
     }
 }
+
+@Composable
+private fun drawerThemeLabel(theme: String): String = stringResource(
+    when (theme) {
+        LauncherSettings.DRAWER_THEME_MATERIAL_YOU -> R.string.settings_drawer_theme_material_you
+        LauncherSettings.DRAWER_THEME_DEFAULT_DARK -> R.string.settings_drawer_theme_default_dark
+        LauncherSettings.DRAWER_THEME_OBSIDIAN_BLACK -> R.string.settings_drawer_theme_obsidian_black
+        LauncherSettings.DRAWER_THEME_LIGHT -> R.string.settings_drawer_theme_light
+        LauncherSettings.DRAWER_THEME_ACCENT_TINT -> R.string.settings_drawer_theme_accent_tint
+        LauncherSettings.DRAWER_THEME_MONOCHROME -> R.string.settings_drawer_theme_monochrome
+        LauncherSettings.DRAWER_THEME_CUSTOM -> R.string.settings_drawer_theme_custom
+        else -> R.string.settings_drawer_theme_system
+    },
+)
 
 @Composable
 private fun GesturesSection(
@@ -2206,7 +2557,10 @@ private fun GesturesSection(
         )
         ExpressiveRowDivider()
 
-        DoubleTapLockToggle(enabled = s.doubleTapToLock, onSetEnabled = { viewModel.setDoubleTapToLock(it, screenType) })
+        DoubleTapActionRow(s = s, viewModel = viewModel, screenType = screenType)
+        ExpressiveRowDivider()
+
+        IconSwipeRow(s = s, viewModel = viewModel, screenType = screenType)
     }
 }
 
@@ -2270,6 +2624,68 @@ private fun AppearanceSection(
     onBatchTimes: () -> Unit,
     onFoldTransition: () -> Unit,
 ) {
+    // Values of the slider being dragged, for the previews (ThemePreview.kt).
+    val overrides = remember { PreviewOverrides() }
+    CompositionLocalProvider(LocalPreviewOverrides provides overrides) {
+        AppearanceSectionContent(
+            s = s,
+            viewModel = viewModel,
+            screenType = screenType,
+            iconPacks = iconPacks,
+            overrides = overrides,
+            onIconPack = onIconPack,
+            onCountStyle = onCountStyle,
+            onPeoplePrivacy = onPeoplePrivacy,
+            onBatchTimes = onBatchTimes,
+            onFoldTransition = onFoldTransition,
+        )
+    }
+}
+
+@Composable
+private fun AppearanceSectionContent(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType,
+    iconPacks: List<IconPackInfo>,
+    overrides: PreviewOverrides,
+    onIconPack: () -> Unit,
+    onCountStyle: () -> Unit,
+    onPeoplePrivacy: () -> Unit,
+    onBatchTimes: () -> Unit,
+    onFoldTransition: () -> Unit,
+) {
+    // The look of these settings screens, and a small home screen that shows every option below.
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_look),
+        icon = Icons.Rounded.Palette,
+        subtitle = stringResource(R.string.settings_look_desc),
+    ) {
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_look_style),
+            options = listOf(
+                LauncherSettings.SETTINGS_STYLE_STANDARD to stringResource(R.string.settings_look_standard),
+                LauncherSettings.SETTINGS_STYLE_STUDIO to stringResource(R.string.settings_look_studio),
+            ),
+            selected = s.settingsStyle,
+            onSelect = viewModel::setSettingsStyle,
+        )
+        ExpressiveRowDivider()
+        Text(
+            text = stringResource(R.string.settings_preview_title),
+            color = LocalExpressivePalette.current.dim,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp, top = 2.dp),
+        )
+        HomeThemePreview(s)
+    }
+
+    // Presets, menu / stack / dot styling, the home backdrop and related switches (ThemingSettings.kt).
+    ThemingExtrasSection(s = s, viewModel = viewModel, screenType = screenType)
+
+    // Motorola's own settings and Motorola Weather (MotorolaSettings.kt; hidden on other phones).
+    MotorolaSection(s = s, viewModel = viewModel)
+
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_animations_fluid_motion),
         icon = Icons.Rounded.AutoAwesome,
@@ -2279,13 +2695,6 @@ private fun AppearanceSection(
             title = stringResource(R.string.settings_aquamorphic_touch),
             checked = s.aquamorphicTouchEnabled,
             onCheckedChange = { viewModel.setAquamorphicTouchEnabled(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveActionItem(
-            title = stringResource(R.string.settings_fold_transition),
-            description = transitionLabel(s.foldTransitionStyle),
-            onClick = onFoldTransition,
         )
         ExpressiveRowDivider()
 
@@ -2301,6 +2710,9 @@ private fun AppearanceSection(
             checked = s.pageBounceEnabled,
             onCheckedChange = { viewModel.setPageBounceEnabled(it, screenType) },
         )
+        ExpressiveRowDivider()
+
+        AnimationStyleRows(s = s, viewModel = viewModel)
     }
 
     ExpressiveCategoryContainer(
@@ -2322,13 +2734,57 @@ private fun AppearanceSection(
         )
         ExpressiveRowDivider()
 
+        // Glass look of home-screen folders (the drawer has its own glass controls).
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_glass_blur_radius),
+            value = s.glassBlurRadius,
+            valueRange = 0f..50f,
+            onValueChange = { viewModel.setGlassBlurRadius(it, screenType) },
+            valueDisplay = "%d%%".format((s.glassBlurRadius * 2).roundToInt()),
+            onDragValue = { overrides.glassBlur = it },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_glass_dark_tint),
+            value = s.glassDarkTint,
+            valueRange = 0f..0.9f,
+            onValueChange = { viewModel.setGlassDarkTint(it, screenType) },
+            valueDisplay = "%d%%".format((s.glassDarkTint * 100).roundToInt()),
+            onDragValue = { overrides.glassTint = it },
+        )
+        GlassBlurPreview(s)
+        ExpressiveRowDivider()
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_themed_icons),
                 checked = s.useThemedIcons,
-                onCheckedChange = viewModel::setUseThemedIcons,
+                onCheckedChange = { viewModel.setUseThemedIcons(it, screenType) },
             )
             ExpressiveRowDivider()
+            if (s.useThemedIcons) {
+                ExpressiveSegmentedControl(
+                    title = stringResource(R.string.settings_themed_style),
+                    options = listOf(
+                        LauncherSettings.THEMED_STYLE_CLASSIC to stringResource(R.string.settings_themed_style_classic),
+                        LauncherSettings.THEMED_STYLE_INVERTED to stringResource(R.string.settings_themed_style_inverted),
+                        LauncherSettings.THEMED_STYLE_GLASS to stringResource(R.string.settings_themed_style_glass),
+                        LauncherSettings.THEMED_STYLE_DUOTONE to stringResource(R.string.settings_themed_style_duotone),
+                    ),
+                    selected = s.themedIconStyle,
+                    onSelect = viewModel::setThemedIconStyle,
+                )
+                ExpressiveRowDivider()
+                ExpressiveSwitchRow(
+                    title = stringResource(R.string.settings_force_themed_icons),
+                    subtitle = stringResource(R.string.settings_force_themed_icons_desc),
+                    checked = s.forceThemedIcons,
+                    onCheckedChange = viewModel::setForceThemedIcons,
+                    shared = true,
+                )
+                ExpressiveRowDivider()
+            }
         }
 
         val iconPackName = iconPacks.firstOrNull { it.packageName == s.iconPackPackage }?.label
@@ -2340,7 +2796,10 @@ private fun AppearanceSection(
         )
         ExpressiveRowDivider()
 
-        WeatherToggle(enabled = s.showWeather, onSetEnabled = viewModel::setShowWeather)
+        IconShapeRow(selected = s.iconShape, onSelect = viewModel::setIconShape)
+        ExpressiveRowDivider()
+
+        WeatherToggle(enabled = s.showWeather, onSetEnabled = { viewModel.setShowWeather(it, screenType) })
         ExpressiveRowDivider()
 
         StatusBarToggle(enabled = s.showStatusBar, onSetEnabled = { viewModel.setShowStatusBar(it, screenType) })
@@ -2365,7 +2824,17 @@ private fun AppearanceSection(
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_tonal),
             checked = s.widgetTonalBackground,
-            onCheckedChange = viewModel::setWidgetTonalBackground,
+            onCheckedChange = { viewModel.setWidgetTonalBackground(it, screenType) },
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_widget_background_opacity),
+            value = s.widgetBackgroundOpacity,
+            onValueChange = { viewModel.setWidgetBackgroundOpacity((it * 20f).roundToInt() / 20f) },
+            valueDisplay = "%d%%".format((s.widgetBackgroundOpacity * 100).roundToInt()),
+            subtitle = stringResource(R.string.settings_widget_background_opacity_desc),
+            onDragValue = { overrides.widgetOpacity = it },
         )
         ExpressiveRowDivider()
 
@@ -2384,6 +2853,7 @@ private fun AppearanceSection(
 
         ExpressiveActionItem(
             title = stringResource(R.string.settings_people_privacy),
+            shared = true,
             description = stringResource(
                 when (s.peoplePrivacy) {
                     LauncherSettings.PRIVACY_SENDER -> R.string.settings_people_privacy_sender
@@ -2397,6 +2867,7 @@ private fun AppearanceSection(
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_people_show_apps),
+            shared = true,
             checked = s.peopleShowApps,
             onCheckedChange = viewModel::setPeopleShowApps,
         )
@@ -2404,6 +2875,7 @@ private fun AppearanceSection(
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_people_batch),
+            shared = true,
             checked = s.peopleBatchEnabled,
             onCheckedChange = viewModel::setPeopleBatchEnabled,
         )
@@ -2411,6 +2883,7 @@ private fun AppearanceSection(
             ExpressiveRowDivider()
             ExpressiveActionItem(
                 title = stringResource(R.string.settings_people_batch_times),
+            shared = true,
                 description = s.peopleBatchTimes.replace(",", ", "),
                 onClick = onBatchTimes,
             )
@@ -2426,6 +2899,7 @@ private fun AppearanceSection(
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_lock_desktop),
+            shared = true,
             checked = s.desktopLocked,
             onCheckedChange = viewModel::setDesktopLocked,
         )
@@ -2447,32 +2921,38 @@ private fun NotificationsSection(
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_notif_dots),
             checked = s.showNotificationDots,
-            onCheckedChange = viewModel::setShowNotificationDots,
+            onCheckedChange = { viewModel.setShowNotificationDots(it, screenType) },
         )
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_notif_count),
             checked = s.notificationDotCount,
-            onCheckedChange = viewModel::setNotificationDotCount,
+            onCheckedChange = { viewModel.setNotificationDotCount(it, screenType) },
         )
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_notif_size),
             value = s.notificationDotScale,
-            onValueChange = viewModel::setNotificationDotScale,
+            onValueChange = { viewModel.setNotificationDotScale(it, screenType) },
             valueRange = 0.6f..1.8f,
             valueDisplay = "%.1fx".format(s.notificationDotScale),
         )
         ExpressiveRowDivider()
 
-        BadgePreview(
-            icon = previewIcon,
-            showDots = s.showNotificationDots,
-            showCount = s.notificationDotCount,
-            scale = s.notificationDotScale,
-        )
+        NotificationDotStyleRows(s = s, viewModel = viewModel, screenType = screenType)
+        ExpressiveRowDivider()
+
+        // The preview follows the shape, colour and corner chosen in the rows above.
+        CompositionLocalProvider(LocalBadgeStyle provides BadgeStyle(s.dotShape, s.dotColor, s.dotPosition)) {
+            BadgePreview(
+                icon = previewIcon,
+                showDots = s.showNotificationDots,
+                showCount = s.notificationDotCount,
+                scale = s.notificationDotScale,
+            )
+        }
     }
 }
 
@@ -2487,6 +2967,7 @@ private fun PermissionsSection(
         title = stringResource(R.string.settings_permissions),
         icon = Icons.Rounded.Shield,
         subtitle = stringResource(R.string.settings_category_permissions_desc),
+        sharedByBothDisplays = true,
     ) {
         ExpressiveActionItem(
             title = stringResource(R.string.settings_set_default),
@@ -2530,4 +3011,9 @@ private fun PermissionsSection(
             permission = Manifest.permission.ACCESS_COARSE_LOCATION,
         )
     }
+
+    SystemControlsSection()
 }
+
+/** Installed apps the theme previews draw (home row, folder, dock). */
+private const val PREVIEW_APP_COUNT = 12

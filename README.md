@@ -21,10 +21,11 @@
 - **Dual-Screen Independent Profile Architecture**: Maintain separate workspace layouts, grid configurations, widgets, and dock items for the outer cover screen and inner main display.
 - **Hardware-Accurate Posture Detection**: Seamless transition between closed, flex/half-folded, and unfolded postures (`1080×2520` outer cover screen vs `2232×2484` inner main screen).
 
-### ⚡ Chip & Display Hardware Optimizations
-- **Snapdragon 8s Gen 3 / Adreno 735 GPU Hardware Layer Caching**: Hardware-accelerated GPU shader caching for buttery-smooth Compose rendering without dropped frames.
-- **Kryo Multi-Core Processing**: Distributed background task handling for instant app indexing, widget updates, and layout persistence.
-- **165Hz LTPO AMOLED Frame Pacing**: Native support for high-refresh-rate displays up to 165Hz with zero jitter.
+### ⚡ Display & Rendering
+- **Adaptive refresh rate**: asks each display for its fastest refresh rate while you touch the launcher (re-read on every fold/unfold, since the cover and inner panels differ) and settles at 60 Hz a few seconds after the last touch.
+- **Cached parallax layer**: with wallpaper parallax on, the home screen is kept as one GPU texture that the motion sensor moves, instead of being redrawn on every sensor sample. The sensor is off whenever the launcher is not in front.
+- **Right-sized icons**: app icons are rasterized at the size they are shown, in a few steps, so large icons stay sharp and folder thumbnails stay small in memory.
+- **Background work off the main thread**: app indexing, icon loading and layout persistence run on background dispatchers.
 
 ### 🎨 Fluid Dynamic Motion
 - **Bouncy Touch Feedback**: Tactile `0.92x` spring scale press effect on icons, cards, and buttons.
@@ -32,7 +33,15 @@
 - **App Launch Zoom**: Expressive `1.25x` launch zoom curve connecting app icons seamlessly to launching activities.
 - **Page Edge Bounce**: Fluid overscroll physical momentum when scrolling workspace pages and app drawers.
 
+### 🪟 Two Displays, Two Profiles
+- **Strictly separate settings**: every look, layout, gesture and animation setting is stored once for the outer (cover) display and once for the inner display. Changing one never changes the other.
+- **Profile switcher in Settings**: pick *Outer display* or *Inner display* at the top of the settings; the display you are holding is marked as in use, and each profile only lists the options that exist on that display.
+- **Copy on demand**: "Copy settings from the other display" transfers a profile once — nothing is shared implicitly. Settings that genuinely belong to the device (notification dots, icon pack, hidden apps, permissions) carry a *Both displays* badge.
+- **Hinge-based detection**: the inner display is recognised by its folding feature, so flip phones (whose inner panel is only phone-wide) get their inner profile too.
+
 ### 🍷 Drawer Styles & Liquid Glass
+- **Per-display drawer colours**: background themes (follow system, Material You, dark, OLED black, light, accent tint, monochrome or any custom colour) and a free accent colour picker, with a live preview in Settings.
+- **Liquid Glass drawer**: a translucent panel with glass rim and sheen over the wallpaper, which is blurred behind the launcher window (Android 12+, where the system has blur enabled).
 - **4 Distinct Drawer Styles**:
   - **Standard Grid**: Clean, classic vertical scrolling grid.
   - **Category Card Interface**: Horizontal paged drawer with smooth pagination.

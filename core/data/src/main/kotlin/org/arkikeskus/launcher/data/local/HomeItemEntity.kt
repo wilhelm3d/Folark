@@ -15,6 +15,10 @@ import androidx.room.PrimaryKey
  *    order rather than a home cell.
  *  - **Pinned deep shortcut on home**: [containerId] = [HOME], [shortcutId] != null, [packageName] is
  *    the publishing app, at a home cell. Launched via LauncherApps.startShortcut.
+ *  - **Widget stack on home**: [containerId] = [HOME], [builtinType] = [BUILTIN_WIDGET_STACK]; it owns
+ *    the spanX×spanY footprint. Its [id] is the container id of the widgets stacked in it.
+ *  - **Widget inside a stack**: [containerId] = the stack's id, [page] = 0, [cellX] = 0 and [cellY] =
+ *    its order in the stack. It is drawn at the stack's size; its own spans are not used.
  *
  * The unique index on (containerId, page, cellX, cellY) enforces "one item per cell" *within each
  * container* (the home grid and each folder are independent cell spaces) — see [HomeLayoutRepository].
@@ -88,5 +92,56 @@ data class HomeItemEntity(
 
         /** [builtinType] of the Pro Interactive Notification List Widget. */
         const val BUILTIN_INTERACTIVE_NOTIFICATIONS = "interactive_notifications"
+
+        /** [builtinType] of the now-playing widget (track, cover art and transport controls). */
+        const val BUILTIN_MEDIA = "media"
+
+        /** [builtinType] of the most-used-apps widget (a grid that reorders itself). */
+        const val BUILTIN_TOP_APPS = "top_apps"
+
+        /** [builtinType] of the device-status widget (battery, storage, memory, Bluetooth batteries). */
+        const val BUILTIN_STATS = "device_stats"
+
+        /** [builtinType] of the weather day widget, and of its big full-forecast variant (same widget, larger default size). */
+        const val BUILTIN_WEATHER_DAY = "weather_day"
+        const val BUILTIN_WEATHER_BIG = "weather_big"
+
+        /** [builtinType] of the quick-note widget. */
+        const val BUILTIN_NOTE = "note"
+
+        /** [builtinType] of a Nothing OS 3 style stackable widget container. */
+        const val BUILTIN_WIDGET_STACK = "widget_stack"
+
+        /**
+         * Prefix of the [shortcutId] of a launcher-made shortcut that opens its app in a floating
+         * window. The row is shaped like a pinned deep shortcut ([packageName] + [userSerial]), with
+         * the app's activity class after the prefix — but it is NOT a system shortcut: it is never
+         * pinned in, resolved by, or started through LauncherApps' shortcut APIs.
+         */
+        const val FLOATING_SHORTCUT_PREFIX = "folark.floating:"
+
+        fun floatingShortcutId(className: String): String = FLOATING_SHORTCUT_PREFIX + className
+
+        /**
+         * Prefix of the [shortcutId] of a home shortcut for a saved app pair (the pair's id follows).
+         * Like a floating shortcut it is the launcher's own, not a system shortcut. [packageName] and
+         * [userSerial] are the pair's first app, so the row goes when that app is uninstalled.
+         */
+        const val APP_PAIR_SHORTCUT_PREFIX = "folark.pair:"
+
+        fun appPairShortcutId(pairId: String): String = APP_PAIR_SHORTCUT_PREFIX + pairId
+
+        /** The app pair id of a pair shortcut id, or null for any other shortcut id. */
+        fun appPairShortcutPairId(shortcutId: String?): String? =
+            shortcutId?.takeIf { it.startsWith(APP_PAIR_SHORTCUT_PREFIX) }?.removePrefix(APP_PAIR_SHORTCUT_PREFIX)
+
+        /** True for a shortcut the launcher made itself (floating, app pair) — one the system's
+         *  shortcut APIs know nothing about. */
+        fun isLauncherShortcutId(shortcutId: String?): Boolean =
+            floatingShortcutClass(shortcutId) != null || appPairShortcutPairId(shortcutId) != null
+
+        /** The activity class of a floating shortcut id, or null for a real (system) shortcut id. */
+        fun floatingShortcutClass(shortcutId: String?): String? =
+            shortcutId?.takeIf { it.startsWith(FLOATING_SHORTCUT_PREFIX) }?.removePrefix(FLOATING_SHORTCUT_PREFIX)
     }
 }

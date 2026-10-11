@@ -25,13 +25,20 @@ class AppIconFetcher(
     private val source: LauncherAppsSource,
 ) : Fetcher {
     override suspend fun fetch(): FetchResult? = withContext(Dispatchers.Default) {
-        val drawable = source.loadIcon(data.app, data.themed, data.dark, data.iconPack) ?: return@withContext null
-        val size = ICON_PX
+        val loaded = source.loadIcon(data.app, data.themed, data.dark, data.iconPack, data.customIcon) ?: return@withContext null
+        // Settings ▸ Icon shape: adaptive icons cut to the chosen outline (the system's otherwise).
+        val drawable = IconShapes.apply(loaded, data.shape)
+        // The size the icon is shown at (stepped, see iconRasterSize); the default for callers
+        // that do not say.
+        val size = if (data.sizePx > 0) data.sizePx else ICON_PX
         val tempBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(tempBitmap)
         drawable.setBounds(0, 0, size, size)
         drawable.draw(canvas)
         val hardwareBitmap = tempBitmap.copy(Bitmap.Config.HARDWARE, false) ?: tempBitmap
+        // The drawing copy is done with once the icon lives in graphics memory; freeing it now
+        // instead of at the next garbage collection keeps a full drawer scroll from piling them up.
+        if (hardwareBitmap !== tempBitmap) tempBitmap.recycle()
         ImageFetchResult(
             image = hardwareBitmap.asImage(),
             isSampled = false,

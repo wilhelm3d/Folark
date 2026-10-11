@@ -4,16 +4,22 @@ import android.appwidget.AppWidgetHost
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -21,8 +27,12 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.SettingsRepository
+import org.arkikeskus.launcher.data.backup.BackupRepository
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
+import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
 import org.arkikeskus.launcher.feature.home.APPWIDGET_HOST_ID
 import org.arkikeskus.launcher.feature.home.LocalAppWidgetHost
 import org.arkikeskus.launcher.feature.home.LocalOrphanWidgetConfigResult
@@ -31,8 +41,17 @@ import org.arkikeskus.launcher.feature.home.LockAccessibilityService
 import org.arkikeskus.launcher.launcher.system.FoldStateMonitor
 import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.LauncherShell
 import org.arkikeskus.launcher.ui.LauncherShellViewModel
+import org.arkikeskus.launcher.ui.LocalPopupTheme
+import org.arkikeskus.launcher.ui.component.BadgeStyle
+import org.arkikeskus.launcher.ui.component.rememberSystemPowerSave
+import org.arkikeskus.launcher.ui.component.LocalBatterySaver
+import org.arkikeskus.launcher.ui.component.LocalBadgeStyle
+import org.arkikeskus.launcher.ui.component.LocalAppLaunchZoom
+import org.arkikeskus.launcher.ui.component.LocalAquamorphicTouch
+import org.arkikeskus.launcher.ui.component.LocalCustomIcons
 import org.arkikeskus.launcher.ui.component.LocalFoldState
 import org.arkikeskus.launcher.ui.component.LocalIconEpochs
 import org.arkikeskus.launcher.ui.component.LocalScreenType
@@ -56,6 +75,10 @@ class LauncherActivity : ComponentActivity() {
 
     @Inject lateinit var foldStateMonitor: FoldStateMonitor
     @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var backupRepository: BackupRepository
+
+    /** The restore count this screen was built with; a restore made in Settings reloads it. */
+    private var seenRestore = 0
 
     // Use the Activity context (not applicationContext) for the host — Launcher3 does the same; a
     // collection widget's RemoteViewsAdapter and the host's listener callbacks register against this.
@@ -64,69 +87,71 @@ class LauncherActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        seenRestore = backupRepository.restoreGeneration.value
         enableEdgeToEdge()
-        val initBounds = windowManager.currentWindowMetrics.bounds
-        val initMaxDim = maxOf(initBounds.width(), initBounds.height())
-        val initIsInner = foldStateMonitor.isInnerDisplay(this)
-        Log.d(
-            "FolarkFoldDiagnostics",
-            "LauncherActivity onCreate: bounds=${initBounds.width()}x${initBounds.height()}, maxDimension=$initMaxDim, isInnerDisplay=$initIsInner"
-        )
-        runCatching {
-            val lp = window.attributes
-            runCatching {
-                val fieldMax = lp.javaClass.getField("preferredMaxDisplayRefreshRate")
-                fieldMax.setFloat(lp, 165f)
-            }
-            runCatching {
-                val fieldMin = lp.javaClass.getField("preferredMinDisplayRefreshRate")
-                fieldMin.setFloat(lp, 120f)
-            }
-            window.attributes = lp
-        }
-        runCatching {
-            window.setSustainedPerformanceMode(true)
-        }
+        requestHighRefreshRate()
+        // One fold-state flow for the activity's lifetime. Building it inside setContent created a
+        // new shared flow (and a new coroutine in lifecycleScope) on every recomposition.
+        val foldStates = foldStateMonitor.foldStateFlow(this, lifecycleScope)
         setContent {
-            val foldState by foldStateMonitor.foldStateFlow(this, lifecycleScope).collectAsStateWithLifecycle()
+            val foldState by foldStates.collectAsStateWithLifecycle()
             val screenType = foldState.screenType
-            val settings by settingsRepository.settings(screenType).collectAsStateWithLifecycle(initialValue = LauncherSettings())
-
-            val bounds = windowManager.currentWindowMetrics.bounds
-            val maxDimension = maxOf(bounds.width(), bounds.height())
-            val isInner = foldStateMonitor.isInnerDisplay(this)
-            Log.d(
-                "FolarkFoldDiagnostics",
-                "LauncherActivity setContent: bounds=${bounds.width()}x${bounds.height()}, maxDimension=$maxDimension, isInnerDisplay=$isInner, foldState=$foldState, screenType=$screenType"
-            )
+            // Each display reads its own profile; remembered so a recomposition doesn't resubscribe.
+            val settingsFlow = remember(screenType) { settingsRepository.settings(screenType) }
+            val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
+            // Folark's battery saver: on, off, or together with the system's own.
+            val systemPowerSave = rememberSystemPowerSave()
+            val batterySaver = when (settings.batterySaverMode) {
+                LauncherSettings.BATTERY_SAVER_ON -> true
+                LauncherSettings.BATTERY_SAVER_OFF -> false
+                else -> systemPowerSave
+            }
+            SideEffect {
+                if (batterySaverActive != batterySaver) {
+                    batterySaverActive = batterySaver
+                    // Ask again: the cap on the refresh rate just changed.
+                    requestedRefreshRate = 0f
+                    applyRefreshRate(idle = true)
+                }
+            }
 
             var previousFoldState by remember { mutableStateOf(foldState) }
+            // Plays the fold transition of the display that was just switched TO.
+            val foldTransition = remember { Animatable(1f) }
             LaunchedEffect(foldState) {
-                val currentBounds = windowManager.currentWindowMetrics.bounds
-                val maxDim = maxOf(currentBounds.width(), currentBounds.height())
-                val isInnerDisp = foldStateMonitor.isInnerDisplay(this@LauncherActivity)
-                Log.d(
-                    "FolarkFoldDiagnostics",
-                    "LauncherActivity LaunchedEffect(foldState): bounds=${currentBounds.width()}x${currentBounds.height()}, maxDimension=$maxDim, isInnerDisplay=$isInnerDisp, foldState=$foldState, screenType=${foldState.screenType}"
-                )
-                if (previousFoldState != foldState) {
-                    val wasClosed = previousFoldState == FoldState.CLOSED
-                    val isNowClosed = foldState == FoldState.CLOSED
-                    if (wasClosed && !isNowClosed) {
-                        when (settings.unfoldAction) {
-                            LauncherSettings.ACTION_SEARCH -> {}
-                            LauncherSettings.ACTION_DRAWER -> {}
-                        }
-                    } else if (!wasClosed && isNowClosed) {
-                        when (settings.foldAction) {
-                            LauncherSettings.ACTION_PAGE_0 -> {}
-                            LauncherSettings.ACTION_LOCK -> {
-                                runCatching { LockAccessibilityService.lock() }
-                            }
-                        }
+                val previous = previousFoldState
+                previousFoldState = foldState
+                if (previous.screenType == foldState.screenType) return@LaunchedEffect
+                // Read the target display's profile straight from the store: the `settings` state
+                // above may still hold the profile of the display that was just left.
+                val target = settingsRepository.settings(foldState.screenType).first()
+                if (foldState.screenType == ScreenType.INNER) {
+                    when (target.unfoldAction) {
+                        LauncherSettings.ACTION_SEARCH, LauncherSettings.ACTION_DRAWER ->
+                            shellCommands.tryEmit(target.unfoldAction)
+                        else -> Unit
                     }
-                    previousFoldState = foldState
+                } else {
+                    when (target.foldAction) {
+                        // "Already on home" semantics: close the drawer and snap to the home page.
+                        LauncherSettings.ACTION_PAGE_0 -> homeSignals.tryEmit(true)
+                        LauncherSettings.ACTION_LOCK -> runCatching { LockAccessibilityService.lock() }
+                        else -> Unit
+                    }
                 }
+            }
+
+            // Keyed on the display, not the posture: a flat -> half-opened change must not cancel
+            // a running transition and strand the launcher half transparent. A second display
+            // switch restarts the effect, which again ends fully visible.
+            val skipFirstTransition = remember { booleanArrayOf(true) }
+            LaunchedEffect(screenType) {
+                if (skipFirstTransition[0]) {
+                    skipFirstTransition[0] = false
+                    return@LaunchedEffect
+                }
+                foldTransition.snapTo(0f)
+                foldTransition.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
             }
 
             LaunchedEffect(settings.allowLandscape) {
@@ -137,23 +162,141 @@ class LauncherActivity : ComponentActivity() {
                 }
             }
 
-            LauncherTheme(amoledDark = settings.amoledDark) {
+            LauncherTheme(
+                amoledDark = settings.amoledDark,
+                fontFamily = settings.appFontFamily
+                    .takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT }
+                    ?.let { LauncherFontFamily.resolve(it) },
+                boldText = settings.appFontBold,
+                fontScale = settings.appFontSizeScale,
+            ) {
                 val iconEpochs by hiltViewModel<LauncherShellViewModel>().iconEpochs.collectAsStateWithLifecycle()
+                val customIcons by hiltViewModel<LauncherShellViewModel>().customIcons.collectAsStateWithLifecycle()
                 CompositionLocalProvider(
                     LocalAppWidgetHost provides appWidgetHost,
                     LocalWidgetConfigLauncher provides ::startWidgetConfig,
                     LocalOrphanWidgetConfigResult provides orphanConfigResult,
                     LocalIconEpochs provides iconEpochs,
+                    LocalCustomIcons provides customIcons,
+                    LocalPopupTheme provides settings.popupTheme,
+                    LocalBadgeStyle provides BadgeStyle(settings.dotShape, settings.dotColor, settings.dotPosition),
+                    LocalBatterySaver provides batterySaver,
                     LocalScreenType provides foldState.screenType,
                     LocalFoldState provides foldState,
+                    LocalAquamorphicTouch provides settings.aquamorphicTouchEnabled,
+                    LocalAppLaunchZoom provides settings.appLaunchZoomEnabled,
                 ) {
+                    val transitionStyle = settings.foldTransitionStyle
                     LauncherShell(
                         homeSignals = homeSignals,
+                        shellCommands = shellCommands,
                         onOpenSettings = { startActivity(Intent(this@LauncherActivity, SettingsActivity::class.java)) },
+                        modifier = Modifier.graphicsLayer {
+                            val t = foldTransition.value
+                            if (t >= 1f) return@graphicsLayer
+                            alpha = t
+                            when (transitionStyle) {
+                                LauncherSettings.TRANSITION_CROSSFADE -> Unit
+                                LauncherSettings.TRANSITION_SLIDE -> translationX = (1f - t) * size.width * 0.12f
+                                LauncherSettings.TRANSITION_SCALE -> {
+                                    scaleX = 0.88f + 0.12f * t
+                                    scaleY = 0.88f + 0.12f * t
+                                }
+                                LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE -> {
+                                    scaleX = 1.08f - 0.08f * t
+                                    scaleY = 1.08f - 0.08f * t
+                                }
+                                LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP -> {
+                                    cameraDistance = 16f * density
+                                    transformOrigin = TransformOrigin(0f, 0.5f)
+                                    rotationY = (1f - t) * -18f
+                                }
+                                else -> {
+                                    scaleX = 0.95f + 0.05f * t
+                                    scaleY = 0.95f + 0.05f * t
+                                }
+                            }
+                        },
                     )
                 }
             }
         }
+    }
+
+    /** One-shot commands for the shell (currently: open the drawer after an unfold). */
+    private val shellCommands = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    private val refreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val dropToIdleRefreshRate = Runnable { applyRefreshRate(idle = true) }
+
+    /** The rate last asked of the window; 0 = nothing asked yet (or the display changed). */
+    private var requestedRefreshRate = 0f
+
+    /** Android's top refresh rate setting, read each time home comes back; unknown = no cap. */
+    private var peakRefreshCap = Float.POSITIVE_INFINITY
+
+    /** Mirrors [LocalBatterySaver] for the refresh-rate code, which runs outside composition. */
+    private var batterySaverActive = false
+
+    /**
+     * Asks the window for the panel's fastest refresh rate — or, when [idle], for the slowest one
+     * that is still at least 60 Hz, so a home screen nobody is touching does not keep the panel at
+     * its top rate. Read from the display in use each time rather than hard-coded: the cover and
+     * the inner display of a foldable usually top out at different rates.
+     */
+    private fun applyRefreshRate(idle: Boolean) {
+        runCatching {
+            val all = display?.supportedModes?.map { it.refreshRate }?.distinct().orEmpty()
+            // Never above Android's own top rate (Settings ▸ Smooth display): such an ask is ignored
+            // at best, and each change of ask is a window relayout.
+            val rates = all.filter { it <= peakRefreshCap + 1f }.ifEmpty { all }
+            val top = rates.maxOrNull() ?: return
+            // Battery saver: never above the idle rate, even while a finger is down.
+            val fastest = if (batterySaverActive) rates.filter { it <= IDLE_REFRESH_RATE + 1f }.maxOrNull() ?: top else top
+            val target = if (idle) rates.filter { it >= IDLE_REFRESH_RATE - 1f }.minOrNull() ?: fastest else fastest
+            if (target == requestedRefreshRate) return
+            requestedRefreshRate = target
+            window.attributes = window.attributes.apply { preferredRefreshRate = target }
+        }
+    }
+
+    /** Full rate now (a touch, a fold, coming home), back to the idle rate after a quiet moment. */
+    private fun requestHighRefreshRate() {
+        refreshHandler.removeCallbacks(dropToIdleRefreshRate)
+        applyRefreshRate(idle = false)
+        refreshHandler.postDelayed(dropToIdleRefreshRate, REFRESH_IDLE_AFTER_MS)
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                // Stay fast for as long as a finger is down; the countdown starts on release.
+                refreshHandler.removeCallbacks(dropToIdleRefreshRate)
+                applyRefreshRate(idle = false)
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                if (ev.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                    // Before the tap reaches the icon: an app opened by it grows out of this spot.
+                    org.arkikeskus.launcher.data.LaunchOrigin.touch(
+                        window.decorView,
+                        ev.rawX,
+                        ev.rawY,
+                        (LAUNCH_ORIGIN_DP * resources.displayMetrics.density).toInt(),
+                    )
+                }
+                refreshHandler.removeCallbacks(dropToIdleRefreshRate)
+                refreshHandler.postDelayed(dropToIdleRefreshRate, REFRESH_IDLE_AFTER_MS)
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // A fold/unfold arrives here (the activity is not recreated) and moves the window to a
+        // display with other modes: forget what was asked of the old one and ask again.
+        requestedRefreshRate = 0f
+        requestHighRefreshRate()
     }
 
     /** Pending callback for the in-flight widget configuration activity (see [startWidgetConfig]). */
@@ -195,17 +338,37 @@ class LauncherActivity : ComponentActivity() {
         super.onStart()
         // A launcher is the device HOME — a host hiccup must never crash it.
         runCatching { appWidgetHost.startListening() }
+        LockAccessibilityService.setHomeVisible(true)
+        keepAccessibilityServiceOn()
+        // Back from Settings after a restore: rebuild the home screen from the restored layout.
+        val restore = backupRepository.restoreGeneration.value
+        if (restore != seenRestore) {
+            seenRestore = restore
+            recreate()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         wasForeground = true
+        val cap = org.arkikeskus.launcher.data.SystemControls.peakRefreshRate(this)
+            ?.takeIf { it > 0f && it.isFinite() } ?: Float.POSITIVE_INFINITY
+        if (cap != peakRefreshCap) {
+            peakRefreshCap = cap
+            requestedRefreshRate = 0f
+        }
+        // Coming home plays an animation without any touch on the launcher.
+        requestHighRefreshRate()
     }
 
     override fun onStop() {
         super.onStop()
         runCatching { appWidgetHost.stopListening() }
+        LockAccessibilityService.setHomeVisible(false)
         wasForeground = false
+        refreshHandler.removeCallbacks(dropToIdleRefreshRate)
+        // Once a day, when automatic backups are on (Settings ▸ Backup & restore).
+        backupRepository.autoBackupSoon()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -215,8 +378,23 @@ class LauncherActivity : ComponentActivity() {
         homeSignals.tryEmit(wasForeground)
     }
 
+    /** If Android switched Folark's accessibility service off, turn it back on (System controls). */
+    private fun keepAccessibilityServiceOn() {
+        val service = android.content.ComponentName(this, LockAccessibilityService::class.java)
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            org.arkikeskus.launcher.data.SystemControls.keepServiceOn(applicationContext, service)
+        }
+    }
+
     private companion object {
         /** Request code for the system-routed widget configuration activity. */
         const val WIDGET_CONFIG_REQUEST = 0x4357
+
+        /** The rate an untouched home screen settles at, and how long after the last touch. */
+        const val IDLE_REFRESH_RATE = 60f
+        const val REFRESH_IDLE_AFTER_MS = 3_000L
+
+        /** The size of the spot an app grows out of: about an icon. */
+        const val LAUNCH_ORIGIN_DP = 56
     }
 }

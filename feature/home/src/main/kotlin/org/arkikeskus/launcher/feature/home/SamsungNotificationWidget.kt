@@ -143,8 +143,10 @@ fun SamsungNotificationWidget(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     slots.take(5).forEach { slot ->
-                        SamsungNotificationSlot(slot, 36.dp, countStyle, noIndication) {
-                            viewModel.open(slot)
+                        key(slot.notification.key) {
+                            SamsungNotificationSlot(slot, 36.dp, countStyle, noIndication) {
+                                viewModel.open(slot)
+                            }
                         }
                     }
                     if (slots.size > 5) {
@@ -242,9 +244,6 @@ private fun SamsungNotificationSlot(
 
 @Composable
 private fun rememberSamsungNotifSmallIcon(n: StatusNotification, size: Dp): ImageBitmap? {
-    val context = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
-    return remember(n.key, n.postTime, px) {
-        runCatching { n.icon.loadDrawable(context)?.toBitmap(width = px, height = px)?.asImageBitmap() }.getOrNull()
-    }
+    return rememberNotificationIcon(n.icon, n.key + "@" + n.postTime, px)
 }

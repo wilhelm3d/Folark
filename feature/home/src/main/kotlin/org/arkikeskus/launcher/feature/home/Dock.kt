@@ -42,6 +42,7 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.ui.DragSource
 import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.aquamorphicTouch
 import org.arkikeskus.launcher.ui.component.iconSizeForCell
 import kotlinx.coroutines.withTimeoutOrNull
@@ -56,7 +57,7 @@ import kotlin.math.roundToInt
 @Composable
 fun Dock(
     apps: List<AppItem>,
-    badges: Map<String, Int>,
+    badges: BadgeCounts,
     badgeShowCount: Boolean,
     badgeScale: Float,
     showLabels: Boolean,
@@ -89,10 +90,11 @@ fun Dock(
         onDispose { dragController.dockBounds = Rect.Zero }
     }
     // Icon size derived from the slot so 6–7 dock icons fit a narrow screen (fixed 52dp overlapped).
+    val preferredIconSize = 52.dp * LocalIconSizeScale.current
     val dockIconSize = if (rowWidthPx > 0 && apps.isNotEmpty()) {
-        iconSizeForCell(with(density) { (rowWidthPx.toFloat() / apps.size).toDp() }, 52.dp)
+        iconSizeForCell(with(density) { (rowWidthPx.toFloat() / apps.size).toDp() }, preferredIconSize)
     } else {
-        52.dp
+        preferredIconSize
     }
 
     val shape = RoundedCornerShape(30.dp)
@@ -204,7 +206,9 @@ fun Dock(
                                     }
                                     if (completed && dragController.moving) {
                                         val rootPos = dragController.rootPosition
-                                        if (dragController.isOverRemove(rootPos)) {
+                                        if (dragController.dropOnSplit(app, rootPos)) {
+                                            // Split target: the partner picker opens; the dock is unchanged.
+                                        } else if (dragController.isOverRemove(rootPos)) {
                                             onRemoveFromDock(app)
                                         } else if (dragController.isOverGrid(rootPos)) {
                                             val (page, cx, cy) = dragController.cellAt(rootPos)
@@ -241,17 +245,19 @@ fun Dock(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    AppIcon(
-                        appItem = app,
-                        labelColor = labelColor,
-                        showLabel = showLabels,
-                        iconSize = dockIconSize,
-                        // The dock stays a compact bar: one label line even when home labels wrap.
-                        maxLabelLines = 1,
-                        badgeCount = badges[app.badgeKey] ?: 0,
-                        badgeShowCount = badgeShowCount,
-                        badgeScale = badgeScale,
-                    )
+                    WithBadge({ badges[app.badgeKey] ?: 0 }) { badgeCount ->
+                        AppIcon(
+                            appItem = app,
+                            labelColor = labelColor,
+                            showLabel = showLabels,
+                            iconSize = dockIconSize,
+                            // The dock stays a compact bar: one label line even when home labels wrap.
+                            maxLabelLines = 1,
+                            badgeCount = badgeCount,
+                            badgeShowCount = badgeShowCount,
+                            badgeScale = badgeScale,
+                        )
+                    }
                 }
             }
         }

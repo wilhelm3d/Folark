@@ -3,6 +3,7 @@ package org.arkikeskus.launcher.ui.expressive
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -36,6 +37,10 @@ val LightExpressivePalette = ExpressivePalette(
 )
 
 val LocalExpressivePalette = staticCompositionLocalOf { LightExpressivePalette }
+
+/** The accent the expressive components draw with. Defaults to the launcher [Accent]; the app
+ *  drawer provides its own per-display accent colour here. */
+val LocalAccent = compositionLocalOf { Accent }
 
 /** Provides the dark/light expressive palette by system theme. */
 @Composable

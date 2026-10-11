@@ -1,8 +1,11 @@
 package org.arkikeskus.launcher.data
 
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -358,7 +361,6 @@ class SettingsRepositoryTest {
         val repo = newRepository()
         repo.setFoldAction(LauncherSettings.ACTION_PAGE_0, ScreenType.OUTER)
         repo.setUnfoldAction(LauncherSettings.ACTION_SEARCH, ScreenType.INNER)
-        repo.setInnerTaskbarEnabled(false, ScreenType.INNER)
         repo.setOuterWallpaperScale(1.5f)
         repo.setInnerWallpaperScale(1.2f)
         repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_SLIDE)
@@ -370,7 +372,6 @@ class SettingsRepositoryTest {
 
         val innerSettings = repo.settings(ScreenType.INNER).first()
         assertThat(innerSettings.unfoldAction).isEqualTo(LauncherSettings.ACTION_SEARCH)
-        assertThat(innerSettings.innerTaskbarEnabled).isFalse()
         assertThat(innerSettings.innerWallpaperScale).isEqualTo(1.2f)
     }
 
@@ -662,5 +663,106 @@ class SettingsRepositoryTest {
         assertThat(inner.swipeDownAction).isEqualTo(LauncherSettings.GESTURE_DRAWER)
         assertThat(inner.doubleTapAction).isEqualTo(LauncherSettings.GESTURE_NOTIFICATIONS)
         assertThat(inner.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
+    }
+
+    // --- Display profiles never inherit from each other ----------------------------------------
+
+    @Test
+    fun `upgrade freezes what the inner profile inherited, then the profiles are independent`() = runTest {
+        val store = InMemoryDataStore()
+        store.edit {
+            it[booleanPreferencesKey("show_home_labels")] = false
+            it[floatPreferencesKey("dock_opacity")] = 0.8f
+            it[stringPreferencesKey("fold_transition_style")] = LauncherSettings.TRANSITION_SLIDE
+        }
+        val repo = SettingsRepository(store)
+
+        // The old build showed the inner display the outer values; an upgrade must not change that.
+        val inherited = repo.settings(ScreenType.INNER).first()
+        assertThat(inherited.showHomeLabels).isFalse()
+        assertThat(inherited.dockBackgroundOpacity).isEqualTo(0.8f)
+        assertThat(inherited.foldTransitionStyle).isEqualTo(LauncherSettings.TRANSITION_SLIDE)
+
+        // ...but from now on an outer change stays on the outer display.
+        repo.setShowHomeLabels(true, ScreenType.OUTER)
+        repo.setDockBackgroundOpacity(0.1f, ScreenType.OUTER)
+        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_SCALE, ScreenType.OUTER)
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.showHomeLabels).isFalse()
+        assertThat(inner.dockBackgroundOpacity).isEqualTo(0.8f)
+        assertThat(inner.foldTransitionStyle).isEqualTo(LauncherSettings.TRANSITION_SLIDE)
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.showHomeLabels).isTrue()
+        assertThat(outer.dockBackgroundOpacity).isEqualTo(0.1f)
+    }
+
+    @Test
+    fun `fresh install - an outer setting never reaches the inner display`() = runTest {
+        val repo = newRepository()
+        repo.settings(ScreenType.OUTER).first()
+
+        repo.setShowDrawerLabels(false, ScreenType.OUTER)
+        repo.setAppLabelTextScale(1.4f, ScreenType.OUTER)
+        repo.setShowStatusBar(true, ScreenType.OUTER)
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.showDrawerLabels).isTrue()
+        assertThat(inner.appLabelTextScale).isEqualTo(1.0f)
+        assertThat(inner.showStatusBar).isFalse()
+    }
+
+    @Test
+    fun `drawer look is stored per display, clamped and opaque`() = runTest {
+        val repo = newRepository()
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerThemeTint)
+            .isEqualTo(LauncherSettings.DRAWER_THEME_SYSTEM)
+
+        repo.setDrawerGlassEnabled(true, ScreenType.INNER)
+        repo.setDrawerPanelOpacity(0.01f, ScreenType.INNER)
+        repo.setDrawerThemeTint(LauncherSettings.DRAWER_THEME_CUSTOM, ScreenType.INNER)
+        repo.setDrawerCustomColor(0x00123456, ScreenType.INNER)
+
+        val inner = repo.settings(ScreenType.INNER).first()
+        assertThat(inner.drawerGlassEnabled).isTrue()
+        assertThat(inner.drawerPanelOpacity).isEqualTo(LauncherSettings.MIN_DRAWER_PANEL_OPACITY)
+        assertThat(inner.drawerThemeTint).isEqualTo(LauncherSettings.DRAWER_THEME_CUSTOM)
+        assertThat(inner.drawerCustomColor).isEqualTo(0xFF123456.toInt())
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.drawerGlassEnabled).isFalse()
+        assertThat(outer.drawerThemeTint).isEqualTo(LauncherSettings.DRAWER_THEME_SYSTEM)
+    }
+
+    @Test
+    fun `a style change keeps an accent the user picked`() = runTest {
+        val repo = newRepository()
+        repo.setDrawerAccentColor(0xFF7B1FA2.toInt(), ScreenType.OUTER)
+
+        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI, ScreenType.OUTER)
+
+        assertThat(repo.settings(ScreenType.OUTER).first().drawerAccentColor).isEqualTo(0xFF7B1FA2.toInt())
+    }
+
+    @Test
+    fun `copyProfile copies settings but not the grid size or the dock apps`() = runTest {
+        val repo = newRepository()
+        repo.setDrawerGlassEnabled(true, ScreenType.INNER)
+        repo.setSwipeUpAction(LauncherSettings.GESTURE_SEARCH, ScreenType.INNER)
+        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_CROSSFADE, ScreenType.INNER)
+        repo.setHomeColumns(7, ScreenType.INNER)
+        repo.addToDock("pkg/Activity", ScreenType.INNER)
+        repo.setDrawerScrimOpacity(0.9f, ScreenType.OUTER) // unset on the source: goes back to default
+
+        repo.copyProfile(from = ScreenType.INNER, to = ScreenType.OUTER)
+
+        val outer = repo.settings(ScreenType.OUTER).first()
+        assertThat(outer.drawerGlassEnabled).isTrue()
+        assertThat(outer.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
+        assertThat(outer.foldTransitionStyle).isEqualTo(LauncherSettings.TRANSITION_CROSSFADE)
+        assertThat(outer.drawerScrimOpacity).isEqualTo(0.5f)
+        assertThat(outer.homeColumns).isEqualTo(4)
+        assertThat(repo.dockFavorites(ScreenType.OUTER).first()).isEmpty()
+        assertThat(repo.settings(ScreenType.INNER).first().homeColumns).isEqualTo(7)
     }
 }

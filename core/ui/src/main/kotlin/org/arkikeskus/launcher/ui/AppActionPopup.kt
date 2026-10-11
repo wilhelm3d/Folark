@@ -22,6 +22,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +50,11 @@ import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.ui.expressive.Accent
+import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.ui.expressive.DarkExpressivePalette
+import org.arkikeskus.launcher.ui.expressive.ExpressivePalette
+import org.arkikeskus.launcher.ui.expressive.LightExpressivePalette
+import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.ExpressiveTheme
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 
@@ -181,7 +187,7 @@ fun IconMenuPopup(
                 Icon(
                     painter = painterResource(item.icon),
                     contentDescription = null,
-                    tint = Accent,
+                    tint = LocalAccent.current,
                     modifier = Modifier.size(22.dp),
                 )
                 Text(
@@ -218,7 +224,7 @@ private fun ExpressivePopupCard(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        ExpressiveTheme {
+        PopupThemed {
             val palette = LocalExpressivePalette.current
             val cardColor = palette.surfaceHi
             val cardWidthPx = with(density) { CARD_WIDTH.toPx() }
@@ -257,6 +263,44 @@ private fun ExpressivePopupCard(
 }
 
 /**
+ * The look of the long-press menus under this subtree (Settings ▸ Appearance), one of
+ * `LauncherSettings.POPUP_THEME_*`. Provided once at the launcher root.
+ */
+val LocalPopupTheme = compositionLocalOf { LauncherSettings.POPUP_THEME_CLASSIC }
+
+/** Resolves [LocalPopupTheme] into the palette and accent the popup rows draw with. */
+@Composable
+private fun PopupThemed(content: @Composable () -> Unit) {
+    when (LocalPopupTheme.current) {
+        LauncherSettings.POPUP_THEME_MATERIAL -> {
+            // The launcher's own Material colours (wallpaper-based where the system provides them).
+            val scheme = MaterialTheme.colorScheme
+            CompositionLocalProvider(
+                LocalExpressivePalette provides ExpressivePalette(
+                    bg = scheme.surface,
+                    surfaceHi = scheme.surfaceContainerHigh,
+                    text = scheme.onSurface,
+                    dim = scheme.onSurfaceVariant,
+                    faint = scheme.outline,
+                    trackOff = scheme.outlineVariant,
+                    thumbOff = scheme.outline,
+                    btn = scheme.onSurface.copy(alpha = 0.07f),
+                    shadow = 0.dp,
+                ),
+                LocalAccent provides scheme.primary,
+                content = content,
+            )
+        }
+        LauncherSettings.POPUP_THEME_DARK ->
+            CompositionLocalProvider(LocalExpressivePalette provides DarkExpressivePalette, content = content)
+        LauncherSettings.POPUP_THEME_LIGHT ->
+            CompositionLocalProvider(LocalExpressivePalette provides LightExpressivePalette, content = content)
+        // Classic: the warm-orange palette that follows the system dark/light mode.
+        else -> ExpressiveTheme(content = content)
+    }
+}
+
+/**
  * A shortcut row: tap the label launches it; tap the trailing **+** (shown when [onPin] != null) pins
  * it to the home screen — the + is the affordance that tells the user this shortcut can be pinned.
  */
@@ -287,7 +331,7 @@ private fun ShortcutPopupRow(text: String, onClick: () -> Unit, onPin: (() -> Un
                 Icon(
                     painter = painterResource(LauncherIcons.Add),
                     contentDescription = stringResource(R.string.shortcut_pin),
-                    tint = Accent,
+                    tint = LocalAccent.current,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -308,7 +352,7 @@ private fun PopupRow(text: String, @DrawableRes icon: Int?, onClick: () -> Unit)
             Icon(
                 painter = painterResource(icon),
                 contentDescription = null,
-                tint = Accent,
+                tint = LocalAccent.current,
                 modifier = Modifier.size(20.dp),
             )
         }

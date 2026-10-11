@@ -17,7 +17,7 @@ import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 
 /** The app-icon style (icon pack + themed), so the shell's floating drag icon matches the surfaces. */
-data class IconStyle(val iconPack: String = "", val themed: Boolean = false)
+data class IconStyle(val iconPack: String = "", val themed: Boolean = false, val shape: String = "")
 
 /**
  * Exposes just the icon-style settings to [LauncherShell] so the single floating drag icon — drawn
@@ -37,22 +37,25 @@ class LauncherShellViewModel @Inject constructor(
         settingsRepository.settings(screenType)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings())
 
-    val iconStyle: StateFlow<IconStyle> = _screenType.flatMapLatest { screenType ->
-        settingsRepository.settings(screenType)
-            .map { IconStyle(it.iconPackPackage, it.useThemedIcons) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IconStyle())
+    // The rest are cut from that one stream: each settings(...) collection reads every setting
+    // again on every write to the store.
+    val iconStyle: StateFlow<IconStyle> = settings
+        .map { IconStyle(it.iconPackPackage, it.useThemedIcons, it.iconShape) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IconStyle())
 
-    val drawerHeightFraction: StateFlow<Float> = _screenType.flatMapLatest { screenType ->
-        settingsRepository.settings(screenType).map { it.drawerHeightFraction }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0f)
+    val drawerHeightFraction: StateFlow<Float> = settings.map { it.drawerHeightFraction }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0f)
 
-    val drawerWidthFraction: StateFlow<Float> = _screenType.flatMapLatest { screenType ->
-        settingsRepository.settings(screenType).map { it.drawerWidthFraction }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0f)
+    val drawerWidthFraction: StateFlow<Float> = settings.map { it.drawerWidthFraction }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0f)
 
-    val drawerAlignment: StateFlow<String> = _screenType.flatMapLatest { screenType ->
-        settingsRepository.settings(screenType).map { it.drawerAlignment }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.DRAWER_ALIGNMENT_CENTER)
+    val drawerAlignment: StateFlow<String> = settings.map { it.drawerAlignment }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.DRAWER_ALIGNMENT_CENTER)
 
     val iconEpochs: StateFlow<IconEpochs> = launcherAppsSource.iconEpochs
+
+    /** Hand-picked icons (app key → "pack|drawable"), provided to every icon surface. Eagerly: the
+     *  first frame should already draw the picked icons instead of flashing the default ones. */
+    val customIcons: StateFlow<Map<String, String>> = settingsRepository.customIcons
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 }

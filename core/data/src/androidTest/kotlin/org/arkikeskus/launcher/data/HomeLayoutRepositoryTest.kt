@@ -11,6 +11,7 @@ import org.arkikeskus.launcher.data.local.HomeItemDao
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.data.local.LauncherDatabase
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.ScreenType
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -50,10 +51,10 @@ class HomeLayoutRepositoryTest {
 
     @Test
     fun widgetDropKeepsChosenPageAndPushesAnOccupantAtomically() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
         val target = org.arkikeskus.launcher.model.WidgetPlacement(0, 0, 0, 2, 2)
-        assertThat(repo.addWidgetAt(42, "pkg/Widget", null, target, 4, 6)).isTrue()
-        val all = dao.getContainer(HomeItemEntity.HOME)
+        assertThat(repo.addWidgetAt(42, "pkg/Widget", null, target, 4, 6, ScreenType.OUTER)).isTrue()
+        val all = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         val widget = all.single { it.appWidgetId == 42 }
         val icon = all.single { it.appWidgetId == null }
         assertThat(widget.cell()).isEqualTo(Triple(0, 0, 0))
@@ -63,99 +64,99 @@ class HomeLayoutRepositoryTest {
     @Test
     fun rejectedDropAfterConfigurationLeavesExistingLayoutUntouched() = runTest {
         val full = org.arkikeskus.launcher.model.WidgetPlacement(0, 0, 0, 4, 6)
-        assertThat(repo.addWidgetAt(41, "pkg/Full", null, full, 4, 6)).isTrue()
+        assertThat(repo.addWidgetAt(41, "pkg/Full", null, full, 4, 6, ScreenType.OUTER)).isTrue()
         val before = dao.getAll()
-        assertThat(repo.addWidgetAt(42, "pkg/New", null, full.copy(spanX = 2, spanY = 2), 4, 6)).isFalse()
+        assertThat(repo.addWidgetAt(42, "pkg/New", null, full.copy(spanX = 2, spanY = 2), 4, 6, ScreenType.OUTER)).isFalse()
         assertThat(dao.getAll()).isEqualTo(before)
     }
 
     @Test
     fun redeliveredWidgetConfigurationDoesNotDuplicateItsHostId() = runTest {
         val p = org.arkikeskus.launcher.model.WidgetPlacement(2, 1, 1, 2, 2)
-        assertThat(repo.addWidgetAt(42, "pkg/Widget", null, p, 4, 6)).isTrue()
-        assertThat(repo.addWidgetAt(42, "pkg/Widget", null, p, 4, 6)).isTrue()
+        assertThat(repo.addWidgetAt(42, "pkg/Widget", null, p, 4, 6, ScreenType.OUTER)).isTrue()
+        assertThat(repo.addWidgetAt(42, "pkg/Widget", null, p, 4, 6, ScreenType.OUTER)).isTrue()
         assertThat(dao.getAll().count { it.appWidgetId == 42 }).isEqualTo(1)
         assertThat(dao.getAll().single().cell()).isEqualTo(Triple(2, 1, 1))
     }
 
     @Test
     fun removeStaleAppRows_compactsFolderChildren_soAddToFolderCannotCollide() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6)
-        repo.addToHome(app("b"), columns = 4, rows = 6)
-        repo.addToHome(app("c"), columns = 4, rows = 6)
-        repo.addToHome(app("d"), columns = 4, rows = 6)
-        val folderId = repo.createFolder(app("a"), app("b"), "F")
-        repo.addToFolder(app("c"), folderId) // children: a(0), b(1), c(2)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("b"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("c"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("d"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        val folderId = repo.createFolder(app("a"), app("b"), "F", ScreenType.OUTER)
+        repo.addToFolder(app("c"), folderId, ScreenType.OUTER) // children: a(0), b(1), c(2)
 
         // "a" — the FIRST child — gets uninstalled; the sweep removes its row.
         repo.removeStaleAppRows { pkg, _ -> pkg != "a" }
 
         // The children must be re-indexed 0..n-1: a cellX gap would make the next insert reuse an
         // occupied index (childCount) and crash on the unique cell index.
-        val children = dao.getContainerOrdered(folderId)
+        val children = dao.getContainerOrdered(folderId, "OUTER")
         assertThat(children.map { it.cellX }).containsExactly(0, 1).inOrder()
-        repo.addToFolder(app("d"), folderId) // must not throw
-        assertThat(dao.getContainerOrdered(folderId)).hasSize(3)
+        repo.addToFolder(app("d"), folderId, ScreenType.OUTER) // must not throw
+        assertThat(dao.getContainerOrdered(folderId, "OUTER")).hasSize(3)
     }
 
     @Test
     fun removeStaleAppRows_dissolvesAFolderLeftWithOneChild() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6)
-        repo.addToHome(app("b"), columns = 4, rows = 6)
-        val folderId = repo.createFolder(app("a"), app("b"), "F")
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("b"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        val folderId = repo.createFolder(app("a"), app("b"), "F", ScreenType.OUTER)
 
         repo.removeStaleAppRows { pkg, _ -> pkg != "b" }
 
         // One child left → the folder dissolves and the survivor takes its cell on HOME.
-        val home = dao.getContainer(HomeItemEntity.HOME)
+        val home = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         assertThat(home).hasSize(1)
         assertThat(home.single().packageName).isEqualTo("a")
         assertThat(home.single().isFolder).isFalse()
-        assertThat(dao.getContainerOrdered(folderId)).isEmpty()
+        assertThat(dao.getContainerOrdered(folderId, "OUTER")).isEmpty()
     }
 
     @Test
     fun moveItem_toFreeCell_moves() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6) // lands at (0,0,0)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // lands at (0,0,0)
 
-        val accepted = repo.moveItem(app("a"), page = 0, cellX = 2, cellY = 1)
+        val accepted = repo.moveItem(app("a"), page = 0, cellX = 2, cellY = 1, screenType = ScreenType.OUTER)
 
         assertThat(accepted).isTrue()
-        val items = dao.getContainer(HomeItemEntity.HOME)
+        val items = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         assertThat(items).hasSize(1)
         assertThat(items.single().cell()).isEqualTo(Triple(0, 2, 1))
     }
 
     @Test
     fun moveItem_ontoOccupiedCell_swaps() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6) // (0,0,0)
-        repo.addToHome(app("b"), columns = 4, rows = 6) // (0,1,0)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // (0,0,0)
+        repo.addToHome(app("b"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // (0,1,0)
 
-        val accepted = repo.moveItem(app("a"), page = 0, cellX = 1, cellY = 0)
+        val accepted = repo.moveItem(app("a"), page = 0, cellX = 1, cellY = 0, screenType = ScreenType.OUTER)
 
         assertThat(accepted).isTrue()
-        val byPkg = dao.getContainer(HomeItemEntity.HOME).associateBy { it.packageName }
+        val byPkg = dao.getContainer(HomeItemEntity.HOME, "OUTER").associateBy { it.packageName }
         assertThat(byPkg.getValue("a").cell()).isEqualTo(Triple(0, 1, 0))
         assertThat(byPkg.getValue("b").cell()).isEqualTo(Triple(0, 0, 0))
-        assertThat(dao.getContainer(HomeItemEntity.HOME).map { it.cell() }).containsNoDuplicates()
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER").map { it.cell() }).containsNoDuplicates()
     }
 
     @Test
     fun moveItem_ontoOwnCell_isNoOp() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6) // (0,0,0)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // (0,0,0)
 
-        val accepted = repo.moveItem(app("a"), page = 0, cellX = 0, cellY = 0)
+        val accepted = repo.moveItem(app("a"), page = 0, cellX = 0, cellY = 0, screenType = ScreenType.OUTER)
 
         assertThat(accepted).isTrue()
-        assertThat(dao.getContainer(HomeItemEntity.HOME).single().cell()).isEqualTo(Triple(0, 0, 0))
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER").single().cell()).isEqualTo(Triple(0, 0, 0))
     }
 
     @Test
     fun moveItem_missingApp_returnsFalse() = runTest {
-        val accepted = repo.moveItem(app("ghost"), page = 0, cellX = 0, cellY = 0)
+        val accepted = repo.moveItem(app("ghost"), page = 0, cellX = 0, cellY = 0, screenType = ScreenType.OUTER)
 
         assertThat(accepted).isFalse()
-        assertThat(dao.getContainer(HomeItemEntity.HOME)).isEmpty()
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER")).isEmpty()
     }
 
     @Test
@@ -164,9 +165,9 @@ class HomeLayoutRepositoryTest {
         dao.insert(HomeItemEntity(packageName = "a", className = "a.M", userSerial = 0, page = 0, cellX = 0, cellY = 0))
         dao.insert(HomeItemEntity(packageName = "b", className = "b.M", userSerial = 0, page = 0, cellX = 6, cellY = 0))
 
-        repo.reflow(columns = 4, rows = 6)
+        repo.reflow(columns = 4, rows = 6, screenType = ScreenType.OUTER)
 
-        val items = dao.getContainer(HomeItemEntity.HOME)
+        val items = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         assertThat(items.all { it.cellX in 0..3 }).isTrue()
         assertThat(items.map { it.cell() }).containsNoDuplicates()
     }
@@ -187,9 +188,9 @@ class HomeLayoutRepositoryTest {
             )
         }
 
-        repo.reflow(columns = 2, rows = 6)
+        repo.reflow(columns = 2, rows = 6, screenType = ScreenType.OUTER)
 
-        val items = dao.getContainer(HomeItemEntity.HOME)
+        val items = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         assertThat(items).hasSize(13)
         assertThat(items.all { it.cellX in 0..1 }).isTrue()
         assertThat(items.any { it.page == 1 }).isTrue()
@@ -198,90 +199,90 @@ class HomeLayoutRepositoryTest {
 
     @Test
     fun placeAt_newApp_freeCell_inserts() = runTest {
-        val accepted = repo.placeAt(app("a"), page = 0, cellX = 2, cellY = 1, columns = 4, rows = 6)
+        val accepted = repo.placeAt(app("a"), page = 0, cellX = 2, cellY = 1, columns = 4, rows = 6, screenType = ScreenType.OUTER)
 
         assertThat(accepted).isTrue()
-        assertThat(dao.getContainer(HomeItemEntity.HOME).single().cell()).isEqualTo(Triple(0, 2, 1))
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER").single().cell()).isEqualTo(Triple(0, 2, 1))
     }
 
     @Test
     fun placeAt_newApp_occupiedCell_fallsBackToFirstFree() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6) // occupies (0,0,0)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // occupies (0,0,0)
 
-        val accepted = repo.placeAt(app("b"), page = 0, cellX = 0, cellY = 0, columns = 4, rows = 6)
+        val accepted = repo.placeAt(app("b"), page = 0, cellX = 0, cellY = 0, columns = 4, rows = 6, screenType = ScreenType.OUTER)
 
         assertThat(accepted).isTrue()
-        val byPkg = dao.getContainer(HomeItemEntity.HOME).associateBy { it.packageName }
+        val byPkg = dao.getContainer(HomeItemEntity.HOME, "OUTER").associateBy { it.packageName }
         assertThat(byPkg.getValue("a").cell()).isEqualTo(Triple(0, 0, 0)) // untouched
         assertThat(byPkg.getValue("b").cell()).isEqualTo(Triple(0, 1, 0)) // first free cell
-        assertThat(dao.getContainer(HomeItemEntity.HOME).map { it.cell() }).containsNoDuplicates()
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER").map { it.cell() }).containsNoDuplicates()
     }
 
     @Test
     fun placeAt_existingApp_swaps() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6) // (0,0,0)
-        repo.addToHome(app("b"), columns = 4, rows = 6) // (0,1,0)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // (0,0,0)
+        repo.addToHome(app("b"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // (0,1,0)
 
-        val accepted = repo.placeAt(app("a"), page = 0, cellX = 1, cellY = 0, columns = 4, rows = 6)
+        val accepted = repo.placeAt(app("a"), page = 0, cellX = 1, cellY = 0, columns = 4, rows = 6, screenType = ScreenType.OUTER)
 
         assertThat(accepted).isTrue()
-        val byPkg = dao.getContainer(HomeItemEntity.HOME).associateBy { it.packageName }
+        val byPkg = dao.getContainer(HomeItemEntity.HOME, "OUTER").associateBy { it.packageName }
         assertThat(byPkg.getValue("a").cell()).isEqualTo(Triple(0, 1, 0))
         assertThat(byPkg.getValue("b").cell()).isEqualTo(Triple(0, 0, 0))
-        assertThat(dao.getContainer(HomeItemEntity.HOME)).hasSize(2)
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER")).hasSize(2)
     }
 
     @Test
     fun addToHome_isIdempotentPerKey() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6)
-        repo.addToHome(app("a"), columns = 4, rows = 6)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
 
-        assertThat(dao.getContainer(HomeItemEntity.HOME)).hasSize(1)
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER")).hasSize(1)
     }
 
     @Test
     fun createFolder_movesBothAppsIntoFolderAtTargetCell() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6) // (0,0,0)
-        repo.addToHome(app("b"), columns = 4, rows = 6) // (0,1,0)
-        val targetRow = dao.getByKey(HomeItemEntity.HOME, "a", "a.Main", 0L)!!
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // (0,0,0)
+        repo.addToHome(app("b"), columns = 4, rows = 6, screenType = ScreenType.OUTER) // (0,1,0)
+        val targetRow = dao.getByKey(HomeItemEntity.HOME, "a", "a.Main", 0L, "OUTER")!!
 
-        val folderId = repo.createFolder(target = app("a"), dropped = app("b"), name = "Folder")
+        val folderId = repo.createFolder(target = app("a"), dropped = app("b"), name = "Folder", screenType = ScreenType.OUTER)
 
         assertThat(folderId).isGreaterThan(0L)
-        val home = dao.getContainer(HomeItemEntity.HOME)
+        val home = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         assertThat(home).hasSize(1) // just the folder
         val folder = home.single()
         assertThat(folder.isFolder).isTrue()
         assertThat(folder.cell()).isEqualTo(targetRow.cell()) // folder took the target's cell
-        val children = dao.getContainer(folderId).map { it.packageName }.toSet()
+        val children = dao.getContainer(folderId, "OUTER").map { it.packageName }.toSet()
         assertThat(children).containsExactly("a", "b")
     }
 
     @Test
     fun addToFolder_appendsChild() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6)
-        repo.addToHome(app("b"), columns = 4, rows = 6)
-        repo.addToHome(app("c"), columns = 4, rows = 6)
-        val folderId = repo.createFolder(app("a"), app("b"), "F")
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("b"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("c"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        val folderId = repo.createFolder(app("a"), app("b"), "F", ScreenType.OUTER)
 
-        repo.addToFolder(app("c"), folderId)
+        repo.addToFolder(app("c"), folderId, ScreenType.OUTER)
 
-        assertThat(dao.getContainer(folderId).map { it.packageName }).containsExactly("a", "b", "c")
-        assertThat(dao.getContainer(HomeItemEntity.HOME)).hasSize(1) // only the folder remains on home
+        assertThat(dao.getContainer(folderId, "OUTER").map { it.packageName }).containsExactly("a", "b", "c")
+        assertThat(dao.getContainer(HomeItemEntity.HOME, "OUTER")).hasSize(1) // only the folder remains on home
     }
 
     @Test
     fun removeFromFolder_dissolvesWhenOneRemains() = runTest {
-        repo.addToHome(app("a"), columns = 4, rows = 6)
-        repo.addToHome(app("b"), columns = 4, rows = 6)
-        val folderId = repo.createFolder(app("a"), app("b"), "F")
+        repo.addToHome(app("a"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        repo.addToHome(app("b"), columns = 4, rows = 6, screenType = ScreenType.OUTER)
+        val folderId = repo.createFolder(app("a"), app("b"), "F", ScreenType.OUTER)
         val folderCell = dao.getById(folderId)!!.cell()
 
-        repo.removeFromFolder(app("a"), folderId, columns = 4, rows = 6)
+        repo.removeFromFolder(app("a"), folderId, columns = 4, rows = 6, screenType = ScreenType.OUTER)
 
         // Folder gone; the last app ("b") sits at the folder's old cell; "a" back on home elsewhere.
         assertThat(dao.getById(folderId)).isNull()
-        val home = dao.getContainer(HomeItemEntity.HOME)
+        val home = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         assertThat(home.none { it.isFolder }).isTrue()
         val b = home.first { it.packageName == "b" }
         assertThat(b.cell()).isEqualTo(folderCell)
@@ -303,9 +304,9 @@ class HomeLayoutRepositoryTest {
             )
         }
 
-        repo.reflow(columns = 8, rows = 8)
+        repo.reflow(columns = 8, rows = 8, screenType = ScreenType.OUTER)
 
-        val items = dao.getContainer(HomeItemEntity.HOME)
+        val items = dao.getContainer(HomeItemEntity.HOME, "OUTER")
         assertThat(items).hasSize(64)
         assertThat(items.all { it.cellX in 0..7 && it.cellY in 0..7 }).isTrue()
         assertThat(items.all { it.page == 0 }).isTrue()

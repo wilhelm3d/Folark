@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,8 @@ fun ExpressiveCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 10.dp)
+            // Clip before clickable so the press ripple follows the rounded card, not its square bounds.
+            .clip(RoundedCornerShape(20.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         Row(
@@ -64,15 +67,17 @@ fun ExpressiveActionRow(
     onClick: () -> Unit,
 ) {
     val p = LocalExpressivePalette.current
+    val accent = LocalAccent.current
     ExpressiveCard(onClick = onClick) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, color = Accent, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Text(description, color = p.dim, fontSize = 12.5.sp)
+            Text(label, color = accent, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            // An empty description (search results pass "") must not reserve a blank second line.
+            if (description.isNotBlank()) Text(description, color = p.dim, fontSize = 12.5.sp)
         }
         Icon(
             painter = painterResource(trailingIcon),
             contentDescription = null,
-            tint = if (trailingIcon == LauncherIcons.Add) Accent else p.faint,
+            tint = if (trailingIcon == LauncherIcons.Add) accent else p.faint,
             modifier = Modifier.size(22.dp),
         )
     }

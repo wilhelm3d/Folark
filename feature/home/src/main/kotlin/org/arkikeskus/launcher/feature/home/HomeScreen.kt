@@ -7,6 +7,12 @@ import android.content.ContextWrapper
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -18,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,9 +54,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +84,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -122,11 +134,16 @@ import org.arkikeskus.launcher.ui.PopupAction
 import org.arkikeskus.launcher.ui.RenameDialog
 import org.arkikeskus.launcher.ui.rememberHomeDragController
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
 import org.arkikeskus.launcher.ui.component.rememberParallaxOffset
+import org.arkikeskus.launcher.ui.component.LocalBatterySaver
+import org.arkikeskus.launcher.ui.component.LocalHomeCovered
 import org.arkikeskus.launcher.ui.component.LocalFoldState
 import org.arkikeskus.launcher.ui.component.LocalIconPack
+import org.arkikeskus.launcher.data.MotoLinks
+import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import kotlin.math.abs
@@ -155,7 +172,8 @@ fun HomeScreen(
     val settings = uiState.settings
     // True briefly after a heads-up notification, while the system transiently shows its own status bar
     // over ours; used to blank the themed bar so they don't overlap.
-    val headsUpActive by viewModel.headsUpActive.collectAsStateWithLifecycle()
+    // Read only where the themed bar fades (in its layer), so a heads-up doesn't recompose home.
+    val headsUpActive = viewModel.headsUpActive.collectAsStateWithLifecycle()
     // First-run intro (fresh installs only) — covers the whole home surface until finished/skipped.
     val showOnboarding by viewModel.showOnboarding.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -224,6 +242,8 @@ fun HomeScreen(
     val widgetConfigLauncher = LocalWidgetConfigLauncher.current
     val appWidgetManager = remember { AppWidgetManager.getInstance(context) }
     var showWidgetPicker by remember { mutableStateOf(false) }
+    // The widget stack the picker is choosing a widget FOR ("Add to stack"); null = a normal add.
+    var stackToAddTo by remember { mutableStateOf<Long?>(null) }
     val widgetDrag = remember(dragController) { WidgetDragController(dragController) }
     val widgetScope = rememberCoroutineScope()
     var liveBindId by remember { mutableStateOf<Int?>(null) }
@@ -246,8 +266,15 @@ fun HomeScreen(
     // Mirrors Launcher3's LauncherWidgetHolder keeping every host view registered for the app's lifetime.
     val widgetViews = remember { mutableStateMapOf<Int, android.appwidget.AppWidgetHostView>() }
     val widgetScrollableById = remember { mutableStateMapOf<Int, Boolean>() }
+    // Widgets inside a stack need a host view too — without one the stack shows empty tiles.
     val placedWidgetIds = remember(uiState.entries) {
-        uiState.entries.filterIsInstance<PlacedWidget>().map { it.appWidgetId }.toSet()
+        uiState.entries.flatMap { entry ->
+            when (entry) {
+                is PlacedWidget -> listOf(entry.appWidgetId)
+                is PlacedWidgetStack -> entry.items.filterIsInstance<PlacedWidget>().map { it.appWidgetId }
+                else -> emptyList()
+            }
+        }.toSet()
     }
     LaunchedEffect(placedWidgetIds, widgetHost) {
         val host = widgetHost ?: return@LaunchedEffect
@@ -311,6 +338,10 @@ fun HomeScreen(
                 val saved = runCatching {
                     if (bind.restoreRowId != null) {
                         viewModel.bindRestoredWidget(bind.restoreRowId, bind.appWidgetId)
+                    } else if (bind.stackId != null) {
+                        viewModel.addBoundWidgetToStack(
+                            bind.stackId, bind.appWidgetId, bind.provider.provider.flattenToString(),
+                        )
                     } else {
                         val target = bind.placement ?: return@runCatching false
                         viewModel.addWidgetAt(bind.appWidgetId, bind.provider.provider.flattenToString(), null, target)
@@ -360,8 +391,14 @@ fun HomeScreen(
     }
 
     // Allocate an id and bind [provider] (silently if allowed, else via the system bind dialog), then
-    // configure. [restoreRowId] != null re-binds an existing placeholder row instead of adding a new one.
-    fun startBind(provider: AppWidgetProviderInfo, restoreRowId: Long?, placement: WidgetPlacement? = null) {
+    // configure. [restoreRowId] != null re-binds an existing placeholder row instead of adding a new one;
+    // [stackId] != null adds the new widget to that widget stack instead of a grid placement.
+    fun startBind(
+        provider: AppWidgetProviderInfo,
+        restoreRowId: Long?,
+        placement: WidgetPlacement? = null,
+        stackId: Long? = null,
+    ) {
         // Guards a double tap. Only a bind started by THIS process blocks: [pendingWidget] is saveable,
         // so one whose result never arrives would otherwise refuse every later add, silently, forever.
         if (pendingWidget != null && pendingWidget?.appWidgetId == liveBindId) return
@@ -370,7 +407,7 @@ fun HomeScreen(
             widgetMessage(R.string.widget_add_failed)
             return
         }
-        val bind = PendingWidgetBind(id, provider, restoreRowId, placement)
+        val bind = PendingWidgetBind(id, provider, restoreRowId, placement, stackId)
         liveBindId = id
         pendingWidget = bind
         val bound = runCatching { appWidgetManager.bindAppWidgetIdIfAllowed(id, provider.profile, provider.provider, null) }.getOrDefault(false)
@@ -390,6 +427,7 @@ fun HomeScreen(
 
     fun addWidget(choice: WidgetChoice, placement: WidgetPlacement) {
         showWidgetPicker = false
+        stackToAddTo = null
         when (choice) {
             is WidgetChoice.App -> startBind(choice.provider, restoreRowId = null, placement = placement)
             is WidgetChoice.Builtin -> widgetScope.launch {
@@ -432,6 +470,10 @@ fun HomeScreen(
         dragController.dockItemCount = uiState.dockApps.size
         dragController.dockHasSpace = settings.dockEnabled && uiState.dockApps.size < settings.dockColumns
     }
+    // The split drop target only exists while the setting is on (see HomeDragController.isOverSplit).
+    LaunchedEffect(settings.splitLaunchEnabled) {
+        dragController.splitEnabled = settings.splitLaunchEnabled
+    }
     // A drag that starts moving dismisses the menu (so the menu and drop bar never coexist).
     LaunchedEffect(dragController.moving) {
         if (dragController.moving) menuTarget = null
@@ -448,12 +490,17 @@ fun HomeScreen(
             renameTarget = null
             openFolderId = null
             showWidgetPicker = false
+            stackToAddTo = null
             widgetDrag.cancel()
         }
     }
 
     // Notification badges (empty when disabled), and whether to render the count or a plain dot.
-    val badges = if (settings.showNotificationDots) uiState.badges else emptyMap()
+    // The counts are their own state and are only read where a badge is drawn (see BadgeCounts),
+    // so a notification does not recompose the home screen from the top.
+    val badgeState = viewModel.badges.collectAsStateWithLifecycle()
+    val showNotificationDots = rememberUpdatedState(settings.showNotificationDots)
+    val badges = remember(badgeState) { BadgeCounts(badgeState) { showNotificationDots.value } }
     val badgeShowCount = settings.notificationDotCount
     val badgeScale = settings.notificationDotScale
 
@@ -468,12 +515,15 @@ fun HomeScreen(
                 }
             }
             LauncherSettings.GESTURE_NONE -> {}
+            // Motorola gestures (MotoLinks): a note, Secure Vault, Ready For, Game Center, ...
+            else -> if (!MotoLinks.runGesture(context, action)) widgetMessage(R.string.gesture_moto_unavailable)
         }
     }
 
-    val foldState = LocalFoldState.current
-    val isHalfOpenedTabletop = foldState == FoldState.HALF_OPENED && settings.halfOpenedModeEnabled
-    val wallpaperScale = if (screenType == ScreenType.OUTER) settings.outerWallpaperScale else settings.innerWallpaperScale
+    // Half folded (and the setting on): where the hinge is decides the layout, see HalfFold.kt.
+    val halfFoldHinge = if (settings.halfOpenedModeEnabled) rememberHalfFoldHinge() else null
+    val tabletopHinge = halfFoldHinge?.takeIf { it.acrossScreen }
+    val bookFold = halfFoldHinge != null && !halfFoldHinge.acrossScreen
 
     val systemDensity = LocalDensity.current
     val dpiDensity = remember(systemDensity, settings.dpiWorkspace) {
@@ -483,30 +533,55 @@ fun HomeScreen(
         )
     }
 
+    val widgetLooks by viewModel.widgetLooks.collectAsStateWithLifecycle()
     // All app icons on home (workspace, dock, folders) honour the themed-icons setting and the
     // user's app-label text-size multiplier.
     CompositionLocalProvider(
         LocalDensity provides dpiDensity,
         LocalTonalWidgets provides settings.widgetTonalBackground,
+        LocalWidgetBackgroundAlpha provides settings.widgetBackgroundOpacity,
         LocalThemedIcons provides settings.useThemedIcons,
         LocalIconPack provides settings.iconPackPackage,
+        LocalIconShape provides settings.iconShape,
+        LocalMotoWeatherTap provides settings.motoWeatherTap,
         LocalAppLabelScale provides settings.appLabelTextScale,
         LocalAppLabelLines provides if (settings.twoLineHomeLabels) 2 else 1,
+        LocalIconSizeScale provides settings.iconSizeScale,
+        LocalWidgetLooks provides widgetLooks,
+        LocalStackStyle provides StackStyle(
+            cornerRadius = settings.stackCornerRadius,
+            indicator = settings.stackIndicator,
+            showPill = settings.stackShowPill,
+            autoRotateSeconds = settings.stackAutoRotateSeconds,
+        ),
+        LocalFolderStyle provides FolderStyle(
+            shape = settings.folderShape,
+            theme = settings.folderTheme,
+            preview = settings.folderPreview,
+            openColumns = settings.folderOpenColumns,
+            openSize = settings.folderOpenSize,
+        ),
         // Force the workspace left-to-right even in RTL locales (ar/he/fa/ur). The grid renders with
         // RTL-aware Modifier.offset {} but the drag/drop, drop-ring and popup-anchor math is all
         // absolute left-origin, so under RTL they disagree and a drop lands in the mirrored cell.
         // Pinning LTR keeps render + touch consistent; the drawer/settings keep their natural RTL.
         LocalLayoutDirection provides LayoutDirection.Ltr,
     ) {
-        val parallaxOffset = rememberParallaxOffset(enabled = settings.parallaxWallpaper)
+        // The motion sensor only runs while the launcher is the app in front: home stays composed
+        // behind every other app, and used to keep the sensor awake there. Its on/off lives in its
+        // own small composable, so a resume, a pause or the drawer covering home recomposes only that.
+        val parallaxOffset = remember { mutableStateOf<State<Offset>?>(null) }
+        HomeParallax(enabledSetting = settings.parallaxWallpaper, out = parallaxOffset)
     Box(
         modifier = modifier
             .fillMaxSize()
             .graphicsLayer {
-                translationX = parallaxOffset.x
-                translationY = parallaxOffset.y
+                // Read here, not in composition: the sensor moves this layer and nothing else.
+                val shift = parallaxOffset.value?.value ?: Offset.Zero
+                // A plain layer: moving it reuses what every icon and widget already drew.
+                translationX = shift.x
+                translationY = shift.y
             }
-            .then(if (isHalfOpenedTabletop) Modifier.padding(bottom = 120.dp) else Modifier)
             // Root-level, Initial-pass swipe detector: a flick up/down anywhere on home (over icons,
             // folders, shortcuts or the dock — not just empty space) drives the drawer/notifications.
             .pixelHomeSwipe(
@@ -525,8 +600,29 @@ fun HomeScreen(
                 onLeftEdgeAction = viewModel::onLeftSwipe,
                 // Right-edge action: a left-drag on the rightmost page launches the configured app.
                 rightEdgeEnabled = settings.rightSwipeAppKey.isNotBlank() && !showOnboarding,
-                atRightEdge = { dragController.currentPage == (uiState.pageCount - 1).coerceAtLeast(0) },
+                // Book layout: the pager rests on the left page of the last pair.
+                atRightEdge = {
+                    dragController.currentPage + (if (dragController.isDualPage) 1 else 0) >= (uiState.pageCount - 1).coerceAtLeast(0)
+                },
                 onRightEdgeAction = viewModel::onRightSwipe,
+                // Swipe up on an app icon (Settings ▸ Gestures): instead of opening the drawer.
+                iconSwipeEnabled = settings.iconSwipeUpAction != LauncherSettings.ICON_SWIPE_NONE &&
+                    !settings.desktopLocked && !showOnboarding,
+                onIconSwipe = { app, at ->
+                    when (settings.iconSwipeUpAction) {
+                        LauncherSettings.ICON_SWIPE_MENU -> {
+                            menuTarget = AppMenuTarget(
+                                app, IntOffset(at.x.roundToInt(), at.y.roundToInt()), DragSource.Home,
+                                at.y > windowHeightPx / 2,
+                            )
+                        }
+                        LauncherSettings.ICON_SWIPE_FLOATING -> viewModel.launchFloating(app)
+                        LauncherSettings.ICON_SWIPE_SPLIT -> {
+                            dragController.splitRequest = app
+                        }
+                        else -> Unit
+                    }
+                },
             ),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -552,8 +648,8 @@ fun HomeScreen(
                 //    content; WindowManager deliberately withholds that reveal from WindowInsets to keep the
                 //    layout stable (verified against AOSP), so it can't be seen via insets — we detect it
                 //    from our own NotificationListener instead and blank the bar for the heads-up window.
-                val suppressThemedBar =
-                    settings.hideSystemStatusBar && (systemBarInset > 0.dp || headsUpActive)
+                val hideSystemBar = settings.hideSystemStatusBar
+                val systemBarShown = systemBarInset > 0.dp
                 StatusBar(
                     // Only align to the camera cutout when we own the top zone (system bar hidden).
                     alignToCutout = settings.hideSystemStatusBar,
@@ -567,7 +663,10 @@ fun HomeScreen(
                         // that pushes the workspace down, so removing it would jump the whole grid up
                         // for the heads-up window and back — and let the top row sit under a
                         // force-shown system bar. Only the pixels must vanish; the slot stays.
-                        .graphicsLayer { alpha = if (suppressThemedBar) 0f else 1f }
+                        .graphicsLayer {
+                            val suppressThemedBar = hideSystemBar && (systemBarShown || headsUpActive.value)
+                            alpha = if (suppressThemedBar) 0f else 1f
+                        }
                         // When the system bar is hidden, occupy its zone at the very top (replacing it).
                         // Otherwise the scrim + topInset (inside StatusBar) handle the system-bar band, so
                         // no external statusBarsPadding here — that padding is what left the scrim gap.
@@ -577,8 +676,8 @@ fun HomeScreen(
                         ),
                 )
             }
-            val lockNeedsServiceMsg = stringResource(R.string.double_tap_lock_needs_service)
-            val isDualPage = screenType == ScreenType.INNER && settings.innerDualPageWorkspace
+            // Book half-fold: one page per half, nothing on the crease.
+            val isDualPage = screenType == ScreenType.INNER && (settings.innerDualPageWorkspace || bookFold)
             Workspace(
                 pageCount = uiState.pageCount,
                 columns = settings.homeColumns,
@@ -595,6 +694,10 @@ fun HomeScreen(
                 locked = settings.desktopLocked,
                 isDualPage = isDualPage,
                 pageBounceEnabled = settings.pageBounceEnabled,
+                pageScrollEffect = settings.pageScrollEffect,
+                allowNewPage = settings.newPageOnDrag,
+                animationSpeed = settings.animationSpeed,
+                onWidgetLookChange = { rowId, look -> viewModel.setWidgetLook(rowId, look) },
                 homeSignals = homeSignals,
                 homePage = if (uiState.loaded) uiState.homePage else null,
                 pageRequests = pageRequests,
@@ -608,27 +711,49 @@ fun HomeScreen(
                 onMoveToDock = { app, index -> viewModel.moveToDock(app, index) },
                 onRemoveFromHome = { viewModel.removeFromHome(it) },
                 onOpenFolder = { openFolderId = it.id },
+                onFolderTap = { folder ->
+                    val first = folder.apps.firstOrNull()
+                    if (settings.folderTapFirstApp && first != null) {
+                        viewModel.launch(first)
+                    } else {
+                        openFolderId = folder.id
+                    }
+                },
                 onLaunchShortcut = { viewModel.launchShortcut(it) },
                 onRemoveShortcut = { viewModel.removeShortcut(it) },
                 onCreateFolder = { target, dropped -> viewModel.createFolder(target, dropped, defaultFolderName) },
                 onAddToFolder = { app, folderId -> viewModel.addToFolder(app, folderId) },
+                onCreateWidgetStack = { targetRowId, droppedRowId -> viewModel.createWidgetStack(targetRowId, droppedRowId) },
+                onAddToWidgetStack = { stackId, widgetRowId ->
+                    if (widgetRowId < 0L) {
+                        stackToAddTo = stackId
+                        showWidgetPicker = true
+                    } else {
+                        viewModel.addToWidgetStack(stackId, widgetRowId)
+                    }
+                },
+                onRemoveFromWidgetStack = { stackId, itemRowId ->
+                    viewModel.removeFromWidgetStack(stackId, itemRowId) { freedId ->
+                        runCatching { widgetHost?.deleteAppWidgetId(freedId) }
+                    }
+                },
                 onEmptyAreaMenu = { anchor, above -> homeOptions = anchor to above },
                 onEmptyAreaDoubleTap = {
-                    // `settings` is this composition's value; Workspace reads the latest lambda via
-                    // rememberUpdatedState, so a toggled setting takes effect without a restart.
-                    val action = when {
-                        settings.doubleTapAction != LauncherSettings.GESTURE_NONE -> settings.doubleTapAction
-                        settings.doubleTapToLock -> LauncherSettings.GESTURE_LOCK
-                        else -> LauncherSettings.GESTURE_NONE
-                    }
+                    val action = settings.doubleTapAction
                     if (action != LauncherSettings.GESTURE_NONE) {
                         executeAction(action)
                     }
                 },
                 onRemoveWidget = { rowId, appWidgetId ->
-                    // A built-in widget has no host id to free (appWidgetId == null).
+                    // A built-in widget has no host id to free (appWidgetId == null). A widget stack
+                    // has none of its own either, but the widgets inside it do — the repository
+                    // reports those once the rows are gone.
                     appWidgetId?.let { widgetHost?.deleteAppWidgetId(it) }
-                    viewModel.removeWidget(rowId)
+                    viewModel.removeWidget(rowId) { freed ->
+                        freed.filter { it != appWidgetId }.forEach { id ->
+                            runCatching { widgetHost?.deleteAppWidgetId(id) }
+                        }
+                    }
                 },
                 onRestorePendingWidget = { startRestoreWidget(it) },
                 // A pending placeholder has no allocated host id yet, so just drop its row.
@@ -663,8 +788,11 @@ fun HomeScreen(
 
             // Show the dock whenever it's enabled — even with no favorites yet — so a fresh install
             // can be populated by dragging apps onto it (there is no "add to dock" menu item).
-            if (settings.dockEnabled) {
-                val dockAlignModifier = if (screenType == ScreenType.INNER) {
+            val dockContent: @Composable ColumnScope.() -> Unit = { if (settings.dockEnabled) {
+                // The narrower, alignable dock is for wide inner screens only; a flip phone's inner
+                // display is phone-wide and keeps the full-width dock.
+                val wideScreen = LocalConfiguration.current.screenWidthDp >= 600
+                val dockAlignModifier = if (screenType == ScreenType.INNER && wideScreen) {
                     when (settings.innerDockAlignment) {
                         LauncherSettings.DOCK_ALIGNMENT_LEFT -> Modifier.fillMaxWidth(0.6f).align(Alignment.Start)
                         LauncherSettings.DOCK_ALIGNMENT_RIGHT -> Modifier.fillMaxWidth(0.6f).align(Alignment.End)
@@ -694,39 +822,67 @@ fun HomeScreen(
                         .navigationBarsPadding()
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                 )
+            } }
+            if (tabletopHinge != null) {
+                // Laptop / tabletop: the pages fill the top half (the workspace takes the rest of the
+                // column), the bottom half below the hinge holds the dock in its middle.
+                val bottomHalf = with(LocalDensity.current) {
+                    (windowHeightPx - tabletopHinge.bounds.top).coerceAtLeast(0).toDp()
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth().height(bottomHalf),
+                    verticalArrangement = Arrangement.Center,
+                    content = dockContent,
+                )
+            } else {
+                dockContent()
             }
         }
 
-        // Drop-to-remove zone: a "Poista" pill at the top during any removable home drag (an app, or a
-        // pinned shortcut via [localDragging]); dropping an icon on it removes it from home. Turns red
-        // while the dragged icon is over it. Publishes its bounds for the drag's hit-test.
-        if ((dragController.moving && (dragController.source == DragSource.Home || dragController.source == DragSource.Dock)) || dragController.localDragging) {
-            val overRemove = dragController.isOverRemove(dragController.rootPosition)
-            Surface(
-                color = if (overRemove) Color(0xFFD32F2F) else Color.Black.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(24.dp),
+        // Drop targets at the top while an icon is dragged, side by side:
+        //  - "Remove" during any removable home drag (an app from home/dock, or a pinned shortcut via
+        //    [localDragging]); dropping an icon on it removes it from home.
+        //  - "Split" during any app drag (home, dock or drawer) when the setting is on; dropping an
+        //    app on it opens the partner picker for a split screen.
+        // Each lights up while the dragged icon is over it and publishes its bounds for the hit-test.
+        val showRemoveTarget = (dragController.moving &&
+            (dragController.source == DragSource.Home || dragController.source == DragSource.Dock)) ||
+            dragController.localDragging
+        val showSplitTarget = dragController.moving && settings.splitLaunchEnabled
+        if (showRemoveTarget || showSplitTarget) {
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    // Clear the themed status bar (when shown) so the "remove" pill doesn't overlap it.
-                    .padding(top = if (settings.showStatusBar) 44.dp else 16.dp)
-                    .onGloballyPositioned { dragController.removeBounds = it.boundsInRoot() },
+                    // Clear the themed status bar (when shown) so the pills don't overlap it.
+                    .padding(top = if (settings.showStatusBar) 44.dp else 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        painter = painterResource(LauncherIcons.Close),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
+                // Derived, so a drag recomposes this row only when the finger enters or leaves a target
+                // (reading the position here re-ran the whole home screen on every pointer move).
+                val overRemove by remember(dragController) {
+                    derivedStateOf { dragController.isOverRemove(dragController.rootPosition) }
+                }
+                val overSplit by remember(dragController) {
+                    derivedStateOf { dragController.isOverSplit(dragController.rootPosition) }
+                }
+                if (showRemoveTarget) {
+                    DragTargetPill(
+                        icon = LauncherIcons.Close,
+                        label = stringResource(R.string.drag_remove),
+                        active = overRemove,
+                        activeColor = Color(0xFFD32F2F),
+                        modifier = Modifier.onGloballyPositioned { dragController.removeBounds = it.boundsInRoot() },
                     )
-                    Text(
-                        text = stringResource(R.string.drag_remove),
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
+                }
+                if (showSplitTarget) {
+                    DragTargetPill(
+                        icon = LauncherIcons.SwapHoriz,
+                        label = stringResource(R.string.drag_split),
+                        active = overSplit,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.onGloballyPositioned { dragController.splitBounds = it.boundsInRoot() },
                     )
                 }
             }
@@ -776,11 +932,55 @@ fun HomeScreen(
         if (showOnboarding) {
             OnboardingFlow(
                 onFinish = { viewModel.finishOnboarding() },
+                // The restore already marked the intro as done; close it and reload the home
+                // screen so the restored layout and widgets are set up from scratch.
+                onRestored = {
+                    viewModel.finishOnboarding()
+                    context.hostActivity()?.recreate()
+                },
                 onContactsGranted = { viewModel.onContactsPermissionGranted() },
                 onPhoneGranted = { viewModel.onPhonePermissionGranted() },
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+
+    // An app is waiting for its split-screen partner (dropped on the split target, or chosen from a
+    // long-press menu on home, the dock or the drawer).
+    dragController.splitRequest?.let { first ->
+        val allApps by viewModel.allApps.collectAsStateWithLifecycle()
+        SplitPartnerDialog(
+            first = first,
+            apps = allApps.filter { it.key != first.key },
+            onPick = { second, addToHome ->
+                dragController.splitRequest = null
+                if (addToHome) viewModel.addAppPairShortcut(first, second)
+                viewModel.launchSplit(first, second)
+            },
+            onDismiss = { dragController.splitRequest = null },
+        )
+    }
+
+    // "Change icon" was chosen for an app (from a menu on home, the dock or the drawer).
+    dragController.iconPickRequest?.let { app ->
+        val iconPacks by viewModel.iconPacks.collectAsStateWithLifecycle()
+        val customIcons by viewModel.customIcons.collectAsStateWithLifecycle()
+        IconPickerDialog(
+            app = app,
+            packs = iconPacks.map { it.packageName to it.label },
+            hasCustomIcon = app.key in customIcons,
+            loadNames = viewModel::iconPackDrawableNames,
+            loadIcon = viewModel::iconPackBitmap,
+            onPick = { pack, drawable ->
+                viewModel.setCustomIcon(app, pack, drawable)
+                dragController.iconPickRequest = null
+            },
+            onReset = {
+                viewModel.clearCustomIcon(app)
+                dragController.iconPickRequest = null
+            },
+            onDismiss = { dragController.iconPickRequest = null },
+        )
     }
 
     val menu = menuTarget
@@ -791,9 +991,33 @@ fun HomeScreen(
             // Flip the popup above the icon when it's in the lower half (e.g. dock or a bottom-row
             // icon), so it never runs off the bottom of the screen. Decided where the anchor is built.
             preferAbove = menu.preferAbove,
-            actions = listOf(
+            actions = listOfNotNull(
                 PopupAction(stringResource(R.string.app_info), LauncherIcons.Info) { AppActions.openAppInfo(context, menu.app) },
                 PopupAction(stringResource(R.string.rename), LauncherIcons.Edit) { renameTarget = menu.app },
+                PopupAction(stringResource(R.string.change_icon), LauncherIcons.SwapVert) {
+                    dragController.iconPickRequest = menu.app
+                },
+                if (settings.floatingLaunchEnabled) {
+                    PopupAction(stringResource(R.string.open_floating), LauncherIcons.OpenInNew) {
+                        viewModel.launchFloating(menu.app)
+                    }
+                } else {
+                    null
+                },
+                if (settings.floatingLaunchEnabled) {
+                    PopupAction(stringResource(R.string.add_floating_shortcut), LauncherIcons.Add) {
+                        viewModel.addFloatingShortcut(menu.app)
+                    }
+                } else {
+                    null
+                },
+                if (settings.splitLaunchEnabled) {
+                    PopupAction(stringResource(R.string.open_split), LauncherIcons.SwapHoriz) {
+                        dragController.splitRequest = menu.app
+                    }
+                } else {
+                    null
+                },
                 PopupAction(
                     stringResource(if (menu.source == DragSource.Dock) R.string.dock_remove else R.string.home_remove),
                     LauncherIcons.Close,
@@ -816,6 +1040,7 @@ fun HomeScreen(
             items = buildList {
                 if (!settings.desktopLocked) {
                     add(IconMenuItem(R.drawable.ic_widgets, stringResource(R.string.home_options_widgets)) {
+                        stackToAddTo = null
                         showWidgetPicker = true
                     })
                 }
@@ -832,19 +1057,6 @@ fun HomeScreen(
                 })
                 // Pages: the menu was opened on the page the pager is showing.
                 val page = dragController.currentPage.coerceIn(0, uiState.pageCount - 1)
-                fun showInsertedPage(at: Int) = when {
-                    at >= 0 -> { pageRequests.tryEmit(at); Unit }
-                    at == PAGE_FAILED -> widgetMessage(R.string.home_options_page_failed)
-                    else -> widgetMessage(R.string.home_options_page_limit)
-                }
-                if (!settings.desktopLocked) {
-                    add(IconMenuItem(R.drawable.ic_page_add_left, stringResource(R.string.home_options_page_left)) {
-                        widgetScope.launch { showInsertedPage(viewModel.insertPage(page)) }
-                    })
-                    add(IconMenuItem(R.drawable.ic_page_add_right, stringResource(R.string.home_options_page_right)) {
-                        widgetScope.launch { showInsertedPage(viewModel.insertPage(page + 1)) }
-                    })
-                }
                 if (page != uiState.homePage) {
                     add(IconMenuItem(R.drawable.ic_home_page, stringResource(R.string.home_options_set_home)) {
                         viewModel.setHomePage(page)
@@ -866,19 +1078,37 @@ fun HomeScreen(
         )
     }
 
-    if (showWidgetPicker) {
+    AnimatedVisibility(
+        visible = showWidgetPicker,
+        enter = fadeIn(animationSpec = tween(220)) + scaleIn(animationSpec = tween(220), initialScale = 0.94f),
+        exit = fadeOut(animationSpec = tween(180)) + scaleOut(animationSpec = tween(180), targetScale = 0.94f),
+    ) {
         CompositionLocalProvider(LocalTonalWidgets provides settings.widgetTonalBackground) {
-        WidgetPickerScreen(
-            dragController = widgetDrag,
-            columns = settings.homeColumns,
-            rows = settings.homeRows,
-            onPick = { choice, sx, sy ->
-                val target = widgetDrag.findSpace?.invoke(sx, sy)
-                if (target == null) widgetMessage(R.string.widget_no_space) else addWidget(choice, target)
-            },
-            onDismiss = { widgetDrag.cancel(); showWidgetPicker = false },
-            modifier = Modifier.fillMaxSize(),
-        )
+            WidgetPickerScreen(
+                dragController = widgetDrag,
+                columns = settings.homeColumns,
+                rows = settings.homeRows,
+                screenType = screenType,
+                settings = settings,
+                onPick = { choice, sx, sy ->
+                    val targetStack = stackToAddTo
+                    if (targetStack != null) {
+                        // The same bind → configure → save pipeline as a normal add (system bind
+                        // dialog, the widget's own setup screen, process death), ending in the stack.
+                        when (choice) {
+                            is WidgetChoice.App -> startBind(choice.provider, restoreRowId = null, stackId = targetStack)
+                            is WidgetChoice.Builtin -> viewModel.addBuiltinToStack(targetStack, choice.type)
+                        }
+                        stackToAddTo = null
+                        showWidgetPicker = false
+                    } else {
+                        val target = widgetDrag.findSpace?.invoke(sx, sy)
+                        if (target == null) widgetMessage(R.string.widget_no_space) else addWidget(choice, target)
+                    }
+                },
+                onDismiss = { widgetDrag.cancel(); showWidgetPicker = false; stackToAddTo = null },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 
@@ -906,6 +1136,8 @@ fun HomeScreen(
             badgeScale = badgeScale,
             glassBlurRadius = settings.glassBlurRadius,
             glassDarkTint = settings.glassDarkTint,
+            openAnimation = settings.folderOpenAnimation,
+            animationSpeed = settings.animationSpeed,
             onRename = { viewModel.renameFolder(openFolder.id, it) },
             onAppClick = { viewModel.launch(it) },
             onRemoveFromFolder = { viewModel.removeFromFolder(it, openFolder.id) },
@@ -950,6 +1182,8 @@ private fun Modifier.pixelHomeSwipe(
     rightEdgeEnabled: Boolean = false,
     atRightEdge: () -> Boolean = { false },
     onRightEdgeAction: () -> Unit = {},
+    iconSwipeEnabled: Boolean = false,
+    onIconSwipe: (AppItem, Offset) -> Unit = { _, _ -> },
 ): Modifier {
     val latestSwipeUpAction by rememberUpdatedState(swipeUpAction)
     val latestSwipeDownAction by rememberUpdatedState(swipeDownAction)
@@ -958,6 +1192,10 @@ private fun Modifier.pixelHomeSwipe(
     val latestOnAction by rememberUpdatedState(onAction)
     val latestOnLeftEdgeAction by rememberUpdatedState(onLeftEdgeAction)
     val latestOnRightEdgeAction by rememberUpdatedState(onRightEdgeAction)
+    val latestAtLeftEdge by rememberUpdatedState(atLeftEdge)
+    val latestAtRightEdge by rememberUpdatedState(atRightEdge)
+    val latestIconSwipeEnabled by rememberUpdatedState(iconSwipeEnabled)
+    val latestOnIconSwipe by rememberUpdatedState(onIconSwipe)
 
     return pointerInput(swipeUpAction, swipeDownAction, leftEdgeEnabled, rightEdgeEnabled, dragController) {
         val touchSlop = viewConfiguration.touchSlop
@@ -976,7 +1214,9 @@ private fun Modifier.pixelHomeSwipe(
             val velocityTracker = VelocityTracker()
             velocityTracker.addPosition(down.uptimeMillis, down.position)
             // 0 = undecided, 1 = drawer up-drag, 2 = left-edge action, 3 = notification shade, 4 = right-edge action
+            // 5 = swipe up that started on an app icon (see [iconSwipeEnabled]).
             var mode = 0
+            var swipedApp: AppItem? = null
             var lastY = down.position.y
 
             while (true) {
@@ -1002,6 +1242,12 @@ private fun Modifier.pixelHomeSwipe(
                         if (change.position.x - down.position.x > size.width * 0.25f) latestOnLeftEdgeAction()
                     } else if (mode == 4) {
                         if (down.position.x - change.position.x > size.width * 0.25f) latestOnRightEdgeAction()
+                    } else if (mode == 5) {
+                        val app = swipedApp
+                        // A deliberate flick, not a twitch: the finger has to travel a little way up.
+                        if (app != null && down.position.y - change.position.y > 40.dp.toPx()) {
+                            latestOnIconSwipe(app, down.position)
+                        }
                     }
                     break
                 }
@@ -1014,7 +1260,13 @@ private fun Modifier.pixelHomeSwipe(
                         abs(dy) > touchSlop && abs(dy) > abs(dx) -> when {
                             dy < 0f -> {
                                 val action = latestSwipeUpAction
-                                if ((action == LauncherSettings.GESTURE_DRAWER || action == LauncherSettings.GESTURE_SEARCH) &&
+                                val iconApp = if (latestIconSwipeEnabled) dragController.appAt?.invoke(down.position) else null
+                                if (iconApp != null) {
+                                    // The swipe started on an app icon that has its own swipe action.
+                                    swipedApp = iconApp
+                                    mode = 5
+                                    change.consume()
+                                } else if ((action == LauncherSettings.GESTURE_DRAWER || action == LauncherSettings.GESTURE_SEARCH) &&
                                     down.position.y > size.height * 0.15f
                                 ) {
                                     mode = 1
@@ -1041,10 +1293,10 @@ private fun Modifier.pixelHomeSwipe(
                         }
                         // Horizontal gesture.
                         abs(dx) > touchSlop && abs(dx) >= abs(dy) -> {
-                            if (leftEdgeEnabled && dx > 0f && atLeftEdge()) {
+                            if (leftEdgeEnabled && dx > 0f && latestAtLeftEdge()) {
                                 mode = 2
                                 change.consume()
-                            } else if (rightEdgeEnabled && dx < 0f && atRightEdge()) {
+                            } else if (rightEdgeEnabled && dx < 0f && latestAtRightEdge()) {
                                 mode = 4
                                 change.consume()
                             } else {
@@ -1075,6 +1327,8 @@ private data class PendingWidgetBind(
     val provider: AppWidgetProviderInfo,
     val restoreRowId: Long?,
     val placement: WidgetPlacement? = null,
+    /** Non-null = the new widget goes into this widget stack rather than onto a grid [placement]. */
+    val stackId: Long? = null,
 )
 
 /** Bundles [PendingWidgetBind] into saved instance state so an in-flight bind survives process death
@@ -1086,6 +1340,7 @@ private val PendingWidgetBindSaver = Saver<PendingWidgetBind?, android.os.Bundle
                 putInt("id", it.appWidgetId)
                 putParcelable("provider", it.provider)
                 putLong("row", it.restoreRowId ?: -1L)
+                putLong("stack", it.stackId ?: -1L)
                 it.placement?.let { p ->
                     putIntArray("placement", intArrayOf(p.page, p.cellX, p.cellY, p.spanX, p.spanY))
                 }
@@ -1099,7 +1354,8 @@ private val PendingWidgetBindSaver = Saver<PendingWidgetBind?, android.os.Bundle
             PendingWidgetBind(b.getInt("id"), it, b.getLong("row").takeIf { row -> row >= 0 },
                 b.getIntArray("placement")?.takeIf { p -> p.size == 5 }?.let { p ->
                     WidgetPlacement(p[0], p[1], p[2], p[3], p[4])
-                })
+                },
+                b.getLong("stack", -1L).takeIf { stack -> stack >= 0 })
         }
     },
 )
@@ -1113,3 +1369,19 @@ private data class AppMenuTarget(
 )
 
 /** The long-press menu is the shared [org.arkikeskus.launcher.ui.AppActionPopup] (core/ui). */
+
+/**
+ * Runs the parallax sensor while home is in front, not covered and not in battery saver, and hands
+ * its offset (one [State] for the screen's lifetime) to [out] for the home layer to read.
+ */
+@Composable
+private fun HomeParallax(enabledSetting: Boolean, out: MutableState<State<Offset>?>) {
+    var homeResumed by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        homeResumed = true
+        onPauseOrDispose { homeResumed = false }
+    }
+    val active = enabledSetting && homeResumed && !LocalBatterySaver.current && !LocalHomeCovered.current
+    val offset = rememberParallaxOffset(enabled = active)
+    SideEffect { if (out.value !== offset) out.value = offset }
+}

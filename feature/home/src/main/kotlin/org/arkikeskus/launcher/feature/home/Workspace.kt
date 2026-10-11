@@ -25,14 +25,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.SideEffect
@@ -57,7 +67,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -84,9 +93,11 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.arkikeskus.launcher.model.WidgetPlacement
@@ -100,7 +111,11 @@ import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.ui.DragSource
 import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.LauncherIcons
+import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalBatterySaver
+import org.arkikeskus.launcher.ui.component.LocalHomeCovered
+import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.AppLabel
 import org.arkikeskus.launcher.ui.component.aquamorphicTouch
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
@@ -136,7 +151,7 @@ fun Workspace(
     columns: Int,
     rows: Int,
     entries: List<HomeEntry>,
-    badges: Map<String, Int>,
+    badges: BadgeCounts,
     badgeShowCount: Boolean,
     badgeScale: Float,
     showLabels: Boolean,
@@ -147,6 +162,12 @@ fun Workspace(
     locked: Boolean,
     isDualPage: Boolean = false,
     pageBounceEnabled: Boolean = true,
+    /** Swipe effect of the pages (LauncherSettings.PAGE_EFFECT_*) and the animation speed multiplier. */
+    pageScrollEffect: String = LauncherSettings.PAGE_EFFECT_SLIDE,
+    /** Whether a drag past the last page may open a new one (never in the book layout). */
+    allowNewPage: Boolean = false,
+    animationSpeed: Float = 1f,
+    onWidgetLookChange: (rowId: Long, look: WidgetLook?) -> Unit = { _, _ -> },
     homeSignals: Flow<Boolean>,
     /** The page HOME returns to and the launcher opens on; null until settings have been read. */
     homePage: Int? = null,
@@ -162,10 +183,16 @@ fun Workspace(
     onMoveToDock: (AppItem, Int) -> Unit,
     onRemoveFromHome: (AppItem) -> Unit,
     onOpenFolder: (PlacedFolder) -> Unit,
+    // A plain tap on a folder. Opens it by default; the host may launch its first app instead
+    // (Settings ▸ Folders), in which case a still long-press is what opens the folder.
+    onFolderTap: (PlacedFolder) -> Unit = onOpenFolder,
     onLaunchShortcut: (PlacedShortcut) -> Unit,
     onRemoveShortcut: (Long) -> Unit,
     onCreateFolder: (target: AppItem, dropped: AppItem) -> Unit,
     onAddToFolder: (app: AppItem, folderId: Long) -> Unit,
+    onCreateWidgetStack: (targetRowId: Long, droppedRowId: Long) -> Unit = { _, _ -> },
+    onAddToWidgetStack: (stackId: Long, widgetRowId: Long) -> Unit = { _, _ -> },
+    onRemoveFromWidgetStack: (stackId: Long, itemRowId: Long) -> Unit = { _, _ -> },
     onEmptyAreaMenu: (IntOffset, Boolean) -> Unit,
     // Two clean taps on empty space within the platform double-tap timeout. The caller decides what
     // (if anything) happens — Workspace only reports the gesture.
@@ -194,8 +221,17 @@ fun Workspace(
     var gridSize by remember { mutableStateOf(IntSize.Zero) }
     var dragging by remember { mutableStateOf<PlacedApp?>(null) }
     var dragPos by remember { mutableStateOf(Offset.Zero) }
-    var dragDistance by remember { mutableStateOf(0f) }
     var editingWidget by remember { mutableStateOf<EditingItem?>(null) }
+    // The widget whose "Widget style" dialog is open (row id), and every saved look.
+    var lookEditing by remember { mutableStateOf<Long?>(null) }
+    val widgetLooks = LocalWidgetLooks.current
+    lookEditing?.let { id ->
+        WidgetLookDialog(
+            look = widgetLooks[id] ?: WidgetLook(),
+            onChange = { onWidgetLookChange(id, it) },
+            onDismiss = { lookEditing = null },
+        )
+    }
     // While the edit frame is open, the root swipe-up detector must yield (it bails on localGestureActive),
     // so a handle/scrim drag can never open the drawer. Reset when the frame closes.
     LaunchedEffect(editingWidget, widgetDragController.active) {
@@ -217,7 +253,23 @@ fun Workspace(
     // forced a pager relayout exactly as the drag began, making pickup stutter and miss moves. The
     // trailing page is hidden from the dots and the workspace snaps back off it when not dragging,
     // so it reads as a single page until an icon actually lands there.
-    val pagerState = rememberPagerState(initialPage = (homePage ?: 0).coerceIn(0, pageCount), pageCount = { pageCount + 1 })
+    // The spare page exists only where it is wanted: with "new page when dragging" on, or in the book
+    // layout as the blank right half of an odd last page. [lastPage] is the highest pager page;
+    // [lastLeftPage] the highest page the pager may rest on (book layout: the left page of a pair).
+    val sparePages = when {
+        isDualPage -> pageCount % 2
+        allowNewPage -> 1
+        else -> 0
+    }
+    val lastPage = (pageCount + sparePages - 1).coerceAtLeast(0)
+    val lastLeftPage = if (isDualPage) (lastPage / 2) * 2 else lastPage
+    fun restPage(page: Int): Int = (if (isDualPage) page - page % 2 else page).coerceIn(0, lastLeftPage)
+    val pagerState = rememberPagerState(initialPage = restPage(homePage ?: 0), pageCount = { lastPage + 1 })
+    /** The page a step forward (+1) or back (-1) lands on; the book layout turns two pages at once. */
+    fun stepPage(direction: Int): Int =
+        (pagerState.currentPage + direction * (if (isDualPage) 2 else 1)).coerceIn(0, lastLeftPage)
+    // For the long-lived swipe detector, which must see the page count of the latest composition.
+    val currentStepPage by rememberUpdatedState(::stepPage)
     // Settings arrive a beat after the first frame: open on the home page once they are known.
     // Saved across recreation so a restored pager (rotation, locale change, process death) keeps
     // the page the user was on. Later home-page changes never move the pager — the page menu's
@@ -227,7 +279,7 @@ fun Workspace(
         val target = homePage ?: return@LaunchedEffect
         if (openedOnHome) return@LaunchedEffect
         openedOnHome = true
-        if (pagerState.currentPage != target) pagerState.scrollToPage(target.coerceIn(0, pageCount))
+        if (pagerState.currentPage != restPage(target)) pagerState.scrollToPage(restPage(target))
     }
     // The pager's own count is the live bound: this collector never restarts, so the pageCount
     // parameter it closed over would be the first composition's.
@@ -236,6 +288,8 @@ fun Workspace(
     }
     // The cell the dragged icon would drop into — shown as a placeholder while dragging.
     var targetCell by remember { mutableStateOf<IntOffset?>(null) }
+    // The page [targetCell] is on (with two pages side by side it is not always the current one).
+    var targetCellPage by remember { mutableIntStateOf(0) }
 
     val placedApps = remember(entries) { entries.filterIsInstance<PlacedApp>() }
     val folders = remember(entries) { entries.filterIsInstance<PlacedFolder>() }
@@ -245,6 +299,7 @@ fun Workspace(
     // transient until the user binds (→ PlacedWidget) or removes them.
     val pendingWidgets = remember(entries) { entries.filterIsInstance<PendingWidget>() }
     val builtins = remember(entries) { entries.filterIsInstance<PlacedBuiltin>() }
+    val stacks = remember(entries) { entries.filterIsInstance<PlacedWidgetStack>() }
     val effectiveWidgets = remember(placedWidgets, widgetOptimistic) {
         val opt = widgetOptimistic
         if (opt == null) placedWidgets else placedWidgets.map { w ->
@@ -263,14 +318,24 @@ fun Workspace(
             } else s
         }
     }
+    val effectiveStacks = remember(stacks, widgetOptimistic) {
+        val opt = widgetOptimistic
+        if (opt == null) stacks else stacks.map { s ->
+            if (s.rowId == opt.first) {
+                s.copy(page = opt.second.page, cellX = opt.second.cellX, cellY = opt.second.cellY,
+                    spanX = opt.second.spanX, spanY = opt.second.spanY)
+            } else s
+        }
+    }
     // clear the optimistic override once the DB flow reports the widget at its new bounds. Keyed on
     // the override too: a drop (or resize) back onto the SAME bounds writes nothing, so the flow never
     // emits and the override used to stay forever — pinning the widget to that cell on screen even
     // after a later add pushed its row elsewhere.
-    LaunchedEffect(placedWidgets, builtins, widgetOptimistic) {
+    LaunchedEffect(placedWidgets, builtins, stacks, widgetOptimistic) {
         val opt = widgetOptimistic ?: return@LaunchedEffect
         val landed = (placedWidgets.map { it.rowId to WidgetBounds(it.page, it.cellX, it.cellY, it.spanX, it.spanY) } +
-            builtins.map { it.rowId to WidgetBounds(it.page, it.cellX, it.cellY, it.spanX, it.spanY) })
+            builtins.map { it.rowId to WidgetBounds(it.page, it.cellX, it.cellY, it.spanX, it.spanY) } +
+            stacks.map { it.rowId to WidgetBounds(it.page, it.cellX, it.cellY, it.spanX, it.spanY) })
             .any { it == opt }
         if (landed) widgetOptimistic = null
     }
@@ -324,9 +389,10 @@ fun Workspace(
             if (s.rowId == opt.first) s.copy(page = opt.second.first, cellX = opt.second.second, cellY = opt.second.third) else s
         }
     }
-    // Apps + folders + pinned shortcuts together — what's actually on the grid (rendering + occupants).
-    val effectiveEntries: List<HomeEntry> = remember(effectiveApps, effectiveFolders, effectiveShortcuts, effectiveWidgets, pendingWidgets, effectiveBuiltins) {
-        effectiveApps + effectiveFolders + effectiveShortcuts + effectiveWidgets + pendingWidgets + effectiveBuiltins
+    // Apps + folders + pinned shortcuts + widgets + widget stacks together — what's actually on the
+    // grid (rendering + occupants). An entry type missing here is never drawn and never blocks a cell.
+    val effectiveEntries: List<HomeEntry> = remember(effectiveApps, effectiveFolders, effectiveShortcuts, effectiveWidgets, pendingWidgets, effectiveBuiltins, effectiveStacks) {
+        effectiveApps + effectiveFolders + effectiveShortcuts + effectiveWidgets + pendingWidgets + effectiveBuiltins + effectiveStacks
     }
     // The drag gesture's pointerInput block outlives recomposition (its keys don't include the entry
     // list), so it must read the *latest* placements through this state, not a stale closure capture.
@@ -337,8 +403,20 @@ fun Workspace(
     val currentEmptyAreaMenu by rememberUpdatedState(onEmptyAreaMenu)
     val currentEmptyAreaDoubleTap by rememberUpdatedState(onEmptyAreaDoubleTap)
     val currentWidgetDrag by rememberUpdatedState(widgetDragController)
+    val currentFolderTap by rememberUpdatedState(onFolderTap)
+    val currentOpenFolder by rememberUpdatedState(onOpenFolder)
+    val currentLaunchShortcut by rememberUpdatedState(onLaunchShortcut)
+    val currentRemoveShortcut by rememberUpdatedState(onRemoveShortcut)
 
-    val cellW = if (columns > 0 && gridSize.width > 0) gridSize.width.toFloat() / columns else 1f
+    // Book layout (inner display): the pager shows two half-width pages side by side, so a page is
+    // half the grid wide and a point in the right half belongs to the page after the current one.
+    // "Grid x" below is measured from the left edge of the whole pager.
+    fun pageWidthPx(): Float = if (isDualPage) gridSize.width / 2f else gridSize.width.toFloat()
+    fun pageAtX(gridX: Float): Int =
+        if (isDualPage && gridX >= pageWidthPx()) (pagerState.currentPage + 1).coerceAtMost(lastPage) else pagerState.currentPage
+    fun xInPage(gridX: Float): Float = if (isDualPage && gridX >= pageWidthPx()) gridX - pageWidthPx() else gridX
+    fun pageLeft(page: Int): Float = if (isDualPage) (page - pagerState.currentPage) * pageWidthPx() else 0f
+    val cellW = if (columns > 0 && gridSize.width > 0) pageWidthPx() / columns else 1f
     val cellH = if (rows > 0 && gridSize.height > 0) gridSize.height.toFloat() / rows else 1f
     // Icon/folder/shortcut size derived from the cell so 6–7 columns fit a narrow screen (a fixed
     // 52dp icon bled into neighbouring cells there) AND so a whole label line fits under it in a
@@ -349,10 +427,12 @@ fun Workspace(
         fontFactor = labelFontFactor(density.fontScale),
         lines = LocalAppLabelLines.current,
     )
+    // The user's icon-size multiplier scales the preferred size; the cell still has the last word.
+    val preferredIconSize = 52.dp * LocalIconSizeScale.current
     val cellIconSize = if (gridSize.width > 0 && gridSize.height > 0) {
-        iconSizeForCell(with(density) { cellW.toDp() }, 52.dp, with(density) { cellH.toDp() }, labelBlock)
+        iconSizeForCell(with(density) { cellW.toDp() }, preferredIconSize, with(density) { cellH.toDp() }, labelBlock)
     } else {
-        52.dp
+        preferredIconSize
     }
     // Page flips only when the dragged icon is pushed right against the screen edge.
     val edgePx = with(density) { 20.dp.toPx() }
@@ -366,12 +446,14 @@ fun Workspace(
                 is PlacedWidget -> e.spanX to e.spanY
                 is PendingWidget -> e.spanX to e.spanY
                 is PlacedBuiltin -> e.spanX to e.spanY
+                is PlacedWidgetStack -> e.spanX to e.spanY
                 else -> 1 to 1
             }
             val erow = when (e) {
                 is PlacedWidget -> e.rowId
                 is PendingWidget -> e.rowId
                 is PlacedBuiltin -> e.rowId
+                is PlacedWidgetStack -> e.rowId
                 else -> -2L
             }
             if (erow == excludeRowId) continue
@@ -381,18 +463,54 @@ fun Workspace(
         return true
     }
 
+    val dropTargetCache = remember { DropTargetCache() }
+
     fun canPlaceWidget(p: WidgetPlacement, rowId: Long = Long.MIN_VALUE): Boolean =
         ReorderPlanner.planFit(latestEntries.widgetRects(), rowId, p.page, p.cellX, p.cellY,
             p.spanX, p.spanY, columns, rows) != null
 
+    /**
+     * The widget (or stack) that the dragged widget [draggedRowId] would be stacked onto if dropped at
+     * [p]: the one it covers most, provided it covers MORE than half of the smaller of the two
+     * footprints. A lighter overlap stays an ordinary move that pushes the neighbour aside, so
+     * nudging a widget next to another one never stacks them by accident.
+     */
+    fun stackTargetFor(draggedRowId: Long, p: WidgetPlacement): HomeEntry? {
+        var best: HomeEntry? = null
+        var bestOverlap = 0
+        for (e in latestEntries) {
+            if (e.page != p.page) continue
+            val footprint = when (e) {
+                is PlacedWidget -> Triple(e.rowId, e.spanX, e.spanY)
+                is PlacedBuiltin -> Triple(e.rowId, e.spanX, e.spanY)
+                is PlacedWidgetStack -> Triple(e.rowId, e.spanX, e.spanY)
+                else -> null
+            } ?: continue
+            val (rowId, sx, sy) = footprint
+            if (rowId == draggedRowId) continue
+            val overlapX = minOf(e.cellX + sx, p.cellX + p.spanX) - maxOf(e.cellX, p.cellX)
+            val overlapY = minOf(e.cellY + sy, p.cellY + p.spanY) - maxOf(e.cellY, p.cellY)
+            if (overlapX <= 0 || overlapY <= 0) continue
+            val overlap = overlapX * overlapY
+            if (overlap * 2 > minOf(sx * sy, p.spanX * p.spanY) && overlap > bestOverlap) {
+                best = e
+                bestOverlap = overlap
+            }
+        }
+        return best
+    }
+
     fun liftWidget(item: EditingItem, root: Offset, fraction: Offset, owner: Any) {
         // A second finger on another widget: the first drag keeps the controller (no snapshot, no buzz).
         if (widgetDragController.active != null) return
-        val bitmap = item.appWidgetId?.let { id ->
+        // A stack has no content of its own: its drag preview is the first widget in it.
+        val stackFront = stacks.firstOrNull { it.rowId == item.rowId }?.items?.firstOrNull()
+        val previewWidgetId = item.appWidgetId ?: (stackFront as? PlacedWidget)?.appWidgetId
+        val bitmap = previewWidgetId?.let { id ->
             widgetViews[id]?.let { view -> runCatching { view.drawToBitmap() }.getOrNull() }
         }
-        val builtin = builtins.firstOrNull { it.rowId == item.rowId }
-        val choice = builtin?.let { WidgetChoice.Builtin(it.type) } ?: item.appWidgetId?.let { id ->
+        val builtin = builtins.firstOrNull { it.rowId == item.rowId } ?: (stackFront as? PlacedBuiltin)
+        val choice = builtin?.let { WidgetChoice.Builtin(it.type) } ?: previewWidgetId?.let { id ->
             runCatching { AppWidgetManager.getInstance(context).getAppWidgetInfo(id) }.getOrNull()
                 ?.let { WidgetChoice.App(it) }
         }
@@ -410,14 +528,30 @@ fun Workspace(
             val drag = widgetDragController.active
             if (drag == null || locked || pagerState.isScrollInProgress) null else {
                 val pos = widgetDragController.position - dragController.gridBounds.topLeft
-                widgetDropPlacement(pagerState.currentPage, pos.x, pos.y,
-                    gridSize.width.toFloat(), gridSize.height.toFloat(), columns, rows,
+                val raw = widgetDropPlacement(pageAtX(pos.x), xInPage(pos.x), pos.y,
+                    pageWidthPx(), gridSize.height.toFloat(), columns, rows,
                     drag.spanX, drag.spanY, drag.grabFraction.x, drag.grabFraction.y
-                )?.takeIf { canPlaceWidget(it, drag.item?.rowId ?: Long.MIN_VALUE) }
+                )
+                val rowId = drag.item?.rowId
+                // This runs for every frame of a drag, but the answer only changes when the finger
+                // crosses into another cell (or the layout changes): the stack check and the
+                // push-aside plan are worked out once per cell, not once per frame.
+                val cache = dropTargetCache
+                if (raw != cache.placement || rowId != cache.rowId || latestEntries !== cache.entries) {
+                    cache.placement = raw
+                    cache.rowId = rowId
+                    cache.entries = latestEntries
+                    cache.valid = raw != null && (
+                        // Dropping onto another widget stacks the two, which needs no free cells at all.
+                        (rowId != null && stackTargetFor(rowId, raw) != null) ||
+                            canPlaceWidget(raw, rowId ?: Long.MIN_VALUE)
+                        )
+                }
+                raw?.takeIf { cache.valid }
             }
         }
         widgetDragController.findSpace = { sx, sy ->
-            val pages = listOf(pagerState.currentPage) + (0..pageCount).filter { it != pagerState.currentPage }
+            val pages = listOf(pagerState.currentPage) + (0..lastPage).filter { it != pagerState.currentPage }
             pages.firstNotNullOfOrNull { page ->
                 val candidates = (0..(rows - sy)).flatMap { y ->
                     (0..(columns - sx)).map { x -> WidgetPlacement(page, x, y, sx, sy) }
@@ -427,6 +561,15 @@ fun Workspace(
             }
         }
         widgetDragController.keepsGestureLock = { editingWidget != null }
+        // For the swipe-up-on-an-icon gesture: the app whose cell is under a root position.
+        dragController.appAt = { p ->
+            if (!dragController.isOverGrid(p)) null else {
+                val (page, cellX, cellY) = dragController.cellAt(p)
+                latestEntries.firstNotNullOfOrNull { e ->
+                    (e as? PlacedApp)?.takeIf { it.page == page && it.cellX == cellX && it.cellY == cellY }?.app
+                }
+            }
+        }
         widgetDragController.onStill = { drag ->
             drag.item?.let { editingWidget = it }
         }
@@ -437,14 +580,31 @@ fun Workspace(
                 editingWidget = null
             } else if (!locked && target != null) {
                 if (item != null) {
-                    editingWidget = null
-                    widgetOptimistic = item.rowId to WidgetBounds(target.page, target.cellX, target.cellY, target.spanX, target.spanY)
-                    scope.launch {
-                        if (onSetWidgetBounds(item.rowId, target.page, target.cellX, target.cellY, target.spanX, target.spanY)) {
-                            editingWidget = item.copy(page = target.page, cellX = target.cellX, cellY = target.cellY,
-                                spanX = target.spanX, spanY = target.spanY)
-                        } else {
-                            widgetOptimistic = null
+                    val occupant = stackTargetFor(item.rowId, target)
+                    when (occupant) {
+                        is PlacedWidget -> {
+                            editingWidget = null
+                            onCreateWidgetStack(occupant.rowId, item.rowId)
+                        }
+                        is PlacedBuiltin -> {
+                            editingWidget = null
+                            onCreateWidgetStack(occupant.rowId, item.rowId)
+                        }
+                        is PlacedWidgetStack -> {
+                            editingWidget = null
+                            onAddToWidgetStack(occupant.rowId, item.rowId)
+                        }
+                        else -> {
+                            editingWidget = null
+                            widgetOptimistic = item.rowId to WidgetBounds(target.page, target.cellX, target.cellY, target.spanX, target.spanY)
+                            scope.launch {
+                                if (onSetWidgetBounds(item.rowId, target.page, target.cellX, target.cellY, target.spanX, target.spanY)) {
+                                    editingWidget = item.copy(page = target.page, cellX = target.cellX, cellY = target.cellY,
+                                        spanX = target.spanX, spanY = target.spanY)
+                                } else {
+                                    widgetOptimistic = null
+                                }
+                            }
                         }
                     }
                 } else {
@@ -461,6 +621,7 @@ fun Workspace(
             widgetDragController.onDrop = null
             widgetDragController.onStill = null
             widgetDragController.keepsGestureLock = { false }
+            dragController.appAt = null
         }
     }
     LaunchedEffect(widgetDragController.active, widgetDragController.moving, pageCount) {
@@ -477,7 +638,7 @@ fun Workspace(
             if (direction == 0) return@collectLatest
             while (widgetDragController.moving) {
                 delay(550)
-                val next = (pagerState.currentPage + direction).coerceIn(0, pageCount)
+                val next = stepPage(direction)
                 if (next == pagerState.currentPage) break
                 pagerState.animateScrollToPage(next)
             }
@@ -494,7 +655,7 @@ fun Workspace(
         onTap: () -> Unit,
         onStillPress: () -> Unit,
         onRemove: () -> Unit,
-    ): Modifier = this.pointerInput(rowId, entry.page, entry.cellX, entry.cellY, cellW, cellH, columns, rows, pageCount, locked) {
+    ): Modifier = this.pointerInput(entry, rowId, cellW, cellH, columns, rows, pageCount, lastPage, isDualPage, locked) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             down.consume()
@@ -521,7 +682,7 @@ fun Workspace(
             // Claim the gesture for this local entry so the root swipe-up detector (which runs in the
             // Initial pass, before us) won't steal the first movement after this long-press.
             dragController.localGestureActive = true
-            localDragPos = Offset(entry.cellX * cellW + down.position.x, entry.cellY * cellH + down.position.y)
+            localDragPos = Offset(pageLeft(entry.page) + entry.cellX * cellW + down.position.x, entry.cellY * cellH + down.position.y)
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             try {
                 val completed = drag(down.id) { change ->
@@ -535,16 +696,17 @@ fun Workspace(
                     // Publish root coords so the remove zone can highlight + hit-test this local drag.
                     if (removable) dragController.update(dragController.gridBounds.topLeft + localDragPos)
                     if (!pagerState.isScrollInProgress) {
-                        if (localDragPos.x > gridSize.width - edgePx && pagerState.currentPage < pageCount) {
-                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                        if (localDragPos.x > gridSize.width - edgePx && stepPage(1) != pagerState.currentPage) {
+                            scope.launch { pagerState.animateScrollToPage(stepPage(1)) }
                         } else if (localDragPos.x < edgePx && pagerState.currentPage > 0) {
-                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                            scope.launch { pagerState.animateScrollToPage(stepPage(-1)) }
                         }
                     }
-                    val cx = (localDragPos.x / cellW).toInt().coerceIn(0, columns - 1)
+                    val cx = (xInPage(localDragPos.x) / cellW).toInt().coerceIn(0, columns - 1)
                     val cy = (localDragPos.y / cellH).toInt().coerceIn(0, rows - 1)
                     val nc = IntOffset(cx, cy)
                     if (nc != targetCell) targetCell = nc
+                    targetCellPage = pageAtX(localDragPos.x)
                 }
                 targetCell = null
                 val rootPos = dragController.gridBounds.topLeft + localDragPos
@@ -552,9 +714,9 @@ fun Workspace(
                     onRemove()
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 } else if (completed && localMoving) {
-                    val tx = (localDragPos.x / cellW).toInt().coerceIn(0, columns - 1)
+                    val tx = (xInPage(localDragPos.x) / cellW).toInt().coerceIn(0, columns - 1)
                     val ty = (localDragPos.y / cellH).toInt().coerceIn(0, rows - 1)
-                    val targetPage = pagerState.currentPage
+                    val targetPage = pageAtX(localDragPos.x)
                     if (targetPage != entry.page || tx != entry.cellX || ty != entry.cellY) {
                         localOptimistic = rowId to Triple(targetPage, tx, ty)
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -585,57 +747,73 @@ fun Workspace(
     // when HOME was pressed while the launcher was already foreground (alreadyOnHome). Coming home
     // from an app keeps the page the app was launched from — the Pixel Launcher convention.
     val homeIndex = homePage ?: 0
-    LaunchedEffect(homeSignals, pageCount, homeIndex) {
+    LaunchedEffect(homeSignals, pageCount, homeIndex, isDualPage) {
+        // Book layout: "home" is the pair that holds the home page.
+        val homeRest = if (isDualPage) homeIndex - homeIndex % 2 else homeIndex
         homeSignals.collect { alreadyOnHome ->
             widgetDragController.cancel()
             editingWidget = null
-            if (alreadyOnHome && pagerState.currentPage != homeIndex) pagerState.animateScrollToPage(homeIndex)
+            if (alreadyOnHome && pagerState.currentPage != homeRest) pagerState.animateScrollToPage(homeRest)
         }
     }
 
     // Only retreat from the temporary trailing page. Pages explicitly added from the menu are
     // permanent even when empty, including pages beyond the last icon or widget.
-    val settledPage = pagerState.settledPage
     // A drawer/dock→home drag flips to an empty page ON PURPOSE so the app can be dropped there; the
     // retreat must yield to it (otherwise the page snaps back to the front under the finger — the
     // "it won't stay on the other page" bug). The in-home icon/local drags are already covered by
     // dragging/draggingLocal.
     val crossSurfaceDrag = dragController.moving &&
         (dragController.source == DragSource.Drawer || dragController.source == DragSource.Dock)
-    LaunchedEffect(settledPage, pageCount, dragging, draggingLocal, crossSurfaceDrag, widgetDragController.active) {
-        if (dragging != null || draggingLocal != null || crossSurfaceDrag || widgetDragController.active != null || settledPage < pageCount) return@LaunchedEffect
-        // After a cross-surface drag ends, the dropped app reaches this page via the DB flow a beat
-        // later — wait briefly before deciding the page is empty, so a valid drop isn't undone.
-        // A page-count change cancels this wait: the trailing page may have become permanent.
-        if (latestEntries.none { it.page == settledPage }) kotlinx.coroutines.delay(180)
-        if (dragging == null && draggingLocal == null && widgetDragController.active == null) {
-            val target = emptyPageReturnTarget(
-                settledPage = settledPage,
-                permanentPageCount = pageCount,
-                hasContent = latestEntries.any { it.page == settledPage },
-            )
-            if (target != null) pagerState.animateScrollToPage(target)
+    // The settled page is followed inside the effects (not read here), so a page swipe doesn't
+    // recompose the whole workspace.
+    LaunchedEffect(pageCount, dragging, draggingLocal, crossSurfaceDrag, widgetDragController.active) {
+        if (dragging != null || draggingLocal != null || crossSurfaceDrag || widgetDragController.active != null) return@LaunchedEffect
+        snapshotFlow { pagerState.settledPage }.collectLatest { settledPage ->
+            if (settledPage < pageCount) return@collectLatest
+            // After a cross-surface drag ends, the dropped app reaches this page via the DB flow a beat
+            // later — wait briefly before deciding the page is empty, so a valid drop isn't undone.
+            // A page-count change cancels this wait: the trailing page may have become permanent.
+            if (latestEntries.none { it.page == settledPage }) kotlinx.coroutines.delay(180)
+            if (dragging == null && draggingLocal == null && widgetDragController.active == null) {
+                val target = emptyPageReturnTarget(
+                    settledPage = settledPage,
+                    permanentPageCount = pageCount,
+                    hasContent = latestEntries.any { it.page == settledPage },
+                )
+                if (target != null) pagerState.animateScrollToPage(target)
+            }
         }
     }
 
+    // Book layout: whatever moved the pager (home button, a drag, a page request), it comes to rest
+    // on the left page of a pair.
+    LaunchedEffect(isDualPage, pageCount, dragging, draggingLocal, crossSurfaceDrag, widgetDragController.active) {
+        if (!isDualPage || dragging != null || draggingLocal != null || crossSurfaceDrag || widgetDragController.active != null) return@LaunchedEffect
+        snapshotFlow { pagerState.settledPage }.collectLatest { settledPage ->
+            // Pages turn in pairs (1|2, 3|4 …): never rest on 2|3.
+            val rest = (settledPage - settledPage % 2).coerceIn(0, lastLeftPage)
+            if (settledPage != rest) pagerState.animateScrollToPage(rest)
+        }
+    }
     // Publish the grid metrics so a dock→home drop can map the finger's root position to a cell.
     LaunchedEffect(columns, rows, isDualPage) {
         dragController.columns = columns
         dragController.rows = rows
         dragController.isDualPage = isDualPage
     }
-    LaunchedEffect(pagerState, pageCount, isDualPage) {
+    LaunchedEffect(pagerState, pageCount, isDualPage, lastPage) {
         // Allow the always-present trailing page (index == pageCount) so a drawer/dock drop can land on
         // a BRAND-NEW page. Clamping to pageCount-1 made cellAt() report the last existing page, so an
         // app dragged from the drawer onto a new page always saved to the front page instead.
         snapshotFlow { pagerState.currentPage }
-            .collect { dragController.currentPage = if (isDualPage) it * 2 else it.coerceIn(0, pageCount) }
+            .collect { dragController.currentPage = it.coerceIn(0, lastPage) }
     }
     // Cross-page flip for a drawer→home / dock→home drag. The in-home icon and folder/shortcut drags
     // run their own edge-flip (they own grid-local coords); a drawer/dock drag is owned by another
     // surface and only feeds the controller a root position, so Workspace watches it here and advances
     // the pager at the screen edges — letting an app be dropped straight onto any page.
-    LaunchedEffect(pagerState, pageCount) {
+    LaunchedEffect(pagerState, pageCount, isDualPage, lastPage) {
         snapshotFlow {
             if (dragController.moving &&
                 (dragController.source == DragSource.Drawer || dragController.source == DragSource.Dock)
@@ -647,10 +825,10 @@ fun Workspace(
         }.collect { pos ->
             if (pos == null || pagerState.isScrollInProgress) return@collect
             val localX = pos.x - dragController.gridBounds.left
-            if (localX > gridSize.width - edgePx && pagerState.currentPage < pageCount) {
-                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+            if (localX > gridSize.width - edgePx && stepPage(1) != pagerState.currentPage) {
+                pagerState.animateScrollToPage(stepPage(1))
             } else if (localX < edgePx && pagerState.currentPage > 0) {
-                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                pagerState.animateScrollToPage(stepPage(-1))
             }
         }
     }
@@ -688,7 +866,7 @@ fun Workspace(
         Column(modifier = Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = dragging == null && draggingLocal == null && editingWidget == null && widgetDragController.active == null,
+                userScrollEnabled = !isDualPage && dragging == null && draggingLocal == null && editingWidget == null && widgetDragController.active == null,
                 // While dragging, keep every page composed so flipping to another page can't
                 // dispose the dragged item's node (which would cancel the in-progress drag). Also kept
                 // composed during a drawer/dock→home drag so its target page renders as pages flip.
@@ -697,24 +875,66 @@ fun Workspace(
                     (dragController.moving &&
                         (dragController.source == DragSource.Drawer || dragController.source == DragSource.Dock))
                 ) pageCount.coerceAtLeast(0) else 0,
+                pageSize = if (isDualPage) HalfPageSize else PageSize.Fill,
+                // The settle after a swipe follows the animation speed setting.
+                flingBehavior = PagerDefaults.flingBehavior(
+                    state = pagerState,
+                    snapAnimationSpec = spring(
+                        stiffness = Spring.StiffnessMediumLow * animationSpeed * animationSpeed,
+                        visibilityThreshold = 1f,
+                    ),
+                ),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .graphicsLayer {
-                        compositingStrategy = CompositingStrategy.Offscreen
                         translationX = animatedOverscrollPx
                     }
                     .onSizeChanged { gridSize = it }
-                    .onGloballyPositioned { dragController.gridBounds = it.boundsInRoot() },
+                    .onGloballyPositioned { dragController.gridBounds = it.boundsInRoot() }
+                    // Book layout: a sideways swipe turns both pages at once. It is watched on the
+                    // way down to the pages and left alone while anything is being dragged.
+                    .pointerInput(isDualPage) {
+                        if (!isDualPage) return@pointerInput
+                        val slop = viewConfiguration.touchSlop
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            var total = Offset.Zero
+                            var claimed = false
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) break
+                                total += change.positionChange()
+                                val busy = dragging != null || draggingLocal != null || editingWidget != null ||
+                                    widgetDragController.active != null || dragController.moving || dragController.localGestureActive
+                                if (busy) { claimed = false; break }
+                                if (!claimed && abs(total.x) > slop && abs(total.x) > abs(total.y)) claimed = true
+                                if (claimed) change.consume()
+                            }
+                            if (claimed && abs(total.x) > slop * 2f && !pagerState.isScrollInProgress) {
+                                val target = currentStepPage(if (total.x < 0f) 1 else -1)
+                                if (target != pagerState.currentPage) scope.launch { pagerState.animateScrollToPage(target) }
+                            }
+                        }
+                    },
             ) { page ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .graphicsLayer {
+                            // Two pages are on screen at once in the book layout, so no per-page effect there.
+                            if (!isDualPage && pageScrollEffect != LauncherSettings.PAGE_EFFECT_SLIDE) {
+                                pageScrollTransform(
+                                    pageScrollEffect,
+                                    (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
+                                )
+                            }
+                        }
                         // Drop placeholder, drawn (not composed) so moving it across cells during a
                         // drag never triggers recomposition — keeps the drag smooth.
                         .drawBehind {
-                            val onThisPage = page == pagerState.currentPage && cellW > 1f
+                            var onThisPage = page == (if (isDualPage) targetCellPage else pagerState.currentPage) && cellW > 1f
                             // Placeholder cell: our own in-home drag uses [targetCell]; a dock→home
                             // drag (driven by the shared controller) computes it from the finger.
                             val tc: IntOffset? = when {
@@ -728,7 +948,8 @@ fun Workspace(
                                     (dragController.source == DragSource.Dock ||
                                         dragController.source == DragSource.Drawer) &&
                                     dragController.isOverGrid(dragController.rootPosition) -> {
-                                    val (_, cx, cy) = dragController.cellAt(dragController.rootPosition)
+                                    val (cellPage, cx, cy) = dragController.cellAt(dragController.rootPosition)
+                                    if (isDualPage) onThisPage = page == cellPage && cellW > 1f
                                     IntOffset(cx, cy)
                                 }
                                 else -> null
@@ -750,7 +971,7 @@ fun Workspace(
                         // pointer pass, so a flick now wins the gesture even over icons, folders,
                         // shortcuts and the dock — matching Pixel Launcher. Only the still-long-press
                         // settings detector remains a page-background gesture.
-                        .pointerInput(Unit) {
+                        .pointerInput(isDualPage) {
                             // Still long-press on empty space opens settings. Times out a touch
                             // later than the icon long-press, so an icon pickup (which consumes the
                             // pointer) always wins and suppresses this. The same detector also spots
@@ -796,7 +1017,7 @@ fun Workspace(
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                     // Anchor the options popup at the press point (root coords); flip it
                                     // above when the press is in the lower half of the screen.
-                                    val anchorPt = dragController.gridBounds.topLeft + down.position
+                                    val anchorPt = dragController.gridBounds.topLeft + down.position + Offset(pageLeft(page), 0f)
                                     currentEmptyAreaMenu(
                                         IntOffset(anchorPt.x.roundToInt(), anchorPt.y.roundToInt()),
                                         anchorPt.y > windowHeightPx * 0.45f,
@@ -821,9 +1042,9 @@ fun Workspace(
                     effectiveEntries.asSequence()
                         .filter { it.page == page }
                         .forEach { entry ->
+                            key(entry.slotKey()) {
                             when (entry) {
                             is PlacedFolder -> {
-                                val folderBadge = entry.apps.sumOf { badges[it.badgeKey] ?: 0 }
                                 Box(
                                     modifier = Modifier
                                         .offset {
@@ -842,24 +1063,26 @@ fun Workspace(
                                             entry = entry,
                                             rowId = entry.id,
                                             removable = false,
-                                            onTap = { onOpenFolder(entry) },
-                                            onStillPress = { onOpenFolder(entry) },
+                                            onTap = { currentFolderTap(entry) },
+                                            onStillPress = { currentOpenFolder(entry) },
                                             onRemove = {},
                                         ),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    FolderIcon(
-                                        name = entry.name,
-                                        apps = entry.apps,
-                                        showLabel = showLabels,
-                                        badgeCount = folderBadge,
-                                        badgeShowCount = badgeShowCount,
-                                        badgeScale = badgeScale,
-                                        labelColor = labelColor,
-                                        size = cellIconSize,
-                                        glassBlurRadius = glassBlurRadius,
-                                        glassDarkTint = glassDarkTint,
-                                    )
+                                    WithBadge({ entry.apps.sumOf { badges[it.badgeKey] ?: 0 } }) { folderBadge ->
+                                        FolderIcon(
+                                            name = entry.name,
+                                            apps = entry.apps,
+                                            showLabel = showLabels,
+                                            badgeCount = folderBadge,
+                                            badgeShowCount = badgeShowCount,
+                                            badgeScale = badgeScale,
+                                            labelColor = labelColor,
+                                            size = cellIconSize,
+                                            glassBlurRadius = glassBlurRadius,
+                                            glassDarkTint = glassDarkTint,
+                                        )
+                                    }
                                 }
                             }
                             is PlacedApp -> {
@@ -891,7 +1114,7 @@ fun Workspace(
                                     }
                                     .pointerInput(
                                         placed.app.key, placed.page, placed.cellX, placed.cellY,
-                                        cellW, cellH, columns, rows, pageCount, locked,
+                                        cellW, cellH, columns, rows, pageCount, lastPage, isDualPage, locked,
                                     ) {
                                         awaitEachGesture {
                                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -936,9 +1159,8 @@ fun Workspace(
                                             if (locked) return@awaitEachGesture
                                             // PICK UP
                                             dragging = placed
-                                            dragDistance = 0f
                                             dragPos = Offset(
-                                                placed.cellX * cellW + down.position.x,
+                                                pageLeft(placed.page) + placed.cellX * cellW + down.position.x,
                                                 placed.cellY * cellH + down.position.y,
                                             )
                                             // Lift into the shared controller (not yet "moving").
@@ -954,7 +1176,6 @@ fun Workspace(
                                                     val delta = change.positionChange()
                                                     change.consume()
                                                     dragPos += delta
-                                                    dragDistance += delta.getDistance()
                                                     // Any movement past the touch slop (drag() already
                                                     // enforces it) is a drag → start moving immediately so
                                                     // the floating icon tracks the finger from the start.
@@ -964,11 +1185,11 @@ fun Workspace(
                                                     )
                                                     if (!pagerState.isScrollInProgress) {
                                                         if (dragPos.x > gridSize.width - edgePx &&
-                                                            pagerState.currentPage < pageCount
+                                                            stepPage(1) != pagerState.currentPage
                                                         ) {
                                                             scope.launch {
                                                                 pagerState.animateScrollToPage(
-                                                                    pagerState.currentPage + 1,
+                                                                    stepPage(1),
                                                                 )
                                                             }
                                                         } else if (dragPos.x < edgePx &&
@@ -976,18 +1197,19 @@ fun Workspace(
                                                         ) {
                                                             scope.launch {
                                                                 pagerState.animateScrollToPage(
-                                                                    pagerState.currentPage - 1,
+                                                                    stepPage(-1),
                                                                 )
                                                             }
                                                         }
                                                     }
                                                     // Track the cell the icon would land in.
-                                                    val cx = (dragPos.x / cellW).toInt()
+                                                    val cx = (xInPage(dragPos.x) / cellW).toInt()
                                                         .coerceIn(0, columns - 1)
                                                     val cy = (dragPos.y / cellH).toInt()
                                                         .coerceIn(0, rows - 1)
                                                     val nc = IntOffset(cx, cy)
                                                     if (nc != targetCell) targetCell = nc
+                                                    targetCellPage = pageAtX(dragPos.x)
                                                 }
                                                 // DROP — only act on a real finger-up (completed),
                                                 // never on a cancellation, so the menu can't pop up
@@ -1005,7 +1227,7 @@ fun Workspace(
                                                     // everything lower open up so a tall popup never
                                                     // covers the dock.
                                                     val above = cellTop + cellH / 2f > windowHeightPx * 0.45f
-                                                    val anchorX = dragController.gridBounds.left + d.cellX * cellW + cellW / 2f
+                                                    val anchorX = dragController.gridBounds.left + pageLeft(d.page) + d.cellX * cellW + cellW / 2f
                                                     val anchorY = if (above) cellTop else cellTop + cellH
                                                     onAppMenu(
                                                         d.app,
@@ -1015,6 +1237,11 @@ fun Workspace(
                                                 } else if (d != null && completed && dragController.moving) {
                                                     val rootPos = dragController.gridBounds.topLeft + dragPos
                                                     when {
+                                                        // Dropped on the "split" target → pick a partner;
+                                                        // the icon itself stays where it was.
+                                                        dragController.dropOnSplit(d.app, rootPos) -> {
+                                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        }
                                                         // Dropped on the top "remove" zone → take it off home.
                                                         dragController.isOverRemove(rootPos) -> {
                                                             removedKeys = removedKeys + d.app.key
@@ -1038,11 +1265,11 @@ fun Workspace(
                                                         }
 
                                                         else -> {
-                                                            val tx = (dragPos.x / cellW).toInt()
+                                                            val tx = (xInPage(dragPos.x) / cellW).toInt()
                                                                 .coerceIn(0, columns - 1)
                                                             val ty = (dragPos.y / cellH).toInt()
                                                                 .coerceIn(0, rows - 1)
-                                                            val targetPage = pagerState.currentPage
+                                                            val targetPage = pageAtX(dragPos.x)
                                                             val occupant = latestEntries.firstOrNull {
                                                                 it.page == targetPage && it.cellX == tx && it.cellY == ty &&
                                                                     !(it is PlacedApp && it.app.key == d.app.key)
@@ -1086,18 +1313,20 @@ fun Workspace(
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                AppIcon(
-                                    appItem = placed.app,
-                                    labelColor = labelColor,
-                                    showLabel = showLabels,
-                                    iconSize = cellIconSize,
-                                    // Fixed centred cell: reserve the full label block so a name that
-                                    // wraps does not lift its icon above its neighbours'.
-                                    reserveLabelLines = true,
-                                    badgeCount = badges[placed.app.badgeKey] ?: 0,
-                                    badgeShowCount = badgeShowCount,
-                                    badgeScale = badgeScale,
-                                )
+                                WithBadge({ badges[placed.app.badgeKey] ?: 0 }) { badgeCount ->
+                                    AppIcon(
+                                        appItem = placed.app,
+                                        labelColor = labelColor,
+                                        showLabel = showLabels,
+                                        iconSize = cellIconSize,
+                                        // Fixed centred cell: reserve the full label block so a name that
+                                        // wraps does not lift its icon above its neighbours'.
+                                        reserveLabelLines = true,
+                                        badgeCount = badgeCount,
+                                        badgeShowCount = badgeShowCount,
+                                        badgeScale = badgeScale,
+                                    )
+                                }
                             }
                             }
                             is PlacedShortcut -> {
@@ -1119,9 +1348,9 @@ fun Workspace(
                                             entry = entry,
                                             rowId = entry.rowId,
                                             removable = true,
-                                            onTap = { onLaunchShortcut(entry) },
+                                            onTap = { currentLaunchShortcut(entry) },
                                             onStillPress = {},
-                                            onRemove = { onRemoveShortcut(entry.rowId) },
+                                            onRemove = { currentRemoveShortcut(entry.rowId) },
                                         ),
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -1174,7 +1403,8 @@ fun Workspace(
                                         .widgetDragGesture(widget.rowId, !locked, widgetDragController) { root, fraction, owner ->
                                             liftWidget(EditingItem(widget.rowId, widget.appWidgetId, widget.page,
                                                 widget.cellX, widget.cellY, widget.spanX, widget.spanY), root, fraction, owner)
-                                        },
+                                        }
+                                        .widgetLook(widgetLooks[widget.rowId]),
                                 ) {
                                     if (hostView != null) {
                                         // Host the persistent AppWidgetHostView inside a container, re-parenting
@@ -1186,13 +1416,7 @@ fun Workspace(
                                             update = { container ->
                                                 val wDp = (widget.spanX * cellW / density.density).toInt()
                                                 val hDp = (widget.spanY * cellH / density.density).toInt()
-                                                if (wDp > 0 && hDp > 0) {
-                                                    val opts = widgetSizeOptions(wDp, hDp)
-                                                    runCatching {
-                                                        hostView.updateAppWidgetSize(opts, wDp, hDp, wDp, hDp)
-                                                        hostView.updateAppWidgetOptions(opts)
-                                                    }
-                                                }
+                                                pushWidgetSize(hostView, wDp, hDp)
                                                 if (hostView.parent !== container) {
                                                     (hostView.parent as? android.view.ViewGroup)?.removeView(hostView)
                                                     container.removeAllViews()
@@ -1291,6 +1515,20 @@ fun Workspace(
                             }
                             is PlacedBuiltin -> {
                                 val space = entry
+                                val isScrollableBuiltin = space.type == HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS ||
+                                    space.type == HomeItemEntity.BUILTIN_NOTIFICATIONS ||
+                                    space.type == HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET
+                                var builtinRect by remember(space.rowId) { mutableStateOf(Rect.Zero) }
+                                LaunchedEffect(space.rowId, isScrollableBuiltin) {
+                                    if (isScrollableBuiltin && !builtinRect.isEmpty) {
+                                        dragController.scrollableWidgetRects[space.rowId] = builtinRect
+                                    } else {
+                                        dragController.scrollableWidgetRects.remove(space.rowId)
+                                    }
+                                }
+                                DisposableEffect(space.rowId) {
+                                    onDispose { dragController.scrollableWidgetRects.remove(space.rowId) }
+                                }
                                 Box(
                                     modifier = Modifier
                                         .offset {
@@ -1303,6 +1541,10 @@ fun Workspace(
                                             with(density) { (space.spanX * cellW).toDp() },
                                             with(density) { (space.spanY * cellH).toDp() },
                                         )
+                                        .onGloballyPositioned {
+                                            builtinRect = it.boundsInRoot()
+                                            if (isScrollableBuiltin) dragController.scrollableWidgetRects[space.rowId] = builtinRect
+                                        }
                                         .graphicsLayer {
                                             alpha = if (widgetDragController.moving &&
                                                 widgetDragController.active?.item?.rowId == space.rowId) 0f else 1f
@@ -1310,7 +1552,8 @@ fun Workspace(
                                         .widgetDragGesture(space.rowId, !locked, widgetDragController) { root, fraction, owner ->
                                             liftWidget(EditingItem(space.rowId, null, space.page,
                                                 space.cellX, space.cellY, space.spanX, space.spanY), root, fraction, owner)
-                                        },
+                                        }
+                                        .widgetLook(widgetLooks[space.rowId]),
                                 ) {
                                     CompositionLocalProvider(LocalWidgetDragController provides widgetDragController) {
                                         when (space.type) {
@@ -1328,10 +1571,73 @@ fun Workspace(
                                                 SamsungWeatherWidget(modifier = Modifier.fillMaxSize())
                                             HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS ->
                                                 InteractiveNotificationWidget(modifier = Modifier.fillMaxSize())
+                                            HomeItemEntity.BUILTIN_MEDIA, HomeItemEntity.BUILTIN_TOP_APPS,
+                                            HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE,
+                                HomeItemEntity.BUILTIN_WEATHER_DAY, HomeItemEntity.BUILTIN_WEATHER_BIG ->
+                                                BuiltinWidget(space.type, Modifier.fillMaxSize())
                                             else -> SmartspaceWidget(modifier = Modifier.fillMaxSize())
                                         }
                                     }
                                 }
+                            }
+                            is PlacedWidgetStack -> {
+                                val stack = entry
+                                var stackRect by remember(stack.rowId) { mutableStateOf(Rect.Zero) }
+                                LaunchedEffect(stack.rowId, stack.items.size) {
+                                    if (stack.items.size > 1 && !stackRect.isEmpty) {
+                                        dragController.scrollableWidgetRects[stack.rowId] = stackRect
+                                    } else {
+                                        dragController.scrollableWidgetRects.remove(stack.rowId)
+                                    }
+                                }
+                                DisposableEffect(stack.rowId) {
+                                    onDispose { dragController.scrollableWidgetRects.remove(stack.rowId) }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .offset {
+                                            IntOffset(
+                                                (stack.cellX.coerceIn(0, columns - 1) * cellW).roundToInt(),
+                                                (stack.cellY.coerceIn(0, rows - 1) * cellH).roundToInt(),
+                                            )
+                                        }
+                                        .size(
+                                            with(density) { (stack.spanX * cellW).toDp() },
+                                            with(density) { (stack.spanY * cellH).toDp() },
+                                        )
+                                        .onGloballyPositioned {
+                                            stackRect = it.boundsInRoot()
+                                            if (stack.items.size > 1) {
+                                                dragController.scrollableWidgetRects[stack.rowId] = stackRect
+                                            }
+                                        }
+                                        .graphicsLayer {
+                                            alpha = if (widgetDragController.moving &&
+                                                widgetDragController.active?.item?.rowId == stack.rowId) 0f else 1f
+                                        }
+                                        .widgetDragGesture(stack.rowId, !locked, widgetDragController) { root, fraction, owner ->
+                                            liftWidget(EditingItem(stack.rowId, null, stack.page,
+                                                stack.cellX, stack.cellY, stack.spanX, stack.spanY), root, fraction, owner)
+                                        }
+                                        .widgetLook(widgetLooks[stack.rowId]),
+                                ) {
+                                    WidgetStackContainer(
+                                        stack = stack,
+                                        widthDp = (stack.spanX * cellW / density.density).toInt(),
+                                        heightDp = (stack.spanY * cellH / density.density).toInt(),
+                                        widgetViews = widgetViews,
+                                        widgetDragController = widgetDragController,
+                                        onRestorePendingWidget = onRestorePendingWidget,
+                                        onAddToStack = { stackId ->
+                                            onAddToWidgetStack(stackId, -1L)
+                                        },
+                                        onRemoveFromStack = onRemoveFromWidgetStack,
+                                        onDeleteStack = { id -> onRemoveWidget(id, null) },
+                                        locked = locked,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            }
                             }
                             }
                         }
@@ -1379,6 +1685,7 @@ fun Workspace(
                                                 is PlacedWidget -> e.spanX to e.spanY
                                                 is PendingWidget -> e.spanX to e.spanY
                                                 is PlacedBuiltin -> e.spanX to e.spanY
+                                                is PlacedWidgetStack -> e.spanX to e.spanY
                                                 else -> 1 to 1
                                             }
                                             // The edited row must carry its REAL id so planFit can exclude
@@ -1386,6 +1693,7 @@ fun Workspace(
                                             val erow = when (e) {
                                                 is PlacedWidget -> e.rowId
                                                 is PlacedBuiltin -> e.rowId
+                                                is PlacedWidgetStack -> e.rowId
                                                 else -> -(i.toLong() + 1)
                                             }
                                             ReorderPlanner.Rect(erow, e.page, e.cellX, e.cellY, esx, esy)
@@ -1408,9 +1716,11 @@ fun Workspace(
                                 widgetOptimistic = ew.rowId to WidgetBounds(ew.page, x, y, sx, sy)
                             },
                             onReconfigure = { ew.appWidgetId?.let(onReconfigureWidget); editingWidget = null },
+                            onStyle = { lookEditing = ew.rowId; editingWidget = null },
+                            onDeleteWidget = { onRemoveWidget(ew.rowId, ew.appWidgetId); editingWidget = null },
                             onExit = { editingWidget = null },
                             canMovePrev = ew.page > 0,
-                            canMoveNext = ew.page < pageCount,
+                            canMoveNext = ew.page < lastPage,
                             onMoveToPage = { targetPage, msx, msy ->
                                 // Place at the first free cell on the target page; commit, exit edit and
                                 // scroll there. No room → no-op (stay in edit).
@@ -1435,11 +1745,12 @@ fun Workspace(
                 }
             }
 
-            val indicatorCount = if (isDualPage) ((pageCount + 1) / 2).coerceAtLeast(1) else pageCount
+            val indicatorCount = if (isDualPage) (pageCount + 1) / 2 else pageCount
             if (showPageIndicator && indicatorCount > 1) {
                 PageDots(
                     count = indicatorCount,
-                    current = pagerState.currentPage,
+                    // Read inside the dots: a page swipe recomposes them, not the workspace.
+                    current = { if (isDualPage) pagerState.currentPage / 2 else pagerState.currentPage },
                     home = if (isDualPage) homeIndex / 2 else homeIndex,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1447,7 +1758,7 @@ fun Workspace(
                 )
             }
         }
-        WidgetDragLayer(widgetDragController, dragController, cellW, cellH)
+        WidgetDragLayer(widgetDragController, dragController, cellW, cellH, pageLeft = ::pageLeft)
         // The floating dragged *app icon* is drawn by LauncherShell (above the workspace, dock and the
         // drawer) so it can travel across surfaces. A dragged folder/shortcut never leaves the grid, so
         // its floating preview is drawn here locally, following the finger ([localDragPos], grid coords).
@@ -1492,8 +1803,9 @@ fun Workspace(
 
 /** Launcher3-style widget edit frame: a touch-consuming scrim (so the resize gesture can't leak into
  *  the drawer swipe-up or page scroll), a body-drag layer (move within the page, or drop on the top
- *  Remove pill to delete), a border with glowing accent stroke (1.5.dp), animated drag handle pills/dots
- *  on resizable axes and corners, a floating dimension chip above the widget, and a gear (reconfigure) button. */
+ *  Remove pill to delete), a lightly tinted frame with bar handles on the resizable edges and dots on
+ *  the corners, and one compact action bar (size, widget settings, remove) beside the widget. The
+ *  widget's own content stays visible throughout. */
 @Composable
 private fun WidgetEditOverlay(
     widget: EditingItem,
@@ -1512,6 +1824,8 @@ private fun WidgetEditOverlay(
     onSetBounds: suspend (x: Int, y: Int, spanX: Int, spanY: Int) -> Boolean,
     onPreviewBounds: (x: Int, y: Int, spanX: Int, spanY: Int) -> Unit,
     onReconfigure: () -> Unit,
+    onStyle: () -> Unit,
+    onDeleteWidget: () -> Unit,
     onExit: () -> Unit,
     canMovePrev: Boolean,
     canMoveNext: Boolean,
@@ -1600,6 +1914,7 @@ private fun WidgetEditOverlay(
                     style = Stroke(width = 4.dp.toPx())
                 )
             }
+            .background(borderColor.copy(alpha = 0.10f), RoundedCornerShape(24.dp))
             .border(1.5.dp, borderColor, RoundedCornerShape(24.dp))
             .semantics {
                 stateDescription = sizeLabel
@@ -1619,23 +1934,67 @@ private fun WidgetEditOverlay(
             },
     )
 
-    // Floating cell dimension chip neatly positioned above the widget
-    val chipCenterX = (left + right) / 2f
-    val chipY = (top - with(density) { 36.dp.toPx() }).coerceAtLeast(with(density) { 8.dp.toPx() })
+    // Action bar: the size, widget settings and remove in one compact pill below the widget (above
+    // it when there is no room underneath). Resizing itself is done with the handles on the frame,
+    // or with the accessibility actions on it — the widget is never covered while you size it.
+    var barSize by remember(widget.rowId) { mutableStateOf(IntSize.Zero) }
+    val gridWidth = columns * cellW
+    val gridHeight = rows * cellH
+    val barGap = with(density) { 12.dp.toPx() }
+    val barMaxX = (gridWidth - barSize.width - barGap).coerceAtLeast(0f)
+    val barX = ((left + right) / 2f - barSize.width / 2f).coerceIn(barGap.coerceAtMost(barMaxX), barMaxX)
+    val barY = when {
+        bottom + barGap + barSize.height <= gridHeight -> bottom + barGap
+        top - barGap - barSize.height >= 0f -> top - barGap - barSize.height
+        // No room on either side (a widget as tall as the page): sit inside its bottom edge.
+        else -> (bottom - barGap - barSize.height).coerceAtLeast(0f)
+    }
     Surface(
         modifier = Modifier
-            .offset { IntOffset((chipCenterX - with(density) { 32.dp.toPx() }).roundToInt(), chipY.roundToInt()) }
-            .shadow(6.dp, CircleShape),
-        shape = CircleShape,
+            .offset { IntOffset(barX.roundToInt(), barY.roundToInt()) }
+            .onSizeChanged { barSize = it }
+            // Hidden for the one frame before its size is known, so it never jumps into place.
+            .graphicsLayer { alpha = if (barSize == IntSize.Zero) 0f else 1f }
+            .shadow(8.dp, RoundedCornerShape(22.dp)),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, borderColor.copy(alpha = 0.4f)),
+        border = BorderStroke(1.dp, borderColor.copy(alpha = 0.35f)),
     ) {
-        Text(
-            text = "$sx × $sy",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "$sx × $sy",
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = if (blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            if (reconfigurable) {
+                EditBarButton(
+                    icon = R.drawable.ic_home_settings,
+                    label = stringResource(R.string.widget_reconfigure),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    enabled = !committing,
+                    onClick = onReconfigure,
+                )
+            }
+            EditBarButton(
+                icon = R.drawable.ic_widget_style,
+                label = stringResource(R.string.widget_look),
+                tint = MaterialTheme.colorScheme.onSurface,
+                enabled = !committing,
+                onClick = onStyle,
+            )
+            EditBarButton(
+                icon = LauncherIcons.Delete,
+                label = stringResource(R.string.widget_remove),
+                tint = MaterialTheme.colorScheme.error,
+                enabled = !committing,
+                onClick = onDeleteWidget,
+            )
+        }
     }
 
     if (range != null) {
@@ -1652,6 +2011,8 @@ private fun WidgetEditOverlay(
             centerX: Float,
             centerY: Float,
             label: String,
+            // 0 = corner dot, 1 = horizontal bar (top / bottom edge), 2 = vertical bar (left / right edge)
+            bar: Int = 0,
             onDrag: (Offset) -> Unit,
         ) {
             var active by remember { mutableStateOf(false) }
@@ -1687,7 +2048,10 @@ private fun WidgetEditOverlay(
             ) {
                 Surface(
                     modifier = Modifier
-                        .size(with(density) { (14.dp * scale) })
+                        .size(
+                            width = (when (bar) { 1 -> 30.dp; 2 -> 6.dp; else -> 12.dp }) * scale,
+                            height = (when (bar) { 1 -> 6.dp; 2 -> 30.dp; else -> 12.dp }) * scale,
+                        )
                         .shadow(4.dp, CircleShape),
                     shape = CircleShape,
                     color = borderColor,
@@ -1698,7 +2062,7 @@ private fun WidgetEditOverlay(
 
         // Edge Handles
         if (range.horizontal) {
-            ResizeHandlePill(right, (top + bottom) / 2f, widthLabel) { d ->
+            ResizeHandlePill(right, (top + bottom) / 2f, widthLabel, bar = 2) { d ->
                 accX += d.x
                 val s = step(accX, cellW)
                 if (s != 0) {
@@ -1707,7 +2071,7 @@ private fun WidgetEditOverlay(
                     accX = 0f
                 }
             }
-            ResizeHandlePill(left, (top + bottom) / 2f, widthLabel) { d ->
+            ResizeHandlePill(left, (top + bottom) / 2f, widthLabel, bar = 2) { d ->
                 accX += d.x
                 val s = step(accX, cellW)
                 if (s != 0) {
@@ -1722,7 +2086,7 @@ private fun WidgetEditOverlay(
             }
         }
         if (range.vertical) {
-            ResizeHandlePill((left + right) / 2f, bottom, heightLabel) { d ->
+            ResizeHandlePill((left + right) / 2f, bottom, heightLabel, bar = 1) { d ->
                 accY += d.y
                 val s = step(accY, cellH)
                 if (s != 0) {
@@ -1731,7 +2095,7 @@ private fun WidgetEditOverlay(
                     accY = 0f
                 }
             }
-            ResizeHandlePill((left + right) / 2f, top, heightLabel) { d ->
+            ResizeHandlePill((left + right) / 2f, top, heightLabel, bar = 1) { d ->
                 accY += d.y
                 val s = step(accY, cellH)
                 if (s != 0) {
@@ -1839,29 +2203,6 @@ private fun WidgetEditOverlay(
         }
     }
 
-    if (reconfigurable) {
-        Box(
-            modifier = Modifier
-                .offset {
-                    IntOffset(
-                        ((cx + sx) * cellW - handlePx - 8.dp.toPx()).roundToInt(),
-                        (cy * cellH + 8.dp.toPx()).roundToInt()
-                    )
-                }
-                .size(with(density) { handlePx.toDp() })
-                .background(primary, CircleShape)
-                .clickable(enabled = !committing) { onReconfigure() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_home_settings),
-                contentDescription = stringResource(R.string.widget_reconfigure),
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(with(density) { (handlePx * 0.6f).toDp() }),
-            )
-        }
-    }
-
     if (canMovePrev || canMoveNext) {
         val arrowY = (rows * cellH - handlePx - with(density) { 16.dp.toPx() })
         val centerX = columns * cellW / 2f
@@ -1870,14 +2211,14 @@ private fun WidgetEditOverlay(
                 modifier = Modifier
                     .offset { IntOffset((centerX - handlePx - with(density) { 8.dp.toPx() }).roundToInt(), arrowY.roundToInt()) }
                     .size(with(density) { handlePx.toDp() })
-                    .background(primary, CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
                     .clickable(enabled = !committing) { onMoveToPage(widget.page - 1, sx, sy) },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painter = painterResource(LauncherIcons.ChevronRight),
                     contentDescription = stringResource(R.string.widget_move_prev_page),
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(with(density) { (handlePx * 0.62f).toDp() }).graphicsLayer { scaleX = -1f },
                 )
             }
@@ -1887,19 +2228,380 @@ private fun WidgetEditOverlay(
                 modifier = Modifier
                     .offset { IntOffset((centerX + with(density) { 8.dp.toPx() }).roundToInt(), arrowY.roundToInt()) }
                     .size(with(density) { handlePx.toDp() })
-                    .background(primary, CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
                     .clickable(enabled = !committing) { onMoveToPage(widget.page + 1, sx, sy) },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painter = painterResource(LauncherIcons.ChevronRight),
                     contentDescription = stringResource(R.string.widget_move_next_page),
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(with(density) { (handlePx * 0.62f).toDp() }),
                 )
             }
         }
     }
+}
+
+/** Book layout: every home page takes half of the pager, so two sit side by side. */
+private object HalfPageSize : PageSize {
+    override fun Density.calculateMainAxisPageSize(availableSpace: Int, pageSpacing: Int): Int =
+        ((availableSpace - pageSpacing) / 2).coerceAtLeast(0)
+}
+
+/** One round icon button of the widget edit bar. */
+@Composable
+private fun EditBarButton(icon: Int, label: String, tint: Color, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = label,
+            tint = if (enabled) tint else tint.copy(alpha = 0.38f),
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/** Nothing OS 3 Style Stackable Widget Container. */
+@Composable
+private fun WidgetStackContainer(
+    stack: PlacedWidgetStack,
+    /** The stack's footprint in dp — the size every hosted widget in it is told to render at. */
+    widthDp: Int,
+    heightDp: Int,
+    widgetViews: Map<Int, android.appwidget.AppWidgetHostView>,
+    widgetDragController: WidgetDragController,
+    onRestorePendingWidget: (PendingWidget) -> Unit,
+    onAddToStack: (stackId: Long) -> Unit = {},
+    onRemoveFromStack: (stackId: Long, itemRowId: Long) -> Unit = { _, _ -> },
+    onDeleteStack: (stackId: Long) -> Unit = {},
+    locked: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val pagerState = rememberPagerState(initialPage = 0) { stack.items.size }
+    // Settings ▸ Appearance ▸ Widget stacks: corner radius, page indicator and the options pill.
+    val stackStyle = LocalStackStyle.current
+    val stackShape = RoundedCornerShape(stackStyle.cornerRadius.dp)
+    var menuExpanded by remember { mutableStateOf(false) }
+    val stackScope = rememberCoroutineScope()
+    val itemCount = stack.items.size
+
+    // Settings ▸ Widget stacks ▸ switch automatically: moves on (and wraps round) after the chosen
+    // time. The timer starts again whenever the shown widget changes, and only runs while the
+    // home screen is in front and nobody is touching the stack or its menu.
+    var resumed by remember { mutableStateOf(false) }
+    var touching by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        resumed = true
+        onPauseOrDispose { resumed = false }
+    }
+    // A stack that holds the Now playing widget brings it to the front when something starts
+    // playing (and stops switching by itself until playback ends). You can still swipe away.
+    val mediaIndex = stack.items.indexOfFirst { (it as? PlacedBuiltin)?.type == HomeItemEntity.BUILTIN_MEDIA }
+    val stackContext = LocalContext.current
+    val mediaWatcher = remember(stackContext, mediaIndex >= 0) {
+        if (mediaIndex >= 0) MediaSessionWatcher(stackContext) else null
+    }
+    if (mediaWatcher != null) {
+        LifecycleResumeEffect(mediaWatcher) {
+            mediaWatcher.start()
+            onPauseOrDispose { mediaWatcher.stop() }
+        }
+    }
+    val mediaPlaying = mediaWatcher?.nowPlaying?.playing == true
+    LaunchedEffect(mediaPlaying, mediaIndex) {
+        if (mediaPlaying && mediaIndex >= 0 && pagerState.currentPage != mediaIndex) {
+            pagerState.animateScrollToPage(mediaIndex)
+        }
+    }
+    val autoRotate = if (LocalBatterySaver.current || LocalHomeCovered.current) 0 else stackStyle.autoRotateSeconds
+    LaunchedEffect(autoRotate, itemCount, resumed, menuExpanded, touching, mediaPlaying, pagerState.settledPage) {
+        if (autoRotate <= 0 || itemCount < 2 || !resumed || menuExpanded || touching || mediaPlaying) return@LaunchedEffect
+        while (true) {
+            delay(autoRotate * 1000L)
+            if (widgetDragController.active == null && !pagerState.isScrollInProgress) {
+                pagerState.animateScrollToPage((pagerState.currentPage + 1) % itemCount)
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .clip(stackShape)
+            // A swipe up or down flips to the next or previous widget (wrapping round). It is
+            // watched on the way down to the widgets, because a hosted app widget takes the touches
+            // for itself and the pager underneath would never see the swipe.
+            .pointerInput(itemCount, locked) {
+                if (locked || itemCount < 2) return@pointerInput
+                val slop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    touching = true
+                    var total = Offset.Zero
+                    var claimed = false
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            total += change.positionChange()
+                            if (!claimed && abs(total.y) > slop && abs(total.y) > abs(total.x)) claimed = true
+                            if (claimed) change.consume()
+                        }
+                    } finally {
+                        touching = false
+                    }
+                    if (claimed && abs(total.y) > slop * 2f) {
+                        val step = if (total.y < 0f) 1 else -1
+                        val next = ((pagerState.currentPage + step) % itemCount + itemCount) % itemCount
+                        stackScope.launch { pagerState.animateScrollToPage(next) }
+                    }
+                }
+            },
+    ) {
+        VerticalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            // Swipes are handled by the stack itself (above), the same way for every kind of widget.
+            userScrollEnabled = false,
+            // Keyed by row, not position: removing a widget must not hand its page (and the host
+            // view parked in it) to the next one.
+            key = { index -> stack.items.getOrNull(index)?.stackChildRowId() ?: index },
+        ) { pageIndex ->
+            val child = stack.items.getOrNull(pageIndex) ?: return@VerticalPager
+
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Read here, in the draw phase, so a flip redraws the page instead of recomposing it.
+                        val pageOffset = kotlin.math.abs((pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction)
+                        val scale = (1f - pageOffset * 0.08f).coerceIn(0.88f, 1f)
+                        this.alpha = (1f - pageOffset * 0.35f).coerceIn(0.2f, 1f)
+                        this.scaleX = scale
+                        this.scaleY = scale
+                    }
+                    .clip(stackShape)
+            ) {
+                when (child) {
+                    is PlacedWidget -> {
+                        val view = widgetViews[child.appWidgetId]
+                        if (view != null) {
+                            AndroidView(
+                                factory = { c -> android.widget.FrameLayout(c) },
+                                update = { container ->
+                                    // Same contract as a widget on the grid: without its size options
+                                    // a collection widget (a RemoteViewsService list) renders empty.
+                                    pushWidgetSize(view, widthDp, heightDp)
+                                    if (view.parent !== container) {
+                                        (view.parent as? android.view.ViewGroup)?.removeView(view)
+                                        container.removeAllViews()
+                                        container.addView(
+                                            view,
+                                            android.widget.FrameLayout.LayoutParams(
+                                                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                                                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                                            ),
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, stackShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = child.provider.shortClassName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    is PlacedBuiltin -> {
+                        CompositionLocalProvider(LocalWidgetDragController provides widgetDragController) {
+                            when (child.type) {
+                                HomeItemEntity.BUILTIN_NOTIFICATIONS -> NotificationsWidget(Modifier.fillMaxSize())
+                                HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET -> SamsungNotificationWidget(Modifier.fillMaxSize())
+                                HomeItemEntity.BUILTIN_BATTERY -> BatteryWidget(Modifier.fillMaxSize())
+                                HomeItemEntity.BUILTIN_PEOPLE -> PeopleWidget(Modifier.fillMaxSize())
+                                HomeItemEntity.BUILTIN_NOTHING_CLOCK -> NothingClockWidget(Modifier.fillMaxSize())
+                                HomeItemEntity.BUILTIN_SAMSUNG_WEATHER -> SamsungWeatherWidget(Modifier.fillMaxSize())
+                                HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS -> InteractiveNotificationWidget(Modifier.fillMaxSize())
+                                HomeItemEntity.BUILTIN_MEDIA, HomeItemEntity.BUILTIN_TOP_APPS,
+                                HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE,
+                                HomeItemEntity.BUILTIN_WEATHER_DAY, HomeItemEntity.BUILTIN_WEATHER_BIG ->
+                                    BuiltinWidget(child.type, Modifier.fillMaxSize())
+                                else -> SmartspaceWidget(Modifier.fillMaxSize())
+                            }
+                        }
+                    }
+                    is PendingWidget -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceContainer, stackShape)
+                                .clickable { onRestorePendingWidget(child) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.widget_restore_tap),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+
+        // Stack Options Pill (Top Right)
+        if (!locked && stackStyle.showPill) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+            ) {
+                Surface(
+                    onClick = { menuExpanded = !menuExpanded },
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.50f),
+                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.25f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_widgets),
+                            contentDescription = stringResource(R.string.stack_menu),
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Text(
+                            text = "${stack.items.size}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White,
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp)),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.stack_add), style = MaterialTheme.typography.labelLarge) },
+                        onClick = {
+                            menuExpanded = false
+                            onAddToStack(stack.rowId)
+                        },
+                    )
+                    if (stack.items.size > 1) {
+                        val childRowId = stack.items.getOrNull(pagerState.currentPage)?.stackChildRowId()
+                        if (childRowId != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.stack_remove_active), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onRemoveFromStack(stack.rowId, childRowId)
+                                },
+                            )
+                        }
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.stack_delete), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteStack(stack.rowId)
+                        },
+                    )
+                }
+            }
+        }
+
+        // Animated bottom page indicator: dots, a segmented bar, or nothing.
+        val barIndicator = stackStyle.indicator == LauncherSettings.STACK_INDICATOR_BAR
+        if (stack.items.size > 1 && stackStyle.indicator != LauncherSettings.STACK_INDICATOR_NONE) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 5.dp)
+                    .background(Color.Black.copy(alpha = 0.32f), CircleShape)
+                    .padding(horizontal = 5.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (barIndicator) 2.dp else 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                repeat(stack.items.size) { index ->
+                    val isSelected = pagerState.currentPage == index
+                    val width by androidx.compose.animation.core.animateDpAsState(
+                        targetValue = if (barIndicator) 7.dp else if (isSelected) 8.dp else 4.dp,
+                        label = "stackDotWidth",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(width = width, height = if (barIndicator) 2.dp else 4.dp)
+                            .background(
+                                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.4f),
+                                shape = CircleShape,
+                            ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** How widget stacks are drawn (Settings ▸ Appearance): corner radius in dp, the page indicator
+ *  (`LauncherSettings.STACK_INDICATOR_*`) and whether the options pill shows. */
+data class StackStyle(
+    val cornerRadius: Int = 24,
+    val indicator: String = LauncherSettings.STACK_INDICATOR_DOTS,
+    val showPill: Boolean = false,
+    /** Seconds until a stack shows its next widget by itself; 0 = never. */
+    val autoRotateSeconds: Int = 0,
+)
+
+val LocalStackStyle = androidx.compose.runtime.compositionLocalOf { StackStyle() }
+
+/** The last drop-target answer of a widget drag, keyed by what it was worked out for. */
+private class DropTargetCache {
+    var placement: WidgetPlacement? = null
+    var rowId: Long? = null
+    var entries: List<HomeEntry>? = null
+    var valid: Boolean = false
+}
+
+/** The home_items row id of a widget inside a stack (null for anything a stack cannot hold). */
+/** Who an entry is, for its place in the page's composition (not where it sits). */
+private fun HomeEntry.slotKey(): String = when (this) {
+    is PlacedApp -> "app:" + app.key
+    is PlacedFolder -> "folder:$id"
+    is PlacedShortcut -> "shortcut:$rowId"
+    is PlacedWidget -> "widget:$rowId"
+    is PendingWidget -> "pending:$rowId"
+    is PlacedBuiltin -> "builtin:$rowId"
+    is PlacedWidgetStack -> "stack:$rowId"
+}
+
+private fun HomeEntry.stackChildRowId(): Long? = when (this) {
+    is PlacedWidget -> rowId
+    is PlacedBuiltin -> rowId
+    is PendingWidget -> rowId
+    else -> null
 }
 
 /** The icon + label of a pinned deep shortcut (the gesture, menu and offset live at the call site). */
@@ -1910,6 +2612,89 @@ private fun ShortcutIconContent(
     labelColor: Color = Color.White,
     iconSize: Dp = 52.dp,
 ) {
+    val pairApps = shortcut.pairApps
+    if (pairApps != null) {
+        // An app pair: both app icons side by side on one tile, under the pair's name.
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(iconSize)
+                    .background(Color.White.copy(alpha = 0.22f), RoundedCornerShape(iconSize * 0.3f)),
+            ) {
+                Box(Modifier.align(Alignment.CenterStart).padding(start = iconSize * 0.05f)) {
+                    AppIcon(
+                        appItem = pairApps.first,
+                        labelColor = labelColor,
+                        showLabel = false,
+                        iconSize = iconSize * 0.44f,
+                        aquamorphicTouchEnabled = false,
+                    )
+                }
+                Box(Modifier.align(Alignment.CenterEnd).padding(end = iconSize * 0.05f)) {
+                    AppIcon(
+                        appItem = pairApps.second,
+                        labelColor = labelColor,
+                        showLabel = false,
+                        iconSize = iconSize * 0.44f,
+                        aquamorphicTouchEnabled = false,
+                    )
+                }
+                // A three-app layout: the floating app, smaller, on top in the middle of the two —
+                // on a dark disc so it reads as sitting above them.
+                shortcut.pairThirdApp?.let { third ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(iconSize * 0.4f)
+                            .background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AppIcon(
+                            appItem = third,
+                            labelColor = labelColor,
+                            showLabel = false,
+                            iconSize = iconSize * 0.32f,
+                            aquamorphicTouchEnabled = false,
+                        )
+                    }
+                }
+            }
+            if (showLabel) AppLabel(shortcut.label, labelColor, reserveLines = true)
+        }
+        return
+    }
+    val floatingApp = shortcut.floatingApp
+    if (floatingApp != null) {
+        // A floating shortcut wears its app's own icon, plus a corner badge telling it apart from
+        // the plain app icon it may sit next to.
+        Box {
+            AppIcon(
+                appItem = floatingApp,
+                labelColor = labelColor,
+                showLabel = showLabel,
+                iconSize = iconSize,
+                reserveLabelLines = true,
+                // The cell around a shortcut already carries the press feedback.
+                aquamorphicTouchEnabled = false,
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(x = iconSize * 0.38f, y = (-2).dp)
+                    .size(iconSize * 0.38f)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(LauncherIcons.OpenInNew),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(iconSize * 0.24f),
+                )
+            }
+        }
+        return
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         val icon = shortcut.icon
         if (icon != null) {
@@ -1928,6 +2713,25 @@ private fun ShortcutIconContent(
  * options bundle (the old `Bundle.EMPTY`), because the RemoteViewsService can't size its list. Adapted
  * from AOSP Launcher3 `WidgetSizes.getWidgetSizeOptions` (Apache-2.0).
  */
+/** The size last given to each widget view, so a recomposition doesn't send the same size again. */
+private val sentWidgetSizes = java.util.WeakHashMap<android.view.View, Long>()
+
+/**
+ * Gives a widget its size in dp, but only when it changed. Every send is a call into the system
+ * and wakes the widget's app to redraw, and the page's views are updated on every recomposition.
+ */
+internal fun pushWidgetSize(view: android.appwidget.AppWidgetHostView, wDp: Int, hDp: Int) {
+    if (wDp <= 0 || hDp <= 0) return
+    val packed = (wDp.toLong() shl 32) or hDp.toLong()
+    if (sentWidgetSizes[view] == packed) return
+    sentWidgetSizes[view] = packed
+    val opts = widgetSizeOptions(wDp, hDp)
+    runCatching {
+        view.updateAppWidgetSize(opts, wDp, hDp, wDp, hDp)
+        view.updateAppWidgetOptions(opts)
+    }
+}
+
 internal fun widgetSizeOptions(wDp: Int, hDp: Int): android.os.Bundle =
     android.os.Bundle().apply {
         putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, wDp)
@@ -1964,7 +2768,8 @@ internal fun android.view.View.containsScrollableCollection(): Boolean = when (t
 }
 
 @Composable
-private fun PageDots(count: Int, current: Int, home: Int, modifier: Modifier = Modifier) {
+private fun PageDots(count: Int, current: () -> Int, home: Int, modifier: Modifier = Modifier) {
+    val currentIndex = current()
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
@@ -1972,7 +2777,7 @@ private fun PageDots(count: Int, current: Int, home: Int, modifier: Modifier = M
     ) {
         repeat(count) { index ->
             // The home page's dot wears a ring, so the page HOME returns to is visible at a glance.
-            val color = if (index == current) Color.White else Color.White.copy(alpha = 0.4f)
+            val color = if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.4f)
             Box(
                 modifier = Modifier
                     .size(if (index == home) 9.dp else 7.dp)

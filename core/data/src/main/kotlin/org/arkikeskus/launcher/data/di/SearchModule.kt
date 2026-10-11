@@ -14,6 +14,7 @@ import org.arkikeskus.launcher.data.search.ContentResolverContactDataSource
 import org.arkikeskus.launcher.data.search.PermissionChecker
 import org.arkikeskus.launcher.data.search.SearchProvider
 import org.arkikeskus.launcher.data.search.SettingsSearchProvider
+import org.arkikeskus.launcher.data.search.ShortcutSearchProvider
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -22,6 +23,7 @@ abstract class SearchModule {
     @Binds @IntoSet abstract fun settingsProvider(p: SettingsSearchProvider): SearchProvider
     @Binds @IntoSet abstract fun contactProvider(p: ContactSearchProvider): SearchProvider
     @Binds @IntoSet abstract fun calcProvider(p: CalculatorSearchProvider): SearchProvider
+    @Binds @IntoSet abstract fun shortcutProvider(p: ShortcutSearchProvider): SearchProvider
 
     @Binds abstract fun contactDataSource(impl: ContentResolverContactDataSource): ContactDataSource
     @Binds abstract fun permissionChecker(impl: AndroidPermissionChecker): PermissionChecker

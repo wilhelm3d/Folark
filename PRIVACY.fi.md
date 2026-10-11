@@ -45,20 +45,33 @@ julkinen, joten jokaisen väitteen voi tarkistaa itse:
   ponnahdusilmoitukset toimivat normaalisti. Ilmoitusten tunnisteet ja jakoajat
   tallennetaan laitteelle odotustilan säilyttämiseksi uudelleenkäynnistyksessä,
   mutta niitä ei sisällytetä varmuuskopioihin.
-- **Varmuuskopiot** — viemäsi varmuuskopio kirjoitetaan valitsemaasi
-  tiedostosijaintiin. Se sisältää asettelusi ja asetuksesi, ei mitään muuta.
-  Sovellus on jättäytynyt Androidin järjestelmävarmuuskopioinnin ulkopuolelle
+- **Varmuuskopiot** — Asetukset ▸ Varmuuskopiointi ja palautus kirjoittaa
+  varmuuskopiotiedoston valitsemaasi sijaintiin, ja jos otat automaattisen
+  varmuuskopion käyttöön, pitää yhden ajantasaisen kopion valitsemassasi
+  kansiossa ja päivittää sen enintään kerran päivässä. Varmuuskopio sisältää
+  molempien näyttöjen kotinäytön asettelun, kaikki asetukset (myös kiinnitetyt
+  henkilöt ja käytetyimmät-järjestyksen) sekä kotinäytön taustakuvat — ei
+  mitään muuta. Siihen ei koskaan tallenneta ilmoitusten tekstejä eikä
+  odottavien ilmoitusten tilaa. Sovellus ei itse lähetä varmuuskopiota
+  minnekään; jos valitset tiedostovalitsimessa pilvikansion, kyseinen sovellus
+  tallentaa tiedoston. Varmuuskopio palautetaan vain, kun itse valitset sen,
+  asetuksista tai uudelleenasennuksen jälkeen esittelystä. Sovellus on
+  jättäytynyt Androidin järjestelmävarmuuskopioinnin ulkopuolelle
   (`allowBackup="false"`), joten sen tietoja ei koskaan kopioida Google-tilisi
-  laitevarmuuskopioon eikä siirretä laitteelta toiselle; viemäsi tiedosto on
-  ainoa varmuuskopio.
+  laitevarmuuskopioon eikä siirretä laitteelta toiselle; tallentamasi
+  tiedostot ovat ainoat varmuuskopiot.
 
 ## Verkon käyttö
 
-1. **Sää** (vain kun särivi on käytössä ja sijaintilupa on myönnetty):
-   sovellus hakee lämpötilan ja säätilan avaimettomasta
+1. **Sää** (vain kun särivi on käytössä tai aloitusnäytöllä on säävidget, ja
+   joko sijaintilupa on myönnetty tai olet kirjoittanut sään sijainnin):
+   sovellus hakee säätilan ja ennusteen avaimettomasta
    [Open-Meteo](https://open-meteo.com)-rajapinnasta. Koordinaatit pyöristetään
    noin kilometrin tarkkuuteen ennen pyyntöä; tarkka sijainti ei koskaan
-   poistu laitteelta.
+   poistu laitteelta. Jos kirjoitat paikkakunnan kohtaan Asetukset ▸ Sään
+   sijainti, kyseinen teksti ja laitteen käyttöliittymäkieli lähetetään kerran
+   Open-Meteon paikkahakuun koordinaattien selvittämiseksi, eikä laitteen omaa
+   sijaintia sen jälkeen käytetä säähän lainkaan.
 2. **Kuntanimi** sään vieressä: nimi selvitetään ensisijaisesti laitteen
    omalla geokooderilla. Jos laitteessa ei ole toimivaa geokooderia (joissakin
    malleissa ei ole), sovellus käyttää varalla avaimetonta
@@ -81,8 +94,12 @@ palvelimelle; pyynnöt tunnistautuvat yleisluontoisella
 | Lupa | Käyttötarkoitus |
 |---|---|
 | `QUERY_ALL_PACKAGES` | Asennettujen sovellusten listaus ja käynnistys — launcherin ydintehtävä |
+| `ACCESS_HIDDEN_PROFILES` | Android 15+: Yksityisen tilan (Private Space) näyttäminen sovelluslaatikossa erillisenä, lukittuna osiona. Lukittuna Folark ei listaa sen sovelluksia lainkaan; avattuna ne näkyvät vain tuossa osiossa (ei koskaan aloitusnäytöllä, haussa, widgeteissä tai käyttömäärissä). Lukitus ja avaus tapahtuvat Androidin kautta, joka kysyy näytön lukituksen. Mitään siitä ei tallenneta eikä lähetetä |
 | Ilmoitusten käyttöoikeus (`BIND_NOTIFICATION_LISTENER_SERVICE`) | Pistemerkit, tilarivin kuvakkeet, ilmoitus- ja henkilöwidgetit sekä paikallinen eräposti |
-| Esteettömyyspalvelu (`BIND_ACCESSIBILITY_SERVICE`, valinnainen) | Ainoastaan tuplanapautuslukitus. Palvelu ei vastaanota esteettömyystapahtumia eikä voi lukea näytön sisältöä; se on olemassa vain näytön lukitsemista varten ja käynnissä vain, jos itse otat sen käyttöön |
+| Esteettömyyspalvelu (`BIND_ACCESSIBILITY_SERVICE`, valinnainen) | Tuplanapautuslukitus sekä, jos otat sen asetuksista käyttöön, Folarkin tehtäväpalkki avatulla näytöllä (palvelu piirtää tehtäväpalkin kulmien kosketusalueet ja sovelluskuvakkeet päällekkäisikkunoihin, käynnistää valitsemasi sovelluksen ja pyytää Androidia jakamaan näytön, kun vedät kuvakkeen jaettuun näyttöön). Palvelu ei vastaanota esteettömyystapahtumia eikä voi lukea näytön sisältöä, ja se on käynnissä vain, jos itse otat sen käyttöön |
+| `DUMP` (valinnainen, vain itse suorittamallasi kertaluonteisella `adb shell pm grant` -komennolla) | Tehtäväpalkin jaettu näyttö: Folark lukee Androidin viimeisimpien tehtävien luettelosta juuri avaamansa sovelluksen tehtävänumeron ja lähettää Androidin jaetun näytön komennot; jaetun näytön painike lukee myös, mitkä sovellukset ovat jaetussa näytössä, jotta puolet voi vaihtaa tai yhden sovelluksen avata koko näytölle. Luetaan laitteella vain sillä hetkellä, eikä sitä tallenneta tai lähetetä minnekään |
+| Käyttötietojen käyttö (`PACKAGE_USAGE_STATS`, valinnainen) | Tehtäväpalkin viimeisimmät sovellukset: mitkä sovellukset on tuotu etualalle viime tunteina. Luetaan laitteella tehtäväpalkin näkyessä, eikä niitä tallenneta tai lähetetä minnekään. Vain jos sallit sen Androidin asetuksista |
+| `WRITE_SECURE_SETTINGS` (valinnainen, vain itse suorittamallasi kertaluonteisella `adb shell pm grant` -komennolla) | Asetukset ▸ Käyttöoikeudet ▸ Järjestelmän säätimet: Folarkin oman saavutettavuuspalvelun käynnistäminen uudelleen, jos Android on sammuttanut sen, Androidin suurin virkistystaajuus ja Androidin animaationopeus. Folark muuttaa vain näitä asetuksia ja vain valinnastasi; niistä luetaan vain nykyinen arvo, eikä mitään lähetetä minnekään |
 | `READ_CALENDAR` | Seuraavan tapahtuman näyttäminen kellowidgetissä |
 | `READ_CONTACTS` | Yhteystulokset sovellushaussa ja henkilöwidgetin yhteystietojen yhdistäminen (valinnainen) |
 | `READ_PHONE_STATE` | Signaalinvoimakkuus tilarivillä |

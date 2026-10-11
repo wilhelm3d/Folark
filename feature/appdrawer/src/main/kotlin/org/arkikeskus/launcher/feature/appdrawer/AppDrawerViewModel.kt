@@ -15,8 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.AppRepository
@@ -53,10 +55,23 @@ data class AppDrawerUiState(
     val notificationDotScale: Float = 1f,
     val useThemedIcons: Boolean = false,
     val iconPackPackage: String = "",
+    val iconShape: String = "",
     val calc: SearchResult.Calculation? = null,
     val settingResults: List<SearchResult.Setting> = emptyList(),
     val contactResults: List<SearchResult.Contact> = emptyList(),
     val desktopLocked: Boolean = false,
+    /** Multi-window settings: which of the floating / split entries the long-press menu offers. */
+    val floatingLaunchEnabled: Boolean = true,
+    val splitLaunchEnabled: Boolean = true,
+    /** The display's icon-size multiplier (Settings ▸ Grid). */
+    val iconSizeScale: Float = 1f,
+    /** Drawer folders shown as tabs (Settings ▸ App drawer): id to name, plus the open tab (null = All). */
+    val folderTabsEnabled: Boolean = false,
+    val tabs: List<Pair<Long, String>> = emptyList(),
+    val selectedTab: Long? = null,
+    /** Search extras: matching app shortcuts, and whether to offer the "search the web" row. */
+    val shortcutResults: List<SearchResult.Shortcut> = emptyList(),
+    val searchWeb: Boolean = true,
     val showFrequentApps: Boolean = false,
     val frequentApps: List<AppItem> = emptyList(),
     val appLabelTextScale: Float = 1f,
@@ -66,13 +81,24 @@ data class AppDrawerUiState(
     val drawerSearchPosition: String = LauncherSettings.SEARCH_TOP,
     val drawerIndexBarEnabled: Boolean = true,
     val azIndexPosition: String = LauncherSettings.AZ_POSITION_VERTICAL_RIGHT,
+    val azIndexScale: Float = 1f,
+    val drawerCornerRadius: Int = LauncherSettings.DRAWER_CORNER_AUTO,
+    val drawerHandleStyle: String = LauncherSettings.DRAWER_HANDLE_BAR,
+    val drawerBottomSpace: Int = 0,
+    val drawerLetterHeaders: Boolean = false,
+    val drawerLargeLetterPopup: Boolean = true,
+    val drawerSwipeTabs: Boolean = true,
+    val drawerFlickClose: Boolean = false,
     val drawerBackgroundBlur: Float = 0f,
     val drawerScrimOpacity: Float = 0.5f,
     val glassBlurRadius: Float = 25f,
     val glassDarkTint: Float = 0.45f,
     val drawerStyle: String = LauncherSettings.DRAWER_STYLE_STANDARD_GRID,
-    val drawerThemeTint: String = LauncherSettings.DRAWER_THEME_DEFAULT_DARK,
-    val drawerAccentColor: Int = 0xFF00B0FF.toInt(),
+    val drawerThemeTint: String = LauncherSettings.DRAWER_THEME_SYSTEM,
+    val drawerAccentColor: Int = LauncherSettings.DEFAULT_DRAWER_ACCENT,
+    val drawerCustomColor: Int = LauncherSettings.DEFAULT_DRAWER_CUSTOM_COLOR,
+    val drawerGlassEnabled: Boolean = false,
+    val drawerPanelOpacity: Float = LauncherSettings.DEFAULT_DRAWER_PANEL_OPACITY,
     val drawerHeightFraction: Float = 1.0f,
     val drawerWidthFraction: Float = 1.0f,
     val drawerAlignment: String = LauncherSettings.DRAWER_ALIGNMENT_CENTER,
@@ -97,12 +123,38 @@ class AppDrawerViewModel @Inject constructor(
 
     private val query = MutableStateFlow("")
 
+    /** The open drawer tab: a drawer folder's id, or null for "All". */
+    private val selectedTab = MutableStateFlow<Long?>(null)
+    fun selectTab(id: Long?) { selectedTab.value = id }
+
+    /** The drawer's Private Space section (PrivateSpace.kt); null when there is none, or it is off. */
+    val privateSpace: StateFlow<PrivateSpaceUi?> = combine(
+        appRepository.privateSpace,
+        appRepository.privateApps,
+        settingsRepository.settings(ScreenType.OUTER).map { it.showPrivateSpace }.distinctUntilChanged(),
+    ) { space, apps, show ->
+        if (space == null || !show) null else PrivateSpaceUi(space.locked, if (space.locked) emptyList() else apps)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Locks an open Private Space, or asks Android to unlock it (it prompts for the screen lock). */
+    fun togglePrivateSpace() {
+        val space = privateSpace.value ?: return
+        appRepository.setPrivateSpaceLocked(!space.locked)
+    }
+
+    fun privateSpaceInstallSender() = appRepository.privateSpaceInstallSender()
+
+    fun launchPrivate(appItem: AppItem): Boolean =
+        appRepository.launchPrivate(appItem)
+            .onFailure { Log.w("AppDrawerViewModel", "Failed to launch a Private Space app", it) }
+            .isSuccess
+
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-    private val searchResults: Flow<SearchResults> = combine(
+    private val searchResults: Flow<Pair<String, SearchResults>> = combine(
         query.debounce { if (it.isBlank()) 0L else 200L }, // contacts hit ContentResolver; avoid per-keystroke
         appRepository.apps,                                 // install/uninstall/rename re-runs a live query
     ) { q, _ -> q }
-        .mapLatest { searchAggregator.search(it) }          // mapLatest cancels the previous run
+        .mapLatest { it to searchAggregator.search(it) }    // mapLatest cancels the previous run
 
     val uiState: StateFlow<AppDrawerUiState> = _screenType.flatMapLatest { screenType -> combine(
         appRepository.apps,
@@ -133,7 +185,13 @@ class AppDrawerViewModel @Inject constructor(
             notificationDotScale = settings.notificationDotScale,
             useThemedIcons = settings.useThemedIcons,
             iconPackPackage = settings.iconPackPackage,
+            iconShape = settings.iconShape,
             desktopLocked = settings.desktopLocked,
+            floatingLaunchEnabled = settings.floatingLaunchEnabled,
+            splitLaunchEnabled = settings.splitLaunchEnabled,
+            iconSizeScale = settings.iconSizeScale,
+            folderTabsEnabled = settings.drawerFolderTabs,
+            searchWeb = settings.searchWeb,
             showFrequentApps = settings.showFrequentApps,
             appLabelTextScale = settings.appLabelTextScale,
             twoLineLabels = settings.twoLineDrawerLabels,
@@ -141,6 +199,14 @@ class AppDrawerViewModel @Inject constructor(
             drawerSearchPosition = settings.drawerSearchPosition,
             drawerIndexBarEnabled = settings.drawerIndexBarEnabled,
             azIndexPosition = settings.azIndexPosition,
+            azIndexScale = settings.azIndexScale,
+            drawerCornerRadius = settings.drawerCornerRadius,
+            drawerHandleStyle = settings.drawerHandleStyle,
+            drawerBottomSpace = settings.drawerBottomSpace,
+            drawerLetterHeaders = settings.drawerLetterHeaders,
+            drawerLargeLetterPopup = settings.drawerLargeLetterPopup,
+            drawerSwipeTabs = settings.drawerSwipeTabs,
+            drawerFlickClose = settings.drawerFlickClose,
             drawerBackgroundBlur = settings.drawerBackgroundBlur,
             drawerScrimOpacity = settings.drawerScrimOpacity,
             glassBlurRadius = settings.glassBlurRadius,
@@ -148,6 +214,9 @@ class AppDrawerViewModel @Inject constructor(
             drawerStyle = settings.drawerStyle,
             drawerThemeTint = settings.drawerThemeTint,
             drawerAccentColor = settings.drawerAccentColor,
+            drawerCustomColor = settings.drawerCustomColor,
+            drawerGlassEnabled = settings.drawerGlassEnabled,
+            drawerPanelOpacity = settings.drawerPanelOpacity,
             drawerHeightFraction = settings.drawerHeightFraction,
             drawerWidthFraction = settings.drawerWidthFraction,
             drawerAlignment = settings.drawerAlignment,
@@ -160,19 +229,33 @@ class AppDrawerViewModel @Inject constructor(
     }.combine(settingsRepository.hiddenApps) { state, hidden ->
         // Hide selected apps from the drawer (also excludes them from search results).
         if (hidden.isEmpty()) state else state.copy(apps = state.apps.filterNot { it.key in hidden })
-    }.combine(settingsRepository.drawerFolders) { state, folders ->
+    }.combine(settingsRepository.drawerFolders.combine(selectedTab) { folders, tab -> folders to tab }) { state, foldersAndTab ->
+        val (folders, tab) = foldersAndTab
         // While searching (or with no folders) keep a flat list so folder members stay findable.
         if (state.query.isNotBlank() || folders.isEmpty()) {
             state
+        } else if (state.folderTabsEnabled) {
+            // Folders as tabs: "All" keeps every app in the list; a tab narrows it to that folder.
+            val open = folders.firstOrNull { it.id == tab }
+            val shown = if (open == null) state.apps else {
+                val byKey = state.apps.associateBy { it.key }
+                open.appKeys.mapNotNull { byKey[it] }
+            }
+            state.copy(apps = shown, tabs = folders.map { it.id to it.name }, selectedTab = open?.id)
         } else {
             val byKey = state.apps.associateBy { it.key }
             val folderUis = folders.map { f -> DrawerFolderUi(f.id, f.name, f.appKeys.mapNotNull { byKey[it] }) }
             val inFolder = folders.flatMap { it.appKeys }.toSet()
             state.copy(apps = state.apps.filterNot { it.key in inFolder }, folders = folderUis)
         }
-    }.combine(searchResults) { state, results ->
+    }.combine(searchResults) { state, (searchedFor, results) ->
         if (state.query.isBlank()) {
             state // idle drawer: apps + folders already prepared above
+        } else if (searchedFor.trim() != state.query.trim()) {
+            // The real search is still on its way for this text (it waits for typing to pause):
+            // show a plain name match meanwhile instead of an empty list.
+            val typed = state.query.trim()
+            state.copy(apps = state.apps.filter { it.label.contains(typed, ignoreCase = true) }, folders = emptyList())
         } else {
             state.copy(
                 apps = results.apps,          // hidden-aware app matches from AppSearchProvider
@@ -180,6 +263,7 @@ class AppDrawerViewModel @Inject constructor(
                 calc = results.calc,
                 settingResults = results.settings,
                 contactResults = results.contacts,
+                shortcutResults = results.shortcuts,
             )
         }
     }.combine(appUsageRepository.usage) { state, usage ->
@@ -218,6 +302,18 @@ class AppDrawerViewModel @Inject constructor(
         appRepository.launch(appItem)
             .onFailure { Log.w("AppDrawerViewModel", "Failed to launch ${appItem.key}", it) }
             .isSuccess
+
+    /** Opens [appItem] in a floating window (full screen where the device has none); returns whether
+     *  it started, like [onAppClick]. */
+    fun launchFloating(appItem: AppItem): Boolean =
+        appRepository.launchFloating(appItem)
+            .onFailure { Log.w("AppDrawerViewModel", "Failed to launch ${appItem.key} in a floating window", it) }
+            .isSuccess
+
+    /** Puts a shortcut on home that opens [appItem] straight in a floating window. Idempotent. */
+    fun addFloatingShortcut(appItem: AppItem) = addPinnedShortcut(
+        appItem.packageName, HomeItemEntity.floatingShortcutId(appItem.className), appItem.userSerial,
+    )
 
     fun addToDock(appItem: AppItem) = viewModelScope.launch { settingsRepository.addToDock(appItem.key, _screenType.value) }
 
