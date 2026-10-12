@@ -702,17 +702,16 @@ internal class AppTaskbar(private val context: Context) {
         onTap: (View) -> Unit,
         onHold: (() -> Unit)?,
     ): View {
-        val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
         val view = ImageView(context).apply {
             setImageResource(icon)
-            setColorFilter(Color.WHITE)
+            imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
             contentDescription = context.getString(description)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             val pad = size / 4
             setPadding(pad, pad, pad, pad)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(if (light) Color.argb(110, 0, 0, 0) else Color.argb(40, 255, 255, 255))
+                setColor(Color.argb(140, 20, 20, 25))
             }
         }
         view.setOnClickListener {
