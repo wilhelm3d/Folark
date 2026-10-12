@@ -9,8 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -113,32 +111,6 @@ class NotificationDotListenerService : NotificationListenerService() {
     private var snapshotRetriesLeft = 0
     private val retryRefresh = Runnable { refresh() }
     private val deliverBatch = Runnable { refreshWithRetries() }
-    // Posts and removals arrive in bursts (a download or media notification updates every second,
-    // a sync posts many at once). One snapshot shortly after the burst replaces one per callback.
-    private val coalescedRefresh = Runnable { refreshWithRetries() }
-
-    // Screen off: nothing of Folark's is visible, so no snapshot is taken until it comes on again
-    // (a download notification updating every second would otherwise take one per second all night).
-    private var screenInteractive = true
-    private var refreshPending = false
-    private val screenReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            screenInteractive = intent?.action != Intent.ACTION_SCREEN_OFF
-            if (screenInteractive && refreshPending) {
-                refreshPending = false
-                scheduleRefresh()
-            }
-        }
-    }
-
-    private fun scheduleRefresh() {
-        if (!screenInteractive) {
-            refreshPending = true
-            return
-        }
-        handler.removeCallbacks(coalescedRefresh)
-        handler.postDelayed(coalescedRefresh, COALESCE_REFRESH_MS)
-    }
     private var connected = false
     private var packageRefreshJob: Job? = null
     private var receiverRegistered = false
@@ -154,17 +126,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         }
     }
 
-    private fun scheduleBatchAlarm() {
-        val earliest = heldUntil.values.minOrNull() ?: return
-        val am = getSystemService(AlarmManager::class.java) ?: return
-        val intent = Intent("org.arkikeskus.launcher.ACTION_BATCH_READY").setPackage(packageName)
-        val pi = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, earliest, pi)
-    }
-
     private companion object {
-        /** How long posts/removals are gathered before one snapshot is taken. */
-        private const val COALESCE_REFRESH_MS = 80L
         const val TAG = "NotifDots"
         const val MAX_SNAPSHOT_RETRIES = 2
         const val SNAPSHOT_RETRY_DELAY_MS = 500L
@@ -204,15 +166,10 @@ class NotificationDotListenerService : NotificationListenerService() {
                 addDataScheme("package")
             }
             ContextCompat.registerReceiver(this, packageReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-            screenInteractive = getSystemService(android.os.PowerManager::class.java)?.isInteractive ?: true
-            ContextCompat.registerReceiver(this, screenReceiver, IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_ON)
-                addAction(Intent.ACTION_SCREEN_OFF)
-            }, ContextCompat.RECEIVER_NOT_EXPORTED)
             ContextCompat.registerReceiver(this, timeReceiver, IntentFilter().apply {
                 addAction(Intent.ACTION_TIME_CHANGED)
                 addAction(Intent.ACTION_TIMEZONE_CHANGED)
-                addAction("org.arkikeskus.launcher.ACTION_BATCH_READY")
+                addAction(Intent.ACTION_SCREEN_ON)
             }, ContextCompat.RECEIVER_NOT_EXPORTED)
             receiverRegistered = true
         }
@@ -245,7 +202,6 @@ class NotificationDotListenerService : NotificationListenerService() {
         connected = false
         handler.removeCallbacks(retryRefresh)
         handler.removeCallbacks(deliverBatch)
-        handler.removeCallbacks(coalescedRefresh)
         stopPackageRefresh()
         settingsJob?.cancel()
         settingsJob = null
@@ -253,10 +209,6 @@ class NotificationDotListenerService : NotificationListenerService() {
         badgeRepository.clearAllCanceller()
         badgeRepository.setBadges(emptyMap())
         badgeRepository.setIcons(emptyList())
-        // The lists were just emptied: the next snapshot must be published even if it matches the last one.
-        lastIconsShown = emptyList()
-        lastListShown = emptyList()
-        lastPeopleShown = emptyList()
         badgeRepository.setAllNotifications(emptyList())
         badgeRepository.setPeople(emptyList())
         alertedKeys.clear()
@@ -272,24 +224,19 @@ class NotificationDotListenerService : NotificationListenerService() {
         // as an inset, so this is the only app-observable signal — see the audit note in StatusBar).
         if (sbn != null && isHeadsUpWorthy(sbn) && shouldAlert(sbn)) badgeRepository.notifyHeadsUp()
         if (sbn != null && settingsReady) holdForBatch(sbn)
-        scheduleRefresh()
+        refreshWithRetries()
     }
 
     /** Keep the notification active in Android so every new message can be checked for exceptions. */
     private fun holdForBatch(sbn: StatusBarNotification) {
         val now = System.currentTimeMillis()
         val previous = heldUntil[sbn.key]
-        // Batch delivery off and nothing held for this one: nothing to work out.
-        if (!batchEnabled && previous == null) return
         val entry = runCatching { personEntry(sbn, 0L, currentRanking, Ranking()) }.getOrNull()
         val until = BatchDelivery.holdUntil(
             entry, previous, now, batchEnabled, vipKeys, BatchSchedule.nextDelivery(now, batchTimes),
         )
         if (until == null) heldUntil.remove(sbn.key) else heldUntil[sbn.key] = until
-        if (until != previous) {
-            persistHeld()
-            scheduleBatchAlarm()
-        }
+        if (until != previous) persistHeld()
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
@@ -297,7 +244,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         // A user snoozing an already-held notification leaves its deadline intact. Only a real
         // removal (dismissed or cancelled by the app) forgets it.
         if (sbn != null && reason != REASON_SNOOZED && heldUntil.remove(sbn.key) != null) persistHeld()
-        scheduleRefresh()
+        refreshWithRetries()
     }
 
     /** A FLAG_ONLY_ALERT_ONCE notification heads-ups only on its FIRST post; a re-post (same key) must
@@ -308,19 +255,6 @@ class NotificationDotListenerService : NotificationListenerService() {
         val onlyOnce = ((sbn.notification?.flags ?: 0) and Notification.FLAG_ONLY_ALERT_ONCE) != 0
         return firstTime || !onlyOnce
     }
-
-    /** A profile's serial number never changes: asked of the system once, not once per notification. */
-    private val userSerials = HashMap<android.os.UserHandle, Long>()
-    private fun serialFor(user: android.os.UserHandle): Long =
-        userSerials[user] ?: (runCatching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L)
-            .also { if (it != 0L || user == android.os.Process.myUserHandle()) userSerials[user] = it }
-
-    // What was last handed to the home screen. An update that changes nothing visible (the usual
-    // case for a progress or media notification) is not published again, so nothing recomposes.
-    private var lastIconsShown: List<String> = emptyList()
-    private var lastListShown: List<String> = emptyList()
-    private var lastPeopleShown: List<String> = emptyList()
-    private fun shown(n: StatusNotification): String = "${n.key}|${n.postTime}|${n.count}|${n.title}|${n.text}"
 
     private fun refresh() {
         if (!connected || !heldLoaded) return
@@ -354,7 +288,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         }
         for (sbn in active) {
             if (sbn == null) continue
-            val serial = serialFor(sbn.user)
+            val serial = runCatching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
             val key = "${sbn.packageName}/$serial"
             // People tiles: conversation-like notifications reduced to sender + text + actions; any
             // other real (icon-worthy, not ongoing) notification becomes an app-grouped entry.
@@ -414,8 +348,9 @@ class NotificationDotListenerService : NotificationListenerService() {
                 }
             }
         }
+        Log.d(TAG, "badge snapshot: ${counts.size} app(s) badged")
         badgeRepository.setBadges(counts)
-        val icons =
+        badgeRepository.setIcons(
             visual.map { (k, v) ->
                 // Visual icon = newest notification; tap action = newest OPENABLE notification, so a
                 // newer intentless post never buries an older tappable one. count = app's total.
@@ -426,18 +361,9 @@ class NotificationDotListenerService : NotificationListenerService() {
                     contentIntent = open?.contentIntent,
                     autoCancel = open?.autoCancel ?: false,
                 )
-            }.sortedByDescending { it.postTime }
-        val iconsShown = icons.map(::shown)
-        if (iconsShown != lastIconsShown) {
-            lastIconsShown = iconsShown
-            badgeRepository.setIcons(icons)
-        }
-        val list = allNotifs.sortedByDescending { it.postTime }
-        val listShown = list.map(::shown)
-        if (listShown != lastListShown) {
-            lastListShown = listShown
-            badgeRepository.setAllNotifications(list)
-        }
+            }.sortedByDescending { it.postTime },
+        )
+        badgeRepository.setAllNotifications(allNotifs.sortedByDescending { it.postTime })
         // Migration: earlier betas snoozed in Android. Those existing snoozes cannot be released
         // through the public listener API; keep showing them until Android delivers them.
         if (heldUntil.isNotEmpty()) {
@@ -446,7 +372,7 @@ class NotificationDotListenerService : NotificationListenerService() {
             for (sbn in snoozed) {
                 if (sbn.key in activeKeys) continue
                 val until = heldUntil[sbn.key] ?: continue
-                val serial = serialFor(sbn.user)
+                val serial = runCatching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
                 val entry = runCatching { personEntry(sbn, serial, ranking, tmp) }.getOrNull() ?: continue
                 people.add(entry.copy(heldUntil = until))
             }
@@ -458,18 +384,7 @@ class NotificationDotListenerService : NotificationListenerService() {
                 persistHeld()
             }
         }
-        // Published only when what the tiles show changed: each refresh builds new objects, so
-        // the people widget would otherwise recompose for every notification from any app.
-        val tiles = PeopleGrouping.group(people)
-        val peopleShown = tiles.map { tile ->
-            tile.personKey + "|" + tile.name + "|" + tile.entries.joinToString(";") { e ->
-                "${e.key}|${e.postTime}|${e.count}|${e.heldUntil}|${e.title}|${e.text}|${e.sender}"
-            }
-        }
-        if (peopleShown != lastPeopleShown) {
-            lastPeopleShown = peopleShown
-            badgeRepository.setPeople(tiles)
-        }
+        badgeRepository.setPeople(PeopleGrouping.group(people))
         handler.removeCallbacks(deliverBatch)
         if (settingsReady) {
             heldUntil.filterKeys { it in activeKeys }.values.minOrNull()?.let { until ->
@@ -648,7 +563,6 @@ class NotificationDotListenerService : NotificationListenerService() {
         if (receiverRegistered) {
             unregisterReceiver(packageReceiver)
             unregisterReceiver(timeReceiver)
-            runCatching { unregisterReceiver(screenReceiver) }
             receiverRegistered = false
         }
     }
