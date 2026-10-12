@@ -216,6 +216,7 @@ class SettingsRepository @Inject constructor(
             halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
             splitLaunchEnabled = p[Keys.SPLIT_LAUNCH_ENABLED] ?: true,
             floatingLaunchEnabled = p[Keys.FLOATING_LAUNCH_ENABLED] ?: true,
+            minusOneScreen = p[Keys.MINUS_ONE_SCREEN] ?: LauncherSettings.MINUS_ONE_NONE,
             amoledDark = p[Keys.amoledDark(screenType)] ?: false,
             foldAction = (p[Keys.foldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
                 if (it == LauncherSettings.ACTION_PAGE_0 || it == LauncherSettings.ACTION_LOCK) it else LauncherSettings.ACTION_STAY
@@ -317,6 +318,7 @@ class SettingsRepository @Inject constructor(
             taskbarQuickSwitch = p[Keys.TASKBAR_QUICK_SWITCH] ?: true,
             taskbarSplitControls = p[Keys.TASKBAR_SPLIT_CONTROLS] ?: true,
             taskbarSplitSide = p[Keys.TASKBAR_SPLIT_SIDE] ?: LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT,
+            taskbarAppPrediction = p[Keys.TASKBAR_APP_PREDICTION] ?: true,
             taskbarThreeApp = p[Keys.TASKBAR_THREE_APP] ?: true,
             settingsStyle = p[Keys.SETTINGS_STYLE] ?: LauncherSettings.SETTINGS_STYLE_STUDIO,
             iconShape = (p[Keys.ICON_SHAPE] ?: LauncherSettings.ICON_SHAPE_SYSTEM)
@@ -501,6 +503,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setTaskbarQuickSwitch(value: Boolean) = edit { it[Keys.TASKBAR_QUICK_SWITCH] = value }
     suspend fun setTaskbarSplitControls(value: Boolean) = edit { it[Keys.TASKBAR_SPLIT_CONTROLS] = value }
     suspend fun setTaskbarSplitSide(value: String) = edit { it[Keys.TASKBAR_SPLIT_SIDE] = value }
+    suspend fun setTaskbarAppPrediction(value: Boolean) = edit { it[Keys.TASKBAR_APP_PREDICTION] = value }
     suspend fun setTaskbarThreeApp(value: Boolean) = edit { it[Keys.TASKBAR_THREE_APP] = value }
     suspend fun setSettingsStyle(value: String) = edit { it[Keys.SETTINGS_STYLE] = value }
     suspend fun setIconShape(value: String) = edit { it[Keys.ICON_SHAPE] = value }
@@ -924,6 +927,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setDrawerAlignment(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerAlignment(screenType)] = value }
     suspend fun setParallaxWallpaper(enabled: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.parallaxWallpaper(screenType)] = enabled }
     suspend fun setDrawerLayoutMode(mode: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerLayoutMode(screenType)] = mode }
+    suspend fun setMinusOneScreen(value: String) = edit { it[Keys.MINUS_ONE_SCREEN] = value }
     suspend fun setDockBackgroundOpacity(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dockBackgroundOpacity(screenType)] = value.coerceIn(0f, 1f) }
     suspend fun setShowPageIndicator(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showPageIndicator(screenType)] = value }
     suspend fun setShowNotificationDots(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showNotificationDots(screenType)] = value }
@@ -1179,8 +1183,10 @@ class SettingsRepository @Inject constructor(
         val TASKBAR_QUICK_SWITCH = booleanPreferencesKey("taskbar_quick_switch")
         val TASKBAR_SPLIT_CONTROLS = booleanPreferencesKey("taskbar_split_controls")
         val TASKBAR_SPLIT_SIDE = stringPreferencesKey("taskbar_split_side")
+        val TASKBAR_APP_PREDICTION = booleanPreferencesKey("taskbar_app_prediction")
         val TASKBAR_THREE_APP = booleanPreferencesKey("taskbar_three_app")
         val SETTINGS_STYLE = stringPreferencesKey("settings_style")
+        val MINUS_ONE_SCREEN = stringPreferencesKey("minus_one_screen")
         val ICON_SHAPE = stringPreferencesKey("icon_shape")
         val MOTO_WEATHER_TAP = booleanPreferencesKey("moto_weather_tap")
         val SHOW_PRIVATE_SPACE = booleanPreferencesKey("show_private_space")

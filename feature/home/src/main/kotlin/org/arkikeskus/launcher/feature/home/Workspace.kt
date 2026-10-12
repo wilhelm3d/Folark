@@ -166,6 +166,7 @@ fun Workspace(
     pageScrollEffect: String = LauncherSettings.PAGE_EFFECT_SLIDE,
     /** Whether a drag past the last page may open a new one (never in the book layout). */
     allowNewPage: Boolean = false,
+    minusOneScreen: String = LauncherSettings.MINUS_ONE_NONE,
     animationSpeed: Float = 1f,
     onWidgetLookChange: (rowId: Long, look: WidgetLook?) -> Unit = { _, _ -> },
     homeSignals: Flow<Boolean>,
@@ -861,6 +862,31 @@ fun Workspace(
         ),
         label = "workspace_page_bounce",
     )
+
+    LaunchedEffect(overscrollPx) {
+        if (overscrollPx > 60f && pagerState.currentPage == 0 && !pagerState.isScrollInProgress) {
+            when (minusOneScreen) {
+                LauncherSettings.MINUS_ONE_GOOGLE -> {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent("com.google.android.googlequicksearchbox.TEXT_ASSIST")
+                                .setPackage("com.google.android.googlequicksearchbox")
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
+                LauncherSettings.MINUS_ONE_SMART_FEED -> {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent("com.motorola.smartfeed.action.START")
+                                .setPackage("com.motorola.smartfeed")
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     Box(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {

@@ -466,6 +466,8 @@
     <string name="settings_moto_popup_gesture_unknown">The pop-up gesture and which apps can float: tap to open Motorola\'s pop-up settings</string>
     <string name="settings_taskbar_three_app">Third app in split screen</string>
     <string name="settings_taskbar_three_app_desc">With two apps side by side, drag a third from the taskbar onto them: Android then offers three-app layouts. Off: the drag replaces one side</string>
+    <string name="settings_taskbar_app_prediction">AI App Predictions</string>
+    <string name="settings_taskbar_app_prediction_desc">Use on-device AI to predict what app you want next based on your habits, time, and location</string>
     <string name="settings_taskbar_split_side">New split app opens on</string>
     <string name="settings_taskbar_split_side_left">Left</string>
     <string name="settings_taskbar_split_side_right">Right</string>
@@ -542,6 +544,10 @@
     <string name="settings_gesture_moto_games">Game Center</string>
     <string name="settings_gesture_moto_weather">Motorola Weather</string>
     <string name="settings_gesture_moto_styles">Moto Styles</string>
+    <string name="settings_minus_one_title">Leftmost screen (Minus One)</string>
+    <string name="settings_minus_one_none">None</string>
+    <string name="settings_minus_one_google">Google Discover</string>
+    <string name="settings_minus_one_smart_feed">Moto Smart Feed</string>
     <string name="settings_double_tap_action">Double tap</string>
     <string name="settings_private_space">Private Space</string>
     <string name="settings_private_space_desc">A locked section at the end of the drawer. Its apps never appear on home, in search or in widgets</string>

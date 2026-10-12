@@ -2560,6 +2560,31 @@ private fun GesturesSection(
         DoubleTapActionRow(s = s, viewModel = viewModel, screenType = screenType)
         ExpressiveRowDivider()
 
+        var pickingMinusOne by remember { mutableStateOf(false) }
+        ExpressiveActionItem(
+            title = stringResource(R.string.settings_minus_one_title),
+            description = when (s.minusOneScreen) {
+                LauncherSettings.MINUS_ONE_GOOGLE -> stringResource(R.string.settings_minus_one_google)
+                LauncherSettings.MINUS_ONE_SMART_FEED -> stringResource(R.string.settings_minus_one_smart_feed)
+                else -> stringResource(R.string.settings_minus_one_none)
+            },
+            onClick = { pickingMinusOne = true },
+        )
+        if (pickingMinusOne) {
+            ChoicePicker(
+                title = R.string.settings_minus_one_title,
+                options = listOf(
+                    LauncherSettings.MINUS_ONE_NONE to R.string.settings_minus_one_none,
+                    LauncherSettings.MINUS_ONE_GOOGLE to R.string.settings_minus_one_google,
+                    LauncherSettings.MINUS_ONE_SMART_FEED to R.string.settings_minus_one_smart_feed,
+                ),
+                selected = s.minusOneScreen,
+                onPick = { viewModel.setMinusOneScreen(it); pickingMinusOne = false },
+                onDismiss = { pickingMinusOne = false },
+            )
+        }
+        ExpressiveRowDivider()
+
         IconSwipeRow(s = s, viewModel = viewModel, screenType = screenType)
     }
 }

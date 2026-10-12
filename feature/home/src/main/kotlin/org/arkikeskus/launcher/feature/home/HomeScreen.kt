@@ -694,6 +694,7 @@ fun HomeScreen(
                 locked = settings.desktopLocked,
                 isDualPage = isDualPage,
                 pageBounceEnabled = settings.pageBounceEnabled,
+                minusOneScreen = settings.minusOneScreen,
                 pageScrollEffect = settings.pageScrollEffect,
                 allowNewPage = settings.newPageOnDrag,
                 animationSpeed = settings.animationSpeed,

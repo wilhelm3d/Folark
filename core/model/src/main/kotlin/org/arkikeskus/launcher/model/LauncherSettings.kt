@@ -284,6 +284,8 @@ data class LauncherSettings(
     val taskbarSplitControls: Boolean = true,
     /** Taskbar: the side a new split-screen app opens on, one of TASKBAR_SPLIT_SIDE_*. */
     val taskbarSplitSide: String = TASKBAR_SPLIT_SIDE_RIGHT,
+    /** Use Android's on-device AI (AppPredictionManager) for Taskbar recents instead of just time-based history. */
+    val taskbarAppPrediction: Boolean = true,
     /** Taskbar: a drag over two apps side by side can add a third (Android's drop zones). */
     val taskbarThreeApp: Boolean = true,
     /** Look of the settings screens (both displays), one of SETTINGS_STYLE_*. */
@@ -307,8 +309,15 @@ data class LauncherSettings(
     val innerDockAlignment: String = DOCK_ALIGNMENT_CENTER,
     val parallaxWallpaper: Boolean = false,
     val drawerLayoutMode: String = DRAWER_LAYOUT_GRID,
+    /** What to show when swiping right from the first home page. */
+    val minusOneScreen: String = MINUS_ONE_NONE,
 ) {
     companion object {
+        const val MINUS_ONE_NONE = "none"
+        const val MINUS_ONE_GOOGLE = "google"
+        const val MINUS_ONE_SMART_FEED = "smart_feed"
+        val MINUS_ONE_OPTIONS = listOf(MINUS_ONE_NONE, MINUS_ONE_GOOGLE, MINUS_ONE_SMART_FEED)
+
         const val DRAWER_LAYOUT_GRID = "grid"
         const val DRAWER_LAYOUT_LIST = "list"
 

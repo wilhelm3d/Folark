@@ -82,7 +82,9 @@ class ParallaxSensorManager(context: Context) {
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
-        sensorManager?.registerListener(listener, s, SensorManager.SENSOR_DELAY_UI)
+        // Request UI delay (approx 16ms/60fps) but allow the hardware to batch events up to 33ms.
+        // This wakes the CPU half as often, saving battery without impacting visual smoothness.
+        sensorManager?.registerListener(listener, s, SensorManager.SENSOR_DELAY_UI, 33_000)
         return listener
     }
 

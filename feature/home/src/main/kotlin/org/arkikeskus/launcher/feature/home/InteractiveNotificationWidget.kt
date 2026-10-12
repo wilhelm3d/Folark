@@ -333,6 +333,31 @@ fun InteractiveNotificationItem(
                             Text(action.title.toString(), style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                    
+                    // Render system-provided Smart Replies (Android 10+)
+                    val context = LocalContext.current
+                    notification.actions.forEach { action ->
+                        action.remoteInputs?.forEach { remoteInput ->
+                            remoteInput.choices?.forEach { choice ->
+                                OutlinedButton(
+                                    onClick = { 
+                                        val intent = Intent().apply {
+                                            android.app.RemoteInput.addResultsToIntent(
+                                                arrayOf(remoteInput),
+                                                this,
+                                                android.os.Bundle().apply { putCharSequence(remoteInput.resultKey, choice) }
+                                            )
+                                        }
+                                        runCatching { action.actionIntent.send(context, 0, intent) }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(choice.toString(), style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

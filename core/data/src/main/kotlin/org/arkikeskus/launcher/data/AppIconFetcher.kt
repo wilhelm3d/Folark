@@ -31,7 +31,15 @@ class AppIconFetcher(
         // The size the icon is shown at (stepped, see iconRasterSize); the default for callers
         // that do not say.
         val size = if (data.sizePx > 0) data.sizePx else ICON_PX
-        val tempBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        
+        // VRAM Optimization: If the drawable is completely opaque, we can save 50% of the memory
+        // by using RGB_565 instead of ARGB_8888.
+        val config = if (drawable.opacity == android.graphics.PixelFormat.OPAQUE) {
+            Bitmap.Config.RGB_565
+        } else {
+            Bitmap.Config.ARGB_8888
+        }
+        val tempBitmap = Bitmap.createBitmap(size, size, config)
         val canvas = Canvas(tempBitmap)
         drawable.setBounds(0, 0, size, size)
         drawable.draw(canvas)

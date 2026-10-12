@@ -166,6 +166,7 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarQuickSwitch(value: Boolean) = update { repository.setTaskbarQuickSwitch(value) }
     fun setTaskbarSplitControls(value: Boolean) = update { repository.setTaskbarSplitControls(value) }
     fun setTaskbarSplitSide(value: String) = update { repository.setTaskbarSplitSide(value) }
+    fun setTaskbarAppPrediction(value: Boolean) = update { repository.setTaskbarAppPrediction(value) }
     fun setTaskbarThreeApp(value: Boolean) = update { repository.setTaskbarThreeApp(value) }
     fun setSettingsStyle(value: String) = update { repository.setSettingsStyle(value) }
     fun setIconShape(value: String) = update { repository.setIconShape(value) }
@@ -255,6 +256,7 @@ class SettingsViewModel @Inject constructor(
     fun setDrawerWidthFraction(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setDrawerWidthFraction(value, screenType) }
     fun setDrawerAlignment(value: String, screenType: ScreenType = _screenType.value) = update { repository.setDrawerAlignment(value, screenType) }
     fun setDrawerLayoutMode(value: String, screenType: ScreenType = _screenType.value) = update { repository.setDrawerLayoutMode(value, screenType) }
+    fun setMinusOneScreen(value: String) = update { repository.setMinusOneScreen(value) }
     fun setParallaxWallpaper(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setParallaxWallpaper(value, screenType) }
     fun setDrawerOpensAtTop(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerOpensAtTop(value, screenType) }
     fun setHomeColumns(value: Int, screenType: ScreenType = _screenType.value) = viewModelScope.launch {
