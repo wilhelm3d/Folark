@@ -1,6 +1,7 @@
 package org.arkikeskus.launcher.ui
 
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import kotlinx.coroutines.CancellationException
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -302,5 +303,14 @@ fun LauncherShell(
         }
     }
 
-    BackHandler(enabled = drawerOpen) { animateProgress(0f) }
+    PredictiveBackHandler(enabled = drawerOpen) { progress ->
+        try {
+            progress.collect { _ -> }
+            // Commit: the user completed the swipe.
+            animateProgress(0f)
+        } catch (e: CancellationException) {
+            // Cancelled: the user dragged back but then let go to cancel the back gesture.
+            animateProgress(1f)
+        }
+    }
 }

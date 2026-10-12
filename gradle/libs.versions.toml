@@ -8,6 +8,7 @@ lifecycle = "2.11.0"
 activityCompose = "1.13.0"
 splashscreen = "1.2.0"
 hilt = "2.59.2"
+mlkit-genai = "1.0.0-beta4"
 androidxHilt = "1.3.0"
 room = "2.8.4"
 datastore = "1.2.1"
@@ -25,6 +26,7 @@ profileinstaller = "1.4.1"
 
 [libraries]
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+mlkit-genai-prompt = { group = "com.google.mlkit", name = "genai-prompt", version.ref = "mlkit-genai" }
 # --- build-logic plugin classpath (compileOnly in convention project) ---
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }

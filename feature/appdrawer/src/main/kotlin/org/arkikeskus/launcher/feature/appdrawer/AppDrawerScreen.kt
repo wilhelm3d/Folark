@@ -1606,7 +1606,7 @@ private fun DrawerFolderSheet(
                         .fillMaxWidth()
                         .heightIn(max = 280.dp),
                 ) {
-                    items(items = folder.apps, key = { it.key }) { app ->
+                    items(items = folder.apps, key = { it.key }, contentType = { "app" }) { app ->
                         AppIcon(
                             appItem = app,
                             labelColor = MaterialTheme.colorScheme.onSurface,

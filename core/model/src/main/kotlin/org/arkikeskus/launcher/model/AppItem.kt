@@ -18,6 +18,8 @@ data class AppItem(
     val isHidden: Boolean = false,
     /** In Private Space (Android 15+): shown only in the drawer's Private section. */
     val privateProfile: Boolean = false,
+    /** App is archived by Android (Android 15+). */
+    val isArchived: Boolean = false,
 ) {
     val componentName: ComponentName get() = ComponentName(packageName, className)
 

@@ -247,6 +247,7 @@ class LauncherAppsSource @Inject constructor(
                     userSerial = serial,
                     label = info.label?.toString().orEmpty(),
                     privateProfile = isPrivate,
+                    isArchived = if (Build.VERSION.SDK_INT >= 35) info.applicationInfo.isArchived else false,
                 )
             }
         }.sortedBy { it.label.lowercase() }

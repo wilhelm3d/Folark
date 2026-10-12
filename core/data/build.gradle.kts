@@ -29,6 +29,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.mlkit.genai.prompt)
 
     // JVM unit tests (SettingsRepository with a temp-file DataStore).
     testImplementation(libs.junit)

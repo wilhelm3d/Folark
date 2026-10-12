@@ -338,7 +338,9 @@ fun InteractiveNotificationItem(
                     val context = LocalContext.current
                     notification.actions.forEach { action ->
                         action.remoteInputs?.forEach { remoteInput ->
-                            remoteInput.choices?.forEach { choice ->
+                            // Use app-provided choices, or default to a standard reply if empty
+                            val choices = remoteInput.choices ?: arrayOf("Yes", "No", "Thanks!")
+                            choices.forEach { choice ->
                                 OutlinedButton(
                                     onClick = { 
                                         val intent = Intent().apply {

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.min
+import androidx.compose.foundation.background
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.AppItem
@@ -152,6 +153,23 @@ fun AppIcon(
                 contentDescription = appItem.label,
                 modifier = Modifier.size(iconSize),
             )
+            
+            if (appItem.isArchived) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.Icon(
+                        painter = androidx.compose.ui.res.painterResource(android.R.drawable.stat_sys_download),
+                        contentDescription = "Archived App",
+                        tint = androidx.compose.ui.graphics.Color.White,
+                        modifier = Modifier.size(iconSize * 0.4f)
+                    )
+                }
+            }
+            
             NotificationBadge(count = badgeCount, showCount = badgeShowCount, scale = badgeScale)
         }
         if (showLabel) AppLabel(appItem.label, labelColor, maxLabelLines, reserveLabelLines)
