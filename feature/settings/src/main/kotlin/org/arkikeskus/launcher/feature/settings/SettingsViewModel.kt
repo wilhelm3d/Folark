@@ -172,6 +172,13 @@ class SettingsViewModel @Inject constructor(
     fun setIconShape(value: String) = update { repository.setIconShape(value) }
     fun setMotoWeatherTap(value: Boolean) = update { repository.setMotoWeatherTap(value) }
     fun setShowPrivateSpace(value: Boolean) = update { repository.setShowPrivateSpace(value) }
+    fun setLiveHingeEndAngle(value: Int) = update { repository.setLiveHingeEndAngle(value) }
+    fun setLiveHingeSmoothing(value: Int) = update { repository.setLiveHingeSmoothing(value) }
+    fun setLiveHingeGlass(value: Boolean) = update { repository.setLiveHingeGlass(value) }
+    fun setLiveHingeStyle(value: String) = update { repository.setLiveHingeStyle(value) }
+    fun setLiveHingeSpeed(value: Float) = update { repository.setLiveHingeSpeed(value) }
+    fun setLiveHingeBlur(value: Int) = update { repository.setLiveHingeBlur(value) }
+    fun setLiveHingeFrost(value: Float) = update { repository.setLiveHingeFrost(value) }
     fun setMediaWidgetTheme(value: String) = update { repository.setMediaWidgetTheme(value) }
     fun setAppsWidgetTheme(value: String) = update { repository.setAppsWidgetTheme(value) }
     fun setStatsWidgetTheme(value: String) = update { repository.setStatsWidgetTheme(value) }

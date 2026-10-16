@@ -232,6 +232,7 @@ class SettingsRepository @Inject constructor(
                     it == LauncherSettings.TRANSITION_CROSSFADE ||
                     it == LauncherSettings.TRANSITION_SCALE ||
                     it == LauncherSettings.TRANSITION_SLIDE ||
+                    it == LauncherSettings.TRANSITION_LIVE_HINGE ||
                     it == LauncherSettings.TRANSITION_MORPH_SCALE_FADE) it else LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP
             },
             aquamorphicTouchEnabled = p[Keys.aquamorphicTouchEnabled(screenType)] ?: true,
@@ -325,6 +326,15 @@ class SettingsRepository @Inject constructor(
                 .let { if (it in LauncherSettings.ICON_SHAPES) it else LauncherSettings.ICON_SHAPE_SYSTEM },
             motoWeatherTap = p[Keys.MOTO_WEATHER_TAP] ?: true,
             showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
+            liveHingeEndAngle = (p[Keys.LIVE_HINGE_END_ANGLE] ?: 165).coerceIn(LauncherSettings.MIN_LIVE_HINGE_END_ANGLE, 180),
+            liveHingeSmoothingMs = (p[Keys.LIVE_HINGE_SMOOTHING] ?: 50).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_SMOOTHING_MS),
+            liveHingeGlass = p[Keys.LIVE_HINGE_GLASS] ?: true,
+            liveHingeStyle = (p[Keys.LIVE_HINGE_STYLE] ?: LauncherSettings.LIVE_HINGE_STYLE_PAGES)
+                .let { if (it in LauncherSettings.LIVE_HINGE_STYLES) it else LauncherSettings.LIVE_HINGE_STYLE_PAGES },
+            liveHingeSpeed = (p[Keys.LIVE_HINGE_SPEED] ?: 1f)
+                .coerceIn(LauncherSettings.MIN_LIVE_HINGE_SPEED, LauncherSettings.MAX_LIVE_HINGE_SPEED),
+            liveHingeBlurDp = (p[Keys.LIVE_HINGE_BLUR] ?: 24).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_BLUR_DP),
+            liveHingeFrost = (p[Keys.LIVE_HINGE_FROST] ?: 0.2f).coerceIn(0f, LauncherSettings.MAX_LIVE_HINGE_FROST),
             weatherWidgetAnimated = p[Keys.WEATHER_WIDGET_ANIMATED] ?: true,
             clockWidgetDarkText = p[Keys.CLOCK_WIDGET_DARK_TEXT] ?: false,
             clockWidgetGlassEffect = p[Keys.CLOCK_WIDGET_GLASS_EFFECT] ?: true,
@@ -509,6 +519,13 @@ class SettingsRepository @Inject constructor(
     suspend fun setIconShape(value: String) = edit { it[Keys.ICON_SHAPE] = value }
     suspend fun setMotoWeatherTap(value: Boolean) = edit { it[Keys.MOTO_WEATHER_TAP] = value }
     suspend fun setShowPrivateSpace(value: Boolean) = edit { it[Keys.SHOW_PRIVATE_SPACE] = value }
+    suspend fun setLiveHingeEndAngle(value: Int) = edit { it[Keys.LIVE_HINGE_END_ANGLE] = value }
+    suspend fun setLiveHingeSmoothing(value: Int) = edit { it[Keys.LIVE_HINGE_SMOOTHING] = value }
+    suspend fun setLiveHingeGlass(value: Boolean) = edit { it[Keys.LIVE_HINGE_GLASS] = value }
+    suspend fun setLiveHingeStyle(value: String) = edit { it[Keys.LIVE_HINGE_STYLE] = value }
+    suspend fun setLiveHingeSpeed(value: Float) = edit { it[Keys.LIVE_HINGE_SPEED] = value }
+    suspend fun setLiveHingeBlur(value: Int) = edit { it[Keys.LIVE_HINGE_BLUR] = value }
+    suspend fun setLiveHingeFrost(value: Float) = edit { it[Keys.LIVE_HINGE_FROST] = value }
 
     /** Per-widget look, home row id → "cornerRadius,padding,opacity" (see the home screen's WidgetLook). */
     val widgetLooks: Flow<Map<String, String>> = keyFlow(Keys.WIDGET_LOOKS) { parseLabels(it) }
@@ -1190,6 +1207,13 @@ class SettingsRepository @Inject constructor(
         val ICON_SHAPE = stringPreferencesKey("icon_shape")
         val MOTO_WEATHER_TAP = booleanPreferencesKey("moto_weather_tap")
         val SHOW_PRIVATE_SPACE = booleanPreferencesKey("show_private_space")
+        val LIVE_HINGE_END_ANGLE = intPreferencesKey("live_hinge_end_angle")
+        val LIVE_HINGE_SMOOTHING = intPreferencesKey("live_hinge_smoothing")
+        val LIVE_HINGE_GLASS = booleanPreferencesKey("live_hinge_glass")
+        val LIVE_HINGE_STYLE = stringPreferencesKey("live_hinge_style")
+        val LIVE_HINGE_SPEED = floatPreferencesKey("live_hinge_speed")
+        val LIVE_HINGE_BLUR = intPreferencesKey("live_hinge_blur")
+        val LIVE_HINGE_FROST = floatPreferencesKey("live_hinge_frost")
         val WIDGET_LOOKS = stringPreferencesKey("widget_looks")
         val MEDIA_WIDGET_THEME = stringPreferencesKey("media_widget_theme")
         val APPS_WIDGET_THEME = stringPreferencesKey("apps_widget_theme")

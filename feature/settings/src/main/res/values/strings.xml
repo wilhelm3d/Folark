@@ -551,4 +551,27 @@
     <string name="settings_double_tap_action">Double tap</string>
     <string name="settings_private_space">Private Space</string>
     <string name="settings_private_space_desc">A locked section at the end of the drawer. Its apps never appear on home, in search or in widgets</string>
+    <string name="settings_transition_live_hinge">Live hinge (follows your hand)</string>
+    <string name="settings_live_hinge_end">Fully open at</string>
+    <string name="settings_live_hinge_end_desc">The hinge angle where the effect is done</string>
+    <string name="settings_live_hinge_smoothing">Smoothing</string>
+    <string name="settings_live_hinge_smoothing_desc">Eases the steps between hinge readings; 0 follows them as they come</string>
+    <string name="settings_live_hinge_glass">Glass</string>
+    <string name="settings_live_hinge_glass_desc">Blur and frost over the effect, clearing as the phone opens</string>
+    <string name="settings_live_hinge_blur">Blur</string>
+    <string name="settings_live_hinge_frost">Frost</string>
+    <string name="settings_live_hinge_blur_desc">How blurred home starts; it clears as the phone opens. 0 = off</string>
+    <string name="settings_live_hinge_frost_desc">A light frosted layer that fades as the phone opens. 0 = off</string>
+    <string name="settings_live_hinge_style">Effect</string>
+    <string name="settings_live_hinge_style_pages">Pages</string>
+    <string name="settings_live_hinge_style_water">Water</string>
+    <string name="settings_live_hinge_style_ink">Ink to colour</string>
+    <string name="settings_live_hinge_style_fade">From black</string>
+    <string name="settings_live_hinge_style_drop">Drop</string>
+    <string name="settings_live_hinge_style_doors">Doors</string>
+    <string name="settings_live_hinge_style_portal">Portal</string>
+    <string name="settings_live_hinge_style_zoom">Zoom</string>
+    <string name="settings_live_hinge_speed">Speed</string>
+    <string name="settings_live_hinge_speed_desc">Higher finishes the effect earlier in the opening</string>
+    <string name="settings_live_hinge_preview">Preview: tap to play again. On the phone it follows the hinge</string>
 </resources>

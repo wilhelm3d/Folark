@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -43,6 +44,10 @@ import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.LauncherShell
+import org.arkikeskus.launcher.ui.HingeAngleSource
+import org.arkikeskus.launcher.ui.followHinge
+import org.arkikeskus.launcher.ui.component.liveHingeCurve
+import org.arkikeskus.launcher.ui.component.liveHingeEffect
 import org.arkikeskus.launcher.ui.LauncherShellViewModel
 import org.arkikeskus.launcher.ui.LocalPopupTheme
 import org.arkikeskus.launcher.ui.component.BadgeStyle
@@ -115,6 +120,16 @@ class LauncherActivity : ComponentActivity() {
                 }
             }
 
+            // Live hinge (Inner display ▸ Fold transition): the hinge sensor is read only while
+            // home is started and that transition is chosen for the inner display.
+            val innerSettingsFlow = remember { settingsRepository.settings(ScreenType.INNER) }
+            val innerSettings by innerSettingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
+            val liveHinge = innerSettings.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available
+            LifecycleStartEffect(liveHinge) {
+                if (liveHinge) hinge.start()
+                onStopOrDispose { hinge.stop() }
+            }
+
             var previousFoldState by remember { mutableStateOf(foldState) }
             // Plays the fold transition of the display that was just switched TO.
             val foldTransition = remember { Animatable(1f) }
@@ -151,7 +166,15 @@ class LauncherActivity : ComponentActivity() {
                     return@LaunchedEffect
                 }
                 foldTransition.snapTo(0f)
-                foldTransition.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
+                if (screenType == ScreenType.INNER && liveHinge) {
+                    // Follows the hinge while it moves, then finishes on a short timer (fully open,
+                    // or resting half open).
+                    followHinge(hinge, foldTransition, innerSettings.liveHingeEndAngle.toFloat(), innerSettings.liveHingeSmoothingMs)
+                    val finishMs = (LIVE_FINISH_MS / innerSettings.liveHingeSpeed).toInt().coerceIn(100, 500)
+                    foldTransition.animateTo(1f, tween(durationMillis = finishMs, easing = FastOutSlowInEasing))
+                } else {
+                    foldTransition.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
+                }
             }
 
             LaunchedEffect(settings.allowLandscape) {
@@ -187,13 +210,26 @@ class LauncherActivity : ComponentActivity() {
                     LocalAppLaunchZoom provides settings.appLaunchZoomEnabled,
                 ) {
                     val transitionStyle = settings.foldTransitionStyle
+                    val liveBook = liveHinge && screenType == ScreenType.INNER &&
+                        transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE
                     LauncherShell(
                         homeSignals = homeSignals,
                         shellCommands = shellCommands,
                         onOpenSettings = { startActivity(Intent(this@LauncherActivity, SettingsActivity::class.java)) },
-                        modifier = Modifier.graphicsLayer {
+                        modifier = Modifier.then(
+                            if (liveBook) {
+                                Modifier.liveHingeEffect(
+                                    progress = { liveHingeCurve(foldTransition.value, innerSettings.liveHingeSpeed) },
+                                    style = innerSettings.liveHingeStyle,
+                                    blurDp = innerSettings.liveHingeBlurDp.toFloat(),
+                                    frost = innerSettings.liveHingeFrost,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        ).graphicsLayer {
                             val t = foldTransition.value
-                            if (t >= 1f) return@graphicsLayer
+                            if (t >= 1f || liveBook) return@graphicsLayer
                             alpha = t
                             when (transitionStyle) {
                                 LauncherSettings.TRANSITION_CROSSFADE -> Unit
@@ -206,7 +242,8 @@ class LauncherActivity : ComponentActivity() {
                                     scaleX = 1.08f - 0.08f * t
                                     scaleY = 1.08f - 0.08f * t
                                 }
-                                LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP -> {
+                                // Live hinge folding shut (or without a sensor): the timed book sweep.
+                                LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP, LauncherSettings.TRANSITION_LIVE_HINGE -> {
                                     cameraDistance = 16f * density
                                     transformOrigin = TransformOrigin(0f, 0.5f)
                                     rotationY = (1f - t) * -18f
@@ -222,6 +259,12 @@ class LauncherActivity : ComponentActivity() {
             }
         }
     }
+
+    /** Live hinge: how long the rest of the effect takes once the hinge stops (at speed 1). */
+    private val LIVE_FINISH_MS = 260f
+
+    /** The hinge angle, for the live-hinge fold transition (read only while it is chosen). */
+    private val hinge by lazy { HingeAngleSource(this) }
 
     /** One-shot commands for the shell (currently: open the drawer after an unfold). */
     private val shellCommands = MutableSharedFlow<String>(extraBufferCapacity = 1)

@@ -905,6 +905,10 @@ fun SettingsScreen(
                     LauncherSettings.TRANSITION_CROSSFADE to R.string.settings_transition_crossfade,
                     LauncherSettings.TRANSITION_SCALE to R.string.settings_transition_scale,
                     LauncherSettings.TRANSITION_SLIDE to R.string.settings_transition_slide,
+                ) + listOfNotNull(
+                    // Follows the hinge while opening: the inner display, on phones with a hinge sensor.
+                    (LauncherSettings.TRANSITION_LIVE_HINGE to R.string.settings_transition_live_hinge)
+                        .takeIf { profile == ScreenType.INNER && hasHingeSensor(context) },
                 ),
                 selected = s.foldTransitionStyle,
                 onPick = { viewModel.setFoldTransitionStyle(it, profile); showFoldTransitionPicker = false },
@@ -1534,6 +1538,7 @@ private fun transitionLabel(style: String): String = when (style) {
     LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE -> stringResource(R.string.settings_transition_aquamorphic_ripple)
     LauncherSettings.TRANSITION_SCALE -> stringResource(R.string.settings_transition_scale)
     LauncherSettings.TRANSITION_SLIDE -> stringResource(R.string.settings_transition_slide)
+    LauncherSettings.TRANSITION_LIVE_HINGE -> stringResource(R.string.settings_transition_live_hinge)
     else -> stringResource(R.string.settings_transition_crossfade)
 }
 
@@ -1852,6 +1857,9 @@ private fun DisplayProfilesSection(
             description = transitionLabel(s.foldTransitionStyle),
             onClick = onFoldTransition,
         )
+        if (inner && s.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
+            LiveHingeRows(s = s, viewModel = viewModel)
+        }
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(

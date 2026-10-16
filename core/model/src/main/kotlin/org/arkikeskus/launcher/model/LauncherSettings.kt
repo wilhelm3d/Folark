@@ -296,6 +296,17 @@ data class LauncherSettings(
     val motoWeatherTap: Boolean = true,
     /** The drawer's Private Space section (both displays; where the phone has a Private Space). */
     val showPrivateSpace: Boolean = true,
+    /** Live hinge transition (both displays' settings): the angle the effect ends at (degrees),
+     *  how much the readings are smoothed (ms, 0 = raw) and whether the frosted glass shows. */
+    val liveHingeEndAngle: Int = 165,
+    val liveHingeSmoothingMs: Int = 50,
+    val liveHingeGlass: Boolean = true,
+    /** Live hinge: the effect (one of LIVE_HINGE_STYLE_*), how early in the opening it completes
+     *  (1 = evenly, 2 = done in the first part), and the glass's blur (dp) and frost (0..1). */
+    val liveHingeStyle: String = LIVE_HINGE_STYLE_PAGES,
+    val liveHingeSpeed: Float = 1f,
+    val liveHingeBlurDp: Int = 24,
+    val liveHingeFrost: Float = 0.2f,
     /** Multi-window (both displays): the "Split" drop target shown while an app icon is dragged, and
      *  the "Open in split screen" menu entry. */
     val splitLaunchEnabled: Boolean = true,
@@ -636,6 +647,34 @@ data class LauncherSettings(
         const val TRANSITION_CROSSFADE = "crossfade"
         const val TRANSITION_SCALE = "scale"
         const val TRANSITION_SLIDE = "slide"
+        /** Follows the hinge while the phone opens (needs a hinge sensor; the inner display only). */
+        const val TRANSITION_LIVE_HINGE = "live_hinge"
+        const val MIN_LIVE_HINGE_END_ANGLE = 120
+        const val MAX_LIVE_HINGE_SMOOTHING_MS = 120
+        const val MIN_LIVE_HINGE_SPEED = 0.5f
+        const val MAX_LIVE_HINGE_SPEED = 2.5f
+        const val MAX_LIVE_HINGE_BLUR_DP = 48
+        const val MAX_LIVE_HINGE_FROST = 0.7f
+        /** Two pages folding flat around the hinge. */
+        const val LIVE_HINGE_STYLE_PAGES = "pages"
+        /** Rings spreading from the hinge, like water settling. */
+        const val LIVE_HINGE_STYLE_WATER = "water"
+        /** Black and white and dim, colour flowing in. */
+        const val LIVE_HINGE_STYLE_INK = "ink"
+        /** Out of black. */
+        const val LIVE_HINGE_STYLE_FADE = "fade"
+        /** Falling in from above, as if dropping off the cover screen. */
+        const val LIVE_HINGE_STYLE_DROP = "drop"
+        /** Two halves sliding in to meet at the hinge. */
+        const val LIVE_HINGE_STYLE_DOORS = "doors"
+        /** A circle opening from the hinge. */
+        const val LIVE_HINGE_STYLE_PORTAL = "portal"
+        /** Coming forward out of depth. */
+        const val LIVE_HINGE_STYLE_ZOOM = "zoom"
+        val LIVE_HINGE_STYLES = listOf(
+            LIVE_HINGE_STYLE_PAGES, LIVE_HINGE_STYLE_WATER, LIVE_HINGE_STYLE_INK, LIVE_HINGE_STYLE_FADE,
+            LIVE_HINGE_STYLE_DROP, LIVE_HINGE_STYLE_DOORS, LIVE_HINGE_STYLE_PORTAL, LIVE_HINGE_STYLE_ZOOM,
+        )
 
         const val DEFAULT_BATCH_TIMES = "08:00,12:00,17:00"
     }
