@@ -295,6 +295,11 @@ fun HomeScreen(
                             },
                         )
                         val v = host.createView(context, id, info)
+                        // Android 12+ (API 31+): Automatic Material 3 harmonized colors for third-party widgets
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            val map = android.util.SparseIntArray()
+                            v.setColorResources(map)
+                        }
                         v.setPadding(0, 0, 0, 0)
                         v.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                             widgetScrollableById[id] = v.containsScrollableCollection()

@@ -10,6 +10,7 @@ import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import coil3.ImageLoader
+import coil3.request.CachePolicy
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -69,6 +70,7 @@ object DataModule {
         @ApplicationContext context: Context,
         source: LauncherAppsSource,
     ): ImageLoader = ImageLoader.Builder(context)
+        .diskCachePolicy(CachePolicy.DISABLED) // System icons exist in the APKs, caching them to disk just wastes storage
         .components {
             add(AppIconKeyer())
             add(AppIconFetcher.Factory(source))

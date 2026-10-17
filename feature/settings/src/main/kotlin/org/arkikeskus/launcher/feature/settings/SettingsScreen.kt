@@ -906,9 +906,9 @@ fun SettingsScreen(
                     LauncherSettings.TRANSITION_SCALE to R.string.settings_transition_scale,
                     LauncherSettings.TRANSITION_SLIDE to R.string.settings_transition_slide,
                 ) + listOfNotNull(
-                    // Follows the hinge while opening: the inner display, on phones with a hinge sensor.
+                    // Follows the hinge while opening: on phones with a hinge sensor.
                     (LauncherSettings.TRANSITION_LIVE_HINGE to R.string.settings_transition_live_hinge)
-                        .takeIf { profile == ScreenType.INNER && hasHingeSensor(context) },
+                        .takeIf { hasHingeSensor(context) },
                 ),
                 selected = s.foldTransitionStyle,
                 onPick = { viewModel.setFoldTransitionStyle(it, profile); showFoldTransitionPicker = false },
@@ -1857,7 +1857,7 @@ private fun DisplayProfilesSection(
             description = transitionLabel(s.foldTransitionStyle),
             onClick = onFoldTransition,
         )
-        if (inner && s.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
+        if (s.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
             LiveHingeRows(s = s, viewModel = viewModel)
         }
         ExpressiveRowDivider()

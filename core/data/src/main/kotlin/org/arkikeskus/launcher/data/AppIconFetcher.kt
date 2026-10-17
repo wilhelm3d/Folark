@@ -43,7 +43,8 @@ class AppIconFetcher(
         val canvas = Canvas(tempBitmap)
         drawable.setBounds(0, 0, size, size)
         drawable.draw(canvas)
-        val hardwareBitmap = tempBitmap.copy(Bitmap.Config.HARDWARE, false) ?: tempBitmap
+        // Hardware bitmaps might fail to allocate on low-end devices or during heavy memory pressure.
+        val hardwareBitmap = runCatching { tempBitmap.copy(Bitmap.Config.HARDWARE, false) }.getOrNull() ?: tempBitmap
         // The drawing copy is done with once the icon lives in graphics memory; freeing it now
         // instead of at the next garbage collection keeps a full drawer scroll from piling them up.
         if (hardwareBitmap !== tempBitmap) tempBitmap.recycle()

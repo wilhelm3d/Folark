@@ -92,7 +92,9 @@ class NotificationDotListenerService : NotificationListenerService() {
     @Volatile private var mailPackages: Set<String> = emptySet()
 
     /** Local delivery deadlines, including legacy snoozes made by earlier beta versions. */
-    private val heldUntil = HashMap<String, Long>()
+    private val heldUntil = object : LinkedHashMap<String, Long>(200, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, Long>): Boolean = size > 200
+    }
     private var heldLoaded = false
     private var settingsReady = false
 
@@ -105,7 +107,9 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     /** Keys that have already fired a heads-up, so a FLAG_ONLY_ALERT_ONCE re-post doesn't re-trigger.
      *  Touched only from NLS callbacks (main thread), so it needs no synchronisation. */
-    private val alertedKeys = HashSet<String>()
+    private val alertedKeys = object : LinkedHashMap<String, Boolean>(200, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>): Boolean = size > 200
+    }.keys
 
     private val handler = Handler(Looper.getMainLooper())
     private var snapshotRetriesLeft = 0

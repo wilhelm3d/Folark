@@ -120,11 +120,9 @@ class LauncherActivity : ComponentActivity() {
                 }
             }
 
-            // Live hinge (Inner display ▸ Fold transition): the hinge sensor is read only while
-            // home is started and that transition is chosen for the inner display.
-            val innerSettingsFlow = remember { settingsRepository.settings(ScreenType.INNER) }
-            val innerSettings by innerSettingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
-            val liveHinge = innerSettings.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available
+            // Live hinge (Fold transition): the hinge sensor is read only while
+            // home is started and that transition is chosen for the current display.
+            val liveHinge = settings.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available
             LifecycleStartEffect(liveHinge) {
                 if (liveHinge) hinge.start()
                 onStopOrDispose { hinge.stop() }
@@ -166,11 +164,14 @@ class LauncherActivity : ComponentActivity() {
                     return@LaunchedEffect
                 }
                 foldTransition.snapTo(0f)
-                if (screenType == ScreenType.INNER && liveHinge) {
+                val currentTarget = settingsRepository.settings(screenType).first()
+                if (currentTarget.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available) {
                     // Follows the hinge while it moves, then finishes on a short timer (fully open,
                     // or resting half open).
-                    followHinge(hinge, foldTransition, innerSettings.liveHingeEndAngle.toFloat(), innerSettings.liveHingeSmoothingMs)
-                    val finishMs = (LIVE_FINISH_MS / innerSettings.liveHingeSpeed).toInt().coerceIn(100, 500)
+                    val opening = screenType == ScreenType.INNER
+                    val endAngle = if (opening) currentTarget.liveHingeEndAngle.toFloat() else 0f
+                    followHinge(hinge, foldTransition, endAngle, currentTarget.liveHingeSmoothingMs, opening)
+                    val finishMs = (LIVE_FINISH_MS / currentTarget.liveHingeSpeed).toInt().coerceIn(100, 500)
                     foldTransition.animateTo(1f, tween(durationMillis = finishMs, easing = FastOutSlowInEasing))
                 } else {
                     foldTransition.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
@@ -210,8 +211,7 @@ class LauncherActivity : ComponentActivity() {
                     LocalAppLaunchZoom provides settings.appLaunchZoomEnabled,
                 ) {
                     val transitionStyle = settings.foldTransitionStyle
-                    val liveBook = liveHinge && screenType == ScreenType.INNER &&
-                        transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE
+                    val liveBook = liveHinge && transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE
                     LauncherShell(
                         homeSignals = homeSignals,
                         shellCommands = shellCommands,
@@ -219,10 +219,10 @@ class LauncherActivity : ComponentActivity() {
                         modifier = Modifier.then(
                             if (liveBook) {
                                 Modifier.liveHingeEffect(
-                                    progress = { liveHingeCurve(foldTransition.value, innerSettings.liveHingeSpeed) },
-                                    style = innerSettings.liveHingeStyle,
-                                    blurDp = innerSettings.liveHingeBlurDp.toFloat(),
-                                    frost = innerSettings.liveHingeFrost,
+                                    progress = { liveHingeCurve(foldTransition.value, settings.liveHingeSpeed) },
+                                    style = settings.liveHingeStyle,
+                                    blurDp = settings.liveHingeBlurDp.toFloat(),
+                                    frost = settings.liveHingeFrost,
                                 )
                             } else {
                                 Modifier
@@ -379,8 +379,6 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // A launcher is the device HOME — a host hiccup must never crash it.
-        runCatching { appWidgetHost.startListening() }
         LockAccessibilityService.setHomeVisible(true)
         keepAccessibilityServiceOn()
         // Back from Settings after a restore: rebuild the home screen from the restored layout.
@@ -393,6 +391,8 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // A launcher is the device HOME — a host hiccup must never crash it.
+        runCatching { appWidgetHost.startListening() }
         wasForeground = true
         val cap = org.arkikeskus.launcher.data.SystemControls.peakRefreshRate(this)
             ?.takeIf { it > 0f && it.isFinite() } ?: Float.POSITIVE_INFINITY
@@ -404,9 +404,13 @@ class LauncherActivity : ComponentActivity() {
         requestHighRefreshRate()
     }
 
+    override fun onPause() {
+        super.onPause()
+        runCatching { appWidgetHost.stopListening() }
+    }
+
     override fun onStop() {
         super.onStop()
-        runCatching { appWidgetHost.stopListening() }
         LockAccessibilityService.setHomeVisible(false)
         wasForeground = false
         refreshHandler.removeCallbacks(dropToIdleRefreshRate)

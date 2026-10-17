@@ -189,6 +189,16 @@ class LauncherAppsSource @Inject constructor(
             override fun onPackageRemoved(packageName: String, user: UserHandle) {
                 val serial = runCatching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
                 _packageRemovals.tryEmit(packageName to serial)
+                
+                // Clear any orphaned icons out of Coil's memory cache to free RAM instantly
+                runCatching {
+                    val memoryCache = imageLoader.get().memoryCache
+                    if (memoryCache != null) {
+                        val prefix = "$packageName/"
+                        memoryCache.keys.filter { it.key.startsWith(prefix) }.forEach { memoryCache.remove(it) }
+                    }
+                }
+                
                 packageEvent(packageName)
             }
             override fun onPackageChanged(packageName: String, user: UserHandle) =

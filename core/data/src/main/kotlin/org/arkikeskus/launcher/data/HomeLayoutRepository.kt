@@ -3,6 +3,9 @@ package org.arkikeskus.launcher.data
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import org.arkikeskus.launcher.data.local.HomeItemDao
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.data.local.HomeItemEntity.Companion.HOME
@@ -38,7 +41,12 @@ open class HomeLayoutRepository @Inject constructor(
 ) {
     /** All rows (home items, folders, folder children); the ViewModel partitions by container. */
     // Room re-runs the query on any change to the table, the other screen's rows included.
-    fun homeItems(screenType: ScreenType): Flow<List<HomeItemEntity>> = dao.observeAll(screenType.name).distinctUntilChanged()
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    fun homeItems(screenType: ScreenType): Flow<List<HomeItemEntity>> = 
+        dao.observeAll(screenType.name)
+            .conflate()
+            .debounce(100L)
+            .distinctUntilChanged()
 
     suspend fun addToHome(appItem: AppItem, columns: Int, rows: Int, screenType: ScreenType) {
         db.withTransaction {

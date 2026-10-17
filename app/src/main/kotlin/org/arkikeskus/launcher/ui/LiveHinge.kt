@@ -76,6 +76,7 @@ internal suspend fun followHinge(
     progress: Animatable<Float, AnimationVector1D>,
     endAngle: Float,
     smoothingMs: Int,
+    opening: Boolean = true,
 ) {
     val started = SystemClock.uptimeMillis()
     // The first reading after the screen came on (the listener may have just started).
@@ -84,8 +85,17 @@ internal suspend fun followHinge(
     }
     val first = hinge.angle
     if (first.isNaN()) return
-    val end = endAngle.coerceIn(MIN_SPAN, 180f)
-    val startAngle = first.coerceIn(0f, end - MIN_SPAN)
+    
+    val startAngle: Float
+    val end: Float
+    if (opening) {
+        end = endAngle.coerceIn(MIN_SPAN, 180f)
+        startAngle = first.coerceIn(0f, end - MIN_SPAN)
+    } else {
+        end = endAngle.coerceIn(0f, 180f - MIN_SPAN)
+        startAngle = first.coerceIn(end + MIN_SPAN, 180f)
+    }
+    
     var shown = progress.value
     var lastFrame = 0L
     while (true) {
@@ -93,7 +103,13 @@ internal suspend fun followHinge(
         val dtMs = if (lastFrame == 0L) 0f else (frame - lastFrame) / 1_000_000f
         lastFrame = frame
         val angle = hinge.angle
-        val target = if (angle.isNaN()) shown else ((angle - startAngle) / (end - startAngle)).coerceIn(0f, 1f)
+        val target = if (angle.isNaN()) shown else {
+            if (opening) {
+                ((angle - startAngle) / (end - startAngle)).coerceIn(0f, 1f)
+            } else {
+                ((startAngle - angle) / (startAngle - end)).coerceIn(0f, 1f)
+            }
+        }
         shown = if (smoothingMs <= 0) target else shown + (target - shown) * (1f - exp(-dtMs / smoothingMs))
         progress.snapTo(shown)
         if (shown >= DONE) return
