@@ -107,9 +107,11 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     /** Keys that have already fired a heads-up, so a FLAG_ONLY_ALERT_ONCE re-post doesn't re-trigger.
      *  Touched only from NLS callbacks (main thread), so it needs no synchronisation. */
-    private val alertedKeys = object : LinkedHashMap<String, Boolean>(200, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>): Boolean = size > 200
-    }.keys
+    private val alertedKeys = java.util.Collections.newSetFromMap(
+        object : LinkedHashMap<String, Boolean>(200, 0.75f, true) {
+            override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>): Boolean = size > 200
+        }
+    )
 
     private val handler = Handler(Looper.getMainLooper())
     private var snapshotRetriesLeft = 0
