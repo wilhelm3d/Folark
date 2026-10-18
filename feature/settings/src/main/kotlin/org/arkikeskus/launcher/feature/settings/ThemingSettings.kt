@@ -177,6 +177,14 @@ internal fun ThemingExtrasSection(
             onDismiss = { showPhoneWallpapers = false },
         )
     }
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val path = withContext(Dispatchers.IO) { copyHomeBackground(context, uri, screenType, suffix = ".mp4") }
+                if (path != null) viewModel.setHomeBackgroundImage(path, screenType)
+            }
+        }
+    }
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_home_backdrop),
         icon = Icons.Rounded.Palette,
@@ -211,6 +219,12 @@ internal fun ThemingExtrasSection(
                 else R.string.settings_home_background_set,
             ),
             onClick = { runCatching { pickBackground.launch("image/*") } },
+        )
+        ExpressiveRowDivider()
+        ExpressiveActionItem(
+            title = stringResource(R.string.settings_home_video),
+            description = stringResource(R.string.settings_home_video_desc),
+            onClick = { runCatching { pickVideo.launch("video/*") } },
         )
         if (phoneWallpapers.isNotEmpty()) {
             ExpressiveRowDivider()
@@ -639,10 +653,11 @@ private fun deleteHomeBackgrounds(context: Context, screenType: ScreenType) {
  * name carries a timestamp so a newly picked picture is never served from the image cache of the
  * previous one.
  */
-private fun copyHomeBackground(context: Context, uri: Uri, screenType: ScreenType): String? {
+private fun copyHomeBackground(context: Context, uri: Uri, screenType: ScreenType, suffix: String = ""): String? {
     return runCatching {
         // Copy first, then drop the older pictures: a failed copy must leave the current one in place.
-        val target = File(context.filesDir, homeBackgroundPrefix(screenType) + System.currentTimeMillis())
+        // A video keeps its extension: that is how home tells it from a picture.
+        val target = File(context.filesDir, homeBackgroundPrefix(screenType) + System.currentTimeMillis() + suffix)
         val input = context.contentResolver.openInputStream(uri) ?: return null
         val copied = runCatching { input.use { source -> target.outputStream().use { source.copyTo(it) } } }.isSuccess
         if (!copied) {
@@ -689,6 +704,7 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
         options = listOf(
             LauncherSettings.APP_OPEN_SYSTEM to stringResource(R.string.settings_anim_system),
             LauncherSettings.APP_OPEN_ICON to stringResource(R.string.settings_anim_icon),
+            LauncherSettings.APP_OPEN_REVEAL to stringResource(R.string.settings_anim_reveal),
             LauncherSettings.APP_OPEN_ZOOM to stringResource(R.string.settings_anim_zoom),
             LauncherSettings.APP_OPEN_SLIDE to stringResource(R.string.settings_anim_slide),
             LauncherSettings.APP_OPEN_FADE to stringResource(R.string.settings_anim_fade),

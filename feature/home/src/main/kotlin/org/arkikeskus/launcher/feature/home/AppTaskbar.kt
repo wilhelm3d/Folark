@@ -30,6 +30,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
 import android.view.Gravity
@@ -37,6 +38,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -61,11 +63,14 @@ import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.AppUsageRepository
 import org.arkikeskus.launcher.data.LauncherAppsSource
+import org.arkikeskus.launcher.data.NotificationBadgeRepository
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.ui.component.DEFAULT_NUDGE_COLOR
 import kotlin.math.abs
 
 @EntryPoint
@@ -75,6 +80,7 @@ internal interface AppTaskbarEntryPoint {
     fun appRepository(): AppRepository
     fun appUsageRepository(): AppUsageRepository
     fun launcherAppsSource(): LauncherAppsSource
+    fun notificationBadgeRepository(): NotificationBadgeRepository
 }
 
 /** Everything the bar draws from, in one value so a change rebuilds it once. */
@@ -108,6 +114,12 @@ private data class TaskbarSetup(
     val splitControls: Boolean,
     val splitSide: String,
     val threeApp: Boolean,
+    val hideFullScreen: Boolean,
+    val liveEnabled: Boolean,
+    val liveEffect: String,
+    val nudgeEnabled: Boolean,
+    val nudgeEffect: String,
+    val nudgeSoftness: Float,
 )
 
 /**
@@ -141,6 +153,11 @@ internal class AppTaskbar(private val context: Context) {
     private var screenOn = true
     private val shown = mutableListOf<View>()
     private var shownMode = MODE_NONE
+
+    /** An invisible 1-pixel window that hears whether Android's bars are shown: when an app goes
+     *  full screen (video, games) they are hidden, and the kept-open bar steps aside. */
+    private var probe: View? = null
+    private var fullScreen = false
     private var expanded = false
     private var recentsJob: Job? = null
     private val collapse = Runnable { expanded = false; mediaControlsOpen = false; refresh() }
@@ -183,6 +200,14 @@ internal class AppTaskbar(private val context: Context) {
     private var mediaHiddenAt = 0L
     private var lastMediaTapAt = 0L
     private val mediaSingleTap = Runnable { toggleMediaCard() }
+
+    /** What is going on now (timers, navigation, downloads), and the pill showing it. */
+    private var live: List<LiveActivity> = emptyList()
+    private var livePill: TaskbarLivePill? = null
+    private var liveIndex = 0
+
+    /** The app icons on the bar now, by badgeKey, for the notification nudge. */
+    private val iconViews = HashMap<String, View>()
 
     private var repository: AppRepository? = null
     private var source: LauncherAppsSource? = null
@@ -262,6 +287,12 @@ internal class AppTaskbar(private val context: Context) {
                     splitControls = s.taskbarSplitControls,
                     splitSide = s.taskbarSplitSide,
                     threeApp = s.taskbarThreeApp,
+                    hideFullScreen = s.taskbarHideFullScreen,
+                    liveEnabled = s.liveActivities && s.liveActivitiesTaskbar,
+                    liveEffect = s.liveActivityEffect,
+                    nudgeEnabled = s.iconNudge && s.iconNudgeTaskbar,
+                    nudgeEffect = s.iconNudgeEffect,
+                    nudgeSoftness = s.iconNudgeSoftness,
                 )
             }.distinctUntilChanged().collect { next ->
                 val previous = setup
@@ -276,6 +307,29 @@ internal class AppTaskbar(private val context: Context) {
                 // Only Folark's own launch order moved (every launch): rebuild only if the recent apps changed.
                 val onlyHistory = previous != null && previous.copy(launchHistory = next.launchHistory) == next
                 loadRecents(rebuild = true, force = !onlyHistory)
+            }
+        }
+        // A new notification: its app's icon on the bar nudges (not in battery saver).
+        scope.launch {
+            entry.notificationBadgeRepository().nudges.collect { n ->
+                val s = setup ?: return@collect
+                if (!s.nudgeEnabled || (shownMode != MODE_BAR && shownMode != MODE_BAR_FIXED)) return@collect
+                if (context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true) return@collect
+                iconViews[n.badgeKey]?.let { playTaskbarNudge(it, s.nudgeEffect, n.color ?: DEFAULT_NUDGE_COLOR, s.nudgeSoftness) }
+            }
+        }
+        // Live activities: the pill follows them; it appears or goes with a rebuild of the bar.
+        scope.launch {
+            entry.notificationBadgeRepository().live.collect { next ->
+                val had = live.isNotEmpty()
+                live = next
+                val pill = livePill
+                if (pill != null && next.isNotEmpty() && had) {
+                    pill.activity = next[liveIndex % next.size]
+                    pill.extra = next.size - 1
+                } else if (had != next.isNotEmpty()) {
+                    refresh(rebuild = shownMode == MODE_BAR || shownMode == MODE_BAR_FIXED)
+                }
             }
         }
         // An app update, a new icon style or icon pack: drawn again.
@@ -293,6 +347,7 @@ internal class AppTaskbar(private val context: Context) {
         handler.removeCallbacksAndMessages(null)
         runCatching { context.unregisterReceiver(screenReceiver) }
         remove()
+        ensureProbe(false)
     }
 
     // ------------------------------------------------------------------ what is on screen
@@ -303,8 +358,9 @@ internal class AppTaskbar(private val context: Context) {
     /** Re-evaluates whether the taskbar belongs on screen, and in which form. */
     fun refresh(rebuild: Boolean = false) {
         val s = setup
+        ensureProbe(s != null && s.enabled && s.hideFullScreen && s.keepOpen && screenOn && largeScreen())
         val active = s != null && s.enabled && screenOn && largeScreen() && keyguard?.isKeyguardLocked != true &&
-            (s.pinned.isNotEmpty() || recents.isNotEmpty() || mediaShown(s))
+            (s.pinned.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
         if (!active || s == null) {
             expanded = false
             remove()
@@ -313,7 +369,8 @@ internal class AppTaskbar(private val context: Context) {
         val mode = when {
             homeVisible && s.onHome -> MODE_BAR_FIXED
             homeVisible -> MODE_NONE
-            s.keepOpen -> MODE_BAR_FIXED
+            // Full screen (a video, a game): no bar covering it; a corner swipe still opens it.
+            s.keepOpen && !(s.hideFullScreen && fullScreen) -> MODE_BAR_FIXED
             expanded -> MODE_BAR
             else -> MODE_HANDLES
         }
@@ -324,6 +381,34 @@ internal class AppTaskbar(private val context: Context) {
             MODE_HANDLES -> showHandles(s)
         }
         shownMode = mode
+    }
+
+    private fun ensureProbe(wanted: Boolean) {
+        if (!wanted) {
+            probe?.let { runCatching { windowManager.removeView(it) } }
+            probe = null
+            fullScreen = false
+            return
+        }
+        if (probe != null) return
+        val view = View(context)
+        view.setOnApplyWindowInsetsListener { v, insets ->
+            val barsShown = insets.isVisible(WindowInsets.Type.statusBars()) ||
+                insets.isVisible(WindowInsets.Type.navigationBars())
+            if (fullScreen == barsShown) {
+                fullScreen = !barsShown
+                handler.post { refresh() }
+            }
+            v.onApplyWindowInsets(insets)
+        }
+        val params = WindowManager.LayoutParams(
+            1,
+            1,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply { gravity = Gravity.TOP or Gravity.START }
+        if (runCatching { windowManager.addView(view, params) }.isSuccess) probe = view
     }
 
     /** The home screen came to the front or left it. */
@@ -345,6 +430,8 @@ internal class AppTaskbar(private val context: Context) {
     }
 
     private fun remove() {
+        livePill = null
+        iconViews.clear()
         shown.forEach { runCatching { windowManager.removeView(it) } }
         shown.clear()
         shownMode = MODE_NONE
@@ -445,7 +532,9 @@ internal class AppTaskbar(private val context: Context) {
         }
         val size = dp(s.iconSizeDp)
         fun addIcon(app: AppItem) {
-            row.addView(iconView(app, s, size, hint, fixed), LinearLayout.LayoutParams(size, size).apply {
+            val view = iconView(app, s, size, hint, fixed)
+            iconViews[app.badgeKey] = view
+            row.addView(view, LinearLayout.LayoutParams(size, size).apply {
                 marginStart = dp(s.spacingDp) / 2
                 marginEnd = dp(s.spacingDp) / 2
             })
@@ -457,6 +546,32 @@ internal class AppTaskbar(private val context: Context) {
             row.addView(mediaIconView(s, size, controls, fixed), LinearLayout.LayoutParams(size, size).apply {
                 marginStart = dp(s.spacingDp) / 2
                 marginEnd = dp(s.spacingDp) / 2
+            })
+        }
+        livePill = null
+        if (s.liveEnabled && live.isNotEmpty()) {
+            val pill = TaskbarLivePill(context, size + dp(10), s.liveEffect, lightTheme).apply {
+                activity = live[liveIndex % live.size]
+                extra = live.size - 1
+                setOnClickListener {
+                    val current = activity ?: return@setOnClickListener
+                    current.contentIntent?.let { sendNotificationIntent(context, it) }
+                    if (!fixed) {
+                        expanded = false
+                        refresh()
+                    }
+                }
+                // A long press shows the next one when there are several.
+                setOnLongClickListener {
+                    if (live.size < 2) return@setOnLongClickListener false
+                    liveIndex = (liveIndex + 1) % live.size
+                    activity = live[liveIndex]
+                    true
+                }
+            }
+            livePill = pill
+            row.addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, size + dp(10)).apply {
+                marginEnd = dp(4) + dp(s.spacingDp) / 2
             })
         }
         if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_START) addMedia()

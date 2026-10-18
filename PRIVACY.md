@@ -32,7 +32,12 @@ public, so every claim here can be verified:
   apps, custom app labels, most-used ordering and similar; stored locally.
 - **Notification data** — if you grant notification access, notifications are
   read to show dots/badges, status-bar icons and the optional notification and
-  people widgets, including their open, reply and dismiss actions. Message text
+  people widgets, including their open, reply and dismiss actions. The same
+  data shows an app's latest notifications in its long-press menu, the
+  sender's photo on a chat app's dot, a short nudge of an app's icon when a
+  notification arrives, and ongoing activities (timers,
+  navigation, calls, downloads) as a live pill on home and on the taskbar; each
+  can be switched off in Settings ▸ Notifications, and none of it is stored. Message text
   is processed in memory and never stored persistently or transmitted by the
   launcher; replies are sent through the originating app. People you pin and
   identity links you create are saved in settings, including any matched contact
@@ -40,6 +45,14 @@ public, so every claim here can be verified:
   Optional batch delivery delays only launcher surfaces; Android notifications,
   sounds and pop-ups remain active. Notification keys and delivery times are
   saved locally to retain waiting state after a restart and excluded from backups.
+- **Clipboard history** — only while the clipboard history widget is on your
+  home screen, Folark keeps the last 30 texts you copied, to show them and copy
+  them again. Android lets only the app in front read the clipboard, so Folark
+  looks when the home screen comes into view (Android may show its "pasted from
+  your clipboard" notice then). Texts Android marks as sensitive, such as
+  passwords and one-time codes, are never kept. The list is stored in a private
+  file on the device, is not part of backups and is never transmitted; "Clear
+  all" in the widget, removing a clip, or uninstalling deletes it.
 - **Backups** — Settings ▸ Backup & restore writes a backup file to the
   location you choose, and, if you turn on automatic backup, keeps one
   up-to-date copy in a folder you pick, refreshed at most once a day. A backup
@@ -88,7 +101,7 @@ to the server; the requests identify themselves with a generic
 |---|---|
 | `QUERY_ALL_PACKAGES` | Listing and launching your installed apps — the launcher's core purpose |
 | `ACCESS_HIDDEN_PROFILES` | Android 15+: showing your Private Space in the app drawer as a separate, locked section. While it is locked Folark lists none of its apps; unlocked, its apps appear only in that section (never on home, in search, in widgets or in the usage counts). Locking and unlocking go through Android, which asks for your screen lock. Nothing about it is stored or transmitted |
-| Notification access (`BIND_NOTIFICATION_LISTENER_SERVICE`) | Notification dots/badges, status-bar icons, notification and people widgets, and local batch delivery |
+| Notification access (`BIND_NOTIFICATION_LISTENER_SERVICE`) | Notification dots/badges (optionally with the sender's photo), status-bar icons, notification and people widgets, notifications in the long-press menu, the live activity pill, and local batch delivery |
 | Accessibility service (`BIND_ACCESSIBILITY_SERVICE`, opt-in) | The double-tap-to-lock gesture and, if you turn it on in settings, Folark's taskbar on the unfolded screen (the service draws the taskbar's corner touch zones and app icons in overlay windows, starts the app you pick, and asks Android to split the screen when you drag an icon for split screen). The service receives no accessibility events and cannot read screen content, and only runs if you enable it yourself |
 | `DUMP` (opt-in, only via a one-time `adb shell pm grant` you run yourself) | The taskbar's split screen: Folark reads Android's list of recent tasks to find the task number of the app it just opened, and sends Android's split-screen commands; the split screen button also reads which apps are in the split screen, to offer swapping sides or one app full screen. Read on the device for that moment only, never stored or transmitted |
 | Usage access (`PACKAGE_USAGE_STATS`, opt-in) | The taskbar's recent apps: which apps were brought to the front in the last hours. Read on the device when the taskbar is shown, never stored or transmitted. Only if you allow it in Android's settings |
@@ -96,6 +109,7 @@ to the server; the requests identify themselves with a generic
 | `READ_CALENDAR` | Showing your next event in the clock widget |
 | `READ_CONTACTS` | Contact results in app search and matching people-widget contacts (opt-in) |
 | `READ_PHONE_STATE` | Signal-strength indicator in the status bar |
+| `SET_ALARM` | Search actions: "timer 10 min" or "alarm 7:30" hands your clock app the timer or alarm, which it shows you to confirm. Folark reads no alarms. Search actions (timers, alarms, events, directions, email, notes, phone numbers) only open the matching app with the typed text filled in; nothing typed is stored or transmitted by Folark |
 | `ACCESS_COARSE_LOCATION` | Weather in the clock widget |
 | `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `BLUETOOTH` (≤ Android 11) | Connectivity indicators in the status bar |
 | `INTERNET` | The weather requests described above |

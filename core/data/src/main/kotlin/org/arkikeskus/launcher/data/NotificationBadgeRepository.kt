@@ -7,6 +7,10 @@ import android.os.SystemClock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import org.arkikeskus.launcher.model.LiveActivity
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +39,9 @@ data class StatusNotification(
     val color: Int? = null,
     val actions: List<Notification.Action> = emptyList(),
 )
+
+/** A new notification for an app ([badgeKey] = "packageName/userSerial"), to nudge its icon. */
+data class NotificationNudge(val badgeKey: String, val color: Int?, val time: Long)
 
 /**
  * Holds the current notification-dot counts, keyed by [org.arkikeskus.launcher.model.AppItem.badgeKey]
@@ -69,6 +76,22 @@ class NotificationBadgeRepository @Inject constructor() {
      *  Like [icons], rebuilt from scratch on every listener snapshot and never persisted. */
     private val _people = MutableStateFlow<List<PersonTileState>>(emptyList())
     val people: StateFlow<List<PersonTileState>> = _people.asStateFlow()
+
+    /** New notifications as they arrive, for the icon nudge (not replayed to late subscribers). */
+    private val _nudges = MutableSharedFlow<NotificationNudge>(extraBufferCapacity = 16)
+    val nudges: SharedFlow<NotificationNudge> = _nudges.asSharedFlow()
+
+    fun nudge(badgeKey: String, color: Int?) {
+        _nudges.tryEmit(NotificationNudge(badgeKey, color, System.currentTimeMillis()))
+    }
+
+    /** Ongoing activities (timers, navigation, calls, downloads, live updates), most important first. */
+    private val _live = MutableStateFlow<List<LiveActivity>>(emptyList())
+    val live: StateFlow<List<LiveActivity>> = _live.asStateFlow()
+
+    fun setLive(activities: List<LiveActivity>) {
+        if (_live.value != activities) _live.value = activities
+    }
 
     /** Replaces the per-person snapshot with a fresh one from the listener. */
     fun setPeople(people: List<PersonTileState>) {

@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:launcher"))
     implementation(libs.androidx.window)
+    implementation(libs.androidx.compose.material.icons.extended)
     testImplementation(libs.junit)
     testImplementation(libs.google.truth)
     testImplementation(libs.kotlinx.coroutines.test)

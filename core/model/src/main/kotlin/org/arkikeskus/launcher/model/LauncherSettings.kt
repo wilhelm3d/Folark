@@ -109,8 +109,6 @@ data class LauncherSettings(
     /** Use theme surfaces for built-in widgets; false keeps the translucent wallpaper style. */
     val widgetTonalBackground: Boolean = false,
     val notificationWidgetCountStyle: String = COUNT_NUMBER,
-    /** Double-tap on empty home-screen space locks the screen (needs the lock accessibility service). */
-    val doubleTapToLock: Boolean = false,
     /** What the built-in people widget shows of a notification on the (shared) home screen:
      *  [PRIVACY_ALL] = sender + message text, [PRIVACY_SENDER] = sender only, [PRIVACY_COUNT] = the
      *  tile colors and counts but shows no text at all (pinned people keep their user-chosen name). */
@@ -138,13 +136,15 @@ data class LauncherSettings(
     val swipeUpAction: String = GESTURE_DRAWER,
     /** Enable tabletop / half-opened layout mode when the device is half-folded. */
     val halfOpenedModeEnabled: Boolean = false,
+    /** Half folded: home leans with the hinge (needs the half-folded layout and a hinge sensor). */
+    val hingeTilt: Boolean = true,
     /** AMOLED dark mode (pure black backgrounds and surfaces). */
     val amoledDark: Boolean = false,
     val foldAction: String = ACTION_STAY,
     val unfoldAction: String = ACTION_STAY,
-    val outerWallpaperScale: Float = 1.0f,
-    val innerWallpaperScale: Float = 1.0f,
     val foldTransitionStyle: String = TRANSITION_BOOK_UNFOLD_SWEEP,
+    /** How fast this display's switch animation plays (1 = normal; higher is faster). */
+    val foldTransitionSpeed: Float = 1f,
     val aquamorphicTouchEnabled: Boolean = true,
     val appLaunchZoomEnabled: Boolean = true,
     val pageBounceEnabled: Boolean = true,
@@ -284,10 +284,10 @@ data class LauncherSettings(
     val taskbarSplitControls: Boolean = true,
     /** Taskbar: the side a new split-screen app opens on, one of TASKBAR_SPLIT_SIDE_*. */
     val taskbarSplitSide: String = TASKBAR_SPLIT_SIDE_RIGHT,
-    /** Use Android's on-device AI (AppPredictionManager) for Taskbar recents instead of just time-based history. */
-    val taskbarAppPrediction: Boolean = true,
     /** Taskbar: a drag over two apps side by side can add a third (Android's drop zones). */
     val taskbarThreeApp: Boolean = true,
+    /** Taskbar: kept-open bar steps aside while an app is full screen (video, games). */
+    val taskbarHideFullScreen: Boolean = true,
     /** Look of the settings screens (both displays), one of SETTINGS_STYLE_*. */
     val settingsStyle: String = SETTINGS_STYLE_STUDIO,
     /** Shape of app icons (both displays), one of ICON_SHAPE_*; "system" leaves them as drawn. */
@@ -296,15 +296,32 @@ data class LauncherSettings(
     val motoWeatherTap: Boolean = true,
     /** The drawer's Private Space section (both displays; where the phone has a Private Space). */
     val showPrivateSpace: Boolean = true,
+    /** An app's long-press menu lists its current notifications (both displays). */
+    val popupNotifications: Boolean = true,
+    /** Chat apps' notification dots show the sender's photo (both displays). */
+    val dotAvatars: Boolean = true,
+    /** Ongoing things (a timer, navigation, a call, a download, Android 16 live updates) as a
+     *  live pill at the top of home, and on the taskbar; [liveActivityEffect] is one of LIVE_EFFECT_*. */
+    val liveActivities: Boolean = true,
+    val liveActivitiesTaskbar: Boolean = true,
+    val liveActivityEffect: String = LIVE_EFFECT_GLOW,
+    /** An app's icon nudges when a new notification arrives while home is in view, and on the
+     *  taskbar; [iconNudgeEffect] is one of NUDGE_*. */
+    val iconNudge: Boolean = true,
+    val iconNudgeTaskbar: Boolean = true,
+    val iconNudgeEffect: String = NUDGE_BOUNCE,
+    /** How soft Glow, Heartbeat and Colour are (0 = strong and sharp, 1 = gentle and wide). */
+    val iconNudgeSoftness: Float = 0.5f,
+    /** Quick actions in search: timers, alarms, events, directions, email, notes, numbers. */
+    val searchActions: Boolean = true,
     /** Live hinge transition (both displays' settings): the angle the effect ends at (degrees),
-     *  how much the readings are smoothed (ms, 0 = raw) and whether the frosted glass shows. */
+     *  and how much the readings are smoothed (ms, 0 = raw). */
     val liveHingeEndAngle: Int = 165,
     val liveHingeSmoothingMs: Int = 50,
-    val liveHingeGlass: Boolean = true,
-    /** Live hinge: the effect (one of LIVE_HINGE_STYLE_*), how early in the opening it completes
-     *  (1 = evenly, 2 = done in the first part), and the glass's blur (dp) and frost (0..1). */
+    /** Live hinge: the effect (one of LIVE_HINGE_STYLE_*), and its blur (dp) and frost (0..1). */
     val liveHingeStyle: String = LIVE_HINGE_STYLE_PAGES,
-    val liveHingeSpeed: Float = 1f,
+    /** The effect the outer display plays (on a timer) when the phone is closed. */
+    val liveHingeOuterStyle: String = LIVE_HINGE_STYLE_WATER,
     val liveHingeBlurDp: Int = 24,
     val liveHingeFrost: Float = 0.2f,
     /** Multi-window (both displays): the "Split" drop target shown while an app icon is dragged, and
@@ -518,7 +535,9 @@ data class LauncherSettings(
         const val APP_OPEN_SLIDE = "slide"
         const val APP_OPEN_FADE = "fade"
         const val APP_OPEN_NONE = "none"
-        val APP_OPENS = listOf(APP_OPEN_SYSTEM, APP_OPEN_ICON, APP_OPEN_ZOOM, APP_OPEN_SLIDE, APP_OPEN_FADE, APP_OPEN_NONE)
+        /** The app's window is revealed from the icon that was tapped (a growing clip). */
+        const val APP_OPEN_REVEAL = "reveal"
+        val APP_OPENS = listOf(APP_OPEN_SYSTEM, APP_OPEN_ICON, APP_OPEN_REVEAL, APP_OPEN_ZOOM, APP_OPEN_SLIDE, APP_OPEN_FADE, APP_OPEN_NONE)
         const val FOLDER_ANIM_SHEET = "sheet"
         const val FOLDER_ANIM_ZOOM = "zoom"
         const val FOLDER_ANIM_FADE = "fade"
@@ -649,10 +668,10 @@ data class LauncherSettings(
         const val TRANSITION_SLIDE = "slide"
         /** Follows the hinge while the phone opens (needs a hinge sensor; the inner display only). */
         const val TRANSITION_LIVE_HINGE = "live_hinge"
+        const val MIN_FOLD_TRANSITION_SPEED = 0.4f
+        const val MAX_FOLD_TRANSITION_SPEED = 2.5f
         const val MIN_LIVE_HINGE_END_ANGLE = 120
         const val MAX_LIVE_HINGE_SMOOTHING_MS = 120
-        const val MIN_LIVE_HINGE_SPEED = 0.5f
-        const val MAX_LIVE_HINGE_SPEED = 2.5f
         const val MAX_LIVE_HINGE_BLUR_DP = 48
         const val MAX_LIVE_HINGE_FROST = 0.7f
         /** Two pages folding flat around the hinge. */
@@ -674,6 +693,31 @@ data class LauncherSettings(
         val LIVE_HINGE_STYLES = listOf(
             LIVE_HINGE_STYLE_PAGES, LIVE_HINGE_STYLE_WATER, LIVE_HINGE_STYLE_INK, LIVE_HINGE_STYLE_FADE,
             LIVE_HINGE_STYLE_DROP, LIVE_HINGE_STYLE_DOORS, LIVE_HINGE_STYLE_PORTAL, LIVE_HINGE_STYLE_ZOOM,
+        )
+
+        /** Live activity pill effects: a breathing halo, a light sweeping across, filling up with
+         *  the progress, a light running round the rim, a gentle pulse, drifting colour, or none. */
+        /** Icon nudge effects: a hop, a shake, a heartbeat, a halo, rings spreading, squash and stretch. */
+        const val NUDGE_BOUNCE = "bounce"
+        const val NUDGE_WIGGLE = "wiggle"
+        const val NUDGE_PULSE = "pulse"
+        const val NUDGE_GLOW = "glow"
+        const val NUDGE_RIPPLE = "ripple"
+        const val NUDGE_JELLY = "jelly"
+        /** The icon fills with the app's colour. */
+        const val NUDGE_TINT = "tint"
+        val NUDGE_EFFECTS = listOf(NUDGE_BOUNCE, NUDGE_WIGGLE, NUDGE_PULSE, NUDGE_GLOW, NUDGE_RIPPLE, NUDGE_JELLY, NUDGE_TINT)
+
+        const val LIVE_EFFECT_GLOW = "glow"
+        const val LIVE_EFFECT_SHIMMER = "shimmer"
+        const val LIVE_EFFECT_PROGRESS = "progress"
+        const val LIVE_EFFECT_ORBIT = "orbit"
+        const val LIVE_EFFECT_BREATHE = "breathe"
+        const val LIVE_EFFECT_AURORA = "aurora"
+        const val LIVE_EFFECT_STILL = "still"
+        val LIVE_EFFECTS = listOf(
+            LIVE_EFFECT_GLOW, LIVE_EFFECT_SHIMMER, LIVE_EFFECT_PROGRESS, LIVE_EFFECT_ORBIT,
+            LIVE_EFFECT_BREATHE, LIVE_EFFECT_AURORA, LIVE_EFFECT_STILL,
         )
 
         const val DEFAULT_BATCH_TIMES = "08:00,12:00,17:00"

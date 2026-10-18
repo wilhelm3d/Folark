@@ -126,7 +126,21 @@ fun AppActionPopup(
         }
     }
 
+    // The app's own notifications, newest first, above its shortcuts.
+    val notifications = LocalAppNotifications.current
+        .filter { it.packageName == app.packageName && it.userSerial == app.userSerial }
+        .take(MAX_POPUP_NOTIFICATIONS)
+
     ExpressivePopupCard(anchor = anchor, preferAbove = preferAbove, onDismiss = onDismiss) {
+        notifications.forEach { notification ->
+            PopupNotificationRow(notification, onOpened = onDismiss)
+        }
+        if (notifications.isNotEmpty()) {
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 4.dp),
+                color = LocalExpressivePalette.current.trackOff,
+            )
+        }
         shortcuts.forEach { shortcut ->
             ShortcutPopupRow(
                 text = shortcut.label,

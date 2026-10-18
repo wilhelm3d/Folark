@@ -147,6 +147,8 @@ fun WidgetPickerScreen(
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_TOP_APPS), stringResource(R.string.top_apps_widget_name)),
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_STATS), stringResource(R.string.stats_widget_name)),
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_NOTE), stringResource(R.string.note_widget_name)),
+        WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_CLIPBOARD), stringResource(R.string.clipboard_widget_name)),
+        WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_MIXER), stringResource(R.string.mixer_widget_name)),
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_WEATHER_DAY), stringResource(R.string.weather_day_widget_name)),
         WidgetOption(WidgetChoice.Builtin(HomeItemEntity.BUILTIN_WEATHER_BIG), stringResource(R.string.weather_big_widget_name)),
     )
@@ -637,6 +639,8 @@ private fun InnerGalleryWidgetCard(
             HomeItemEntity.BUILTIN_TOP_APPS -> columns to 1
             HomeItemEntity.BUILTIN_STATS -> minOf(columns, 3) to 1
             HomeItemEntity.BUILTIN_NOTE -> minOf(columns, 3) to 2
+            HomeItemEntity.BUILTIN_CLIPBOARD -> minOf(columns, 4) to 3
+            HomeItemEntity.BUILTIN_MIXER -> columns to 3
             HomeItemEntity.BUILTIN_WEATHER_DAY -> minOf(columns, 4) to 2
             HomeItemEntity.BUILTIN_WEATHER_BIG -> columns to 4
             else -> columns to 2
@@ -1052,7 +1056,7 @@ private fun BuiltinWidgetPreview(type: String, modifier: Modifier) {
                 HomeItemEntity.BUILTIN_SAMSUNG_WEATHER -> SamsungWeatherWidget(Modifier.fillMaxSize())
                 HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS -> InteractiveNotificationWidget(Modifier.fillMaxSize())
                 HomeItemEntity.BUILTIN_MEDIA, HomeItemEntity.BUILTIN_TOP_APPS,
-                HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE,
+                HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE, HomeItemEntity.BUILTIN_CLIPBOARD, HomeItemEntity.BUILTIN_MIXER,
                 HomeItemEntity.BUILTIN_WEATHER_DAY, HomeItemEntity.BUILTIN_WEATHER_BIG -> BuiltinWidget(type, Modifier.fillMaxSize())
                 else -> SmartspaceWidget(Modifier.fillMaxSize())
             }

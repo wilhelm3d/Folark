@@ -42,6 +42,7 @@ import org.arkikeskus.launcher.data.PersonEventKind
 import org.arkikeskus.launcher.data.ReplyAction
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.StatusNotification
+import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 
@@ -92,9 +93,7 @@ class NotificationDotListenerService : NotificationListenerService() {
     @Volatile private var mailPackages: Set<String> = emptySet()
 
     /** Local delivery deadlines, including legacy snoozes made by earlier beta versions. */
-    private val heldUntil = object : LinkedHashMap<String, Long>(200, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<String, Long>): Boolean = size > 200
-    }
+    private val heldUntil = HashMap<String, Long>()
     private var heldLoaded = false
     private var settingsReady = false
 
@@ -107,11 +106,7 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     /** Keys that have already fired a heads-up, so a FLAG_ONLY_ALERT_ONCE re-post doesn't re-trigger.
      *  Touched only from NLS callbacks (main thread), so it needs no synchronisation. */
-    private val alertedKeys = java.util.Collections.newSetFromMap(
-        object : LinkedHashMap<String, Boolean>(200, 0.75f, true) {
-            override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>): Boolean = size > 200
-        }
-    )
+    private val alertedKeys = HashSet<String>()
 
     private val handler = Handler(Looper.getMainLooper())
     private var snapshotRetriesLeft = 0
@@ -133,6 +128,15 @@ class NotificationDotListenerService : NotificationListenerService() {
     }
 
     private companion object {
+        /** Notification categories that are about something going on now. */
+        val LIVE_CATEGORIES = setOf(
+            Notification.CATEGORY_CALL,
+            Notification.CATEGORY_NAVIGATION,
+            Notification.CATEGORY_STOPWATCH,
+            Notification.CATEGORY_WORKOUT,
+            Notification.CATEGORY_LOCATION_SHARING,
+        )
+
         const val TAG = "NotifDots"
         const val MAX_SNAPSHOT_RETRIES = 2
         const val SNAPSHOT_RETRY_DELAY_MS = 500L
@@ -218,6 +222,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         badgeRepository.setAllNotifications(emptyList())
         badgeRepository.setPeople(emptyList())
         alertedKeys.clear()
+        nudgedKeys.clear()
         // Aggressive OEM battery managers (Samsung, Xiaomi, …) can unbind the listener; ask the system
         // to rebind so dots + status-bar icons come back on their own instead of the user having to
         // re-toggle notification access. No-op if the system declines.
@@ -230,7 +235,62 @@ class NotificationDotListenerService : NotificationListenerService() {
         // as an inset, so this is the only app-observable signal — see the audit note in StatusBar).
         if (sbn != null && isHeadsUpWorthy(sbn) && shouldAlert(sbn)) badgeRepository.notifyHeadsUp()
         if (sbn != null && settingsReady) holdForBatch(sbn)
+        if (sbn != null) runCatching { maybeNudge(sbn) }
         refreshWithRetries()
+    }
+
+    /** Notifications that already nudged their app's icon (a silent update must not nudge again). */
+    private val nudgedKeys = HashSet<String>()
+
+    /**
+     * A new notification someone would want to notice: its app's icon nudges on home and on the
+     * taskbar. Not for ongoing ones, silent ones, ones held for the batch, or quiet updates.
+     */
+    private fun maybeNudge(sbn: StatusBarNotification) {
+        val n = sbn.notification ?: return
+        if ((n.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE)) != 0) return
+        if (sbn.key in heldUntil) return
+        val first = nudgedKeys.add(sbn.key)
+        if (!first && (n.flags and Notification.FLAG_ONLY_ALERT_ONCE) != 0) return
+        val ranking = runCatching { currentRanking }.getOrNull()
+        val tmp = Ranking()
+        if (!isBadgeWorthy(sbn, ranking, tmp)) return
+        if (ranking?.getRanking(sbn.key, tmp) == true && tmp.importance < NotificationManager.IMPORTANCE_DEFAULT) return
+        val serial = runCatching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
+        val color = n.color.takeIf { it != Notification.COLOR_DEFAULT && it != 0 } ?: iconColor(sbn.packageName)
+        badgeRepository.nudge("${sbn.packageName}/$serial", color)
+    }
+
+    private val iconColors = HashMap<String, Int?>()
+
+    /** The most vivid colour of an app's icon (its brand colour, usually), or null for a grey one. */
+    private fun iconColor(pkg: String): Int? = iconColors.getOrPut(pkg) {
+        runCatching {
+            val drawable = packageManager.getApplicationIcon(pkg)
+            val size = 24
+            val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            drawable.setBounds(0, 0, size, size)
+            drawable.draw(android.graphics.Canvas(bitmap))
+            val hsv = FloatArray(3)
+            var weight = 0f
+            var r = 0f
+            var g = 0f
+            var b = 0f
+            for (y in 0 until size) for (x in 0 until size) {
+                val c = bitmap.getPixel(x, y)
+                if (android.graphics.Color.alpha(c) < 200) continue
+                android.graphics.Color.colorToHSV(c, hsv)
+                // Vivid, not too dark or washed out, counts most.
+                val w = hsv[1] * hsv[1] * hsv[2]
+                if (w < 0.05f) continue
+                weight += w
+                r += android.graphics.Color.red(c) * w
+                g += android.graphics.Color.green(c) * w
+                b += android.graphics.Color.blue(c) * w
+            }
+            bitmap.recycle()
+            if (weight < 1f) null else android.graphics.Color.rgb((r / weight).toInt(), (g / weight).toInt(), (b / weight).toInt())
+        }.getOrNull()
     }
 
     /** Keep the notification active in Android so every new message can be checked for exceptions. */
@@ -247,6 +307,7 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
         if (sbn != null) alertedKeys.remove(sbn.key)
+        if (sbn != null) nudgedKeys.remove(sbn.key)
         // A user snoozing an already-held notification leaves its deadline intact. Only a real
         // removal (dismissed or cancelled by the app) forgets it.
         if (sbn != null && reason != REASON_SNOOZED && heldUntil.remove(sbn.key) != null) persistHeld()
@@ -283,6 +344,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         val openable = HashMap<String, StatusNotification>()
         val allNotifs = ArrayList<StatusNotification>()
         val people = ArrayList<PersonEntry>()
+        val live = ArrayList<LiveActivity>()
         val now = System.currentTimeMillis()
         val activeKeys = active.filterNotNull().map { it.key }.toSet()
         val released = heldUntil.filter { (key, until) ->
@@ -304,6 +366,8 @@ class NotificationDotListenerService : NotificationListenerService() {
                 isIconWorthy(sbn) && (sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) == 0 ->
                     runCatching { appEntry(sbn, serial) }.getOrNull()?.let(people::add)
             }
+            // Live pill: what is going on right now (never held: it is about this moment).
+            runCatching { liveEntry(sbn, serial) }.getOrNull()?.let(live::add)
             // Only launcher surfaces wait. Android's shade, sound and heads-up remain unchanged.
             if (sbn.key in heldUntil) continue
             // Dots: strict badge-worthy filter (meaningful home-icon badges).
@@ -370,6 +434,7 @@ class NotificationDotListenerService : NotificationListenerService() {
             }.sortedByDescending { it.postTime },
         )
         badgeRepository.setAllNotifications(allNotifs.sortedByDescending { it.postTime })
+        badgeRepository.setLive(live.sortedWith(compareByDescending<LiveActivity> { livePriority(it) }.thenByDescending { it.postTime }))
         // Migration: earlier betas snoozed in Android. Those existing snoozes cannot be released
         // through the public listener API; keep showing them until Android delivers them.
         if (heldUntil.isNotEmpty()) {
@@ -655,6 +720,65 @@ class NotificationDotListenerService : NotificationListenerService() {
      * We only drop group summaries (they duplicate their children's icons). Notably it does NOT consult
      * `canShowBadge()`, which is what the strict [isBadgeWorthy] dot filter uses.
      */
+    /**
+     * An ongoing notification about something happening right now, as a [LiveActivity]: Android 16
+     * live updates (promoted ongoing), anything with a running clock (timers, stopwatches, calls),
+     * navigation, a workout, location sharing, or a task with a progress bar (downloads, uploads).
+     * Media has its own widget and taskbar icon, so players are left out; so is Folark itself.
+     */
+    private fun liveEntry(sbn: StatusBarNotification, serial: Long): LiveActivity? {
+        val n = sbn.notification ?: return null
+        if (sbn.packageName == packageName) return null
+        if ((n.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return null
+        val ongoing = (n.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE)) != 0
+        val promoted = Build.VERSION.SDK_INT >= 36 && (n.flags and Notification.FLAG_PROMOTED_ONGOING) != 0
+        if (!ongoing && !promoted) return null
+        val extras = n.extras
+        if (extras?.containsKey(Notification.EXTRA_MEDIA_SESSION) == true) return null
+        val chronometer = extras?.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER) == true && n.`when` > 0L
+        val max = extras?.getInt(Notification.EXTRA_PROGRESS_MAX) ?: 0
+        val indeterminate = extras?.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) == true
+        val category = n.category
+        val live = promoted || chronometer || max > 0 || indeterminate || category in LIVE_CATEGORIES
+        if (!live) return null
+        val critical = if (Build.VERSION.SDK_INT >= 36) runCatching { n.shortCriticalText }.getOrNull() else null
+        val title = extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() }
+            ?: appLabel(sbn.packageName)
+        return LiveActivity(
+            key = sbn.key,
+            packageName = sbn.packageName,
+            userSerial = serial,
+            icon = n.smallIcon,
+            color = n.color.takeIf { it != Notification.COLOR_DEFAULT },
+            title = title,
+            text = extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty(),
+            critical = critical,
+            chronometerBase = if (chronometer) n.`when` else 0L,
+            countDown = extras?.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN) == true,
+            progress = if (max > 0) ((extras?.getInt(Notification.EXTRA_PROGRESS) ?: 0).toFloat() / max).coerceIn(0f, 1f) else null,
+            indeterminate = indeterminate,
+            category = category,
+            postTime = sbn.postTime,
+            contentIntent = n.contentIntent,
+        )
+    }
+
+    /** Live updates and calls first, then navigation and clocks, then progress bars. */
+    private fun livePriority(a: LiveActivity): Int = when {
+        a.critical != null -> 4
+        a.category == Notification.CATEGORY_CALL -> 4
+        a.category == Notification.CATEGORY_NAVIGATION -> 3
+        a.chronometerBase > 0L -> 2
+        else -> 1
+    }
+
+    private val labels = HashMap<String, String>()
+
+    private fun appLabel(pkg: String): String = labels.getOrPut(pkg) {
+        runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }
+            .getOrDefault(pkg)
+    }
+
     private fun isIconWorthy(sbn: StatusBarNotification): Boolean {
         val n = sbn.notification ?: return false
         if ((n.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return false

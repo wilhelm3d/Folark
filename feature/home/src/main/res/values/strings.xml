@@ -212,4 +212,15 @@
     <string name="taskbar_media_pause">Pause</string>
     <string name="taskbar_media_next">Next</string>
     <string name="gesture_moto_unavailable">This phone doesn\'t have that Motorola screen</string>
+    <string name="clipboard_widget_name">Clipboard history</string>
+    <string name="clipboard_widget_title">Clipboard</string>
+    <string name="clipboard_widget_empty">Copy something, then come back home: it shows up here</string>
+    <string name="clipboard_copy">Copy again</string>
+    <string name="clipboard_copied">Copied</string>
+    <string name="clipboard_clear">Clear all</string>
+    <string name="mixer_widget_name">Media mixer</string>
+    <string name="mixer_widget_title">Playing</string>
+    <string name="mixer_per_app">Per-app volume</string>
+    <string name="mixer_nothing_playing">Nothing is playing</string>
+    <string name="mixer_media_volume">Media volume</string>
 </resources>

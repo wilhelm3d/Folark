@@ -295,11 +295,6 @@ fun HomeScreen(
                             },
                         )
                         val v = host.createView(context, id, info)
-                        // Android 12+ (API 31+): Automatic Material 3 harmonized colors for third-party widgets
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                            val map = android.util.SparseIntArray()
-                            v.setColorResources(map)
-                        }
                         v.setPadding(0, 0, 0, 0)
                         v.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                             widgetScrollableById[id] = v.containsScrollableCollection()
@@ -577,6 +572,8 @@ fun HomeScreen(
         // own small composable, so a resume, a pause or the drawer covering home recomposes only that.
         val parallaxOffset = remember { mutableStateOf<State<Offset>?>(null) }
         HomeParallax(enabledSetting = settings.parallaxWallpaper, out = parallaxOffset)
+        // Half folded: home leans with the hinge (HingeTilt.kt), read in the layer below.
+        val hingeFold = rememberHingeFold(enabled = settings.hingeTilt && halfFoldHinge != null && !LocalBatterySaver.current)
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -586,6 +583,19 @@ fun HomeScreen(
                 // A plain layer: moving it reuses what every icon and widget already drew.
                 translationX = shift.x
                 translationY = shift.y
+                val fold = hingeFold.value
+                if (fold > 0f) {
+                    cameraDistance = 20f * density
+                    if (tabletopHinge != null) {
+                        // Tabletop: the upper half stands up, and home leans back with it.
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                        rotationX = fold * HINGE_TILT_DEG
+                    } else {
+                        // Book: home turns a little towards the crease.
+                        rotationY = -fold * HINGE_TILT_DEG * 0.6f
+                        translationX += fold * HINGE_SHIFT * size.width
+                    }
+                }
             }
             // Root-level, Initial-pass swipe detector: a flick up/down anywhere on home (over icons,
             // folders, shortcuts or the dock — not just empty space) drives the drawer/notifications.

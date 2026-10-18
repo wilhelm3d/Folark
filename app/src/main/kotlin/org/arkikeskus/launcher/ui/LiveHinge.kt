@@ -76,7 +76,8 @@ internal suspend fun followHinge(
     progress: Animatable<Float, AnimationVector1D>,
     endAngle: Float,
     smoothingMs: Int,
-    opening: Boolean = true,
+    /** The most the effect may advance per millisecond (the display's transition speed). */
+    maxPerMs: Float = Float.POSITIVE_INFINITY,
 ) {
     val started = SystemClock.uptimeMillis()
     // The first reading after the screen came on (the listener may have just started).
@@ -85,17 +86,8 @@ internal suspend fun followHinge(
     }
     val first = hinge.angle
     if (first.isNaN()) return
-    
-    val startAngle: Float
-    val end: Float
-    if (opening) {
-        end = endAngle.coerceIn(MIN_SPAN, 180f)
-        startAngle = first.coerceIn(0f, end - MIN_SPAN)
-    } else {
-        end = endAngle.coerceIn(0f, 180f - MIN_SPAN)
-        startAngle = first.coerceIn(end + MIN_SPAN, 180f)
-    }
-    
+    val end = endAngle.coerceIn(MIN_SPAN, 180f)
+    val startAngle = first.coerceIn(0f, end - MIN_SPAN)
     var shown = progress.value
     var lastFrame = 0L
     while (true) {
@@ -103,14 +95,12 @@ internal suspend fun followHinge(
         val dtMs = if (lastFrame == 0L) 0f else (frame - lastFrame) / 1_000_000f
         lastFrame = frame
         val angle = hinge.angle
-        val target = if (angle.isNaN()) shown else {
-            if (opening) {
-                ((angle - startAngle) / (end - startAngle)).coerceIn(0f, 1f)
-            } else {
-                ((startAngle - angle) / (startAngle - end)).coerceIn(0f, 1f)
-            }
-        }
-        shown = if (smoothingMs <= 0) target else shown + (target - shown) * (1f - exp(-dtMs / smoothingMs))
+        val target = if (angle.isNaN()) shown else ((angle - startAngle) / (end - startAngle)).coerceIn(0f, 1f)
+        val before = shown
+        val eased = if (smoothingMs <= 0) target else shown + (target - shown) * (1f - exp(-dtMs / smoothingMs))
+        // However fast the phone is opened, the effect plays at no more than its own speed.
+        val limit = maxPerMs * dtMs
+        shown = eased.coerceIn(before - limit, before + limit)
         progress.snapTo(shown)
         if (shown >= DONE) return
         val now = SystemClock.uptimeMillis()

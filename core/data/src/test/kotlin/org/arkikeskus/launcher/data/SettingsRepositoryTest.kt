@@ -150,18 +150,6 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `doubleTapToLock defaults to false and round-trips`() = runTest {
-        val repo = newRepository()
-        assertThat(repo.settings.first().doubleTapToLock).isFalse()
-
-        repo.setDoubleTapToLock(true)
-        assertThat(repo.settings.first().doubleTapToLock).isTrue()
-
-        repo.setDoubleTapToLock(false)
-        assertThat(repo.settings.first().doubleTapToLock).isFalse()
-    }
-
-    @Test
     fun `showFrequentApps defaults to false and round-trips`() = runTest {
         val repo = newRepository()
         assertThat(repo.settings.first().showFrequentApps).isFalse()
@@ -361,18 +349,14 @@ class SettingsRepositoryTest {
         val repo = newRepository()
         repo.setFoldAction(LauncherSettings.ACTION_PAGE_0, ScreenType.OUTER)
         repo.setUnfoldAction(LauncherSettings.ACTION_SEARCH, ScreenType.INNER)
-        repo.setOuterWallpaperScale(1.5f)
-        repo.setInnerWallpaperScale(1.2f)
         repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_SLIDE)
 
         val outerSettings = repo.settings(ScreenType.OUTER).first()
         assertThat(outerSettings.foldAction).isEqualTo(LauncherSettings.ACTION_PAGE_0)
-        assertThat(outerSettings.outerWallpaperScale).isEqualTo(1.5f)
         assertThat(outerSettings.foldTransitionStyle).isEqualTo(LauncherSettings.TRANSITION_SLIDE)
 
         val innerSettings = repo.settings(ScreenType.INNER).first()
         assertThat(innerSettings.unfoldAction).isEqualTo(LauncherSettings.ACTION_SEARCH)
-        assertThat(innerSettings.innerWallpaperScale).isEqualTo(1.2f)
     }
 
     @Test
@@ -454,21 +438,17 @@ class SettingsRepositoryTest {
         val repo = newRepository()
         repo.setLeftSwipeAppKey("app.outer", ScreenType.OUTER)
         repo.setRightSwipeAppKey("app.outer.right", ScreenType.OUTER)
-        repo.setDoubleTapToLock(true, ScreenType.OUTER)
 
         repo.setLeftSwipeAppKey("app.inner", ScreenType.INNER)
         repo.setRightSwipeAppKey("app.inner.right", ScreenType.INNER)
-        repo.setDoubleTapToLock(false, ScreenType.INNER)
 
         val outer = repo.settings(ScreenType.OUTER).first()
         assertThat(outer.leftSwipeAppKey).isEqualTo("app.outer")
         assertThat(outer.rightSwipeAppKey).isEqualTo("app.outer.right")
-        assertThat(outer.doubleTapToLock).isTrue()
 
         val inner = repo.settings(ScreenType.INNER).first()
         assertThat(inner.leftSwipeAppKey).isEqualTo("app.inner")
         assertThat(inner.rightSwipeAppKey).isEqualTo("app.inner.right")
-        assertThat(inner.doubleTapToLock).isFalse()
     }
 
     @Test

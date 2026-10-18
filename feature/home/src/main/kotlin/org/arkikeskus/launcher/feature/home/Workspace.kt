@@ -1598,7 +1598,7 @@ fun Workspace(
                                             HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS ->
                                                 InteractiveNotificationWidget(modifier = Modifier.fillMaxSize())
                                             HomeItemEntity.BUILTIN_MEDIA, HomeItemEntity.BUILTIN_TOP_APPS,
-                                            HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE,
+                                            HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE, HomeItemEntity.BUILTIN_CLIPBOARD, HomeItemEntity.BUILTIN_MIXER,
                                 HomeItemEntity.BUILTIN_WEATHER_DAY, HomeItemEntity.BUILTIN_WEATHER_BIG ->
                                                 BuiltinWidget(space.type, Modifier.fillMaxSize())
                                             else -> SmartspaceWidget(modifier = Modifier.fillMaxSize())
@@ -2465,7 +2465,7 @@ private fun WidgetStackContainer(
                                 HomeItemEntity.BUILTIN_SAMSUNG_WEATHER -> SamsungWeatherWidget(Modifier.fillMaxSize())
                                 HomeItemEntity.BUILTIN_INTERACTIVE_NOTIFICATIONS -> InteractiveNotificationWidget(Modifier.fillMaxSize())
                                 HomeItemEntity.BUILTIN_MEDIA, HomeItemEntity.BUILTIN_TOP_APPS,
-                                HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE,
+                                HomeItemEntity.BUILTIN_STATS, HomeItemEntity.BUILTIN_NOTE, HomeItemEntity.BUILTIN_CLIPBOARD, HomeItemEntity.BUILTIN_MIXER,
                                 HomeItemEntity.BUILTIN_WEATHER_DAY, HomeItemEntity.BUILTIN_WEATHER_BIG ->
                                     BuiltinWidget(child.type, Modifier.fillMaxSize())
                                 else -> SmartspaceWidget(Modifier.fillMaxSize())

@@ -2,7 +2,7 @@ package org.arkikeskus.launcher.feature.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.runtime.LaunchedEffect
@@ -168,8 +168,7 @@ fun FolderDialog(
         LaunchedEffect(folder.id) {
             progress.animateTo(1f, tween((240 / animationSpeed.coerceAtLeast(0.1f)).toInt(), easing = FastOutSlowInEasing))
         }
-        @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-        BasicAlertDialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.88f)

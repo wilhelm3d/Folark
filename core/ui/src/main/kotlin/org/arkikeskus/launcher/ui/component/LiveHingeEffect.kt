@@ -105,9 +105,10 @@ fun Modifier.liveHingeEffect(progress: () -> Float, style: String, blurDp: Float
         }
     }
 
-/** How far along the effect is for a hinge [raw] progress: [speed] above 1 finishes it earlier in the opening. */
-fun liveHingeCurve(raw: Float, speed: Float): Float =
-    (1f - (1f - raw.coerceIn(0f, 1f)).pow(speed.coerceIn(0.25f, 4f))).coerceIn(0f, 1f)
+/** How long the timed version (outer display, after closing) takes at [speed]. */
+fun liveHingeTimedMs(speed: Float): Int = (TIMED_EFFECT_MS / speed.coerceIn(0.25f, 4f)).toInt().coerceIn(250, 1_400)
+
+private const val TIMED_EFFECT_MS = 650f
 
 private fun ContentDrawScope.page(camera: Camera, matrix: Matrix, hingeX: Float, degrees: Float) {
     drawIntoCanvas { canvas ->

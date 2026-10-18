@@ -191,7 +191,6 @@ class SettingsRepository @Inject constructor(
             widgetTonalBackground = p[Keys.widgetTonalBackground(screenType)] ?: false,
             notificationWidgetCountStyle = (p[Keys.notificationWidgetCountStyle(screenType)] ?: LauncherSettings.COUNT_NUMBER)
                 .let { if (it == LauncherSettings.COUNT_DOT || it == LauncherSettings.COUNT_NONE) it else LauncherSettings.COUNT_NUMBER },
-            doubleTapToLock = p[Keys.doubleTapToLock(screenType)] ?: false,
             peoplePrivacy = (p[Keys.PEOPLE_PRIVACY] ?: LauncherSettings.PRIVACY_ALL).let {
                 if (it == LauncherSettings.PRIVACY_SENDER || it == LauncherSettings.PRIVACY_COUNT) it
                 else LauncherSettings.PRIVACY_ALL
@@ -214,6 +213,7 @@ class SettingsRepository @Inject constructor(
                 if (it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_NONE) it else LauncherSettings.GESTURE_DRAWER
             },
             halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
+            hingeTilt = p[Keys.HINGE_TILT] ?: true,
             splitLaunchEnabled = p[Keys.SPLIT_LAUNCH_ENABLED] ?: true,
             floatingLaunchEnabled = p[Keys.FLOATING_LAUNCH_ENABLED] ?: true,
             minusOneScreen = p[Keys.MINUS_ONE_SCREEN] ?: LauncherSettings.MINUS_ONE_NONE,
@@ -224,8 +224,8 @@ class SettingsRepository @Inject constructor(
             unfoldAction = (p[Keys.unfoldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
                 if (it == LauncherSettings.ACTION_SEARCH || it == LauncherSettings.ACTION_DRAWER) it else LauncherSettings.ACTION_STAY
             },
-            outerWallpaperScale = (p[Keys.OUTER_WALLPAPER_SCALE] ?: 1.0f).coerceIn(1.0f, 2.5f),
-            innerWallpaperScale = (p[Keys.INNER_WALLPAPER_SCALE] ?: 1.0f).coerceIn(1.0f, 2.5f),
+            foldTransitionSpeed = (p[Keys.foldTransitionSpeed(screenType)] ?: 1f)
+                .coerceIn(LauncherSettings.MIN_FOLD_TRANSITION_SPEED, LauncherSettings.MAX_FOLD_TRANSITION_SPEED),
             foldTransitionStyle = (p[Keys.foldTransitionStyle(screenType)] ?: LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP).let {
                 if (it == LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP ||
                     it == LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE ||
@@ -319,20 +319,31 @@ class SettingsRepository @Inject constructor(
             taskbarQuickSwitch = p[Keys.TASKBAR_QUICK_SWITCH] ?: true,
             taskbarSplitControls = p[Keys.TASKBAR_SPLIT_CONTROLS] ?: true,
             taskbarSplitSide = p[Keys.TASKBAR_SPLIT_SIDE] ?: LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT,
-            taskbarAppPrediction = p[Keys.TASKBAR_APP_PREDICTION] ?: true,
             taskbarThreeApp = p[Keys.TASKBAR_THREE_APP] ?: true,
+            taskbarHideFullScreen = p[Keys.TASKBAR_HIDE_FULL_SCREEN] ?: true,
             settingsStyle = p[Keys.SETTINGS_STYLE] ?: LauncherSettings.SETTINGS_STYLE_STUDIO,
             iconShape = (p[Keys.ICON_SHAPE] ?: LauncherSettings.ICON_SHAPE_SYSTEM)
                 .let { if (it in LauncherSettings.ICON_SHAPES) it else LauncherSettings.ICON_SHAPE_SYSTEM },
             motoWeatherTap = p[Keys.MOTO_WEATHER_TAP] ?: true,
             showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
+            popupNotifications = p[Keys.POPUP_NOTIFICATIONS] ?: true,
+            dotAvatars = p[Keys.DOT_AVATARS] ?: true,
+            liveActivities = p[Keys.LIVE_ACTIVITIES] ?: true,
+            liveActivitiesTaskbar = p[Keys.LIVE_ACTIVITIES_TASKBAR] ?: true,
+            liveActivityEffect = (p[Keys.LIVE_ACTIVITY_EFFECT] ?: LauncherSettings.LIVE_EFFECT_GLOW)
+                .let { if (it in LauncherSettings.LIVE_EFFECTS) it else LauncherSettings.LIVE_EFFECT_GLOW },
+            searchActions = p[Keys.SEARCH_ACTIONS] ?: true,
+            iconNudge = p[Keys.ICON_NUDGE] ?: true,
+            iconNudgeTaskbar = p[Keys.ICON_NUDGE_TASKBAR] ?: true,
+            iconNudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
+                .let { if (it in LauncherSettings.NUDGE_EFFECTS) it else LauncherSettings.NUDGE_BOUNCE },
+            iconNudgeSoftness = (p[Keys.ICON_NUDGE_SOFTNESS] ?: 0.5f).coerceIn(0f, 1f),
             liveHingeEndAngle = (p[Keys.LIVE_HINGE_END_ANGLE] ?: 165).coerceIn(LauncherSettings.MIN_LIVE_HINGE_END_ANGLE, 180),
             liveHingeSmoothingMs = (p[Keys.LIVE_HINGE_SMOOTHING] ?: 50).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_SMOOTHING_MS),
-            liveHingeGlass = p[Keys.LIVE_HINGE_GLASS] ?: true,
             liveHingeStyle = (p[Keys.LIVE_HINGE_STYLE] ?: LauncherSettings.LIVE_HINGE_STYLE_PAGES)
                 .let { if (it in LauncherSettings.LIVE_HINGE_STYLES) it else LauncherSettings.LIVE_HINGE_STYLE_PAGES },
-            liveHingeSpeed = (p[Keys.LIVE_HINGE_SPEED] ?: 1f)
-                .coerceIn(LauncherSettings.MIN_LIVE_HINGE_SPEED, LauncherSettings.MAX_LIVE_HINGE_SPEED),
+            liveHingeOuterStyle = (p[Keys.LIVE_HINGE_OUTER_STYLE] ?: LauncherSettings.LIVE_HINGE_STYLE_WATER)
+                .let { if (it in LauncherSettings.LIVE_HINGE_STYLES) it else LauncherSettings.LIVE_HINGE_STYLE_WATER },
             liveHingeBlurDp = (p[Keys.LIVE_HINGE_BLUR] ?: 24).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_BLUR_DP),
             liveHingeFrost = (p[Keys.LIVE_HINGE_FROST] ?: 0.2f).coerceIn(0f, LauncherSettings.MAX_LIVE_HINGE_FROST),
             weatherWidgetAnimated = p[Keys.WEATHER_WIDGET_ANIMATED] ?: true,
@@ -425,10 +436,11 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setFoldAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.foldAction(screenType)] = value }
     suspend fun setUnfoldAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.unfoldAction(screenType)] = value }
-    suspend fun setOuterWallpaperScale(value: Float) = edit { it[Keys.OUTER_WALLPAPER_SCALE] = value.coerceIn(1.0f, 2.5f) }
-    suspend fun setInnerWallpaperScale(value: Float) = edit { it[Keys.INNER_WALLPAPER_SCALE] = value.coerceIn(1.0f, 2.5f) }
     suspend fun setFoldTransitionStyle(value: String, screenType: ScreenType = ScreenType.OUTER) = edit {
         it[Keys.foldTransitionStyle(screenType)] = value
+    }
+    suspend fun setFoldTransitionSpeed(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit {
+        it[Keys.foldTransitionSpeed(screenType)] = value
     }
     suspend fun setAquamorphicTouchEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.aquamorphicTouchEnabled(screenType)] = value }
     suspend fun setAppLaunchZoomEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.appLaunchZoomEnabled(screenType)] = value }
@@ -513,17 +525,25 @@ class SettingsRepository @Inject constructor(
     suspend fun setTaskbarQuickSwitch(value: Boolean) = edit { it[Keys.TASKBAR_QUICK_SWITCH] = value }
     suspend fun setTaskbarSplitControls(value: Boolean) = edit { it[Keys.TASKBAR_SPLIT_CONTROLS] = value }
     suspend fun setTaskbarSplitSide(value: String) = edit { it[Keys.TASKBAR_SPLIT_SIDE] = value }
-    suspend fun setTaskbarAppPrediction(value: Boolean) = edit { it[Keys.TASKBAR_APP_PREDICTION] = value }
     suspend fun setTaskbarThreeApp(value: Boolean) = edit { it[Keys.TASKBAR_THREE_APP] = value }
     suspend fun setSettingsStyle(value: String) = edit { it[Keys.SETTINGS_STYLE] = value }
     suspend fun setIconShape(value: String) = edit { it[Keys.ICON_SHAPE] = value }
     suspend fun setMotoWeatherTap(value: Boolean) = edit { it[Keys.MOTO_WEATHER_TAP] = value }
     suspend fun setShowPrivateSpace(value: Boolean) = edit { it[Keys.SHOW_PRIVATE_SPACE] = value }
+    suspend fun setPopupNotifications(value: Boolean) = edit { it[Keys.POPUP_NOTIFICATIONS] = value }
+    suspend fun setDotAvatars(value: Boolean) = edit { it[Keys.DOT_AVATARS] = value }
+    suspend fun setLiveActivities(value: Boolean) = edit { it[Keys.LIVE_ACTIVITIES] = value }
+    suspend fun setLiveActivitiesTaskbar(value: Boolean) = edit { it[Keys.LIVE_ACTIVITIES_TASKBAR] = value }
+    suspend fun setLiveActivityEffect(value: String) = edit { it[Keys.LIVE_ACTIVITY_EFFECT] = value }
+    suspend fun setSearchActions(value: Boolean) = edit { it[Keys.SEARCH_ACTIONS] = value }
+    suspend fun setIconNudge(value: Boolean) = edit { it[Keys.ICON_NUDGE] = value }
+    suspend fun setIconNudgeTaskbar(value: Boolean) = edit { it[Keys.ICON_NUDGE_TASKBAR] = value }
+    suspend fun setIconNudgeEffect(value: String) = edit { it[Keys.ICON_NUDGE_EFFECT] = value }
+    suspend fun setIconNudgeSoftness(value: Float) = edit { it[Keys.ICON_NUDGE_SOFTNESS] = value.coerceIn(0f, 1f) }
     suspend fun setLiveHingeEndAngle(value: Int) = edit { it[Keys.LIVE_HINGE_END_ANGLE] = value }
     suspend fun setLiveHingeSmoothing(value: Int) = edit { it[Keys.LIVE_HINGE_SMOOTHING] = value }
-    suspend fun setLiveHingeGlass(value: Boolean) = edit { it[Keys.LIVE_HINGE_GLASS] = value }
     suspend fun setLiveHingeStyle(value: String) = edit { it[Keys.LIVE_HINGE_STYLE] = value }
-    suspend fun setLiveHingeSpeed(value: Float) = edit { it[Keys.LIVE_HINGE_SPEED] = value }
+    suspend fun setLiveHingeOuterStyle(value: String) = edit { it[Keys.LIVE_HINGE_OUTER_STYLE] = value }
     suspend fun setLiveHingeBlur(value: Int) = edit { it[Keys.LIVE_HINGE_BLUR] = value }
     suspend fun setLiveHingeFrost(value: Float) = edit { it[Keys.LIVE_HINGE_FROST] = value }
 
@@ -817,6 +837,8 @@ class SettingsRepository @Inject constructor(
     suspend fun setDoubleTapAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.doubleTapAction(screenType)] = value }
     suspend fun setSwipeUpAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.swipeUpAction(screenType)] = value }
     suspend fun setHalfOpenedModeEnabled(value: Boolean) = edit { it[Keys.HALF_OPENED_ENABLED] = value }
+    suspend fun setHingeTilt(value: Boolean) = edit { it[Keys.HINGE_TILT] = value }
+    suspend fun setTaskbarHideFullScreen(value: Boolean) = edit { it[Keys.TASKBAR_HIDE_FULL_SCREEN] = value }
     suspend fun setSplitLaunchEnabled(value: Boolean) = edit { it[Keys.SPLIT_LAUNCH_ENABLED] = value }
     suspend fun setFloatingLaunchEnabled(value: Boolean) = edit { it[Keys.FLOATING_LAUNCH_ENABLED] = value }
     suspend fun setAmoledDark(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.amoledDark(screenType)] = value }
@@ -970,8 +992,6 @@ class SettingsRepository @Inject constructor(
     /** Locks/unlocks the desktop layout (blocks moving/removing/adding home + dock items). */
     suspend fun setDesktopLocked(value: Boolean) = edit { it[Keys.DESKTOP_LOCKED] = value }
 
-    /** Toggles double-tap to lock screen. */
-    suspend fun setDoubleTapToLock(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.doubleTapToLock(screenType)] = value }
 
     /** Whether the app drawer reopens at the top vs. remembers its last scroll position. */
     suspend fun setDrawerOpensAtTop(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerOpensAtTop(screenType)] = value }
@@ -1133,6 +1153,7 @@ class SettingsRepository @Inject constructor(
 
         fun aquamorphicTouchEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "aquamorphic_touch_enabled" else "aquamorphic_touch_enabled_inner")
         fun foldTransitionStyle(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "fold_transition_style_outer" else "fold_transition_style_inner")
+        fun foldTransitionSpeed(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "fold_transition_speed_outer" else "fold_transition_speed_inner")
         fun appLaunchZoomEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "app_launch_zoom_enabled" else "app_launch_zoom_enabled_inner")
         fun pageBounceEnabled(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "page_bounce_enabled" else "page_bounce_enabled_inner")
         fun iconSizeScale(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "icon_size_scale" else "icon_size_scale_inner")
@@ -1200,18 +1221,26 @@ class SettingsRepository @Inject constructor(
         val TASKBAR_QUICK_SWITCH = booleanPreferencesKey("taskbar_quick_switch")
         val TASKBAR_SPLIT_CONTROLS = booleanPreferencesKey("taskbar_split_controls")
         val TASKBAR_SPLIT_SIDE = stringPreferencesKey("taskbar_split_side")
-        val TASKBAR_APP_PREDICTION = booleanPreferencesKey("taskbar_app_prediction")
         val TASKBAR_THREE_APP = booleanPreferencesKey("taskbar_three_app")
         val SETTINGS_STYLE = stringPreferencesKey("settings_style")
         val MINUS_ONE_SCREEN = stringPreferencesKey("minus_one_screen")
         val ICON_SHAPE = stringPreferencesKey("icon_shape")
         val MOTO_WEATHER_TAP = booleanPreferencesKey("moto_weather_tap")
         val SHOW_PRIVATE_SPACE = booleanPreferencesKey("show_private_space")
+        val POPUP_NOTIFICATIONS = booleanPreferencesKey("popup_notifications")
+        val DOT_AVATARS = booleanPreferencesKey("dot_avatars")
+        val LIVE_ACTIVITIES = booleanPreferencesKey("live_activities")
+        val LIVE_ACTIVITIES_TASKBAR = booleanPreferencesKey("live_activities_taskbar")
+        val LIVE_ACTIVITY_EFFECT = stringPreferencesKey("live_activity_effect")
+        val SEARCH_ACTIONS = booleanPreferencesKey("search_actions")
+        val ICON_NUDGE = booleanPreferencesKey("icon_nudge")
+        val ICON_NUDGE_TASKBAR = booleanPreferencesKey("icon_nudge_taskbar")
+        val ICON_NUDGE_EFFECT = stringPreferencesKey("icon_nudge_effect")
+        val ICON_NUDGE_SOFTNESS = floatPreferencesKey("icon_nudge_softness")
         val LIVE_HINGE_END_ANGLE = intPreferencesKey("live_hinge_end_angle")
         val LIVE_HINGE_SMOOTHING = intPreferencesKey("live_hinge_smoothing")
-        val LIVE_HINGE_GLASS = booleanPreferencesKey("live_hinge_glass")
         val LIVE_HINGE_STYLE = stringPreferencesKey("live_hinge_style")
-        val LIVE_HINGE_SPEED = floatPreferencesKey("live_hinge_speed")
+        val LIVE_HINGE_OUTER_STYLE = stringPreferencesKey("live_hinge_outer_style")
         val LIVE_HINGE_BLUR = intPreferencesKey("live_hinge_blur")
         val LIVE_HINGE_FROST = floatPreferencesKey("live_hinge_frost")
         val WIDGET_LOOKS = stringPreferencesKey("widget_looks")
@@ -1231,10 +1260,10 @@ class SettingsRepository @Inject constructor(
         /** Set once the inner profile stopped inheriting from the outer one (see splitProfilesOnce). */
         val PROFILES_SPLIT = booleanPreferencesKey("profiles_split_done")
         val HALF_OPENED_ENABLED = booleanPreferencesKey("half_opened_mode_enabled")
+        val HINGE_TILT = booleanPreferencesKey("hinge_tilt")
+        val TASKBAR_HIDE_FULL_SCREEN = booleanPreferencesKey("taskbar_hide_full_screen")
         val SPLIT_LAUNCH_ENABLED = booleanPreferencesKey("split_launch_enabled")
         val FLOATING_LAUNCH_ENABLED = booleanPreferencesKey("floating_launch_enabled")
-        val OUTER_WALLPAPER_SCALE = floatPreferencesKey("outer_wallpaper_scale")
-        val INNER_WALLPAPER_SCALE = floatPreferencesKey("inner_wallpaper_scale")
         val FOLD_TRANSITION_STYLE = stringPreferencesKey("fold_transition_style")
         val APP_PAIRS = stringPreferencesKey("app_pairs")
 

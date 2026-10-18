@@ -329,6 +329,7 @@ fun AppDrawerScreen(
         settingResults = uiState.settingResults,
         contactResults = uiState.contactResults,
         shortcutResults = uiState.shortcutResults,
+        actionResults = uiState.actionResults,
         searchWeb = uiState.searchWeb,
         tabs = uiState.tabs,
         selectedTab = uiState.selectedTab,
@@ -505,6 +506,7 @@ private fun AppDrawerContent(
     settingResults: List<SearchResult.Setting>,
     contactResults: List<SearchResult.Contact>,
     shortcutResults: List<SearchResult.Shortcut> = emptyList(),
+    actionResults: List<SearchResult.Action> = emptyList(),
     searchWeb: Boolean = false,
     // Drawer folders shown as tabs (id to name); empty = the feature is off or there are none.
     tabs: List<Pair<Long, String>> = emptyList(),
@@ -798,6 +800,16 @@ private fun AppDrawerContent(
                                     }
                                 }
                             }
+                            if (actionResults.isNotEmpty()) {
+                                item(contentType = "header") {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_actions))
+                                }
+                                items(items = actionResults, key = { it.id }, contentType = { "action" }) { action ->
+                                    ExpressiveActionRow(label = action.label, description = action.detail, trailingIcon = LauncherIcons.OpenInNew) {
+                                        if (startSearchAction(context, action)) onClose()
+                                    }
+                                }
+                            }
                             if (apps.isNotEmpty()) {
                                 item(contentType = "header") {
                                     ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
@@ -840,7 +852,7 @@ private fun AppDrawerContent(
                                     ExpressiveSectionTitle(stringResource(R.string.search_section_contacts))
                                 }
                                 items(items = contactResults, key = { it.id }, contentType = { "contact" }) { contact ->
-                                    ContactResultRow(contact)
+                                    ContactResultRow(contact, onOpened = onClose)
                                 }
                             }
                             if (shortcutResults.isNotEmpty()) {
@@ -864,7 +876,7 @@ private fun AppDrawerContent(
                                 }
                             }
                             if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty() &&
-                                shortcutResults.isEmpty() && !searchWeb
+                                shortcutResults.isEmpty() && actionResults.isEmpty() && !searchWeb
                             ) {
                                 item(contentType = "empty") {
                                     Text(
@@ -938,6 +950,17 @@ private fun AppDrawerContent(
                                     }
                                 }
                             }
+                            if (actionResults.isNotEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
+                                    ExpressiveSectionTitle(stringResource(R.string.search_section_actions))
+                                }
+                                items(items = actionResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
+                                    contentType = { "action" }) { action ->
+                                    ExpressiveActionRow(label = action.label, description = action.detail, trailingIcon = LauncherIcons.OpenInNew) {
+                                        if (startSearchAction(context, action)) onClose()
+                                    }
+                                }
+                            }
                             if (apps.isNotEmpty()) {
                                 item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
                                     ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
@@ -967,7 +990,7 @@ private fun AppDrawerContent(
                                 }
                                 items(items = contactResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
                                     contentType = { "contact" }) { contact ->
-                                    ContactResultRow(contact)
+                                    ContactResultRow(contact, onOpened = onClose)
                                 }
                             }
                             if (shortcutResults.isNotEmpty()) {
@@ -992,7 +1015,7 @@ private fun AppDrawerContent(
                                 }
                             }
                             if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty() &&
-                                shortcutResults.isEmpty() && !searchWeb
+                                shortcutResults.isEmpty() && actionResults.isEmpty() && !searchWeb
                             ) {
                                 item(span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
                                     Text(
@@ -1957,7 +1980,7 @@ private fun CalcResultCard(calc: SearchResult.Calculation, onCopy: () -> Unit) {
 }
 
 @Composable
-private fun ContactResultRow(contact: SearchResult.Contact) {
+private fun ContactResultRow(contact: SearchResult.Contact, onOpened: () -> Unit) {
     val context = LocalContext.current
     val p = LocalExpressivePalette.current
     val callDesc = stringResource(R.string.search_contact_call)
@@ -1968,6 +1991,7 @@ private fun ContactResultRow(contact: SearchResult.Contact) {
                 android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(contact.lookupUri))
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
             )
+            onOpened()
         }
     }) {
         // Avatar is decorative here — the contact name provides the accessible label.
@@ -1982,6 +2006,7 @@ private fun ContactResultRow(contact: SearchResult.Contact) {
                             android.net.Uri.fromParts("tel", contact.number, null))
                             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
+                    onOpened()
                 }
             }) { Icon(painter = painterResource(LauncherIcons.Call), contentDescription = callDesc, tint = LocalAccent.current) }
             IconButton(onClick = {
@@ -1991,6 +2016,7 @@ private fun ContactResultRow(contact: SearchResult.Contact) {
                             android.net.Uri.fromParts("smsto", contact.number, null))
                             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
+                    onOpened()
                 }
             }) { Icon(painter = painterResource(LauncherIcons.Message), contentDescription = messageDesc, tint = LocalAccent.current) }
         }

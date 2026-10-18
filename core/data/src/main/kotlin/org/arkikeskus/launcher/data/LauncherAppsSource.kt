@@ -189,16 +189,6 @@ class LauncherAppsSource @Inject constructor(
             override fun onPackageRemoved(packageName: String, user: UserHandle) {
                 val serial = runCatching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
                 _packageRemovals.tryEmit(packageName to serial)
-                
-                // Clear any orphaned icons out of Coil's memory cache to free RAM instantly
-                runCatching {
-                    val memoryCache = imageLoader.get().memoryCache
-                    if (memoryCache != null) {
-                        val prefix = "$packageName/"
-                        memoryCache.keys.filter { it.key.startsWith(prefix) }.forEach { memoryCache.remove(it) }
-                    }
-                }
-                
                 packageEvent(packageName)
             }
             override fun onPackageChanged(packageName: String, user: UserHandle) =
@@ -275,22 +265,28 @@ class LauncherAppsSource @Inject constructor(
         animation: String = LauncherSettings.APP_OPEN_SYSTEM,
         speed: Float = 1f,
     ): Result<Unit> = runCatching {
-        val origin = if (animation == LauncherSettings.APP_OPEN_ICON) LaunchOrigin.take() else null
-        val options = if (origin != null) fromIconOptions(origin.first, origin.second) else openOptions(animation, speed)
+        val fromIcon = animation == LauncherSettings.APP_OPEN_ICON || animation == LauncherSettings.APP_OPEN_REVEAL
+        val origin = if (fromIcon) LaunchOrigin.take() else null
+        val options = if (origin != null) {
+            fromIconOptions(origin.first, origin.second, reveal = animation == LauncherSettings.APP_OPEN_REVEAL)
+        } else {
+            openOptions(animation, speed)
+        }
         launcherApps.startMainActivity(appItem.componentName, appItem.user, origin?.second, options)
     }
 
-    /** The app's window grows out of the icon at [bounds] (on screen), measured from [view]. */
-    private fun fromIconOptions(view: android.view.View, bounds: Rect): Bundle? = runCatching {
+    /** The app's window grows out of the icon at [bounds] (on screen), measured from [view]; with
+     *  [reveal] it is uncovered from there instead (a clip that widens to the full window). */
+    private fun fromIconOptions(view: android.view.View, bounds: Rect, reveal: Boolean = false): Bundle? = runCatching {
         val at = IntArray(2)
         view.getLocationOnScreen(at)
-        ActivityOptions.makeScaleUpAnimation(
-            view,
-            bounds.left - at[0],
-            bounds.top - at[1],
-            bounds.width(),
-            bounds.height(),
-        ).toBundle()
+        val x = bounds.left - at[0]
+        val y = bounds.top - at[1]
+        if (reveal) {
+            ActivityOptions.makeClipRevealAnimation(view, x, y, bounds.width(), bounds.height()).toBundle()
+        } else {
+            ActivityOptions.makeScaleUpAnimation(view, x, y, bounds.width(), bounds.height()).toBundle()
+        }
     }.getOrNull()
 
     /**

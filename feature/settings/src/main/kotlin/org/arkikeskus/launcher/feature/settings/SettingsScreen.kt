@@ -906,9 +906,14 @@ fun SettingsScreen(
                     LauncherSettings.TRANSITION_SCALE to R.string.settings_transition_scale,
                     LauncherSettings.TRANSITION_SLIDE to R.string.settings_transition_slide,
                 ) + listOfNotNull(
-                    // Follows the hinge while opening: on phones with a hinge sensor.
-                    (LauncherSettings.TRANSITION_LIVE_HINGE to R.string.settings_transition_live_hinge)
-                        .takeIf { hasHingeSensor(context) },
+                    // Inner display: follows the hinge while opening (phones with a hinge sensor).
+                    // Outer display: the same effects, played on a timer after closing.
+                    if (profile == ScreenType.INNER) {
+                        (LauncherSettings.TRANSITION_LIVE_HINGE to R.string.settings_transition_live_hinge)
+                            .takeIf { hasHingeSensor(context) }
+                    } else {
+                        LauncherSettings.TRANSITION_LIVE_HINGE to R.string.settings_transition_hinge_timed
+                    },
                 ),
                 selected = s.foldTransitionStyle,
                 onPick = { viewModel.setFoldTransitionStyle(it, profile); showFoldTransitionPicker = false },
@@ -1532,13 +1537,14 @@ private fun unfoldActionLabel(action: String): String = when (action) {
 }
 
 @Composable
-private fun transitionLabel(style: String): String = when (style) {
+private fun transitionLabel(style: String, inner: Boolean = true): String = when (style) {
     LauncherSettings.TRANSITION_MORPH_SCALE_FADE -> stringResource(R.string.settings_transition_morph_scale_fade)
     LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP -> stringResource(R.string.settings_transition_book_unfold_sweep)
     LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE -> stringResource(R.string.settings_transition_aquamorphic_ripple)
     LauncherSettings.TRANSITION_SCALE -> stringResource(R.string.settings_transition_scale)
     LauncherSettings.TRANSITION_SLIDE -> stringResource(R.string.settings_transition_slide)
-    LauncherSettings.TRANSITION_LIVE_HINGE -> stringResource(R.string.settings_transition_live_hinge)
+    LauncherSettings.TRANSITION_LIVE_HINGE ->
+        stringResource(if (inner) R.string.settings_transition_live_hinge else R.string.settings_transition_hinge_timed)
     else -> stringResource(R.string.settings_transition_crossfade)
 }
 
@@ -1854,11 +1860,13 @@ private fun DisplayProfilesSection(
 
         ExpressiveActionItem(
             title = stringResource(R.string.settings_fold_transition),
-            description = transitionLabel(s.foldTransitionStyle),
+            description = transitionLabel(s.foldTransitionStyle, inner),
             onClick = onFoldTransition,
         )
+        ExpressiveRowDivider()
+        TransitionSpeedRow(s = s, viewModel = viewModel, screenType = screenType)
         if (s.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
-            LiveHingeRows(s = s, viewModel = viewModel)
+            LiveHingeRows(s = s, viewModel = viewModel, inner = inner)
         }
         ExpressiveRowDivider()
 
@@ -1890,6 +1898,16 @@ private fun DisplayProfilesSection(
             onCheckedChange = viewModel::setHalfOpenedModeEnabled,
         )
         ExpressiveRowDivider()
+
+        if (s.halfOpenedModeEnabled && hasHingeSensor(LocalContext.current)) {
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_hinge_tilt),
+                subtitle = stringResource(R.string.settings_hinge_tilt_desc),
+                checked = s.hingeTilt,
+                onCheckedChange = viewModel::setHingeTilt,
+            )
+            ExpressiveRowDivider()
+        }
 
         ExpressiveActionItem(
             title = stringResource(R.string.settings_app_pairs),
@@ -2316,6 +2334,16 @@ private fun AppDrawerSection(
                 ),
                 selected = s.drawerSearchPosition,
                 onSelect = { viewModel.setDrawerSearchPosition(it, screenType) },
+            )
+            ExpressiveRowDivider()
+            ContactSearchRow(checked = s.searchContacts, onCheckedChange = viewModel::setSearchContacts)
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_search_actions),
+                subtitle = stringResource(R.string.settings_search_actions_desc),
+                checked = s.searchActions,
+                onCheckedChange = viewModel::setSearchActions,
+                shared = true,
             )
         }
         ExpressiveRowDivider()
@@ -2986,6 +3014,30 @@ private fun NotificationsSection(
                 scale = s.notificationDotScale,
             )
         }
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_dot_avatars),
+            subtitle = stringResource(R.string.settings_dot_avatars_desc),
+            checked = s.dotAvatars,
+            onCheckedChange = viewModel::setDotAvatars,
+            shared = true,
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_popup_notifications),
+            subtitle = stringResource(R.string.settings_popup_notifications_desc),
+            checked = s.popupNotifications,
+            onCheckedChange = viewModel::setPopupNotifications,
+            shared = true,
+        )
+        ExpressiveRowDivider()
+
+        IconNudgeRows(s, viewModel, previewIcon)
+        ExpressiveRowDivider()
+
+        LiveActivityRows(s, viewModel)
     }
 }
 

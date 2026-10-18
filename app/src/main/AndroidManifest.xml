@@ -7,6 +7,9 @@
 
     <!-- Optional: contacts in app-drawer search; requested at runtime, gated by a setting. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Search actions: "timer 10 min" and "alarm 7:30" hand the clock app a timer or alarm to
+         confirm (an ordinary permission, granted at install). -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <!-- Optional: the smartspace widget's next-calendar-event row; requested at runtime from the
          widget itself. Clock + date work without it. -->

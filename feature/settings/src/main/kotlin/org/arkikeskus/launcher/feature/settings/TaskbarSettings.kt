@@ -105,6 +105,16 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         )
         ExpressiveRowDivider()
 
+        if (s.taskbarKeepOpen) {
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_taskbar_hide_full_screen),
+                subtitle = stringResource(R.string.settings_taskbar_hide_full_screen_desc),
+                checked = s.taskbarHideFullScreen,
+                onCheckedChange = viewModel::setTaskbarHideFullScreen,
+            )
+            ExpressiveRowDivider()
+        }
+
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_handles),
             options = listOf(

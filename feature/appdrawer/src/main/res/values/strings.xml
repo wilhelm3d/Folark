@@ -39,4 +39,6 @@
     <string name="drawer_private_space_unlock">Unlock</string>
     <string name="drawer_private_space_install">Install apps</string>
     <string name="drawer_private_space_empty">No apps here yet</string>
+    <string name="search_section_actions">Actions</string>
+    <string name="search_action_no_app">No app on this phone can do that</string>
 </resources>

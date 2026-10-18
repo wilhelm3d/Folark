@@ -52,6 +52,20 @@ import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.ui.component.LocalIconNudges
+import org.arkikeskus.launcher.ui.component.IconNudges
+import org.arkikeskus.launcher.ui.component.IconNudgeEvent
+import androidx.compose.runtime.mutableStateMapOf
+import org.arkikeskus.launcher.ui.component.LocalBadgeAvatars
+import org.arkikeskus.launcher.ui.component.LivePill
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.padding
+import android.os.Build
+import android.content.Context
+import android.app.PendingIntent
+import android.app.ActivityOptions
 
 /**
  * Hosts the launcher surface: the home screen with the app drawer as a **finger-following** slide-up
@@ -79,6 +93,10 @@ fun LauncherShell(
         viewModel.setScreenType(screenType)
     }
     val iconStyle by viewModel.iconStyle.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val live by viewModel.live.collectAsStateWithLifecycle()
+    val statusNotifications by viewModel.notifications.collectAsStateWithLifecycle()
+    val avatars by viewModel.avatars.collectAsStateWithLifecycle()
     val shellSettings by viewModel.settings.collectAsStateWithLifecycle()
     val drawerHeightFraction by viewModel.drawerHeightFraction.collectAsStateWithLifecycle()
     val drawerWidthFraction by viewModel.drawerWidthFraction.collectAsStateWithLifecycle()
@@ -189,6 +207,50 @@ fun LauncherShell(
         if (drawerBlurDp <= 0f) 0f else (homeBlurDp + (drawerBlurDp - homeBlurDp) * progress) / drawerBlurDp
     }
 
+    // Each app's notifications for its long-press menu (Settings ▸ Notifications), sender photos
+    // for the dots: provided to home, dock and drawer alike.
+    val popupNotifications = remember(statusNotifications, shellSettings.popupNotifications) {
+        if (!shellSettings.popupNotifications) {
+            emptyList()
+        } else {
+            statusNotifications.mapNotNull { n ->
+                val title = n.title?.takeIf { it.isNotBlank() } ?: n.text?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                PopupNotification(
+                    key = n.key,
+                    packageName = n.packageName,
+                    userSerial = n.userSerial,
+                    title = title,
+                    text = if (n.title.isNullOrBlank()) "" else n.text.orEmpty(),
+                    postTime = n.postTime,
+                    icon = n.icon,
+                    open = {
+                        n.contentIntent?.let { openNotificationIntent(context, it) }
+                        if (n.autoCancel) viewModel.dismissNotification(n.key)
+                    },
+                    dismiss = { viewModel.dismissNotification(n.key) },
+                )
+            }
+        }
+    }
+    // A new notification nudges its app's icon (newest per app; each with its own id so a second
+    // message replays the effect). Not in battery saver.
+    val nudgeEvents = remember { mutableStateMapOf<String, IconNudgeEvent>() }
+    LaunchedEffect(Unit) {
+        var id = 0L
+        viewModel.nudges.collect { n -> nudgeEvents[n.badgeKey] = IconNudgeEvent(n.badgeKey, n.color, n.time, ++id) }
+    }
+    val iconNudges = remember(shellSettings.iconNudge, shellSettings.iconNudgeEffect, shellSettings.iconNudgeSoftness, batterySaver) {
+        if (shellSettings.iconNudge && !batterySaver) {
+            IconNudges(shellSettings.iconNudgeEffect, shellSettings.iconNudgeSoftness, nudgeEvents)
+        } else {
+            null
+        }
+    }
+    CompositionLocalProvider(
+        LocalAppNotifications provides popupNotifications,
+        LocalBadgeAvatars provides avatars,
+        LocalIconNudges provides iconNudges,
+    ) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -198,9 +260,17 @@ fun LauncherShell(
         // Behind the home screen: this display's own background picture (drawn over the system
         // wallpaper, which a launcher cannot swap per display without re-theming the whole system),
         // then the dim layer that keeps icons and labels readable on a busy wallpaper.
-        if (shellSettings.homeBackgroundImage.isNotBlank()) {
+        val backgroundPath = shellSettings.homeBackgroundImage
+        if (backgroundPath.isNotBlank() && isVideoBackground(backgroundPath)) {
+            // A looping silent video, playing only while home is in view (VideoBackground.kt).
+            VideoBackground(
+                path = backgroundPath,
+                playing = !homeCovered && !LocalBatterySaver.current,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (backgroundPath.isNotBlank()) {
             AsyncImage(
-                model = java.io.File(shellSettings.homeBackgroundImage),
+                model = java.io.File(backgroundPath),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -236,6 +306,26 @@ fun LauncherShell(
                     }
                 },
         )
+        }
+
+        // What is going on right now (a timer, navigation, a download): a live pill on top of home.
+        if (shellSettings.liveActivities && live.isNotEmpty() && !homeCovered) {
+            var liveIndex by remember { mutableIntStateOf(0) }
+            val shownLive = live[liveIndex % live.size]
+            LivePill(
+                activity = shownLive,
+                effect = shellSettings.liveActivityEffect,
+                animate = !batterySaver,
+                light = false,
+                extra = live.size - 1,
+                onClick = { shownLive.contentIntent?.let { openNotificationIntent(context, it) } },
+                // Several at once: a long press shows the next.
+                onLongPress = if (live.size > 1) ({ liveIndex++ }) else null,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 4.dp),
+            )
         }
 
         // Always compose AppDrawerScreen at fillMaxSize to keep it pre-composed, pre-measured, and pre-laid out.
@@ -302,6 +392,7 @@ fun LauncherShell(
             }
         }
     }
+    }
 
     PredictiveBackHandler(enabled = drawerOpen) { progress ->
         try {
@@ -312,5 +403,20 @@ fun LauncherShell(
             // Cancelled: the user dragged back but then let go to cancel the back gesture.
             animateProgress(1f)
         }
+    }
+}
+
+/**
+ * Fires a notification's tap action like the notification shade would. Android 14+ no longer lends
+ * the sender's right to open an activity; home is in front on the tap, so the grant is ours to give.
+ */
+private fun openNotificationIntent(context: Context, intent: PendingIntent) {
+    runCatching {
+        val options = ActivityOptions.makeBasic()
+        if (Build.VERSION.SDK_INT >= 34) {
+            @Suppress("DEPRECATION")
+            options.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+        }
+        intent.send(context, 0, null, null, null, null, options.toBundle())
     }
 }

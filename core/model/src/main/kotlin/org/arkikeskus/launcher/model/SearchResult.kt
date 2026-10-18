@@ -40,6 +40,29 @@ sealed interface SearchResult {
     data class Calculation(val expression: String, val result: String) : SearchResult {
         override val id: String get() = "calc"
     }
+
+    /** Something to do, from what was typed ("timer 10 min", "alarm 7:30"): [kind] picks the app,
+     *  [args] fill it in (see the drawer's startSearchAction). */
+    data class Action(
+        val kind: String,
+        val label: String,
+        val detail: String,
+        val args: Map<String, String>,
+    ) : SearchResult {
+        override val id: String get() = "action:$kind:$label"
+
+        companion object {
+            const val TIMER = "timer"
+            const val ALARM = "alarm"
+            const val EVENT = "event"
+            const val NAVIGATE = "navigate"
+            const val MAP = "map"
+            const val EMAIL = "email"
+            const val NOTE = "note"
+            const val CALL = "call"
+            const val MESSAGE = "message"
+        }
+    }
 }
 
 /** Search results grouped into the sections the drawer renders (top→bottom: calc, apps, settings, contacts). */
@@ -49,4 +72,5 @@ data class SearchResults(
     val settings: List<SearchResult.Setting> = emptyList(),
     val contacts: List<SearchResult.Contact> = emptyList(),
     val shortcuts: List<SearchResult.Shortcut> = emptyList(),
+    val actions: List<SearchResult.Action> = emptyList(),
 )

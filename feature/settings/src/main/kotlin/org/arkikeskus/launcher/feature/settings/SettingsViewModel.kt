@@ -100,9 +100,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setFoldAction(value: String, screenType: ScreenType = _screenType.value) = update { repository.setFoldAction(value, screenType) }
     fun setUnfoldAction(value: String, screenType: ScreenType = _screenType.value) = update { repository.setUnfoldAction(value, screenType) }
-    fun setOuterWallpaperScale(value: Float) = update { repository.setOuterWallpaperScale(value) }
-    fun setInnerWallpaperScale(value: Float) = update { repository.setInnerWallpaperScale(value) }
     fun setFoldTransitionStyle(value: String, screenType: ScreenType = _screenType.value) = update { repository.setFoldTransitionStyle(value, screenType) }
+    fun setFoldTransitionSpeed(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setFoldTransitionSpeed(value, screenType) }
     fun setAquamorphicTouchEnabled(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setAquamorphicTouchEnabled(value, screenType) }
     fun setAppLaunchZoomEnabled(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setAppLaunchZoomEnabled(value, screenType) }
     fun setPageBounceEnabled(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setPageBounceEnabled(value, screenType) }
@@ -166,17 +165,25 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarQuickSwitch(value: Boolean) = update { repository.setTaskbarQuickSwitch(value) }
     fun setTaskbarSplitControls(value: Boolean) = update { repository.setTaskbarSplitControls(value) }
     fun setTaskbarSplitSide(value: String) = update { repository.setTaskbarSplitSide(value) }
-    fun setTaskbarAppPrediction(value: Boolean) = update { repository.setTaskbarAppPrediction(value) }
     fun setTaskbarThreeApp(value: Boolean) = update { repository.setTaskbarThreeApp(value) }
     fun setSettingsStyle(value: String) = update { repository.setSettingsStyle(value) }
     fun setIconShape(value: String) = update { repository.setIconShape(value) }
     fun setMotoWeatherTap(value: Boolean) = update { repository.setMotoWeatherTap(value) }
     fun setShowPrivateSpace(value: Boolean) = update { repository.setShowPrivateSpace(value) }
+    fun setPopupNotifications(value: Boolean) = update { repository.setPopupNotifications(value) }
+    fun setDotAvatars(value: Boolean) = update { repository.setDotAvatars(value) }
+    fun setLiveActivities(value: Boolean) = update { repository.setLiveActivities(value) }
+    fun setLiveActivitiesTaskbar(value: Boolean) = update { repository.setLiveActivitiesTaskbar(value) }
+    fun setLiveActivityEffect(value: String) = update { repository.setLiveActivityEffect(value) }
+    fun setSearchActions(value: Boolean) = update { repository.setSearchActions(value) }
+    fun setIconNudge(value: Boolean) = update { repository.setIconNudge(value) }
+    fun setIconNudgeTaskbar(value: Boolean) = update { repository.setIconNudgeTaskbar(value) }
+    fun setIconNudgeEffect(value: String) = update { repository.setIconNudgeEffect(value) }
+    fun setIconNudgeSoftness(value: Float) = update { repository.setIconNudgeSoftness(value) }
     fun setLiveHingeEndAngle(value: Int) = update { repository.setLiveHingeEndAngle(value) }
     fun setLiveHingeSmoothing(value: Int) = update { repository.setLiveHingeSmoothing(value) }
-    fun setLiveHingeGlass(value: Boolean) = update { repository.setLiveHingeGlass(value) }
     fun setLiveHingeStyle(value: String) = update { repository.setLiveHingeStyle(value) }
-    fun setLiveHingeSpeed(value: Float) = update { repository.setLiveHingeSpeed(value) }
+    fun setLiveHingeOuterStyle(value: String) = update { repository.setLiveHingeOuterStyle(value) }
     fun setLiveHingeBlur(value: Int) = update { repository.setLiveHingeBlur(value) }
     fun setLiveHingeFrost(value: Float) = update { repository.setLiveHingeFrost(value) }
     fun setMediaWidgetTheme(value: String) = update { repository.setMediaWidgetTheme(value) }
@@ -211,6 +218,8 @@ class SettingsViewModel @Inject constructor(
     fun setDoubleTapAction(value: String, screenType: ScreenType = _screenType.value) = update { repository.setDoubleTapAction(value, screenType) }
     fun setSwipeUpAction(value: String, screenType: ScreenType = _screenType.value) = update { repository.setSwipeUpAction(value, screenType) }
     fun setHalfOpenedModeEnabled(value: Boolean) = update { repository.setHalfOpenedModeEnabled(value) }
+    fun setHingeTilt(value: Boolean) = update { repository.setHingeTilt(value) }
+    fun setTaskbarHideFullScreen(value: Boolean) = update { repository.setTaskbarHideFullScreen(value) }
     fun setSplitLaunchEnabled(value: Boolean) = update { repository.setSplitLaunchEnabled(value) }
     fun setFloatingLaunchEnabled(value: Boolean) = update { repository.setFloatingLaunchEnabled(value) }
     fun setAmoledDark(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setAmoledDark(value, screenType) }
@@ -299,7 +308,6 @@ class SettingsViewModel @Inject constructor(
     fun setRightSwipeAppKey(key: String?, screenType: ScreenType = _screenType.value) = update { repository.setRightSwipeAppKey(key, screenType) }
 
     fun setDesktopLocked(value: Boolean) = update { repository.setDesktopLocked(value) }
-    fun setDoubleTapToLock(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDoubleTapToLock(value, screenType) }
 
     fun setAppLabelTextScale(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setAppLabelTextScale(value, screenType) }
     fun setAppLabelColor(argb: Int, screenType: ScreenType = _screenType.value) = update { repository.setAppLabelColor(argb, screenType) }

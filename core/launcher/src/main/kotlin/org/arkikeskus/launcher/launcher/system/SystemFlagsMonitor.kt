@@ -95,7 +95,7 @@ class SystemFlagsMonitor @Inject constructor(
             airplane = readBool { Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1 },
             silent = ringer == AudioManager.RINGER_MODE_SILENT,
             vibrate = ringer == AudioManager.RINGER_MODE_VIBRATE,
-            bluetooth = readBool(android.Manifest.permission.BLUETOOTH) { bluetoothManager?.adapter?.isEnabled == true },
+            bluetooth = readBool { bluetoothManager?.adapter?.isEnabled == true },
             alarm = readBool { alarmManager?.nextAlarmClock != null },
             location = readBool { locationManager?.isLocationEnabled == true },
             nfc = readBool { NfcAdapter.getDefaultAdapter(context)?.isEnabled == true },
@@ -118,14 +118,9 @@ class SystemFlagsMonitor @Inject constructor(
         }
     }
 
-    private inline fun readBool(permission: String? = null, block: () -> Boolean): Boolean {
-        if (permission != null && ContextCompat.checkSelfPermission(context, permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return false
-        }
-        return try {
-            block()
-        } catch (e: Exception) {
-            false
-        }
+    private inline fun readBool(block: () -> Boolean): Boolean = try {
+        block()
+    } catch (e: Exception) {
+        false
     }
 }

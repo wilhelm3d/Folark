@@ -71,6 +71,7 @@ data class AppDrawerUiState(
     val selectedTab: Long? = null,
     /** Search extras: matching app shortcuts, and whether to offer the "search the web" row. */
     val shortcutResults: List<SearchResult.Shortcut> = emptyList(),
+    val actionResults: List<SearchResult.Action> = emptyList(),
     val searchWeb: Boolean = true,
     val showFrequentApps: Boolean = false,
     val frequentApps: List<AppItem> = emptyList(),
@@ -264,6 +265,7 @@ class AppDrawerViewModel @Inject constructor(
                 settingResults = results.settings,
                 contactResults = results.contacts,
                 shortcutResults = results.shortcuts,
+                actionResults = results.actions,
             )
         }
     }.combine(appUsageRepository.usage) { state, usage ->

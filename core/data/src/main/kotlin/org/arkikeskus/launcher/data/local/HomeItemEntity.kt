@@ -109,6 +109,12 @@ data class HomeItemEntity(
         /** [builtinType] of the quick-note widget. */
         const val BUILTIN_NOTE = "note"
 
+        /** [builtinType] of the clipboard history widget. */
+        const val BUILTIN_CLIPBOARD = "clipboard"
+
+        /** [builtinType] of the media mixer widget (every playing app at once). */
+        const val BUILTIN_MIXER = "media_mixer"
+
         /** [builtinType] of a Nothing OS 3 style stackable widget container. */
         const val BUILTIN_WIDGET_STACK = "widget_stack"
 

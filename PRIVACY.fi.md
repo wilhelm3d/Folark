@@ -36,6 +36,12 @@ julkinen, joten jokaisen väitteen voi tarkistaa itse:
 - **Ilmoitustiedot** — jos myönnät ilmoitusten käyttöoikeuden, ilmoituksia
   luetaan pistemerkkien, tilarivin kuvakkeiden sekä valinnaisten ilmoitus- ja
   henkilöwidgettien näyttämiseen ja niiden avaus-, vastaus- ja poistotoimintoihin.
+  Samoista tiedoista näytetään sovelluksen uusimmat ilmoitukset sen pitkän
+  painalluksen valikossa, viestisovelluksen pistemerkissä lähettäjän kuva,
+  sovelluksen kuvakkeen lyhyt liike uuden ilmoituksen saapuessa sekä
+  käynnissä olevat asiat (ajastimet, navigointi, puhelut, lataukset) elävänä
+  pillerinä aloitusnäytöllä ja tehtäväpalkissa. Kunkin voi poistaa käytöstä
+  kohdassa Asetukset ▸ Ilmoitukset, eikä mitään niistä tallenneta.
   Viestitekstit käsitellään muistissa; launcher ei tallenna niitä pysyvästi eikä
   lähetä niitä minnekään. Vastaukset välitetään alkuperäisen sovelluksen kautta.
   Kiinnittämäsi henkilöt ja luomasi henkilöllisyyksien yhdistämiset tallennetaan
@@ -45,6 +51,16 @@ julkinen, joten jokaisen väitteen voi tarkistaa itse:
   ponnahdusilmoitukset toimivat normaalisti. Ilmoitusten tunnisteet ja jakoajat
   tallennetaan laitteelle odotustilan säilyttämiseksi uudelleenkäynnistyksessä,
   mutta niitä ei sisällytetä varmuuskopioihin.
+- **Leikepöydän historia** — vain kun leikepöydän historia -widget on
+  aloitusnäytöllä, Folark säilyttää 30 viimeksi kopioimaasi tekstiä, jotta ne
+  voi näyttää ja kopioida uudelleen. Android antaa vain edessä olevan
+  sovelluksen lukea leikepöytää, joten Folark katsoo sitä, kun aloitusnäyttö
+  tulee näkyviin (Android voi silloin näyttää ilmoituksen leikepöydän
+  lukemisesta). Tekstejä, jotka Android merkitsee arkaluonteisiksi, kuten
+  salasanoja ja kertakoodeja, ei koskaan säilytetä. Lista tallennetaan
+  laitteen yksityiseen tiedostoon, se ei kuulu varmuuskopioihin eikä sitä
+  lähetetä minnekään; widgetin "Tyhjennä kaikki", leikkeen poisto tai
+  sovelluksen poisto poistaa sen.
 - **Varmuuskopiot** — Asetukset ▸ Varmuuskopiointi ja palautus kirjoittaa
   varmuuskopiotiedoston valitsemaasi sijaintiin, ja jos otat automaattisen
   varmuuskopion käyttöön, pitää yhden ajantasaisen kopion valitsemassasi
@@ -95,7 +111,7 @@ palvelimelle; pyynnöt tunnistautuvat yleisluontoisella
 |---|---|
 | `QUERY_ALL_PACKAGES` | Asennettujen sovellusten listaus ja käynnistys — launcherin ydintehtävä |
 | `ACCESS_HIDDEN_PROFILES` | Android 15+: Yksityisen tilan (Private Space) näyttäminen sovelluslaatikossa erillisenä, lukittuna osiona. Lukittuna Folark ei listaa sen sovelluksia lainkaan; avattuna ne näkyvät vain tuossa osiossa (ei koskaan aloitusnäytöllä, haussa, widgeteissä tai käyttömäärissä). Lukitus ja avaus tapahtuvat Androidin kautta, joka kysyy näytön lukituksen. Mitään siitä ei tallenneta eikä lähetetä |
-| Ilmoitusten käyttöoikeus (`BIND_NOTIFICATION_LISTENER_SERVICE`) | Pistemerkit, tilarivin kuvakkeet, ilmoitus- ja henkilöwidgetit sekä paikallinen eräposti |
+| Ilmoitusten käyttöoikeus (`BIND_NOTIFICATION_LISTENER_SERVICE`) | Pistemerkit (valinnaisesti lähettäjän kuvalla), tilarivin kuvakkeet, ilmoitus- ja henkilöwidgetit, ilmoitukset pitkän painalluksen valikossa, elävä toimintapilleri sekä paikallinen eräposti |
 | Esteettömyyspalvelu (`BIND_ACCESSIBILITY_SERVICE`, valinnainen) | Tuplanapautuslukitus sekä, jos otat sen asetuksista käyttöön, Folarkin tehtäväpalkki avatulla näytöllä (palvelu piirtää tehtäväpalkin kulmien kosketusalueet ja sovelluskuvakkeet päällekkäisikkunoihin, käynnistää valitsemasi sovelluksen ja pyytää Androidia jakamaan näytön, kun vedät kuvakkeen jaettuun näyttöön). Palvelu ei vastaanota esteettömyystapahtumia eikä voi lukea näytön sisältöä, ja se on käynnissä vain, jos itse otat sen käyttöön |
 | `DUMP` (valinnainen, vain itse suorittamallasi kertaluonteisella `adb shell pm grant` -komennolla) | Tehtäväpalkin jaettu näyttö: Folark lukee Androidin viimeisimpien tehtävien luettelosta juuri avaamansa sovelluksen tehtävänumeron ja lähettää Androidin jaetun näytön komennot; jaetun näytön painike lukee myös, mitkä sovellukset ovat jaetussa näytössä, jotta puolet voi vaihtaa tai yhden sovelluksen avata koko näytölle. Luetaan laitteella vain sillä hetkellä, eikä sitä tallenneta tai lähetetä minnekään |
 | Käyttötietojen käyttö (`PACKAGE_USAGE_STATS`, valinnainen) | Tehtäväpalkin viimeisimmät sovellukset: mitkä sovellukset on tuotu etualalle viime tunteina. Luetaan laitteella tehtäväpalkin näkyessä, eikä niitä tallenneta tai lähetetä minnekään. Vain jos sallit sen Androidin asetuksista |
@@ -103,6 +119,7 @@ palvelimelle; pyynnöt tunnistautuvat yleisluontoisella
 | `READ_CALENDAR` | Seuraavan tapahtuman näyttäminen kellowidgetissä |
 | `READ_CONTACTS` | Yhteystulokset sovellushaussa ja henkilöwidgetin yhteystietojen yhdistäminen (valinnainen) |
 | `READ_PHONE_STATE` | Signaalinvoimakkuus tilarivillä |
+| `SET_ALARM` | Hakutoiminnot: "timer 10 min" tai "alarm 7:30" antaa kellosovellukselle ajastimen tai herätyksen, jonka se näyttää vahvistettavaksi. Folark ei lue herätyksiä. Hakutoiminnot (ajastimet, herätykset, tapahtumat, reittiohjeet, sähköposti, muistiinpanot, puhelinnumerot) vain avaavat sopivan sovelluksen kirjoitettu teksti valmiiksi täytettynä; Folark ei tallenna eikä lähetä kirjoitettua tekstiä |
 | `ACCESS_COARSE_LOCATION` | Sää kellowidgetissä |
 | `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `BLUETOOTH` (≤ Android 11) | Yhteysilmaisimet tilarivillä |
 | `INTERNET` | Yllä kuvatut sääpyynnöt |

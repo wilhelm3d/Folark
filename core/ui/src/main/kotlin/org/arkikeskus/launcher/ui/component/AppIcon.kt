@@ -139,6 +139,9 @@ fun AppIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(contentAlignment = badgeAlignment()) {
+            // A new notification for this app: the icon nudges (Settings ▸ Notifications).
+            val nudges = LocalIconNudges.current
+            val nudge = if (nudges != null) Modifier.iconNudge(nudges.events[appItem.badgeKey], nudges.effect, nudges.softness) else Modifier
             AsyncImage(
                 model = IconRequest(
                     appItem,
@@ -151,7 +154,7 @@ fun AppIcon(
                     shape = LocalIconShape.current,
                 ),
                 contentDescription = appItem.label,
-                modifier = Modifier.size(iconSize),
+                modifier = nudge.size(iconSize),
             )
             
             if (appItem.isArchived) {
@@ -170,7 +173,13 @@ fun AppIcon(
                 }
             }
             
-            NotificationBadge(count = badgeCount, showCount = badgeShowCount, scale = badgeScale)
+            // A chat app with a sender photo shows the photo instead of the plain dot.
+            val avatar = if (badgeCount > 0) LocalBadgeAvatars.current[appItem.badgeKey] else null
+            if (avatar != null) {
+                AvatarBadge(avatar, count = badgeCount, showCount = badgeShowCount, scale = badgeScale)
+            } else {
+                NotificationBadge(count = badgeCount, showCount = badgeShowCount, scale = badgeScale)
+            }
         }
         if (showLabel) AppLabel(appItem.label, labelColor, maxLabelLines, reserveLabelLines)
     }

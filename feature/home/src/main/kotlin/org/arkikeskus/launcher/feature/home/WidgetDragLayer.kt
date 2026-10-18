@@ -53,6 +53,8 @@ internal fun BuiltinWidget(type: String, modifier: Modifier = Modifier) {
         HomeItemEntity.BUILTIN_TOP_APPS -> TopAppsWidget(modifier)
         HomeItemEntity.BUILTIN_STATS -> DeviceStatsWidget(modifier)
         HomeItemEntity.BUILTIN_NOTE -> NoteWidget(modifier)
+        HomeItemEntity.BUILTIN_CLIPBOARD -> ClipboardWidget(modifier)
+        HomeItemEntity.BUILTIN_MIXER -> MediaMixerWidget(modifier)
         HomeItemEntity.BUILTIN_WEATHER_DAY, HomeItemEntity.BUILTIN_WEATHER_BIG -> WeatherDayWidget(modifier)
         else -> SmartspaceWidget(modifier)
     }
