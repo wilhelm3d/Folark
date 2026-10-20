@@ -106,7 +106,7 @@ fun Modifier.liveHingeEffect(progress: () -> Float, style: String, blurDp: Float
     }
 
 /** How long the timed version (outer display, after closing) takes at [speed]. */
-fun liveHingeTimedMs(speed: Float): Int = (TIMED_EFFECT_MS / speed.coerceIn(0.25f, 4f)).toInt().coerceIn(250, 1_400)
+fun liveHingeTimedMs(speed: Float): Int = (TIMED_EFFECT_MS / speed.coerceIn(0.1f, 4f)).toInt().coerceIn(250, 6_500)
 
 private const val TIMED_EFFECT_MS = 650f
 

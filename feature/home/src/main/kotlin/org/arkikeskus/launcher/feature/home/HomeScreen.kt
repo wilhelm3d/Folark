@@ -134,6 +134,7 @@ import org.arkikeskus.launcher.ui.PopupAction
 import org.arkikeskus.launcher.ui.RenameDialog
 import org.arkikeskus.launcher.ui.rememberHomeDragController
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
 import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
@@ -836,6 +837,8 @@ fun HomeScreen(
                     onAppMenu = { app, anchor -> menuTarget = AppMenuTarget(app, anchor, DragSource.Dock, anchor.y > windowHeightPx / 2) },
                     modifier = dockAlignModifier
                         .navigationBarsPadding()
+                        // Above Folark's taskbar when it stays on home.
+                        .padding(bottom = LocalTaskbarInset.current)
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                 )
             } }

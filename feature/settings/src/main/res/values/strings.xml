@@ -615,4 +615,6 @@
     <string name="settings_nudge_glow">Glow</string>
     <string name="settings_nudge_ripple">Ripple</string>
     <string name="settings_nudge_jelly">Jelly</string>
+    <string name="settings_unlock_transition">Also when unlocking</string>
+    <string name="settings_unlock_transition_desc">Unlocking the phone straight to home plays this display\'s transition at its speed (Live hinge plays its effect on a timer)</string>
 </resources>

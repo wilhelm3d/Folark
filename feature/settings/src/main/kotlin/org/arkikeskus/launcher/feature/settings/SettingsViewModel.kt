@@ -177,6 +177,7 @@ class SettingsViewModel @Inject constructor(
     fun setLiveActivityEffect(value: String) = update { repository.setLiveActivityEffect(value) }
     fun setSearchActions(value: Boolean) = update { repository.setSearchActions(value) }
     fun setIconNudge(value: Boolean) = update { repository.setIconNudge(value) }
+    fun setUnlockTransition(value: Boolean) = update { repository.setUnlockTransition(value) }
     fun setIconNudgeTaskbar(value: Boolean) = update { repository.setIconNudgeTaskbar(value) }
     fun setIconNudgeEffect(value: String) = update { repository.setIconNudgeEffect(value) }
     fun setIconNudgeSoftness(value: Float) = update { repository.setIconNudgeSoftness(value) }

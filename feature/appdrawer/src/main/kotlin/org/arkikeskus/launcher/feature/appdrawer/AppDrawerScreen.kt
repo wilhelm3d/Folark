@@ -36,6 +36,14 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.WindowInsets
+import org.arkikeskus.launcher.ui.component.rememberKeyboardShown
+import org.arkikeskus.launcher.ui.component.keyboardInsets
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -142,6 +150,7 @@ import org.arkikeskus.launcher.ui.LauncherIcons
 import org.arkikeskus.launcher.ui.PopupAction
 import org.arkikeskus.launcher.ui.RenameDialog
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
 import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.ContactAvatar
 import org.arkikeskus.launcher.ui.component.aquamorphicTouch
@@ -193,8 +202,15 @@ fun AppDrawerScreen(
     // Inner display only: the drawer docks to one side as a full-height panel instead of covering
     // the unfolded screen edge to edge.
     val sidebar = uiState.innerSidebarAppDrawer && screenType == ScreenType.INNER
-    val effectiveHeightFraction =
-        if (sidebar) 1f else (drawerHeightFraction ?: uiState.drawerHeightFraction).coerceIn(0.4f, 1.0f)
+    // While the keyboard is up (searching), a shorter drawer grows to the full height so the
+    // results keep room above the keyboard; it shrinks back when the keyboard goes.
+    val keyboardUp by rememberKeyboardShown()
+    val chosenHeight = if (sidebar) 1f else (drawerHeightFraction ?: uiState.drawerHeightFraction).coerceIn(0.4f, 1.0f)
+    val effectiveHeightFraction by animateFloatAsState(
+        targetValue = if (keyboardUp) 1f else chosenHeight,
+        animationSpec = tween(KEYBOARD_GROW_MS),
+        label = "drawerHeightWithKeyboard",
+    )
     val effectiveWidthFraction = (drawerWidthFraction ?: uiState.drawerWidthFraction).coerceIn(0.4f, 1.0f)
         .let { if (sidebar) it.coerceAtMost(SIDEBAR_MAX_WIDTH_FRACTION) else it }
     val effectiveAlignment = (drawerAlignment ?: uiState.drawerAlignment).let {
@@ -224,6 +240,13 @@ fun AppDrawerScreen(
     var openFolderId by remember { mutableStateOf<Long?>(null) }
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
     val focusManager = LocalFocusManager.current
+    // The keyboard was closed (back, its own close key): the search field lets go too, so no
+    // cursor lingers and a tap on the field brings the keyboard back.
+    var hadKeyboard by remember { mutableStateOf(false) }
+    LaunchedEffect(keyboardUp) {
+        if (hadKeyboard && !keyboardUp) focusManager.clearFocus()
+        hadKeyboard = keyboardUp
+    }
     // The drawer stays composed while closed (translated off-screen), so its grid scroll persists
     // across opens. When "open at top" is on, reset it to the top as the drawer closes (invisible),
     // so the next open shows the "most used" row / A–Z start instead of the last scroll position.
@@ -645,11 +668,18 @@ private fun AppDrawerContent(
                     // A drawer that stops short of the top must not reserve the status bar's height
                     // above its handle (that was the empty band at the top of the panel).
                     .windowInsetsPadding(
-                        if (sidebar || drawerHeightFraction >= 1.0f) WindowInsets.safeDrawing
-                        else WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                        // The keyboard's room only while Android really shows it (keyboardInsets).
+                        if (sidebar || drawerHeightFraction >= 1.0f) {
+                            WindowInsets.systemBars.union(WindowInsets.displayCutout).union(keyboardInsets())
+                        } else {
+                            WindowInsets.systemBars.union(WindowInsets.displayCutout)
+                                .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+                                .union(keyboardInsets())
+                        },
                     )
-                    // Settings ▸ App drawer ▸ space below the drawer (a taskbar the system does not report).
-                    .padding(bottom = drawerBottomSpace.dp)
+                    // Settings ▸ App drawer ▸ space below the drawer (a taskbar the system does not report),
+                    // or at least the room Folark's own taskbar takes when it stays on screen.
+                    .padding(bottom = maxOf(drawerBottomSpace.dp, LocalTaskbarInset.current))
                     .nestedScroll(pullConnection),
             ) {
             DragHandle(width = style.handleWidth, arrow = drawerHandleStyle == LauncherSettings.DRAWER_HANDLE_ARROW, progress = drawerProgress)
@@ -2022,3 +2052,6 @@ private fun ContactResultRow(contact: SearchResult.Contact, onOpened: () -> Unit
         }
     }
 }
+
+/** How long a short drawer takes to grow to full height when the keyboard comes up. */
+private const val KEYBOARD_GROW_MS = 220

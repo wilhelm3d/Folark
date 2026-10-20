@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableSharedFlow
+import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -101,6 +102,7 @@ class LauncherActivity : ComponentActivity() {
         // One fold-state flow for the activity's lifetime. Building it inside setContent created a
         // new shared flow (and a new coroutine in lifecycleScope) on every recomposition.
         val foldStates = foldStateMonitor.foldStateFlow(this, lifecycleScope)
+        registerLockReceiver()
         setContent {
             val foldState by foldStates.collectAsStateWithLifecycle()
             val screenType = foldState.screenType
@@ -189,8 +191,36 @@ class LauncherActivity : ComponentActivity() {
                     // Closed: the outer display plays its hinge effect on a timer (the hinge has stopped).
                     foldTransition.animateTo(1f, tween(liveHingeTimedMs(speed), easing = FastOutSlowInEasing))
                 } else {
-                    val ms = (CLASSIC_TRANSITION_MS / speed).toInt().coerceIn(120, 1_200)
+                    val ms = (CLASSIC_TRANSITION_MS / speed.coerceAtLeast(0.1f)).toInt().coerceIn(120, 4_200)
                     foldTransition.animateTo(1f, tween(durationMillis = ms, easing = FastOutSlowInEasing))
+                }
+            }
+
+            // Unlocking straight to home plays the display's transition too (Settings ▸ each
+            // display ▸ Also when unlocking): hidden while the phone is locked, revealed with the
+            // effect at the display's speed once it is unlocked.
+            val currentScreen by rememberUpdatedState(screenType)
+            LaunchedEffect(Unit) {
+                unlockSignals.collect { signal ->
+                    val target = settingsRepository.settings(currentScreen).first()
+                    val style = target.foldTransitionStyle
+                    if (!target.unlockTransition || signal == UNLOCK_SHOW) {
+                        foldTransition.snapTo(1f)
+                        return@collect
+                    }
+                    if (signal == UNLOCK_HIDE) {
+                        foldTransition.snapTo(0f)
+                        return@collect
+                    }
+                    foldTransition.snapTo(0f)
+                    val speed = target.foldTransitionSpeed
+                    if (style == LauncherSettings.TRANSITION_LIVE_HINGE) {
+                        // The hinge isn't moving: the live effect plays on a timer, as on the cover screen.
+                        foldTransition.animateTo(1f, tween(liveHingeTimedMs(speed), easing = FastOutSlowInEasing))
+                    } else {
+                        val ms = (CLASSIC_TRANSITION_MS / speed.coerceAtLeast(0.1f)).toInt().coerceIn(120, 4_200)
+                        foldTransition.animateTo(1f, tween(durationMillis = ms, easing = FastOutSlowInEasing))
+                    }
                 }
             }
 
@@ -421,6 +451,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) revealAfterLock()
         // Android lets only the focused app read the clipboard: home just came into view, so pick
         // up what was copied meanwhile (only while a clipboard widget is on home).
         if (hasFocus) clipboardHistory.capture()
@@ -456,6 +487,56 @@ class LauncherActivity : ComponentActivity() {
         homeSignals.tryEmit(wasForeground)
     }
 
+    // ---------------------------------------------------------------- unlock transition
+
+    /** Hide / play / show signals for the unlock transition (see setContent). */
+    private val unlockSignals = MutableSharedFlow<Int>(extraBufferCapacity = 4)
+
+    /** Home was hidden when the screen went off and waits to be revealed. */
+    private var hiddenForLock = false
+    private var screenOnAt = 0L
+
+    private val lockReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            when (intent?.action) {
+                // Locked: home is hidden behind the lock screen, ready to be revealed.
+                Intent.ACTION_SCREEN_OFF -> {
+                    hiddenForLock = true
+                    unlockSignals.tryEmit(UNLOCK_HIDE)
+                }
+                Intent.ACTION_SCREEN_ON -> screenOnAt = android.os.SystemClock.elapsedRealtime()
+                Intent.ACTION_USER_PRESENT -> if (hasWindowFocus()) revealAfterLock()
+            }
+        }
+    }
+
+    /**
+     * Home in front with the phone unlocked after the screen was off: play the transition when this
+     * follows the unlock, or just show home when the phone was unlocked into another app earlier.
+     */
+    private fun revealAfterLock() {
+        if (!hiddenForLock) return
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        if (keyguard?.isKeyguardLocked == true) return
+        hiddenForLock = false
+        val sinceScreenOn = android.os.SystemClock.elapsedRealtime() - screenOnAt
+        unlockSignals.tryEmit(if (sinceScreenOn < UNLOCK_WINDOW_MS) UNLOCK_PLAY else UNLOCK_SHOW)
+    }
+
+    private fun registerLockReceiver() {
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        runCatching { registerReceiver(lockReceiver, filter, RECEIVER_NOT_EXPORTED) }
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(lockReceiver) }
+        super.onDestroy()
+    }
+
     /** If Android switched Folark's accessibility service off, turn it back on (System controls). */
     private fun keepAccessibilityServiceOn() {
         val service = android.content.ComponentName(this, LockAccessibilityService::class.java)
@@ -465,6 +546,13 @@ class LauncherActivity : ComponentActivity() {
     }
 
     private companion object {
+        const val UNLOCK_HIDE = 0
+        const val UNLOCK_PLAY = 1
+        const val UNLOCK_SHOW = 2
+
+        /** Unlocked this soon after the screen came on: the unlock just happened, so it plays. */
+        const val UNLOCK_WINDOW_MS = 20_000L
+
         /** Request code for the system-routed widget configuration activity. */
         const val WIDGET_CONFIG_REQUEST = 0x4357
 

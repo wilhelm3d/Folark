@@ -158,6 +158,8 @@ internal class AppTaskbar(private val context: Context) {
      *  full screen (video, games) they are hidden, and the kept-open bar steps aside. */
     private var probe: View? = null
     private var fullScreen = false
+    /** The keyboard is up in the app in front (as far as Android tells this window). */
+    private var keyboardUp = false
     private var expanded = false
     private var recentsJob: Job? = null
     private val collapse = Runnable { expanded = false; mediaControlsOpen = false; refresh() }
@@ -205,6 +207,7 @@ internal class AppTaskbar(private val context: Context) {
     private var live: List<LiveActivity> = emptyList()
     private var livePill: TaskbarLivePill? = null
     private var liveIndex = 0
+    private val SPACE_GAP_DP = 6
 
     /** The app icons on the bar now, by badgeKey, for the notification nudge. */
     private val iconViews = HashMap<String, View>()
@@ -309,6 +312,10 @@ internal class AppTaskbar(private val context: Context) {
                 loadRecents(rebuild = true, force = !onlyHistory)
             }
         }
+        // The keyboard came up over Folark (or went): the bar steps aside and comes back.
+        scope.launch {
+            TaskbarSpace.keyboardOnHome.drop(1).collect { refresh() }
+        }
         // A new notification: its app's icon on the bar nudges (not in battery saver).
         scope.launch {
             entry.notificationBadgeRepository().nudges.collect { n ->
@@ -342,6 +349,7 @@ internal class AppTaskbar(private val context: Context) {
     }
 
     fun stop() {
+        TaskbarSpace.set(0)
         scope.cancel()
         media.stop()
         handler.removeCallbacksAndMessages(null)
@@ -358,22 +366,28 @@ internal class AppTaskbar(private val context: Context) {
     /** Re-evaluates whether the taskbar belongs on screen, and in which form. */
     fun refresh(rebuild: Boolean = false) {
         val s = setup
-        ensureProbe(s != null && s.enabled && s.hideFullScreen && s.keepOpen && screenOn && largeScreen())
+        // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
+        ensureProbe(s != null && s.enabled && s.keepOpen && screenOn && largeScreen())
         val active = s != null && s.enabled && screenOn && largeScreen() && keyguard?.isKeyguardLocked != true &&
             (s.pinned.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
         if (!active || s == null) {
             expanded = false
             remove()
+            TaskbarSpace.set(0)
             return
         }
         val mode = when {
+            // Typing on home or in the drawer: the bar would cover the keyboard's bottom row.
+            homeVisible && TaskbarSpace.keyboardOnHome.value -> MODE_NONE
             homeVisible && s.onHome -> MODE_BAR_FIXED
             homeVisible -> MODE_NONE
             // Full screen (a video, a game): no bar covering it; a corner swipe still opens it.
-            s.keepOpen && !(s.hideFullScreen && fullScreen) -> MODE_BAR_FIXED
+            s.keepOpen && !(s.hideFullScreen && fullScreen) && !keyboardUp -> MODE_BAR_FIXED
             expanded -> MODE_BAR
             else -> MODE_HANDLES
         }
+        // Only the bar that stays on home takes room there (home and the drawer step aside).
+        if (mode != MODE_BAR_FIXED || !homeVisible) TaskbarSpace.set(0)
         if (mode == shownMode && !rebuild) return
         remove()
         when (mode) {
@@ -388,6 +402,7 @@ internal class AppTaskbar(private val context: Context) {
             probe?.let { runCatching { windowManager.removeView(it) } }
             probe = null
             fullScreen = false
+            keyboardUp = false
             return
         }
         if (probe != null) return
@@ -395,8 +410,10 @@ internal class AppTaskbar(private val context: Context) {
         view.setOnApplyWindowInsetsListener { v, insets ->
             val barsShown = insets.isVisible(WindowInsets.Type.statusBars()) ||
                 insets.isVisible(WindowInsets.Type.navigationBars())
-            if (fullScreen == barsShown) {
+            val ime = insets.isVisible(WindowInsets.Type.ime())
+            if (fullScreen == barsShown || keyboardUp != ime) {
                 fullScreen = !barsShown
+                keyboardUp = ime
                 handler.post { refresh() }
             }
             v.onApplyWindowInsets(insets)
@@ -641,12 +658,25 @@ internal class AppTaskbar(private val context: Context) {
         val barLayout = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(s.bottomDp), watchOutside = !fixed)
         add(column, barLayout)
         barRow = row
+        if (fixed && homeVisible) {
+            // Tell home and the drawer where the bar's top edge is, whenever it is laid out again.
+            row.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishSpace(v) }
+        }
         // A drag over a split screen is handled differently when a third app isn't wanted.
         if (!fixed || !homeVisible) checkSplitForThirdApp(s)
         if (!fixed) {
             handler.removeCallbacks(collapse)
             handler.postDelayed(collapse, AUTO_COLLAPSE_MS)
         }
+    }
+
+    /** The room from the bar's top edge to the bottom of the screen, for home and the drawer. */
+    private fun publishSpace(barRow: View) {
+        if (!barRow.isAttachedToWindow || !homeVisible || shownMode != MODE_BAR_FIXED) return
+        val location = IntArray(2)
+        barRow.getLocationOnScreen(location)
+        val screenHeight = windowManager.currentWindowMetrics.bounds.height()
+        TaskbarSpace.set(screenHeight - location[1] + dp(SPACE_GAP_DP))
     }
 
     /** The bar's backdrop for the chosen theme; null for the see-through one. */

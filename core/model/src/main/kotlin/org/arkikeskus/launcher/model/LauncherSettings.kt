@@ -145,6 +145,8 @@ data class LauncherSettings(
     val foldTransitionStyle: String = TRANSITION_BOOK_UNFOLD_SWEEP,
     /** How fast this display's switch animation plays (1 = normal; higher is faster). */
     val foldTransitionSpeed: Float = 1f,
+    /** The same transition plays when the phone is unlocked straight to home (both displays). */
+    val unlockTransition: Boolean = true,
     val aquamorphicTouchEnabled: Boolean = true,
     val appLaunchZoomEnabled: Boolean = true,
     val pageBounceEnabled: Boolean = true,
@@ -668,8 +670,8 @@ data class LauncherSettings(
         const val TRANSITION_SLIDE = "slide"
         /** Follows the hinge while the phone opens (needs a hinge sensor; the inner display only). */
         const val TRANSITION_LIVE_HINGE = "live_hinge"
-        const val MIN_FOLD_TRANSITION_SPEED = 0.4f
-        const val MAX_FOLD_TRANSITION_SPEED = 2.5f
+        const val MIN_FOLD_TRANSITION_SPEED = 0.1f
+        const val MAX_FOLD_TRANSITION_SPEED = 1.5f
         const val MIN_LIVE_HINGE_END_ANGLE = 120
         const val MAX_LIVE_HINGE_SMOOTHING_MS = 120
         const val MAX_LIVE_HINGE_BLUR_DP = 48

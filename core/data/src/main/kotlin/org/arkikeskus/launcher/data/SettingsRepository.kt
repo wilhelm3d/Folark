@@ -334,6 +334,7 @@ class SettingsRepository @Inject constructor(
                 .let { if (it in LauncherSettings.LIVE_EFFECTS) it else LauncherSettings.LIVE_EFFECT_GLOW },
             searchActions = p[Keys.SEARCH_ACTIONS] ?: true,
             iconNudge = p[Keys.ICON_NUDGE] ?: true,
+            unlockTransition = p[Keys.UNLOCK_TRANSITION] ?: true,
             iconNudgeTaskbar = p[Keys.ICON_NUDGE_TASKBAR] ?: true,
             iconNudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
                 .let { if (it in LauncherSettings.NUDGE_EFFECTS) it else LauncherSettings.NUDGE_BOUNCE },
@@ -537,6 +538,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setLiveActivityEffect(value: String) = edit { it[Keys.LIVE_ACTIVITY_EFFECT] = value }
     suspend fun setSearchActions(value: Boolean) = edit { it[Keys.SEARCH_ACTIONS] = value }
     suspend fun setIconNudge(value: Boolean) = edit { it[Keys.ICON_NUDGE] = value }
+    suspend fun setUnlockTransition(value: Boolean) = edit { it[Keys.UNLOCK_TRANSITION] = value }
     suspend fun setIconNudgeTaskbar(value: Boolean) = edit { it[Keys.ICON_NUDGE_TASKBAR] = value }
     suspend fun setIconNudgeEffect(value: String) = edit { it[Keys.ICON_NUDGE_EFFECT] = value }
     suspend fun setIconNudgeSoftness(value: Float) = edit { it[Keys.ICON_NUDGE_SOFTNESS] = value.coerceIn(0f, 1f) }
@@ -1234,6 +1236,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ACTIVITY_EFFECT = stringPreferencesKey("live_activity_effect")
         val SEARCH_ACTIONS = booleanPreferencesKey("search_actions")
         val ICON_NUDGE = booleanPreferencesKey("icon_nudge")
+        val UNLOCK_TRANSITION = booleanPreferencesKey("unlock_transition")
         val ICON_NUDGE_TASKBAR = booleanPreferencesKey("icon_nudge_taskbar")
         val ICON_NUDGE_EFFECT = stringPreferencesKey("icon_nudge_effect")
         val ICON_NUDGE_SOFTNESS = floatPreferencesKey("icon_nudge_softness")

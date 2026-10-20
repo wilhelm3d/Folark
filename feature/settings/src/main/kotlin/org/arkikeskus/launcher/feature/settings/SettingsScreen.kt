@@ -1865,6 +1865,14 @@ private fun DisplayProfilesSection(
         )
         ExpressiveRowDivider()
         TransitionSpeedRow(s = s, viewModel = viewModel, screenType = screenType)
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_unlock_transition),
+            subtitle = stringResource(R.string.settings_unlock_transition_desc),
+            checked = s.unlockTransition,
+            onCheckedChange = viewModel::setUnlockTransition,
+            shared = true,
+        )
         if (s.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
             LiveHingeRows(s = s, viewModel = viewModel, inner = inner)
         }
