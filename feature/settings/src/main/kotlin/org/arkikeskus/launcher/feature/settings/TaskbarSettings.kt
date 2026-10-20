@@ -128,6 +128,19 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         )
         ExpressiveRowDivider()
 
+        if (!s.taskbarKeepOpen) {
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_taskbar_handle_hint),
+                subtitle = stringResource(R.string.settings_taskbar_handle_hint_desc),
+                checked = s.taskbarHandleHint,
+                onCheckedChange = viewModel::setTaskbarHandleHint,
+            )
+            ExpressiveRowDivider()
+        }
+
+        TaskbarPerAppRows(s, viewModel, apps)
+        ExpressiveRowDivider()
+
         val pinnedCount = s.taskbarPinnedApps?.size
         ExpressiveActionItem(
             title = stringResource(R.string.settings_taskbar_pinned),
@@ -287,6 +300,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_THEME_DARK to stringResource(R.string.settings_taskbar_theme_dark),
                 LauncherSettings.TASKBAR_THEME_LIGHT to stringResource(R.string.settings_taskbar_theme_light),
                 LauncherSettings.TASKBAR_THEME_ACCENT to stringResource(R.string.settings_taskbar_theme_accent),
+                LauncherSettings.TASKBAR_THEME_GLASS to stringResource(R.string.settings_taskbar_theme_glass),
             ),
             selected = s.taskbarTheme,
             onSelect = viewModel::setTaskbarTheme,

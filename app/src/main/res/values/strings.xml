@@ -31,4 +31,9 @@
     <string name="recents_time_hours">%1$d h ago</string>
     <string name="recents_time_yesterday">yesterday</string>
     <string name="recents_time_days">%1$d days ago</string>
+    <string name="recents_drop_split">Split view</string>
+    <string name="recents_drop_attached">Attached view</string>
+    <string name="recents_drag_hint">drop on an app</string>
+    <string name="recents_close_others">Close others</string>
+    <string name="recents_close_all_pins_too">Close all (pins too)</string>
 </resources>

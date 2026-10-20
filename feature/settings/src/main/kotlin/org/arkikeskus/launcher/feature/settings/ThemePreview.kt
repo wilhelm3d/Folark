@@ -451,6 +451,7 @@ private fun MenuCard(theme: String, modifier: Modifier = Modifier) {
         ) to scheme.primary
         LauncherSettings.POPUP_THEME_DARK -> DarkExpressivePalette to Accent
         LauncherSettings.POPUP_THEME_LIGHT -> LightExpressivePalette to Accent
+        LauncherSettings.POPUP_THEME_GLASS -> DarkExpressivePalette.copy(surfaceHi = Color.Black.copy(alpha = 0.38f)) to Accent
         else -> (if (dark) DarkExpressivePalette else LightExpressivePalette) to Accent
     }
     Column(

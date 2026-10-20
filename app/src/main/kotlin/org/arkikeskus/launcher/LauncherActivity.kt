@@ -249,6 +249,7 @@ class LauncherActivity : ComponentActivity() {
                     LocalIconEpochs provides iconEpochs,
                     LocalCustomIcons provides customIcons,
                     LocalPopupTheme provides settings.popupTheme,
+                    org.arkikeskus.launcher.ui.component.LocalGlassLevel provides settings.liquidGlassLevel,
                     LocalBadgeStyle provides BadgeStyle(settings.dotShape, settings.dotColor, settings.dotPosition),
                     LocalBatterySaver provides batterySaver,
                     LocalScreenType provides foldState.screenType,

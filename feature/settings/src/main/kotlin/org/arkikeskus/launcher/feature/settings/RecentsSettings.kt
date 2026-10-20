@@ -73,6 +73,10 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         )
         ExpressiveRowDivider()
 
+        // ---------------------------------------------------------------- look
+        RecentsLookRows(s, viewModel)
+        ExpressiveRowDivider()
+
         // ---------------------------------------------------------------- layout
         ExpressiveStepperRow(
             title = stringResource(R.string.settings_recents_columns_inner),
@@ -135,12 +139,8 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsShowTime,
         )
         ExpressiveRowDivider()
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_recents_show_actions),
-            subtitle = stringResource(R.string.settings_recents_show_actions_desc),
-            checked = s.recentsShowActions,
-            onCheckedChange = viewModel::setRecentsShowActions,
-        )
+        // ---------------------------------------------------------------- buttons and gestures
+        RecentsButtonRows(s, viewModel)
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_confirm_close_all),
@@ -168,6 +168,13 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             subtitle = stringResource(R.string.settings_recents_thumbnails_desc),
             checked = s.recentsThumbnails,
             onCheckedChange = viewModel::setRecentsThumbnails,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_pin_keep_alive),
+            subtitle = stringResource(R.string.settings_recents_pin_keep_alive_desc),
+            checked = s.recentsPinKeepAlive,
+            onCheckedChange = viewModel::setRecentsPinKeepAlive,
         )
         ExpressiveRowDivider()
         ExpressiveSwitchRow(

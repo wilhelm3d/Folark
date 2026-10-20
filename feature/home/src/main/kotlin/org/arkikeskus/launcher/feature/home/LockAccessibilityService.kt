@@ -38,7 +38,22 @@ class LockAccessibilityService : AccessibilityService() {
         taskbar?.onConfigurationChanged()
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    /**
+     * Only while Settings ▸ Taskbar has per-app rules (see [watchApps]): which app came to the
+     * front, by package name. Nothing else is read from the event.
+     */
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString() ?: return
+        // System UI (shade, Recents) and the keyboard aren't apps in front.
+        if (pkg == "com.android.systemui" || pkg == keyboardPackage()) return
+        taskbar?.onForegroundApp(pkg)
+    }
+
+    private fun keyboardPackage(): String? = runCatching {
+        Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+            ?.let { ComponentName.unflattenFromString(it)?.packageName }
+    }.getOrNull()
 
     override fun onInterrupt() = Unit
 
@@ -93,6 +108,35 @@ class LockAccessibilityService : AccessibilityService() {
         }
 
         private const val QUICK_SWITCH_DELAY_MS = 320L
+
+        /**
+         * A touch from (x0, y0) to (x1, y1) over [durationMs], as a finger would do it (Recents'
+         * attached view moves the split screen's divider with it). False without the service.
+         */
+        fun swipe(x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long): Boolean {
+            val service = instance ?: return false
+            val path = android.graphics.Path().apply {
+                moveTo(x0, y0)
+                lineTo(x1, y1)
+            }
+            val gesture = android.accessibilityservice.GestureDescription.Builder()
+                .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, durationMs))
+                .build()
+            return runCatching { service.dispatchGesture(gesture, null, null) }.getOrDefault(false)
+        }
+
+        /** Hears which app comes to the front ([on]), or nothing at all (the default). */
+        fun watchApps(on: Boolean) {
+            val service = instance ?: return
+            runCatching {
+                val info = service.serviceInfo ?: return
+                val types = if (on) AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED else 0
+                if (info.eventTypes == types) return
+                info.eventTypes = types
+                info.feedbackType = android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_GENERIC
+                service.serviceInfo = info
+            }
+        }
 
         /** Locks the screen; false when the service isn't enabled (or not yet connected). */
         fun lock(): Boolean = RootActions.run(

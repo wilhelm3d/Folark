@@ -103,3 +103,9 @@ fun LiquidGlassContainer(
         content()
     }
 }
+
+/**
+ * Settings ▸ Appearance ▸ Liquid Glass level (0 milky .. 1 clear) for surfaces that pick their
+ * glass themselves (the long-press menu). Provided at the launcher root.
+ */
+val LocalGlassLevel = androidx.compose.runtime.compositionLocalOf { 0.5f }

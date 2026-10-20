@@ -96,6 +96,7 @@ private data class TaskbarSetup(
     val theme: String,
     val opacity: Float,
     val handles: String,
+    val handleHint: Boolean,
     val onHome: Boolean,
     val keepOpen: Boolean,
     val themedIcons: Boolean,
@@ -119,6 +120,8 @@ private data class TaskbarSetup(
     val splitSide: String,
     val threeApp: Boolean,
     val hideFullScreen: Boolean,
+    val hiddenApps: Set<String>,
+    val alwaysApps: Set<String>,
     val liveEnabled: Boolean,
     val liveEffect: String,
     val nudgeEnabled: Boolean,
@@ -276,6 +279,7 @@ internal class AppTaskbar(private val context: Context) {
                     theme = s.taskbarTheme,
                     opacity = s.taskbarOpacity,
                     handles = s.taskbarHandles,
+                    handleHint = s.taskbarHandleHint,
                     onHome = s.taskbarOnHome,
                     keepOpen = s.taskbarKeepOpen,
                     themedIcons = s.useThemedIcons,
@@ -303,6 +307,8 @@ internal class AppTaskbar(private val context: Context) {
                     splitSide = s.taskbarSplitSide,
                     threeApp = s.taskbarThreeApp,
                     hideFullScreen = s.taskbarHideFullScreen,
+                    hiddenApps = s.taskbarHiddenApps,
+                    alwaysApps = s.taskbarAlwaysApps,
                     liveEnabled = s.liveActivities && s.liveActivitiesTaskbar,
                     liveEffect = s.liveActivityEffect,
                     nudgeEnabled = s.iconNudge && s.iconNudgeTaskbar,
@@ -317,6 +323,8 @@ internal class AppTaskbar(private val context: Context) {
                     iconCache.clear()
                 }
                 setup = next
+                // Per-app rules need to know which app is in front: only then is the service told.
+                LockAccessibilityService.watchApps(next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty())
                 // The media session is only followed while the media icon is wanted.
                 if (next.enabled && next.mediaEnabled) media.start() else media.stop()
                 // Only Folark's own launch order moved (every launch): rebuild only if the recent apps changed.
@@ -379,7 +387,7 @@ internal class AppTaskbar(private val context: Context) {
     fun refresh(rebuild: Boolean = false) {
         val s = setup
         // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
-        ensureProbe(s != null && s.enabled && s.keepOpen && screenOn && largeScreen())
+        ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty()) && screenOn && largeScreen())
         val active = s != null && s.enabled && screenOn && largeScreen() && keyguard?.isKeyguardLocked != true &&
             (s.pinned.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
         if (!active || s == null) {
@@ -393,6 +401,9 @@ internal class AppTaskbar(private val context: Context) {
             homeVisible && TaskbarSpace.keyboardOnHome.value -> MODE_NONE
             homeVisible && s.onHome -> MODE_BAR_FIXED
             homeVisible -> MODE_NONE
+            // Settings ▸ Taskbar ▸ per app: never in these apps; always (but not over the keyboard) in those.
+            foreground in s.hiddenApps -> MODE_NONE
+            foreground in s.alwaysApps && !keyboardUp -> MODE_BAR_FIXED
             // Full screen (a video, a game): no bar covering it; a corner swipe still opens it.
             s.keepOpen && !(s.hideFullScreen && fullScreen) && !keyboardUp -> MODE_BAR_FIXED
             expanded -> MODE_BAR
@@ -438,6 +449,19 @@ internal class AppTaskbar(private val context: Context) {
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
         if (runCatching { windowManager.addView(view, params) }.isSuccess) probe = view
+    }
+
+    /** The app in front (only followed while per-app rules exist), null when unknown. */
+    private var foreground: String? = null
+
+    /** Another app came to the front: re-decides the bar only when a per-app rule is involved. */
+    fun onForegroundApp(packageName: String) {
+        val s = setup ?: return
+        if (packageName == foreground) return
+        val before = foreground
+        foreground = packageName
+        fun ruled(p: String?) = p != null && (p in s.hiddenApps || p in s.alwaysApps)
+        if (ruled(before) || ruled(packageName)) refresh()
     }
 
     /** The home screen came to the front or left it. */
@@ -521,6 +545,18 @@ internal class AppTaskbar(private val context: Context) {
                     }
                     true
                 }
+            }
+            // A small line shows where the swipe starts (Settings ▸ Taskbar ▸ Show where to swipe).
+            if (s.handleHint) {
+                zone.addView(View(context).apply {
+                    background = GradientDrawable().apply {
+                        cornerRadius = dpf(3f)
+                        setColor(Color.argb(150, 255, 255, 255))
+                    }
+                    elevation = dpf(2f)
+                }, FrameLayout.LayoutParams(dp(28), dp(5), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+                    bottomMargin = dp(10)
+                })
             }
             add(zone, params(Gravity.BOTTOM or side, 0, 0))
         }
@@ -694,8 +730,9 @@ internal class AppTaskbar(private val context: Context) {
     }
 
     /** The bar's backdrop for the chosen theme; null for the see-through one. */
-    private fun barBackground(s: TaskbarSetup): GradientDrawable? {
+    private fun barBackground(s: TaskbarSetup): Drawable? {
         val alpha = (s.opacity.coerceIn(0f, 1f) * 255).toInt()
+        if (s.theme == LauncherSettings.TASKBAR_THEME_GLASS) return glassBackground(alpha)
         val (fill, rim) = when (s.theme) {
             LauncherSettings.TASKBAR_THEME_CLEAR -> return null
             LauncherSettings.TASKBAR_THEME_FROSTED -> Color.argb((alpha * 0.55f).toInt(), 40, 42, 48) to Color.argb(70, 255, 255, 255)
@@ -712,6 +749,26 @@ internal class AppTaskbar(private val context: Context) {
             cornerRadius = dpf(28f)
             setColor(fill)
             setStroke(dp(1), rim)
+        }
+    }
+
+    /** Liquid Glass: milky see-through fill, bright rim, and a sheen along the top. */
+    private fun glassBackground(alpha: Int): Drawable {
+        val body = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.argb((alpha * 0.42f).toInt(), 255, 255, 255), Color.argb((alpha * 0.14f).toInt(), 255, 255, 255)),
+        ).apply {
+            cornerRadius = dpf(28f)
+            setStroke(dp(1), Color.argb(150, 255, 255, 255))
+        }
+        val sheen = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.argb(110, 255, 255, 255), Color.argb(0, 255, 255, 255)),
+        ).apply { cornerRadius = dpf(22f) }
+        return android.graphics.drawable.LayerDrawable(arrayOf(body, sheen)).apply {
+            setLayerInset(1, dp(10), dp(2), dp(10), 0)
+            setLayerGravity(1, Gravity.TOP or Gravity.FILL_HORIZONTAL)
+            setLayerHeight(1, dp(16))
         }
     }
 

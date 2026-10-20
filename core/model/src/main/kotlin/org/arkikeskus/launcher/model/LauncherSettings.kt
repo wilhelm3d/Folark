@@ -351,6 +351,46 @@ data class LauncherSettings(
     val recentsEnterAnimation: String = RECENTS_ENTER_RISE,
     val recentsSelectAnimation: String = RECENTS_SELECT_POP,
     val recentsAnimationSpeed: Float = 1f,
+    /** Recents look: one of RECENTS_THEME_*; Liquid Glass on top of any of them (how much the
+     *  backdrop is blurred, dp, and how milky the glass is). */
+    val recentsTheme: String = RECENTS_THEME_FOLARK,
+    val recentsGlass: Boolean = false,
+    val recentsGlassBlur: Int = 28,
+    val recentsGlassTint: Float = 0.16f,
+    /** Hold a Recents card and drop it on another: left half split view, right half attached view
+     *  (the other app peeks in at [recentsAttachedSide], taking [recentsAttachedPeek] of the width). */
+    val recentsDragDrop: Boolean = true,
+    /** Recents buttons, each on or off: ✕ (close, root), Split, Pop-up, Full screen (on a split
+     *  card), and at the top Split view and Close all. */
+    val recentsBtnClose: Boolean = true,
+    val recentsBtnSplit: Boolean = true,
+    val recentsBtnPopup: Boolean = true,
+    val recentsBtnUnsplit: Boolean = true,
+    val recentsBtnSplitView: Boolean = true,
+    val recentsBtnCloseAll: Boolean = true,
+    /** What a gesture on a Recents card does: one of RECENTS_ACTION_*. Swipes are sideways in the
+     *  Compact list (left = up, right = down). */
+    val recentsSwipeUpAction: String = RECENTS_ACTION_CLOSE,
+    val recentsSwipeDownAction: String = RECENTS_ACTION_NONE,
+    val recentsLongPressAction: String = RECENTS_ACTION_NONE,
+    val recentsDoubleTapAction: String = RECENTS_ACTION_SPLIT,
+    /** Pinned apps ("package/user"): first in Recents, never closed by Close all; with root and
+     *  [recentsPinKeepAlive] also kept from being closed in the background. [recentsBtnPin]: the
+     *  pin button on cards. */
+    val recentsPinned: Set<String> = emptySet(),
+    val recentsBtnPin: Boolean = true,
+    val recentsPinKeepAlive: Boolean = true,
+    /** Taskbar per app (package names): never shown in [taskbarHiddenApps]; always shown in
+     *  [taskbarAlwaysApps], even full screen or when it isn't kept open. */
+    val taskbarHiddenApps: Set<String> = emptySet(),
+    val taskbarAlwaysApps: Set<String> = emptySet(),
+    /** Liquid Glass everywhere (see withLiquidGlass): one switch and one level (0 milky .. 1 clear). */
+    val liquidGlassEverywhere: Boolean = false,
+    val liquidGlassLevel: Float = 0.5f,
+    val recentsAttachedSide: String = RECENTS_ATTACHED_LEFT,
+    val recentsAttachedPeek: Float = 0.12f,
+    /** Taskbar: a small visible line at the corners where a swipe up opens it (when it isn't kept open). */
+    val taskbarHandleHint: Boolean = true,
     /** Settings ▸ Root. [rootEnabled] off: Folark never asks for root. The modes (ROOT_MODE_*)
      *  pick Android's way or root for locking, Android's Recents key and the notification shade;
      *  the "keep" switches give (and give back) grants with root instead of ADB or settings pages. */
@@ -438,7 +478,9 @@ data class LauncherSettings(
         const val POPUP_THEME_MATERIAL = "material"
         const val POPUP_THEME_DARK = "dark"
         const val POPUP_THEME_LIGHT = "light"
-        val POPUP_THEMES = setOf(POPUP_THEME_CLASSIC, POPUP_THEME_MATERIAL, POPUP_THEME_DARK, POPUP_THEME_LIGHT)
+        /** Liquid Glass: see-through over a soft dark tint, a bright rim and a sheen. */
+        const val POPUP_THEME_GLASS = "glass"
+        val POPUP_THEMES = setOf(POPUP_THEME_CLASSIC, POPUP_THEME_MATERIAL, POPUP_THEME_DARK, POPUP_THEME_LIGHT, POPUP_THEME_GLASS)
 
         const val MAX_STACK_CORNER_RADIUS = 32
         const val MAX_STACK_AUTO_ROTATE_SECONDS = 120
@@ -520,8 +562,11 @@ data class LauncherSettings(
         const val TASKBAR_THEME_DARK = "dark"
         const val TASKBAR_THEME_LIGHT = "light"
         const val TASKBAR_THEME_ACCENT = "accent"
+        /** Liquid Glass: see-through with a bright rim and a sheen along the top. */
+        const val TASKBAR_THEME_GLASS = "glass"
         val TASKBAR_THEMES = listOf(
             TASKBAR_THEME_CLEAR, TASKBAR_THEME_FROSTED, TASKBAR_THEME_DARK, TASKBAR_THEME_LIGHT, TASKBAR_THEME_ACCENT,
+            TASKBAR_THEME_GLASS,
         )
         const val TASKBAR_MEDIA_POS_START = "start"
         const val TASKBAR_MEDIA_POS_MIDDLE = "middle"
@@ -548,6 +593,37 @@ data class LauncherSettings(
         const val MAX_RECENTS_CARD_HEIGHT = 440
         const val MAX_RECENTS_CORNER_DP = 40
         const val MIN_RECENTS_ANIM_SPEED = 0.25f
+        /** Recents themes: Folark's card grid, iPad (big windows in a row), Carousel (one big card
+         *  in the middle), Deck (overlapping cards), Compact (a list), Switcher (big icons). */
+        const val RECENTS_THEME_FOLARK = "folark"
+        const val RECENTS_THEME_IPAD = "ipad"
+        const val RECENTS_THEME_CAROUSEL = "carousel"
+        const val RECENTS_THEME_DECK = "deck"
+        const val RECENTS_THEME_COMPACT = "compact"
+        const val RECENTS_THEME_SWITCHER = "switcher"
+        val RECENTS_THEMES = listOf(
+            RECENTS_THEME_FOLARK, RECENTS_THEME_IPAD, RECENTS_THEME_CAROUSEL,
+            RECENTS_THEME_DECK, RECENTS_THEME_COMPACT, RECENTS_THEME_SWITCHER,
+        )
+        const val MAX_RECENTS_GLASS_BLUR = 80
+        const val MIN_RECENTS_GLASS_TINT = 0.04f
+        const val MAX_RECENTS_GLASS_TINT = 0.4f
+        const val RECENTS_ACTION_NONE = "none"
+        const val RECENTS_ACTION_CLOSE = "close"
+        const val RECENTS_ACTION_SPLIT = "split"
+        const val RECENTS_ACTION_POPUP = "popup"
+        const val RECENTS_ACTION_UNSPLIT = "unsplit"
+        const val RECENTS_ACTION_INFO = "info"
+        const val RECENTS_ACTION_OPEN = "open"
+        const val RECENTS_ACTION_PIN = "pin"
+        val RECENTS_ACTIONS = listOf(
+            RECENTS_ACTION_NONE, RECENTS_ACTION_CLOSE, RECENTS_ACTION_SPLIT, RECENTS_ACTION_POPUP,
+            RECENTS_ACTION_UNSPLIT, RECENTS_ACTION_PIN, RECENTS_ACTION_INFO, RECENTS_ACTION_OPEN,
+        )
+        const val RECENTS_ATTACHED_LEFT = "left"
+        const val RECENTS_ATTACHED_RIGHT = "right"
+        const val MIN_RECENTS_ATTACHED_PEEK = 0.05f
+        const val MAX_RECENTS_ATTACHED_PEEK = 0.3f
         const val MAX_RECENTS_ANIM_SPEED = 2.5f
 
         /** Recents entrances: up from below, out of the distance, falling in diagonally, turning

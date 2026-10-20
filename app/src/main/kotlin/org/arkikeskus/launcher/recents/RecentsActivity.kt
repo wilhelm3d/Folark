@@ -2,12 +2,14 @@ package org.arkikeskus.launcher.recents
 
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
@@ -34,6 +36,11 @@ class RecentsActivity : ComponentActivity() {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val state by viewModel.state.collectAsStateWithLifecycle()
             val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
+            // Liquid Glass: Android blurs whatever is behind Recents (home, or the app).
+            val blurPx = if (settings.recentsGlass) (settings.recentsGlassBlur * resources.displayMetrics.density).toInt() else 0
+            LaunchedEffect(blurPx) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) runCatching { window.setBackgroundBlurRadius(blurPx) }
+            }
             LauncherTheme(
                 darkTheme = true,
                 amoledDark = settings.amoledDark,
@@ -53,6 +60,16 @@ class RecentsActivity : ComponentActivity() {
                     onPopUp = { card -> viewModel.popUp(card); leave() },
                     onUnsplit = { card -> viewModel.unsplit(card); viewModel.open(card); leave() },
                     onOpenTogether = { cards -> viewModel.openTogether(cards, settings.recentsThirdInSplit); leave() },
+                    onCombine = { dragged, target, how ->
+                        if (how == COMBINE_ATTACHED) {
+                            viewModel.openAttached(dragged, target, settings.recentsAttachedSide, settings.recentsAttachedPeek, windowManager.maximumWindowMetrics.bounds)
+                        } else {
+                            viewModel.openTogether(listOf(target, dragged), settings.recentsThirdInSplit)
+                        }
+                        leave()
+                    },
+                    onAppInfo = { card -> viewModel.appInfo(card); leave() },
+                    onTogglePin = viewModel::togglePin,
                     onDismiss = ::leave,
                 )
             }

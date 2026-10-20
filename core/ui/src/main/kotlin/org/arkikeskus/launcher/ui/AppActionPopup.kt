@@ -51,6 +51,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.ui.component.liquidGlass
+import org.arkikeskus.launcher.ui.component.LocalGlassLevel
 import org.arkikeskus.launcher.ui.expressive.DarkExpressivePalette
 import org.arkikeskus.launcher.ui.expressive.ExpressivePalette
 import org.arkikeskus.launcher.ui.expressive.LightExpressivePalette
@@ -255,12 +257,15 @@ private fun ExpressivePopupCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // Left-aligned caret so [caretStart] is a true offset from the card's left edge.
                 if (showCaret && !preferAbove) Caret(pointingUp = true, color = cardColor, modifier = Modifier.align(Alignment.Start).padding(start = caretStart))
+                val glass = LocalPopupTheme.current == LauncherSettings.POPUP_THEME_GLASS
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = cardColor,
-                    tonalElevation = 3.dp,
-                    shadowElevation = 10.dp,
-                    modifier = Modifier.width(CARD_WIDTH),
+                    color = if (glass) Color.Transparent else cardColor,
+                    tonalElevation = if (glass) 0.dp else 3.dp,
+                    shadowElevation = if (glass) 0.dp else 10.dp,
+                    modifier = Modifier
+                        .width(CARD_WIDTH)
+                        .then(if (glass) Modifier.liquidGlass(RoundedCornerShape(20.dp), cardColor) else Modifier),
                 ) {
                     Column(
                         modifier = Modifier
@@ -309,6 +314,14 @@ private fun PopupThemed(content: @Composable () -> Unit) {
             CompositionLocalProvider(LocalExpressivePalette provides DarkExpressivePalette, content = content)
         LauncherSettings.POPUP_THEME_LIGHT ->
             CompositionLocalProvider(LocalExpressivePalette provides LightExpressivePalette, content = content)
+        // Liquid Glass: the dark palette over a see-through tint (how see-through: the glass level).
+        LauncherSettings.POPUP_THEME_GLASS -> {
+            val level = LocalGlassLevel.current
+            CompositionLocalProvider(
+                LocalExpressivePalette provides DarkExpressivePalette.copy(surfaceHi = Color.Black.copy(alpha = 0.62f - 0.38f * level)),
+                content = content,
+            )
+        }
         // Classic: the warm-orange palette that follows the system dark/light mode.
         else -> ExpressiveTheme(content = content)
     }

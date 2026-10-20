@@ -40,10 +40,16 @@ data class RecentsCard(
     val apps: List<AppItem?>,
     val label: String,
     val inactiveMs: Long?,
+    /** Pinned: first in Recents, left open by Close all (and kept in memory with root). */
+    val pinned: Boolean = false,
 ) {
+    /** The pin keys of its apps ("package/user"). */
+    val pinKeys: List<String> get() = tasks.map { pinKey(it) }
     val key: Int get() = tasks.first().taskId
     val isSplit: Boolean get() = tasks.size > 1
 }
+
+internal fun pinKey(task: OpenTask): String = "${task.packageName}/${task.userId}"
 
 data class RecentsState(
     val loading: Boolean = true,
@@ -93,7 +99,7 @@ class RecentsViewModel @Inject constructor(
 
     private suspend fun load(s: LauncherSettings): RecentsState {
         val tasks = OpenTasks.list(context) ?: return RecentsState(loading = false, canList = false)
-        val needRoot = s.recentsThumbnails || s.recentsRootClose
+        val needRoot = s.recentsThumbnails || s.recentsRootClose || (s.recentsPinned.isNotEmpty() && (s.recentsPinKeepAlive || s.recentsBtnCloseAll))
         val root = needRoot && RootShell.available()
         val apps = appRepository.apps.first()
         // Apps sharing the visible split screen stay together on one card.
@@ -111,35 +117,55 @@ class RecentsViewModel @Inject constructor(
                     apps = groupApps,
                     label = splitGroup.mapIndexed { i, t -> groupApps[i]?.label ?: t.packageName }.joinToString(" + "),
                     inactiveMs = splitGroup.mapNotNull { it.inactiveMs }.minOrNull(),
+                    pinned = splitGroup.all { pinKey(it) in s.recentsPinned },
                 )
             } else {
                 val app = appFor(task, apps)
                 // Only apps that have a place in the drawer: no system plumbing.
                 if (app == null) continue
-                cards += RecentsCard(listOf(task), listOf(app), app.label, task.inactiveMs)
+                cards += RecentsCard(listOf(task), listOf(app), app.label, task.inactiveMs, pinned = pinKey(task) in s.recentsPinned)
             }
         }
-        val sorted = if (s.recentsSort == LauncherSettings.RECENTS_SORT_NAME) cards.sortedBy { it.label.lowercase() } else cards
-        return RecentsState(loading = false, canList = true, root = root, cards = sorted.take(s.recentsMaxApps))
+        val ordered = if (s.recentsSort == LauncherSettings.RECENTS_SORT_NAME) cards.sortedBy { it.label.lowercase() } else cards
+        // Pinned apps first (in the same order among themselves); they never fall off the end.
+        val sorted = ordered.sortedByDescending { it.pinned }
+        val shown = sorted.filter { it.pinned } + sorted.filterNot { it.pinned }.take((s.recentsMaxApps - sorted.count { it.pinned }).coerceAtLeast(0))
+        // Pinned apps kept in memory: their priority is given again (Android resets it).
+        if (root && s.recentsPinKeepAlive) {
+            val running = shown.filter { it.pinned }.flatMap { c -> c.tasks.map { it.packageName } }.toSet()
+            if (running.isNotEmpty()) rememberExemptions(RootTasks.protect(running))
+        }
+        return RecentsState(loading = false, canList = true, root = root, cards = shown)
     }
 
     private fun appFor(task: OpenTask, apps: List<AppItem>): AppItem? =
         apps.firstOrNull { it.packageName == task.packageName && it.user.hashCode() == task.userId }
             ?: apps.firstOrNull { it.packageName == task.packageName }
 
-    /** Android's saved screenshots, one by one so the first cards fill in quickly. */
+    /**
+     * Android's screenshots of the open apps. First its saved files (quick, one by one so the first
+     * cards fill in at once); the ones it has only in memory, or keeps elsewhere on this Android
+     * version, are then asked from Android's task manager through the root helper, all together.
+     */
     private fun loadThumbnails(cards: List<RecentsCard>) {
         viewModelScope.launch(Dispatchers.IO) {
+            val missing = ArrayList<Int>()
             for (task in cards.flatMap { it.tasks }) {
                 if (task.taskId in _thumbnails.value) continue
-                val bytes = RootTasks.snapshot(task.taskId, task.userId) ?: continue
-                val bitmap = runCatching {
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                }.getOrNull() ?: continue
-                _thumbnails.value = _thumbnails.value + (task.taskId to bitmap)
+                val bitmap = RootTasks.snapshot(task.taskId, task.userId)?.let(::decode)
+                if (bitmap != null) _thumbnails.value = _thumbnails.value + (task.taskId to bitmap)
+                else missing += task.taskId
             }
+            if (missing.isEmpty()) return@launch
+            val fromSystem = RootTasks.snapshotsFromSystem(context, missing)
+            val decoded = fromSystem.mapNotNull { (id, bytes) -> decode(bytes)?.let { id to it } }
+            if (decoded.isNotEmpty()) _thumbnails.value = _thumbnails.value + decoded
         }
     }
+
+    private fun decode(bytes: ByteArray): ImageBitmap? = runCatching {
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }.getOrNull()
 
     // ------------------------------------------------------------------ actions
 
@@ -162,14 +188,63 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /** Closes everything: Android's own "clear all" (needs only the DUMP grant), else root. */
+    /**
+     * Closes everything but the pinned apps. Without pins: Android's own "clear all" (needs only
+     * the DUMP grant), else root. With pins: root closes the others one by one (without root
+     * Android's "clear all" can't leave any open, so it closes the pinned ones too).
+     */
     fun closeAll() {
         val cards = _state.value.cards
-        _state.value = _state.value.copy(cards = emptyList())
+        val root = _state.value.root
+        val keep = cards.filter { it.pinned }
+        _state.value = _state.value.copy(cards = if (root) keep else emptyList())
         viewModelScope.launch(Dispatchers.IO) {
-            if (!ShellSplit.clearAllRecents(context) && _state.value.root) {
-                cards.flatMap { it.tasks }.forEach { RootTasks.removeTask(context, it.taskId) }
+            val others = cards.filterNot { it.pinned }.flatMap { c -> c.tasks.map { it.taskId } }
+            when {
+                keep.isNotEmpty() && root -> RootTasks.removeTasks(context, others)
+                !ShellSplit.clearAllRecents(context) && root -> RootTasks.removeTasks(context, others)
             }
+        }
+    }
+
+    /** Pins or unpins [card]'s apps; with root and the setting, keeps them in memory (or stops). */
+    fun togglePin(card: RecentsCard) {
+        val pin = !card.pinned
+        _state.value = _state.value.copy(
+            cards = _state.value.cards.map { if (it.key == card.key) it.copy(pinned = pin) else it }.sortedByDescending { it.pinned },
+        )
+        appScope.launch {
+            val s = settingsRepository.settings(ScreenType.INNER).first()
+            val next = if (pin) s.recentsPinned + card.pinKeys else s.recentsPinned - card.pinKeys.toSet()
+            settingsRepository.setRecentsPinned(next)
+            if (!s.recentsPinKeepAlive) return@launch
+            withContext(Dispatchers.IO) {
+                if (!RootShell.available()) return@withContext
+                val packages = card.tasks.map { it.packageName }.toSet()
+                if (pin) {
+                    rememberExemptions(RootTasks.protect(packages))
+                } else {
+                    val exempt = settingsRepository.pinExemptions()
+                    // Still pinned for another profile: leave it.
+                    val stillPinned = next.map { it.substringBefore('/') }.toSet()
+                    for (p in packages - stillPinned) RootTasks.unprotect(p, p in exempt)
+                    settingsRepository.setPinExemptions(exempt - (packages - stillPinned))
+                }
+            }
+        }
+    }
+
+    private fun rememberExemptions(added: Set<String>) {
+        if (added.isEmpty()) return
+        appScope.launch { settingsRepository.setPinExemptions(settingsRepository.pinExemptions() + added) }
+    }
+
+    /** Android's App info page of [card]'s app (for the right profile). */
+    fun appInfo(card: RecentsCard) {
+        val app = card.apps.firstOrNull() ?: return
+        runCatching {
+            context.getSystemService(android.content.pm.LauncherApps::class.java)
+                .startAppDetailsActivity(app.componentName, app.user, null, null)
         }
     }
 
@@ -218,7 +293,29 @@ class RecentsViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) { RootShell.available(recheck = true) }
     }
 
+    /**
+     * Attached view: [main] and [peek] in split screen, then the divider dragged near the edge so
+     * [peek] only peeks in at [side] ("left"/"right"), [peekFraction] of the [screen] width. The
+     * drag is a touch made by Folark's accessibility service (or root), as a finger would do it.
+     */
+    fun openAttached(main: RecentsCard, peek: RecentsCard, side: String, peekFraction: Float, screen: android.graphics.Rect) {
+        val mainTask = main.tasks.first()
+        val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
+        appScope.launch {
+            open(peek)
+            delay(SPLIT_STEP_MS)
+            val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, mainTask.taskId, right = left) }
+            if (!moved) return@launch
+            delay(ATTACH_SETTLE_MS)
+            val y = screen.exactCenterY()
+            val from = screen.exactCenterX()
+            val to = if (left) screen.left + screen.width() * peekFraction else screen.right - screen.width() * peekFraction
+            DividerDrag.drag(from, y, to, y)
+        }
+    }
+
     private companion object {
         const val SPLIT_STEP_MS = 450L
+        const val ATTACH_SETTLE_MS = 900L
     }
 }
