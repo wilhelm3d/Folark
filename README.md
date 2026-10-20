@@ -11,7 +11,7 @@
 
 ## 🚀 Overview
 
-**Folark** is an open-source, ultra-responsive Android home-screen launcher built 100% with **Jetpack Compose** and **Material 3 Expressive Design**. Derived from the high-performance foundations of **ARK Launcher**, Folark has been completely re-architected to deliver a native, fluid, and tailor-made experience for foldable devices, supporting independent cover/inner profiles, desktop taskbar overlays, interactive widgets, and Android 17 performance efficiency.
+**Folark** is an open-source, ultra-responsive Android home-screen launcher built 100% with **Jetpack Compose** and **Material 3 Expressive Design**. Derived from the high-performance foundations of **ARK Launcher**, Folark has been completely re-architected to deliver a native, fluid, and tailor-made experience for foldable devices, supporting independent cover/inner profiles, desktop taskbar overlays, interactive widgets, root-powered recents management, and Android 17 performance efficiency.
 
 ---
 
@@ -23,6 +23,13 @@
 - **Live Hinge Unfold Animations**: Spatial 3D book-sweep, portal, drop, water-ripple, and doors unfold transitions tied directly to physical hinge angle sensors.
 - **Hinge-Aware Parallax Wallpaper**: Gyroscope/accelerometer motion-sensor driven wallpaper depth shift across the fold crease.
 - **Display Refresh Rate Throttling**: Dynamic LTPO refresh rate ramping up to 120Hz/144Hz on touch, automatically stepping down to 60Hz when idle to maximize battery life.
+
+### 👑 Recents with Root Capabilities (KernelSU / Magisk / APatch)
+- **Built-In Recents Screen**: Custom Compose-based task manager (`Settings ▸ Recents`) displaying running apps and active split-screen pairs.
+- **Live Task Thumbnails & Screenshots**: High-resolution task screenshots decoded on-demand via a high-speed daemonized root shell (`RootTasks.snapshot`).
+- **Individual & Batch App Termination**: Force-stop specific background apps or perform "Close All" while respecting pinned apps.
+- **Process Memory Protection (Pin Keep-Alive)**: Pin critical apps to the top of Recents and use root process protection (`RootTasks.protect`) to prevent Android's OOM killer from terminating them.
+- **Daemonized `su` Shell Architecture**: High-performance persistent root shell session (`RootShell`) with automatic 30s idle timeout and fast IPC execution (~1-5ms response).
 
 ### ⚡ Android 17 & Performance Optimizations
 - **AppFunctions Search Integration**: On-device natural language and quick-action search indexing powered by Android 16/17 AppFunctions APIs.
