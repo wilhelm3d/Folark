@@ -1,6 +1,7 @@
 package org.arkikeskus.launcher.feature.settings
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.root.RootShell
@@ -184,6 +186,8 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsRootClose,
         )
         ExpressiveRowDivider()
+        RecentsCheckRow()
+        ExpressiveRowDivider()
         ExpressiveActionItem(
             title = stringResource(
                 when (root) {
@@ -218,4 +222,54 @@ private fun copyToClipboard(context: android.content.Context, text: String) {
     context.getSystemService(android.content.ClipboardManager::class.java)
         ?.setPrimaryClip(android.content.ClipData.newPlainText("adb", text))
     android.widget.Toast.makeText(context, R.string.settings_recents_copied, android.widget.Toast.LENGTH_SHORT).show()
+}
+
+/** Settings ▸ Recents ▸ Check screenshots: runs each step and shows what it answered. */
+@androidx.compose.runtime.Composable
+private fun RecentsCheckRow() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var report by remember { mutableStateOf<String?>(null) }
+    var running by remember { mutableStateOf(false) }
+    ExpressiveActionItem(
+        title = stringResource(if (running) R.string.settings_root_working else R.string.settings_recents_check),
+        description = stringResource(R.string.settings_recents_check_desc),
+        onClick = {
+            if (!running) {
+                running = true
+                scope.launch {
+                    report = withContext(Dispatchers.IO) {
+                        runCatching { org.arkikeskus.launcher.data.root.RootTasks.diagnose(context) }
+                            .getOrElse { "Check failed: ${it.javaClass.simpleName}: ${it.message}" }
+                    }
+                    running = false
+                }
+            }
+        },
+    )
+    val text = report ?: return
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { report = null },
+        title = { androidx.compose.material3.Text(stringResource(R.string.settings_recents_check)) },
+        text = {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                androidx.compose.material3.Text(
+                    text,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+                    modifier = androidx.compose.ui.Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { copyToClipboard(context, text) }) {
+                androidx.compose.material3.Text(stringResource(R.string.settings_recents_check_copy))
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = { report = null }) {
+                androidx.compose.material3.Text(stringResource(R.string.settings_taskbar_done))
+            }
+        },
+    )
 }

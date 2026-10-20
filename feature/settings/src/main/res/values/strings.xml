@@ -768,4 +768,7 @@
     <string name="settings_liquid_glass_everywhere_desc">Drawer, folders, long-press menus, clock widget, taskbar and Recents. Your own looks come back when you turn it off</string>
     <string name="settings_liquid_glass_level">Glass level</string>
     <string name="settings_liquid_glass_level_desc">Left: milky and soft. Right: clear, with a strong blur behind</string>
+    <string name="settings_recents_check">Check screenshots</string>
+    <string name="settings_recents_check_desc">Runs each step of getting the apps\' screenshots and shows what failed. Open a few apps first</string>
+    <string name="settings_recents_check_copy">Copy</string>
 </resources>

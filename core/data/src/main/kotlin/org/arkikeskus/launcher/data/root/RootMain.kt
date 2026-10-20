@@ -39,7 +39,10 @@ class RootMain {
                         dir.mkdirs()
                         var saved = 0
                         for (id in args.drop(2).mapNotNull { it.toIntOrNull() }) {
-                            if (runCatching { saveSnapshot(id, File(dir, "$id.jpg")) }.getOrDefault(false)) saved++
+                            val ok = runCatching { saveSnapshot(id, File(dir, "$id.jpg")) }
+                                .onFailure { System.err.println("task $id: ${it.javaClass.name}: ${it.message} ${(it.cause ?: it).stackTrace.take(3).joinToString(" | ")}") }
+                                .getOrDefault(false)
+                            if (ok) saved++ else System.err.println("task $id: no picture")
                         }
                         "$OK $saved"
                     }
@@ -58,24 +61,77 @@ class RootMain {
          * `getTaskSnapshot(taskId, isLowResolution, ...)`: its parameters differ between Android
          * versions, so it is found by name and given the task, "small copy", and false for the rest.
          */
-        private fun snapshot(taskId: Int, lowRes: Boolean): Any? {
+        /**
+         * Where Android hands out task screenshots: the task manager itself (up to Android 16), or
+         * the separate snapshot manager it gives out (`getTaskSnapshotManager()`, Android 17).
+         */
+        private fun snapshotSources(): List<Any> {
             val manager = taskManager()
-            val method = manager.javaClass.methods
-                .filter { it.name == "getTaskSnapshot" && it.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType }
-                .minByOrNull { it.parameterTypes.size } ?: return null
-            val params: List<Any?> = method.parameterTypes.mapIndexed { i, type ->
-                when {
-                    i == 0 -> taskId
-                    type == Boolean::class.javaPrimitiveType -> if (i == 1) lowRes else false
-                    type == Int::class.javaPrimitiveType -> 0
-                    else -> null
-                } as Any?
+            val sources = mutableListOf(manager)
+            val getter = manager.javaClass.methods.firstOrNull { it.name == "getTaskSnapshotManager" && it.parameterTypes.isEmpty() }
+            if (getter != null) {
+                val got = runCatching { getter.invoke(manager) }.getOrNull()
+                val service = if (got is android.os.IBinder) asInterface(got) else got
+                if (service != null) sources.add(0, service)
             }
-            return method.invoke(manager, *params.toTypedArray())
+            return sources
+        }
+
+        /** An AIDL binder as its interface (`<descriptor>$Stub.asInterface`). */
+        private fun asInterface(binder: android.os.IBinder): Any? = runCatching {
+            val descriptor = binder.interfaceDescriptor ?: return null
+            Class.forName("$descriptor\$Stub").getMethod("asInterface", android.os.IBinder::class.java).invoke(null, binder)
+        }.getOrNull()
+
+        /** What the last snapshot call threw, for helper.log. */
+        private var lastError: Throwable? = null
+
+        /**
+         * `getTaskSnapshot(taskId, isLowResolution, ...)` on whichever source has it: its parameters
+         * differ between Android versions, so it is found by name and given the task, "small copy",
+         * false for any further switch, 0 for any further number.
+         */
+        private fun snapshot(taskId: Int, lowRes: Boolean): Any? {
+            for (source in snapshotSources()) {
+                val methods = source.javaClass.methods
+                    .filter {
+                        it.name.startsWith("getTaskSnapshot") && it.name != "getTaskSnapshotManager" &&
+                            it.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType
+                    }
+                    .sortedBy { it.parameterTypes.size }
+                for (method in methods) {
+                    var firstBoolean = true
+                    val params: List<Any?> = method.parameterTypes.mapIndexed { i, type ->
+                        when {
+                            i == 0 -> taskId
+                            type == Boolean::class.javaPrimitiveType -> (if (firstBoolean) lowRes else false).also { firstBoolean = false }
+                            type == Int::class.javaPrimitiveType -> 0
+                            type == Long::class.javaPrimitiveType -> 0L
+                            else -> null
+                        } as Any?
+                    }
+                    val result = runCatching { method.invoke(source, *params.toTypedArray()) }
+                        .onFailure { lastError = (it as? java.lang.reflect.InvocationTargetException)?.targetException ?: it }
+                        .getOrNull()
+                    if (result != null) return result
+                }
+            }
+            return null
+        }
+
+        /** The snapshot methods each source offers, for helper.log. */
+        private fun describeSources(): String = snapshotSources().joinToString(" ; ") { source ->
+            source.javaClass.name + ": " + source.javaClass.methods
+                .filter { it.name.contains("Snapshot") }
+                .joinToString { m -> m.name + m.parameterTypes.joinToString(",", "(", ")") { it.simpleName } }
         }
 
         private fun saveSnapshot(taskId: Int, out: File): Boolean {
-            val snap = snapshot(taskId, lowRes = true) ?: snapshot(taskId, lowRes = false) ?: return false
+            val snap = snapshot(taskId, lowRes = true) ?: snapshot(taskId, lowRes = false)
+            if (snap == null) {
+                System.err.println("task $taskId: Android has no snapshot. Last error: $lastError. Sources: " + describeSources())
+                return false
+            }
             val buffer = snap.javaClass.getMethod("getHardwareBuffer").invoke(snap) as? HardwareBuffer ?: return false
             val space = runCatching { snap.javaClass.getMethod("getColorSpace").invoke(snap) as? ColorSpace }.getOrNull()
                 ?: ColorSpace.get(ColorSpace.Named.SRGB)

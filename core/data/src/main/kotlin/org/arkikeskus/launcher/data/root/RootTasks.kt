@@ -8,12 +8,20 @@ import android.content.Context
  */
 object RootTasks {
 
-    /** The saved screenshot of task [taskId] (JPEG bytes, the smaller copy first), or null. */
+    /**
+     * The saved screenshot of task [taskId], or null. Android has kept them as `<id>_reduced.jpg`
+     * and `<id>.jpg` (sometimes .png or .webp) in the user's snapshots folder, and on Android 17 in
+     * a folder inside it: whichever is there, the smaller copy first.
+     */
     fun snapshot(taskId: Int, userId: Int): ByteArray? {
         if (taskId < 0 || userId < 0) return null
+        return RootShell.runBytes(snapshotCommand(taskId, userId))?.takeIf { it.size > MIN_JPEG_BYTES }
+    }
+
+    private fun snapshotCommand(taskId: Int, userId: Int): String {
         val dir = "/data/system_ce/$userId/snapshots"
-        return RootShell.runBytes("cat $dir/${taskId}_reduced.jpg 2>/dev/null || cat $dir/$taskId.jpg")
-            ?.takeIf { it.size > MIN_JPEG_BYTES }
+        return "f=\$(find $dir -maxdepth 3 -type f 2>/dev/null | grep -E '/${taskId}(_reduced)?\\.(jpg|png|webp)\$' | sort -r | head -1); " +
+            "[ -n \"\$f\" ] && cat \"\$f\""
     }
 
     /**
@@ -28,8 +36,9 @@ object RootTasks {
         val dir = java.io.File(context.cacheDir, "recents_shots").apply { mkdirs() }
         val path = dir.absolutePath
         if ((apk + path).any { it == '\'' || it == '"' || it == '`' || it == '$' || it == ' ' }) return emptyMap()
+        // What the helper says when something fails is kept for Settings ▸ Recents ▸ Check screenshots.
         RootShell.run(
-            "CLASSPATH='$apk' app_process /system/bin ${RootMain::class.java.name} snapshots '$path' ${ids.joinToString(" ")}",
+            "CLASSPATH='$apk' app_process /system/bin ${RootMain::class.java.name} snapshots '$path' ${ids.joinToString(" ")} 2>'$path/helper.log'; chmod 644 '$path/helper.log'",
             SNAPSHOTS_TIMEOUT_MS,
         ) ?: return emptyMap()
         val out = HashMap<Int, ByteArray>()
@@ -39,6 +48,41 @@ object RootTasks {
             file.delete()
         }
         return out
+    }
+
+    /**
+     * Settings ▸ Recents ▸ Check screenshots: every step of getting an app's screenshot, and what
+     * each one answered, as text to read or copy. Blocking: call off the main thread.
+     */
+    fun diagnose(context: Context): String = buildString {
+        appendLine("Folark screenshot check")
+        appendLine("Root switch (Settings ▸ Root): " + if (RootShell.enabled) "on" else "OFF")
+        val rootOk = RootShell.available(recheck = true)
+        appendLine("1. Root: " + if (rootOk) "yes" else "NO (su refused or missing)")
+        appendLine("   id: " + (RootShell.run("id")?.trim() ?: "-"))
+        val tasks = org.arkikeskus.launcher.data.OpenTasks.list(context)
+        if (tasks == null) {
+            appendLine("2. Open apps: CAN'T READ (no DUMP grant)")
+            return@buildString
+        }
+        appendLine("2. Open apps: ${tasks.size}")
+        tasks.take(4).forEach { appendLine("   #${it.taskId} ${it.packageName} user ${it.userId}") }
+        if (!rootOk) return@buildString
+        val first = tasks.firstOrNull() ?: return@buildString
+        val dir = "/data/system_ce/${first.userId}/snapshots"
+        appendLine("3. Folder $dir:")
+        val listing = RootShell.run("ls -la $dir 2>&1 | head -8; echo '   inside:'; find $dir -mindepth 2 -maxdepth 3 2>&1 | head -12; echo \"   files for #${first.taskId}:\"; find $dir -name '${first.taskId}*' 2>&1 | head -6")
+        appendLine(listing?.trimEnd()?.prependIndent("   ") ?: "   (no answer)")
+        val file = snapshot(first.taskId, first.userId)
+        appendLine("4. File for #${first.taskId}: " + (file?.let { "${it.size} bytes" } ?: "none"))
+        val fromSystem = snapshotsFromSystem(context, listOf(first.taskId))
+        appendLine("5. From the task manager: " + (fromSystem[first.taskId]?.let { "${it.size} bytes" } ?: "none"))
+        val log = runCatching { java.io.File(java.io.File(context.cacheDir, "recents_shots"), "helper.log").readText() }.getOrNull()
+        if (!log.isNullOrBlank()) appendLine("   helper said:\n" + log.trim().lines().take(12).joinToString("\n") { "   $it" })
+        val decoded = (file ?: fromSystem[first.taskId])?.let {
+            android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)
+        }
+        appendLine("6. Picture: " + (decoded?.let { "${it.width}×${it.height}" } ?: "can't be read"))
     }
 
     /**
