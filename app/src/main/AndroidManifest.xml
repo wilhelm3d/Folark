@@ -63,6 +63,9 @@
          top refresh rate, the system animation speed). -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
+    <!-- Folark Recents: bring an open app back to the front. -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+
     <!-- See which apps expose a launcher activity (for the app drawer). -->
     <queries>
         <intent>
@@ -110,6 +113,17 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
             android:label="@string/settings_label"
             android:theme="@style/Theme.ArkikeskusLauncher" />
+
+        <!-- Folark Recents (Settings ▸ Recents): a passing screen over the wallpaper. -->
+        <activity
+            android:name=".recents.RecentsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="org.arkikeskus.launcher.recents"
+            android:excludeFromRecents="true"
+            android:noHistory="false"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
+            android:theme="@style/Theme.ArkikeskusLauncher.Recents" />
 
         <!-- Notification dots: the system binds this once the user grants notification access. -->
         <service

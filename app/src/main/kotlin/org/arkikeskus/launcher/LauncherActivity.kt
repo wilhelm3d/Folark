@@ -460,6 +460,8 @@ class LauncherActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         wasForeground = true
+        // Settings ▸ Root ▸ keep: give back a grant Android took away (cheap unless one is missing).
+        org.arkikeskus.launcher.data.root.RootGrants.restoreIfNeeded(this)
         val cap = org.arkikeskus.launcher.data.SystemControls.peakRefreshRate(this)
             ?.takeIf { it > 0f && it.isFinite() } ?: Float.POSITIVE_INFINITY
         if (cap != peakRefreshCap) {

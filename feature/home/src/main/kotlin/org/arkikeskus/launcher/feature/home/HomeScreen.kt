@@ -119,6 +119,7 @@ import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.data.FolarkRecents
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.AppActionPopup
@@ -514,6 +515,9 @@ fun HomeScreen(
                 if (!LockAccessibilityService.lock()) {
                     widgetMessage(R.string.double_tap_lock_needs_service)
                 }
+            }
+            LauncherSettings.GESTURE_RECENTS -> {
+                if (!settings.recentsEnabled || !FolarkRecents.open(context)) LockAccessibilityService.openRecents()
             }
             LauncherSettings.GESTURE_NONE -> {}
             // Motorola gestures (MotoLinks): a note, Secure Vault, Ready For, Game Center, ...

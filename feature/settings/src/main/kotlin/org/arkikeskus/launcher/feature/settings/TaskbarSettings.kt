@@ -200,6 +200,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_RECENTS_OFF to stringResource(R.string.settings_taskbar_recents_button_off),
                 LauncherSettings.TASKBAR_RECENTS_SYSTEM to stringResource(R.string.settings_taskbar_recents_button_system),
                 LauncherSettings.TASKBAR_RECENTS_DESKTOP to stringResource(R.string.settings_taskbar_recents_button_desktop),
+                LauncherSettings.TASKBAR_RECENTS_FOLARK to stringResource(R.string.settings_taskbar_recents_button_folark),
             ),
             selected = s.taskbarRecentsButton,
             onSelect = viewModel::setTaskbarRecentsButton,

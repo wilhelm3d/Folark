@@ -62,8 +62,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.AppUsageRepository
+import org.arkikeskus.launcher.data.FolarkRecents
 import org.arkikeskus.launcher.data.LauncherAppsSource
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
+import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.model.AppItem
@@ -110,6 +112,8 @@ private data class TaskbarSetup(
     val mediaBadge: Boolean,
     val systemDrag: Boolean,
     val recentsButton: String,
+    val runningApps: Boolean,
+    val runningDots: Boolean,
     val quickSwitch: Boolean,
     val splitControls: Boolean,
     val splitSide: String,
@@ -150,6 +154,9 @@ internal class AppTaskbar(private val context: Context) {
     private var setup: TaskbarSetup? = null
     private var allApps: List<AppItem> = emptyList()
     private var recents: List<AppItem> = emptyList()
+    /** Packages open now (Android's task list), for the taskbar's running dots and open-apps mode. */
+    @Volatile private var runningPackages: Set<String> = emptySet()
+    private var shownRunning: Set<String> = emptySet()
     private var screenOn = true
     private val shown = mutableListOf<View>()
     private var shownMode = MODE_NONE
@@ -285,7 +292,12 @@ internal class AppTaskbar(private val context: Context) {
                     mediaShape = s.taskbarMediaShape,
                     mediaBadge = s.taskbarMediaBadge,
                     systemDrag = s.taskbarSystemDrag,
-                    recentsButton = s.taskbarRecentsButton,
+                    // Folark Recents switched off: the button opens Android's again.
+                    recentsButton = s.taskbarRecentsButton.let {
+                        if (it == LauncherSettings.TASKBAR_RECENTS_FOLARK && !s.recentsEnabled) LauncherSettings.TASKBAR_RECENTS_SYSTEM else it
+                    },
+                    runningApps = s.taskbarRunningApps,
+                    runningDots = s.taskbarRunningDots,
                     quickSwitch = s.taskbarQuickSwitch,
                     splitControls = s.taskbarSplitControls,
                     splitSide = s.taskbarSplitSide,
@@ -550,6 +562,8 @@ internal class AppTaskbar(private val context: Context) {
         val size = dp(s.iconSizeDp)
         fun addIcon(app: AppItem) {
             val view = iconView(app, s, size, hint, fixed)
+            // An app that is open now: a small dot under its icon (Settings ▸ Recents).
+            if (s.runningDots && app.packageName in runningPackages) view.foreground = RunningDot(lightTheme)
             iconViews[app.badgeKey] = view
             row.addView(view, LinearLayout.LayoutParams(size, size).apply {
                 marginStart = dp(s.spacingDp) / 2
@@ -877,6 +891,7 @@ internal class AppTaskbar(private val context: Context) {
 
     /** Motorola's recents screen, or the recents of its desktop taskbar (Ready For) if chosen and present. */
     private fun openRecents(s: TaskbarSetup) {
+        if (s.recentsButton == LauncherSettings.TASKBAR_RECENTS_FOLARK && FolarkRecents.open(context)) return
         if (s.recentsButton == LauncherSettings.TASKBAR_RECENTS_DESKTOP) {
             val intent = Intent(ACTION_DESKTOP_RECENTS)
                 .setPackage(DESKTOP_TASKBAR_PACKAGE)
@@ -1617,8 +1632,10 @@ internal class AppTaskbar(private val context: Context) {
         }
         recentsJob = scope.launch {
             val next = withContext(Dispatchers.IO) { recentApps(s) }
-            val changed = next != recents
+            val running = runningPackages
+            val changed = next != recents || (s.runningDots && running != shownRunning)
             recents = next
+            shownRunning = running
             val barUp = shownMode == MODE_BAR || shownMode == MODE_BAR_FIXED
             val forced = pendingForce
             pendingForce = false
@@ -1633,7 +1650,11 @@ internal class AppTaskbar(private val context: Context) {
         val pinnedKeys = s.pinned.map { it.key }.toSet()
         val own = context.packageName
         val myUser = Process.myUserHandle()
-        val packages = if (hasUsageAccess(context)) usageHistory() else null
+        // Open apps from Android's task list (one-time DUMP grant), for the dots and open-apps mode.
+        val open = if (s.runningApps || s.runningDots) OpenTasks.list(context) else null
+        runningPackages = open?.map { it.packageName }?.toSet().orEmpty()
+        val packages = if (s.runningApps && open != null) open.map { it.packageName }.distinct()
+            else if (hasUsageAccess(context)) usageHistory() else null
         val ordered: List<AppItem> = if (packages != null) {
             packages.mapNotNull { pkg ->
                 allApps.firstOrNull { it.packageName == pkg && it.user == myUser }

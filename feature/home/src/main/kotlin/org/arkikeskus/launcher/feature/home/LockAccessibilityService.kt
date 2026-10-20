@@ -5,6 +5,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
+import org.arkikeskus.launcher.data.root.RootActions
+import org.arkikeskus.launcher.data.root.RootFeatures
 
 /**
  * Double-tap-to-lock, and the host of the optional taskbar over other apps.
@@ -64,13 +66,23 @@ class LockAccessibilityService : AccessibilityService() {
         fun toggleSplitScreen(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN) ?: false
 
         /** Opens Android's recents screen (on this phone, Motorola's own); false without the service. */
-        fun openRecents(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_RECENTS) ?: false
+        fun openRecents(): Boolean = RootActions.run(
+            RootFeatures.recentsMode,
+            android = { instance?.performGlobalAction(GLOBAL_ACTION_RECENTS) ?: false },
+            rootCommand = RootActions.RECENTS,
+        )
 
         /**
          * Back to the last app: recents twice, like a double press of the recents key (the second
          * press, while recents is showing, opens the app before the current one).
          */
-        fun quickSwitch(): Boolean {
+        fun quickSwitch(): Boolean = RootActions.run(
+            RootFeatures.recentsMode,
+            android = ::quickSwitchService,
+            rootCommand = RootActions.QUICK_SWITCH,
+        )
+
+        private fun quickSwitchService(): Boolean {
             val service = instance ?: return false
             if (!service.performGlobalAction(GLOBAL_ACTION_RECENTS)) return false
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
@@ -83,7 +95,11 @@ class LockAccessibilityService : AccessibilityService() {
         private const val QUICK_SWITCH_DELAY_MS = 320L
 
         /** Locks the screen; false when the service isn't enabled (or not yet connected). */
-        fun lock(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) ?: false
+        fun lock(): Boolean = RootActions.run(
+            RootFeatures.lockMode,
+            android = { instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) ?: false },
+            rootCommand = RootActions.LOCK,
+        )
 
         /** Whether the user has allowed the service in the system accessibility settings. */
         fun isEnabled(context: Context): Boolean {

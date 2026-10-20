@@ -8,6 +8,14 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
+    <!-- Folark Recents: over the wallpaper, see-through, no starting window. -->
+    <style name="Theme.ArkikeskusLauncher.Recents" parent="Theme.ArkikeskusLauncher">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
     <!-- Splash screen shown on cold start, then hands off to the launcher theme. -->
     <style name="Theme.ArkikeskusLauncher.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
