@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -78,6 +79,13 @@ class RecentsViewModel @Inject constructor(
     private val _state = MutableStateFlow(RecentsState())
     val state: StateFlow<RecentsState> = _state.asStateFlow()
 
+    /**
+     * The screenshots, decoded small (see [decode]) and held in a cache bounded by bytes: the
+     * least recently shown ones go first when it is full. [_thumbnails] is what the screen draws.
+     */
+    private val cache = object : android.util.LruCache<Int, ImageBitmap>(thumbnailBudget()) {
+        override fun sizeOf(key: Int, value: ImageBitmap): Int = value.asAndroidBitmap().allocationByteCount
+    }
     private val _thumbnails = MutableStateFlow<Map<Int, ImageBitmap>>(emptyMap())
     val thumbnails: StateFlow<Map<Int, ImageBitmap>> = _thumbnails.asStateFlow()
 
@@ -92,7 +100,8 @@ class RecentsViewModel @Inject constructor(
             _state.value = result
             // Screenshots of apps no longer open are let go.
             val ids = result.cards.flatMap { c -> c.tasks.map { it.taskId } }.toSet()
-            _thumbnails.value = _thumbnails.value.filterKeys { it in ids }
+            cache.snapshot().keys.filterNot { it in ids }.forEach { cache.remove(it) }
+            publish()
             if (s.recentsThumbnails && result.root) loadThumbnails(result.cards)
         }
     }
@@ -151,21 +160,49 @@ class RecentsViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val missing = ArrayList<Int>()
             for (task in cards.flatMap { it.tasks }) {
-                if (task.taskId in _thumbnails.value) continue
+                if (cache.get(task.taskId) != null) continue
                 val bitmap = RootTasks.snapshot(task.taskId, task.userId)?.let(::decode)
-                if (bitmap != null) _thumbnails.value = _thumbnails.value + (task.taskId to bitmap)
-                else missing += task.taskId
+                if (bitmap != null) {
+                    cache.put(task.taskId, bitmap)
+                    publish()
+                } else {
+                    missing += task.taskId
+                }
             }
             if (missing.isEmpty()) return@launch
             val fromSystem = RootTasks.snapshotsFromSystem(context, missing)
-            val decoded = fromSystem.mapNotNull { (id, bytes) -> decode(bytes)?.let { id to it } }
-            if (decoded.isNotEmpty()) _thumbnails.value = _thumbnails.value + decoded
+            for ((id, bytes) in fromSystem) decode(bytes)?.let { cache.put(id, it) }
+            if (fromSystem.isNotEmpty()) publish()
         }
     }
 
+    private fun publish() {
+        _thumbnails.value = cache.snapshot()
+    }
+
+    /**
+     * A screenshot decoded no bigger than a card needs: shrunk by whole steps (halving) until it
+     * is at most [THUMB_MAX_EDGE] px on its long side, in 16-bit colour (screenshots have no see-
+     * through parts). A full inner-screen picture would take ~20 MB; this takes well under 1 MB.
+     */
     private fun decode(bytes: ByteArray): ImageBitmap? = runCatching {
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val edge = maxOf(bounds.outWidth, bounds.outHeight)
+        if (edge <= 0) return@runCatching null
+        var sample = 1
+        while (edge / (sample * 2) >= THUMB_MAX_EDGE) sample *= 2
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
     }.getOrNull()
+
+    override fun onCleared() {
+        cache.evictAll()
+        super.onCleared()
+    }
 
     // ------------------------------------------------------------------ actions
 
@@ -315,6 +352,12 @@ class RecentsViewModel @Inject constructor(
     }
 
     private companion object {
+        /** Long side of a decoded screenshot, px (a card is rarely bigger). */
+        const val THUMB_MAX_EDGE = 720
+
+        /** Screenshot memory: an eighth of what the app may use, at most 48 MB. */
+        fun thumbnailBudget(): Int = (Runtime.getRuntime().maxMemory() / 8).coerceAtMost(48L * 1024 * 1024).toInt()
+
         const val SPLIT_STEP_MS = 450L
         const val ATTACH_SETTLE_MS = 900L
     }
