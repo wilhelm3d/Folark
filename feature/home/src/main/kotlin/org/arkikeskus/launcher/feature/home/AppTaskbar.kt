@@ -224,7 +224,8 @@ internal class AppTaskbar(private val context: Context) {
 
     private var repository: AppRepository? = null
     private var source: LauncherAppsSource? = null
-    private val iconCache = HashMap<String, Drawable>()
+    /** Icons of the apps the bar has shown lately; the least recently shown go first when full. */
+    private val iconCache = IconCache(ICON_CACHE_SIZE)
     private var iconStyle = ""
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -1762,7 +1763,15 @@ internal class AppTaskbar(private val context: Context) {
         lastResumed.entries.sortedByDescending { it.value }.map { it.key }
     }.getOrNull()
 
+    /** [android.util.LruCache] with the map-style access the bar uses. */
+    private class IconCache(size: Int) : android.util.LruCache<String, Drawable>(size) {
+        operator fun set(key: String, value: Drawable) { put(key, value) }
+        fun clear() = evictAll()
+    }
+
     companion object {
+        /** Room for every pinned and recent icon at once, with plenty to spare (counted in icons). */
+        private const val ICON_CACHE_SIZE = 48
         private const val MEDIA_CONTROLS_MS = 6_000L
         private const val MEDIA_HIDE_SETTLE_MS = 2_000L
 

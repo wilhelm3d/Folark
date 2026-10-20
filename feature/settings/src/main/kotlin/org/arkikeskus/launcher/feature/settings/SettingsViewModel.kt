@@ -65,10 +65,8 @@ class SettingsViewModel @Inject constructor(
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** All launchable apps (sorted), for the hidden-apps manager list. */
+    /** All launchable apps, for the hidden-apps manager list (already sorted by AppRepository). */
     val apps: StateFlow<List<AppItem>> = appRepository.apps
-        .map { list -> list.sortedBy { it.label.lowercase() } }
-        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Keys currently hidden from the drawer. */
