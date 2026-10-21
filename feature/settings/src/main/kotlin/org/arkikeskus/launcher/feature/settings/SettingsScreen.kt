@@ -50,6 +50,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CallToAction
+import androidx.compose.material.icons.rounded.AdminPanelSettings
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -183,6 +185,18 @@ private enum class SettingsCategory(
         R.string.settings_notifications,
         R.string.settings_category_notifications_desc,
         Icons.Rounded.Notifications,
+    ),
+    RECENTS(
+        R.string.settings_recents,
+        R.string.settings_category_recents_desc,
+        Icons.Rounded.GridView,
+        perDisplay = false,
+    ),
+    ROOT(
+        R.string.settings_root,
+        R.string.settings_category_root_desc,
+        Icons.Rounded.AdminPanelSettings,
+        perDisplay = false,
     ),
     DISPLAY_PROFILES(
         R.string.settings_display_screen_profiles,
@@ -415,6 +429,8 @@ fun SettingsScreen(
                                 SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = profile, onPickColor = { colorTarget = it })
                                 SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
                                 SettingsCategory.TASKBAR -> TaskbarSection(s = s, viewModel = viewModel)
+                                SettingsCategory.RECENTS -> RecentsSection(s = s, viewModel = viewModel)
+                                SettingsCategory.ROOT -> RootSection(s = s, viewModel = viewModel)
                                 SettingsCategory.APP_DRAWER -> AppDrawerSection(
                                     s = s,
                                     viewModel = viewModel,
@@ -653,6 +669,8 @@ fun SettingsScreen(
                                     SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = profile, onPickColor = { colorTarget = it })
                                     SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
                                     SettingsCategory.TASKBAR -> TaskbarSection(s = s, viewModel = viewModel)
+                                    SettingsCategory.RECENTS -> RecentsSection(s = s, viewModel = viewModel)
+                                    SettingsCategory.ROOT -> RootSection(s = s, viewModel = viewModel)
                                     SettingsCategory.APP_DRAWER -> AppDrawerSection(
                                         s = s,
                                         viewModel = viewModel,
@@ -1029,6 +1047,7 @@ private fun gestureLabel(action: String): String = stringResource(
         LauncherSettings.GESTURE_DRAWER -> R.string.settings_gesture_drawer
         LauncherSettings.GESTURE_SEARCH -> R.string.settings_gesture_search
         LauncherSettings.GESTURE_LOCK -> R.string.settings_gesture_lock
+        LauncherSettings.GESTURE_RECENTS -> R.string.settings_gesture_recents
         LauncherSettings.GESTURE_NONE -> R.string.settings_gesture_none
         LauncherSettings.GESTURE_MOTO_NOTE -> R.string.settings_gesture_moto_note
         LauncherSettings.GESTURE_MOTO_VAULT -> R.string.settings_gesture_moto_vault
@@ -1046,6 +1065,7 @@ private fun gestureOptions(context: android.content.Context): List<Pair<String, 
     LauncherSettings.GESTURE_DRAWER to R.string.settings_gesture_drawer,
     LauncherSettings.GESTURE_SEARCH to R.string.settings_gesture_search,
     LauncherSettings.GESTURE_LOCK to R.string.settings_gesture_lock,
+    LauncherSettings.GESTURE_RECENTS to R.string.settings_gesture_recents,
 ) + listOf(
     LauncherSettings.GESTURE_MOTO_NOTE to R.string.settings_gesture_moto_note,
     LauncherSettings.GESTURE_MOTO_VAULT to R.string.settings_gesture_moto_vault,
@@ -1865,6 +1885,14 @@ private fun DisplayProfilesSection(
         )
         ExpressiveRowDivider()
         TransitionSpeedRow(s = s, viewModel = viewModel, screenType = screenType)
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_unlock_transition),
+            subtitle = stringResource(R.string.settings_unlock_transition_desc),
+            checked = s.unlockTransition,
+            onCheckedChange = viewModel::setUnlockTransition,
+            shared = true,
+        )
         if (s.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
             LiveHingeRows(s = s, viewModel = viewModel, inner = inner)
         }

@@ -66,6 +66,9 @@ internal fun ThemingExtrasSection(
     val presetApplied = stringResource(R.string.settings_theme_preset_applied)
     val overrides = LocalPreviewOverrides.current
 
+    // ---- Liquid Glass everywhere: one switch and one level -----------------------------------------
+    LiquidGlassEverywhereSection(s, viewModel)
+
     // ---- Presets: each sets the drawer, folders, menus, dots, stack indicator and dock at once ----
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_theme_presets),
@@ -103,6 +106,7 @@ internal fun ThemingExtrasSection(
                 LauncherSettings.POPUP_THEME_MATERIAL to stringResource(R.string.settings_popup_theme_material),
                 LauncherSettings.POPUP_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
                 LauncherSettings.POPUP_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
+                LauncherSettings.POPUP_THEME_GLASS to stringResource(R.string.settings_folder_theme_glass),
             ),
             selected = s.popupTheme,
             onSelect = { viewModel.setPopupTheme(it, screenType) },

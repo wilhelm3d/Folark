@@ -4,3 +4,6 @@
 # own "consumer" R8 rules, and manifest-declared components (Activity, the notification-listener
 # service) are kept automatically. So no app-specific keeps are needed yet. Add targeted -keep rules
 # below if R8 ever strips or renames something used via reflection.
+
+# Folark Recents with root: started by name through `app_process` (RootTasks.removeTask).
+-keep class org.arkikeskus.launcher.data.root.RootMain { public static void main(java.lang.String[]); }

@@ -52,6 +52,13 @@ import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.ui.component.rememberKeyboardShown
+import androidx.compose.foundation.layout.ime
+import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
+import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.feature.home.TaskbarSpace
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.WindowInsets
 import org.arkikeskus.launcher.ui.component.LocalIconNudges
 import org.arkikeskus.launcher.ui.component.IconNudges
 import org.arkikeskus.launcher.ui.component.IconNudgeEvent
@@ -246,10 +253,25 @@ fun LauncherShell(
             null
         }
     }
+    // Folark's taskbar staying on home (inner display): the dock and the drawer keep clear of it.
+    val taskbarPx by TaskbarSpace.bottomPx.collectAsStateWithLifecycle()
+    val navigationPx = WindowInsets.navigationBars.getBottom(density)
+    // While the keyboard is up the bar steps aside (it would cover the keyboard), so no room is
+    // kept for it either; the drawer and home make room for the keyboard instead.
+    val keyboardUp by rememberKeyboardShown()
+    LaunchedEffect(keyboardUp, screenType) {
+        if (screenType == ScreenType.INNER) TaskbarSpace.setKeyboardOnHome(keyboardUp)
+    }
+    val taskbarInset = if (screenType == ScreenType.INNER && !keyboardUp) {
+        with(density) { (taskbarPx - navigationPx).coerceAtLeast(0).toDp() }
+    } else {
+        0.dp
+    }
     CompositionLocalProvider(
         LocalAppNotifications provides popupNotifications,
         LocalBadgeAvatars provides avatars,
         LocalIconNudges provides iconNudges,
+        LocalTaskbarInset provides taskbarInset,
     ) {
     Box(
         modifier = modifier

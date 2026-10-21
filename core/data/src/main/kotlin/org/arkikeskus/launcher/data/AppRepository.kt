@@ -116,19 +116,21 @@ open class AppRepository @Inject constructor(
         val result = source.launchAppPair(pair)
         if (result.isSuccess) {
             scope.launch {
-                appUsageRepository.recordLaunch(pair.app1Key)
+                // Every app that opened is counted, in one write at the end.
+                val launched = mutableListOf(pair.app1Key)
                 delay(SPLIT_SECOND_APP_DELAY_MS)
                 if (source.launchAppPairSecond(pair).isSuccess) {
-                    appUsageRepository.recordLaunch(pair.app2Key)
+                    launched += pair.app2Key
                     settleIntoSplit(pair.app2ComponentName.packageName)
                 }
                 if (pair.hasThirdApp) {
                     // The third app floats over the pair once the split has settled.
                     delay(SPLIT_THIRD_APP_DELAY_MS)
                     if (source.launchAppPairThird(pair, floatingWindowSize()).isSuccess) {
-                        appUsageRepository.recordLaunch(pair.app3Key)
+                        launched += pair.app3Key
                     }
                 }
+                appUsageRepository.recordLaunches(launched)
             }
         }
         return result
@@ -139,11 +141,12 @@ open class AppRepository @Inject constructor(
         val result = source.launch(first)
         if (result.isSuccess) {
             scope.launch {
-                appUsageRepository.recordLaunch(first.key)
                 delay(SPLIT_SECOND_APP_DELAY_MS)
                 if (source.launchAdjacent(second).isSuccess) {
-                    appUsageRepository.recordLaunch(second.key)
+                    appUsageRepository.recordLaunches(listOf(first.key, second.key))
                     settleIntoSplit(second.packageName)
+                } else {
+                    appUsageRepository.recordLaunch(first.key)
                 }
             }
         }

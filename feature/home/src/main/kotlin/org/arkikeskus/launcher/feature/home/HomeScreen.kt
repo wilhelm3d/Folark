@@ -119,6 +119,7 @@ import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.data.FolarkRecents
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.AppActionPopup
@@ -134,6 +135,7 @@ import org.arkikeskus.launcher.ui.PopupAction
 import org.arkikeskus.launcher.ui.RenameDialog
 import org.arkikeskus.launcher.ui.rememberHomeDragController
 import org.arkikeskus.launcher.ui.component.AppIcon
+import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
 import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
@@ -514,6 +516,9 @@ fun HomeScreen(
                     widgetMessage(R.string.double_tap_lock_needs_service)
                 }
             }
+            LauncherSettings.GESTURE_RECENTS -> {
+                if (!settings.recentsEnabled || !FolarkRecents.open(context)) LockAccessibilityService.openRecents()
+            }
             LauncherSettings.GESTURE_NONE -> {}
             // Motorola gestures (MotoLinks): a note, Secure Vault, Ready For, Game Center, ...
             else -> if (!MotoLinks.runGesture(context, action)) widgetMessage(R.string.gesture_moto_unavailable)
@@ -836,6 +841,8 @@ fun HomeScreen(
                     onAppMenu = { app, anchor -> menuTarget = AppMenuTarget(app, anchor, DragSource.Dock, anchor.y > windowHeightPx / 2) },
                     modifier = dockAlignModifier
                         .navigationBarsPadding()
+                        // Above Folark's taskbar when it stays on home.
+                        .padding(bottom = LocalTaskbarInset.current)
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                 )
             } }

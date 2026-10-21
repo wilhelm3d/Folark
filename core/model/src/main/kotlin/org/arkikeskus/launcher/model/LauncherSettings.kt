@@ -145,6 +145,8 @@ data class LauncherSettings(
     val foldTransitionStyle: String = TRANSITION_BOOK_UNFOLD_SWEEP,
     /** How fast this display's switch animation plays (1 = normal; higher is faster). */
     val foldTransitionSpeed: Float = 1f,
+    /** The same transition plays when the phone is unlocked straight to home (both displays). */
+    val unlockTransition: Boolean = true,
     val aquamorphicTouchEnabled: Boolean = true,
     val appLaunchZoomEnabled: Boolean = true,
     val pageBounceEnabled: Boolean = true,
@@ -314,6 +316,94 @@ data class LauncherSettings(
     val iconNudgeSoftness: Float = 0.5f,
     /** Quick actions in search: timers, alarms, events, directions, email, notes, numbers. */
     val searchActions: Boolean = true,
+    /** Folark's own Recents screen (all shared by both displays): opened by the taskbar's Recents
+     *  button ([TASKBAR_RECENTS_FOLARK]) or a home gesture ([GESTURE_RECENTS]). */
+    val recentsEnabled: Boolean = true,
+    /** Cards per row on the inner screen and on the cover screen. */
+    val recentsColumnsInner: Int = 4,
+    val recentsColumnsOuter: Int = 1,
+    /** The most cards shown. */
+    val recentsMaxApps: Int = 12,
+    /** Height of a card's picture (dp), its corner radius (dp), and how dark the backdrop is (0..1). */
+    val recentsCardHeight: Int = 300,
+    val recentsCornerDp: Int = 26,
+    val recentsBackdropDim: Float = 0.85f,
+    /** Newest first ([RECENTS_SORT_RECENT]) or by name ([RECENTS_SORT_NAME]). */
+    val recentsSort: String = RECENTS_SORT_RECENT,
+    /** When each app was last used, under its name. */
+    val recentsShowTime: Boolean = true,
+    /** Split / Pop-up buttons on each card. */
+    val recentsShowActions: Boolean = true,
+    /** "Close all" asks once more before closing everything. */
+    val recentsConfirmCloseAll: Boolean = false,
+    /** Split view: a third app joins the split screen (phones that allow three, like the Razr
+     *  Fold), otherwise it opens as a pop-up. */
+    val recentsThirdInSplit: Boolean = true,
+    /** With root: Android's saved screenshots of the apps, and closing a single app. */
+    val recentsThumbnails: Boolean = true,
+    val recentsRootClose: Boolean = true,
+    /** Taskbar: the apps that are open now instead of the recently used ones, and a dot under the
+     *  icons of open apps (both need the one-time DUMP grant). */
+    val taskbarRunningApps: Boolean = false,
+    val taskbarRunningDots: Boolean = true,
+    /** Recents animations: how the cards come in (RECENTS_ENTER_*), how a card picked for split
+     *  view answers (RECENTS_SELECT_*), and how fast both play (1 = normal, higher = faster). */
+    val recentsEnterAnimation: String = RECENTS_ENTER_RISE,
+    val recentsSelectAnimation: String = RECENTS_SELECT_POP,
+    val recentsAnimationSpeed: Float = 1f,
+    /** Recents look: one of RECENTS_THEME_*; Liquid Glass on top of any of them (how much the
+     *  backdrop is blurred, dp, and how milky the glass is). */
+    val recentsTheme: String = RECENTS_THEME_FOLARK,
+    val recentsGlass: Boolean = false,
+    val recentsGlassBlur: Int = 28,
+    val recentsGlassTint: Float = 0.16f,
+    /** Hold a Recents card and drop it on another: left half split view, right half attached view
+     *  (the other app peeks in at [recentsAttachedSide], taking [recentsAttachedPeek] of the width). */
+    val recentsDragDrop: Boolean = true,
+    /** Recents buttons, each on or off: ✕ (close, root), Split, Pop-up, Full screen (on a split
+     *  card), and at the top Split view and Close all. */
+    val recentsBtnClose: Boolean = true,
+    val recentsBtnSplit: Boolean = true,
+    val recentsBtnPopup: Boolean = true,
+    val recentsBtnUnsplit: Boolean = true,
+    val recentsBtnSplitView: Boolean = true,
+    val recentsBtnCloseAll: Boolean = true,
+    /** What a gesture on a Recents card does: one of RECENTS_ACTION_*. Swipes are sideways in the
+     *  Compact list (left = up, right = down). */
+    val recentsSwipeUpAction: String = RECENTS_ACTION_CLOSE,
+    val recentsSwipeDownAction: String = RECENTS_ACTION_NONE,
+    val recentsLongPressAction: String = RECENTS_ACTION_NONE,
+    val recentsDoubleTapAction: String = RECENTS_ACTION_SPLIT,
+    /** Pinned apps ("package/user"): first in Recents, never closed by Close all; with root and
+     *  [recentsPinKeepAlive] also kept from being closed in the background. [recentsBtnPin]: the
+     *  pin button on cards. */
+    val recentsPinned: Set<String> = emptySet(),
+    val recentsBtnPin: Boolean = true,
+    val recentsPinKeepAlive: Boolean = true,
+    /** Taskbar per app (package names): never shown in [taskbarHiddenApps]; always shown in
+     *  [taskbarAlwaysApps], even full screen or when it isn't kept open. */
+    val taskbarHiddenApps: Set<String> = emptySet(),
+    val taskbarAlwaysApps: Set<String> = emptySet(),
+    /** Liquid Glass everywhere (see withLiquidGlass): one switch and one level (0 milky .. 1 clear). */
+    val liquidGlassEverywhere: Boolean = false,
+    val liquidGlassLevel: Float = 0.5f,
+    val recentsAttachedSide: String = RECENTS_ATTACHED_LEFT,
+    val recentsAttachedPeek: Float = 0.12f,
+    /** Taskbar: a small visible line at the corners where a swipe up opens it (when it isn't kept open). */
+    val taskbarHandleHint: Boolean = true,
+    /** Settings ▸ Root. [rootEnabled] off: Folark never asks for root. The modes (ROOT_MODE_*)
+     *  pick Android's way or root for locking, Android's Recents key and the notification shade;
+     *  the "keep" switches give (and give back) grants with root instead of ADB or settings pages. */
+    val rootEnabled: Boolean = true,
+    val rootLockMode: String = ROOT_MODE_FALLBACK,
+    val rootRecentsMode: String = ROOT_MODE_FALLBACK,
+    val rootShadeMode: String = ROOT_MODE_FALLBACK,
+    val rootKeepDump: Boolean = false,
+    val rootKeepUsage: Boolean = false,
+    val rootKeepSecureSettings: Boolean = false,
+    val rootKeepNotifications: Boolean = false,
+    val rootKeepAccessibility: Boolean = false,
+    val rootKeepWidgets: Boolean = false,
     /** Live hinge transition (both displays' settings): the angle the effect ends at (degrees),
      *  and how much the readings are smoothed (ms, 0 = raw). */
     val liveHingeEndAngle: Int = 165,
@@ -388,7 +478,9 @@ data class LauncherSettings(
         const val POPUP_THEME_MATERIAL = "material"
         const val POPUP_THEME_DARK = "dark"
         const val POPUP_THEME_LIGHT = "light"
-        val POPUP_THEMES = setOf(POPUP_THEME_CLASSIC, POPUP_THEME_MATERIAL, POPUP_THEME_DARK, POPUP_THEME_LIGHT)
+        /** Liquid Glass: see-through over a soft dark tint, a bright rim and a sheen. */
+        const val POPUP_THEME_GLASS = "glass"
+        val POPUP_THEMES = setOf(POPUP_THEME_CLASSIC, POPUP_THEME_MATERIAL, POPUP_THEME_DARK, POPUP_THEME_LIGHT, POPUP_THEME_GLASS)
 
         const val MAX_STACK_CORNER_RADIUS = 32
         const val MAX_STACK_AUTO_ROTATE_SECONDS = 120
@@ -470,8 +562,11 @@ data class LauncherSettings(
         const val TASKBAR_THEME_DARK = "dark"
         const val TASKBAR_THEME_LIGHT = "light"
         const val TASKBAR_THEME_ACCENT = "accent"
+        /** Liquid Glass: see-through with a bright rim and a sheen along the top. */
+        const val TASKBAR_THEME_GLASS = "glass"
         val TASKBAR_THEMES = listOf(
             TASKBAR_THEME_CLEAR, TASKBAR_THEME_FROSTED, TASKBAR_THEME_DARK, TASKBAR_THEME_LIGHT, TASKBAR_THEME_ACCENT,
+            TASKBAR_THEME_GLASS,
         )
         const val TASKBAR_MEDIA_POS_START = "start"
         const val TASKBAR_MEDIA_POS_MIDDLE = "middle"
@@ -484,6 +579,86 @@ data class LauncherSettings(
         const val TASKBAR_RECENTS_OFF = "off"
         const val TASKBAR_RECENTS_SYSTEM = "system"
         const val TASKBAR_RECENTS_DESKTOP = "desktop"
+        /** Folark's own Recents screen. */
+        const val TASKBAR_RECENTS_FOLARK = "folark"
+
+        const val RECENTS_SORT_RECENT = "recent"
+        const val RECENTS_SORT_NAME = "name"
+        const val MIN_RECENTS_COLUMNS = 1
+        const val MAX_RECENTS_COLUMNS_INNER = 6
+        const val MAX_RECENTS_COLUMNS_OUTER = 2
+        const val MIN_RECENTS_APPS = 4
+        const val MAX_RECENTS_APPS = 30
+        const val MIN_RECENTS_CARD_HEIGHT = 160
+        const val MAX_RECENTS_CARD_HEIGHT = 440
+        const val MAX_RECENTS_CORNER_DP = 40
+        const val MIN_RECENTS_ANIM_SPEED = 0.25f
+        /** Recents themes: Folark's card grid, iPad (big windows in a row), Carousel (one big card
+         *  in the middle), Deck (overlapping cards), Compact (a list), Switcher (big icons). */
+        const val RECENTS_THEME_FOLARK = "folark"
+        const val RECENTS_THEME_IPAD = "ipad"
+        const val RECENTS_THEME_CAROUSEL = "carousel"
+        const val RECENTS_THEME_DECK = "deck"
+        const val RECENTS_THEME_COMPACT = "compact"
+        const val RECENTS_THEME_SWITCHER = "switcher"
+        val RECENTS_THEMES = listOf(
+            RECENTS_THEME_FOLARK, RECENTS_THEME_IPAD, RECENTS_THEME_CAROUSEL,
+            RECENTS_THEME_DECK, RECENTS_THEME_COMPACT, RECENTS_THEME_SWITCHER,
+        )
+        const val MAX_RECENTS_GLASS_BLUR = 80
+        const val MIN_RECENTS_GLASS_TINT = 0.04f
+        const val MAX_RECENTS_GLASS_TINT = 0.4f
+        const val RECENTS_ACTION_NONE = "none"
+        const val RECENTS_ACTION_CLOSE = "close"
+        const val RECENTS_ACTION_SPLIT = "split"
+        const val RECENTS_ACTION_POPUP = "popup"
+        const val RECENTS_ACTION_UNSPLIT = "unsplit"
+        const val RECENTS_ACTION_INFO = "info"
+        const val RECENTS_ACTION_OPEN = "open"
+        const val RECENTS_ACTION_PIN = "pin"
+        val RECENTS_ACTIONS = listOf(
+            RECENTS_ACTION_NONE, RECENTS_ACTION_CLOSE, RECENTS_ACTION_SPLIT, RECENTS_ACTION_POPUP,
+            RECENTS_ACTION_UNSPLIT, RECENTS_ACTION_PIN, RECENTS_ACTION_INFO, RECENTS_ACTION_OPEN,
+        )
+        const val RECENTS_ATTACHED_LEFT = "left"
+        const val RECENTS_ATTACHED_RIGHT = "right"
+        const val MIN_RECENTS_ATTACHED_PEEK = 0.05f
+        const val MAX_RECENTS_ATTACHED_PEEK = 0.3f
+        const val MAX_RECENTS_ANIM_SPEED = 2.5f
+
+        /** Recents entrances: up from below, out of the distance, falling in diagonally, turning
+         *  over, fanning out from a stack, coming into focus. */
+        const val RECENTS_ENTER_RISE = "rise"
+        const val RECENTS_ENTER_ZOOM = "zoom"
+        const val RECENTS_ENTER_CASCADE = "cascade"
+        const val RECENTS_ENTER_FLIP = "flip"
+        const val RECENTS_ENTER_FAN = "fan"
+        const val RECENTS_ENTER_FOCUS = "focus"
+        const val RECENTS_ENTER_NONE = "none"
+        val RECENTS_ENTERS = listOf(
+            RECENTS_ENTER_RISE, RECENTS_ENTER_ZOOM, RECENTS_ENTER_CASCADE, RECENTS_ENTER_FLIP,
+            RECENTS_ENTER_FAN, RECENTS_ENTER_FOCUS, RECENTS_ENTER_NONE,
+        )
+
+        /** A card picked for split view: a hop, a spreading ring, lifted up, leaning to its side,
+         *  a breathing halo, a little shake. */
+        const val RECENTS_SELECT_POP = "pop"
+        const val RECENTS_SELECT_RING = "ring"
+        const val RECENTS_SELECT_LIFT = "lift"
+        const val RECENTS_SELECT_TILT = "tilt"
+        const val RECENTS_SELECT_GLOW = "glow"
+        const val RECENTS_SELECT_JIGGLE = "jiggle"
+        const val RECENTS_SELECT_NONE = "none"
+        val RECENTS_SELECTS = listOf(
+            RECENTS_SELECT_POP, RECENTS_SELECT_RING, RECENTS_SELECT_LIFT, RECENTS_SELECT_TILT,
+            RECENTS_SELECT_GLOW, RECENTS_SELECT_JIGGLE, RECENTS_SELECT_NONE,
+        )
+
+        /** Settings ▸ Root: Android's way only, root when Android's way can't, or root first. */
+        const val ROOT_MODE_OFF = "off"
+        const val ROOT_MODE_FALLBACK = "fallback"
+        const val ROOT_MODE_ALWAYS = "always"
+        val ROOT_MODES = listOf(ROOT_MODE_OFF, ROOT_MODE_FALLBACK, ROOT_MODE_ALWAYS)
         const val TASKBAR_SPLIT_SIDE_LEFT = "left"
         const val TASKBAR_SPLIT_SIDE_RIGHT = "right"
 
@@ -642,6 +817,8 @@ data class LauncherSettings(
         const val GESTURE_SEARCH = "search"
         const val GESTURE_LOCK = "lock"
         const val GESTURE_NONE = "none"
+        /** Folark's own Recents screen. */
+        const val GESTURE_RECENTS = "recents"
         /** Motorola screens as home gestures (offered only where the phone has them, see MotoLinks). */
         const val GESTURE_MOTO_NOTE = "moto_note"
         const val GESTURE_MOTO_VAULT = "moto_vault"
@@ -668,8 +845,8 @@ data class LauncherSettings(
         const val TRANSITION_SLIDE = "slide"
         /** Follows the hinge while the phone opens (needs a hinge sensor; the inner display only). */
         const val TRANSITION_LIVE_HINGE = "live_hinge"
-        const val MIN_FOLD_TRANSITION_SPEED = 0.4f
-        const val MAX_FOLD_TRANSITION_SPEED = 2.5f
+        const val MIN_FOLD_TRANSITION_SPEED = 0.1f
+        const val MAX_FOLD_TRANSITION_SPEED = 1.5f
         const val MIN_LIVE_HINGE_END_ANGLE = 120
         const val MAX_LIVE_HINGE_SMOOTHING_MS = 120
         const val MAX_LIVE_HINGE_BLUR_DP = 48

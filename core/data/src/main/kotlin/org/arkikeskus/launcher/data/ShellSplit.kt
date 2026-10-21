@@ -38,12 +38,16 @@ object ShellSplit {
         }
     }.getOrDefault(false)
 
+    /** Whether the one-time DUMP grant is there (enough for Folark's Recents and split view). */
+    fun hasDump(context: Context): Boolean =
+        context.checkSelfPermission(Manifest.permission.DUMP) == PackageManager.PERMISSION_GRANTED
+
     /** The ADB command that gives both permissions, for [packageName]. */
     fun grantCommand(packageName: String): String =
         "adb shell \"pm grant $packageName android.permission.DUMP; pm grant $packageName android.permission.PACKAGE_USAGE_STATS\""
 
     /** Runs `dumpsys activity <args>` in this process and returns what it printed; null if refused. */
-    private fun dumpActivity(context: Context, args: Array<String>): String? = runCatching {
+    internal fun dump(context: Context, args: Array<String>): String? = runCatching {
         // A file, not a pipe: the system writes the whole reply before the call returns, and a
         // long reply would fill a pipe and stall both sides.
         val file = File(context.cacheDir, "shell_split.txt")
@@ -58,7 +62,7 @@ object ShellSplit {
 
     /** The task number of [packageName]'s newest task, from Android's list of recent tasks. */
     fun taskIdOf(context: Context, packageName: String): Int? {
-        val text = dumpActivity(context, arrayOf("recents"))
+        val text = dump(context, arrayOf("recents"))
         if (text == null) return null
         // Each task starts at a "Recent #n" line; its number appears as "#123" there and/or as
         // "taskId=123" / "id=123" further down. The package shows up in its intent, activity or
@@ -89,7 +93,7 @@ object ShellSplit {
      * screen is open or the dump is refused.
      */
     fun splitTasks(context: Context): List<SplitTask> {
-        val text = dumpActivity(context, arrayOf("activities")) ?: return emptyList()
+        val text = dump(context, arrayOf("activities")) ?: return emptyList()
         val found = LinkedHashMap<Int, SplitTask>()
         var stageIndent = -1
         for (line in text.lineSequence()) {
@@ -121,12 +125,15 @@ object ShellSplit {
     fun exitSplit(context: Context, keepTaskId: Int): Boolean =
         wmShell(context, "splitscreen", "exitSplitScreen", keepTaskId.toString())
 
+    /** Android's own "Clear all" of Recents. */
+    fun clearAllRecents(context: Context): Boolean = wmShell(context, "recents", "clearAll")
+
     private fun wmShell(context: Context, vararg command: String): Boolean =
-        dumpActivity(context, arrayOf("service", "SystemUIService", "WMShell", *command)) != null
+        dump(context, arrayOf("service", "SystemUIService", "WMShell", *command)) != null
 
     /** Moves task [taskId] into the side half, [right] or left, beside the app behind it. */
     fun moveToSide(context: Context, taskId: Int, right: Boolean): Boolean {
-        dumpActivity(
+        dump(
             context,
             arrayOf("service", "SystemUIService", "WMShell", "splitscreen", "moveToSideStage", taskId.toString(), if (right) "1" else "0"),
         ) ?: return false

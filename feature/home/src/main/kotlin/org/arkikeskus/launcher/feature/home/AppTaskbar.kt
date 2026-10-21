@@ -62,8 +62,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.AppUsageRepository
+import org.arkikeskus.launcher.data.FolarkRecents
 import org.arkikeskus.launcher.data.LauncherAppsSource
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
+import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.model.AppItem
@@ -94,6 +96,7 @@ private data class TaskbarSetup(
     val theme: String,
     val opacity: Float,
     val handles: String,
+    val handleHint: Boolean,
     val onHome: Boolean,
     val keepOpen: Boolean,
     val themedIcons: Boolean,
@@ -110,11 +113,15 @@ private data class TaskbarSetup(
     val mediaBadge: Boolean,
     val systemDrag: Boolean,
     val recentsButton: String,
+    val runningApps: Boolean,
+    val runningDots: Boolean,
     val quickSwitch: Boolean,
     val splitControls: Boolean,
     val splitSide: String,
     val threeApp: Boolean,
     val hideFullScreen: Boolean,
+    val hiddenApps: Set<String>,
+    val alwaysApps: Set<String>,
     val liveEnabled: Boolean,
     val liveEffect: String,
     val nudgeEnabled: Boolean,
@@ -150,6 +157,9 @@ internal class AppTaskbar(private val context: Context) {
     private var setup: TaskbarSetup? = null
     private var allApps: List<AppItem> = emptyList()
     private var recents: List<AppItem> = emptyList()
+    /** Packages open now (Android's task list), for the taskbar's running dots and open-apps mode. */
+    @Volatile private var runningPackages: Set<String> = emptySet()
+    private var shownRunning: Set<String> = emptySet()
     private var screenOn = true
     private val shown = mutableListOf<View>()
     private var shownMode = MODE_NONE
@@ -158,6 +168,8 @@ internal class AppTaskbar(private val context: Context) {
      *  full screen (video, games) they are hidden, and the kept-open bar steps aside. */
     private var probe: View? = null
     private var fullScreen = false
+    /** The keyboard is up in the app in front (as far as Android tells this window). */
+    private var keyboardUp = false
     private var expanded = false
     private var recentsJob: Job? = null
     private val collapse = Runnable { expanded = false; mediaControlsOpen = false; refresh() }
@@ -205,13 +217,15 @@ internal class AppTaskbar(private val context: Context) {
     private var live: List<LiveActivity> = emptyList()
     private var livePill: TaskbarLivePill? = null
     private var liveIndex = 0
+    private val SPACE_GAP_DP = 6
 
     /** The app icons on the bar now, by badgeKey, for the notification nudge. */
     private val iconViews = HashMap<String, View>()
 
     private var repository: AppRepository? = null
     private var source: LauncherAppsSource? = null
-    private val iconCache = HashMap<String, Drawable>()
+    /** Icons of the apps the bar has shown lately; the least recently shown go first when full. */
+    private val iconCache = IconCache(ICON_CACHE_SIZE)
     private var iconStyle = ""
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -266,6 +280,7 @@ internal class AppTaskbar(private val context: Context) {
                     theme = s.taskbarTheme,
                     opacity = s.taskbarOpacity,
                     handles = s.taskbarHandles,
+                    handleHint = s.taskbarHandleHint,
                     onHome = s.taskbarOnHome,
                     keepOpen = s.taskbarKeepOpen,
                     themedIcons = s.useThemedIcons,
@@ -282,12 +297,19 @@ internal class AppTaskbar(private val context: Context) {
                     mediaShape = s.taskbarMediaShape,
                     mediaBadge = s.taskbarMediaBadge,
                     systemDrag = s.taskbarSystemDrag,
-                    recentsButton = s.taskbarRecentsButton,
+                    // Folark Recents switched off: the button opens Android's again.
+                    recentsButton = s.taskbarRecentsButton.let {
+                        if (it == LauncherSettings.TASKBAR_RECENTS_FOLARK && !s.recentsEnabled) LauncherSettings.TASKBAR_RECENTS_SYSTEM else it
+                    },
+                    runningApps = s.taskbarRunningApps,
+                    runningDots = s.taskbarRunningDots,
                     quickSwitch = s.taskbarQuickSwitch,
                     splitControls = s.taskbarSplitControls,
                     splitSide = s.taskbarSplitSide,
                     threeApp = s.taskbarThreeApp,
                     hideFullScreen = s.taskbarHideFullScreen,
+                    hiddenApps = s.taskbarHiddenApps,
+                    alwaysApps = s.taskbarAlwaysApps,
                     liveEnabled = s.liveActivities && s.liveActivitiesTaskbar,
                     liveEffect = s.liveActivityEffect,
                     nudgeEnabled = s.iconNudge && s.iconNudgeTaskbar,
@@ -302,12 +324,18 @@ internal class AppTaskbar(private val context: Context) {
                     iconCache.clear()
                 }
                 setup = next
+                // Per-app rules need to know which app is in front: only then is the service told.
+                LockAccessibilityService.watchApps(next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty())
                 // The media session is only followed while the media icon is wanted.
                 if (next.enabled && next.mediaEnabled) media.start() else media.stop()
                 // Only Folark's own launch order moved (every launch): rebuild only if the recent apps changed.
                 val onlyHistory = previous != null && previous.copy(launchHistory = next.launchHistory) == next
                 loadRecents(rebuild = true, force = !onlyHistory)
             }
+        }
+        // The keyboard came up over Folark (or went): the bar steps aside and comes back.
+        scope.launch {
+            TaskbarSpace.keyboardOnHome.drop(1).collect { refresh() }
         }
         // A new notification: its app's icon on the bar nudges (not in battery saver).
         scope.launch {
@@ -342,6 +370,7 @@ internal class AppTaskbar(private val context: Context) {
     }
 
     fun stop() {
+        TaskbarSpace.set(0)
         scope.cancel()
         media.stop()
         handler.removeCallbacksAndMessages(null)
@@ -358,22 +387,31 @@ internal class AppTaskbar(private val context: Context) {
     /** Re-evaluates whether the taskbar belongs on screen, and in which form. */
     fun refresh(rebuild: Boolean = false) {
         val s = setup
-        ensureProbe(s != null && s.enabled && s.hideFullScreen && s.keepOpen && screenOn && largeScreen())
+        // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
+        ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty()) && screenOn && largeScreen())
         val active = s != null && s.enabled && screenOn && largeScreen() && keyguard?.isKeyguardLocked != true &&
             (s.pinned.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
         if (!active || s == null) {
             expanded = false
             remove()
+            TaskbarSpace.set(0)
             return
         }
         val mode = when {
+            // Typing on home or in the drawer: the bar would cover the keyboard's bottom row.
+            homeVisible && TaskbarSpace.keyboardOnHome.value -> MODE_NONE
             homeVisible && s.onHome -> MODE_BAR_FIXED
             homeVisible -> MODE_NONE
+            // Settings ▸ Taskbar ▸ per app: never in these apps; always (but not over the keyboard) in those.
+            foreground in s.hiddenApps -> MODE_NONE
+            foreground in s.alwaysApps && !keyboardUp -> MODE_BAR_FIXED
             // Full screen (a video, a game): no bar covering it; a corner swipe still opens it.
-            s.keepOpen && !(s.hideFullScreen && fullScreen) -> MODE_BAR_FIXED
+            s.keepOpen && !(s.hideFullScreen && fullScreen) && !keyboardUp -> MODE_BAR_FIXED
             expanded -> MODE_BAR
             else -> MODE_HANDLES
         }
+        // Only the bar that stays on home takes room there (home and the drawer step aside).
+        if (mode != MODE_BAR_FIXED || !homeVisible) TaskbarSpace.set(0)
         if (mode == shownMode && !rebuild) return
         remove()
         when (mode) {
@@ -388,6 +426,7 @@ internal class AppTaskbar(private val context: Context) {
             probe?.let { runCatching { windowManager.removeView(it) } }
             probe = null
             fullScreen = false
+            keyboardUp = false
             return
         }
         if (probe != null) return
@@ -395,8 +434,10 @@ internal class AppTaskbar(private val context: Context) {
         view.setOnApplyWindowInsetsListener { v, insets ->
             val barsShown = insets.isVisible(WindowInsets.Type.statusBars()) ||
                 insets.isVisible(WindowInsets.Type.navigationBars())
-            if (fullScreen == barsShown) {
+            val ime = insets.isVisible(WindowInsets.Type.ime())
+            if (fullScreen == barsShown || keyboardUp != ime) {
                 fullScreen = !barsShown
+                keyboardUp = ime
                 handler.post { refresh() }
             }
             v.onApplyWindowInsets(insets)
@@ -409,6 +450,19 @@ internal class AppTaskbar(private val context: Context) {
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
         if (runCatching { windowManager.addView(view, params) }.isSuccess) probe = view
+    }
+
+    /** The app in front (only followed while per-app rules exist), null when unknown. */
+    private var foreground: String? = null
+
+    /** Another app came to the front: re-decides the bar only when a per-app rule is involved. */
+    fun onForegroundApp(packageName: String) {
+        val s = setup ?: return
+        if (packageName == foreground) return
+        val before = foreground
+        foreground = packageName
+        fun ruled(p: String?) = p != null && (p in s.hiddenApps || p in s.alwaysApps)
+        if (ruled(before) || ruled(packageName)) refresh()
     }
 
     /** The home screen came to the front or left it. */
@@ -493,6 +547,18 @@ internal class AppTaskbar(private val context: Context) {
                     true
                 }
             }
+            // A small line shows where the swipe starts (Settings ▸ Taskbar ▸ Show where to swipe).
+            if (s.handleHint) {
+                zone.addView(View(context).apply {
+                    background = GradientDrawable().apply {
+                        cornerRadius = dpf(3f)
+                        setColor(Color.argb(150, 255, 255, 255))
+                    }
+                    elevation = dpf(2f)
+                }, FrameLayout.LayoutParams(dp(28), dp(5), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+                    bottomMargin = dp(10)
+                })
+            }
             add(zone, params(Gravity.BOTTOM or side, 0, 0))
         }
     }
@@ -533,6 +599,8 @@ internal class AppTaskbar(private val context: Context) {
         val size = dp(s.iconSizeDp)
         fun addIcon(app: AppItem) {
             val view = iconView(app, s, size, hint, fixed)
+            // An app that is open now: a small dot under its icon (Settings ▸ Recents).
+            if (s.runningDots && app.packageName in runningPackages) view.foreground = RunningDot(lightTheme)
             iconViews[app.badgeKey] = view
             row.addView(view, LinearLayout.LayoutParams(size, size).apply {
                 marginStart = dp(s.spacingDp) / 2
@@ -641,6 +709,10 @@ internal class AppTaskbar(private val context: Context) {
         val barLayout = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(s.bottomDp), watchOutside = !fixed)
         add(column, barLayout)
         barRow = row
+        if (fixed && homeVisible) {
+            // Tell home and the drawer where the bar's top edge is, whenever it is laid out again.
+            row.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishSpace(v) }
+        }
         // A drag over a split screen is handled differently when a third app isn't wanted.
         if (!fixed || !homeVisible) checkSplitForThirdApp(s)
         if (!fixed) {
@@ -649,9 +721,19 @@ internal class AppTaskbar(private val context: Context) {
         }
     }
 
+    /** The room from the bar's top edge to the bottom of the screen, for home and the drawer. */
+    private fun publishSpace(barRow: View) {
+        if (!barRow.isAttachedToWindow || !homeVisible || shownMode != MODE_BAR_FIXED) return
+        val location = IntArray(2)
+        barRow.getLocationOnScreen(location)
+        val screenHeight = windowManager.currentWindowMetrics.bounds.height()
+        TaskbarSpace.set(screenHeight - location[1] + dp(SPACE_GAP_DP))
+    }
+
     /** The bar's backdrop for the chosen theme; null for the see-through one. */
-    private fun barBackground(s: TaskbarSetup): GradientDrawable? {
+    private fun barBackground(s: TaskbarSetup): Drawable? {
         val alpha = (s.opacity.coerceIn(0f, 1f) * 255).toInt()
+        if (s.theme == LauncherSettings.TASKBAR_THEME_GLASS) return glassBackground(alpha)
         val (fill, rim) = when (s.theme) {
             LauncherSettings.TASKBAR_THEME_CLEAR -> return null
             LauncherSettings.TASKBAR_THEME_FROSTED -> Color.argb((alpha * 0.55f).toInt(), 40, 42, 48) to Color.argb(70, 255, 255, 255)
@@ -668,6 +750,26 @@ internal class AppTaskbar(private val context: Context) {
             cornerRadius = dpf(28f)
             setColor(fill)
             setStroke(dp(1), rim)
+        }
+    }
+
+    /** Liquid Glass: milky see-through fill, bright rim, and a sheen along the top. */
+    private fun glassBackground(alpha: Int): Drawable {
+        val body = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.argb((alpha * 0.42f).toInt(), 255, 255, 255), Color.argb((alpha * 0.14f).toInt(), 255, 255, 255)),
+        ).apply {
+            cornerRadius = dpf(28f)
+            setStroke(dp(1), Color.argb(150, 255, 255, 255))
+        }
+        val sheen = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.argb(110, 255, 255, 255), Color.argb(0, 255, 255, 255)),
+        ).apply { cornerRadius = dpf(22f) }
+        return android.graphics.drawable.LayerDrawable(arrayOf(body, sheen)).apply {
+            setLayerInset(1, dp(10), dp(2), dp(10), 0)
+            setLayerGravity(1, Gravity.TOP or Gravity.FILL_HORIZONTAL)
+            setLayerHeight(1, dp(16))
         }
     }
 
@@ -847,6 +949,7 @@ internal class AppTaskbar(private val context: Context) {
 
     /** Motorola's recents screen, or the recents of its desktop taskbar (Ready For) if chosen and present. */
     private fun openRecents(s: TaskbarSetup) {
+        if (s.recentsButton == LauncherSettings.TASKBAR_RECENTS_FOLARK && FolarkRecents.open(context)) return
         if (s.recentsButton == LauncherSettings.TASKBAR_RECENTS_DESKTOP) {
             val intent = Intent(ACTION_DESKTOP_RECENTS)
                 .setPackage(DESKTOP_TASKBAR_PACKAGE)
@@ -1587,8 +1690,10 @@ internal class AppTaskbar(private val context: Context) {
         }
         recentsJob = scope.launch {
             val next = withContext(Dispatchers.IO) { recentApps(s) }
-            val changed = next != recents
+            val running = runningPackages
+            val changed = next != recents || (s.runningDots && running != shownRunning)
             recents = next
+            shownRunning = running
             val barUp = shownMode == MODE_BAR || shownMode == MODE_BAR_FIXED
             val forced = pendingForce
             pendingForce = false
@@ -1603,7 +1708,11 @@ internal class AppTaskbar(private val context: Context) {
         val pinnedKeys = s.pinned.map { it.key }.toSet()
         val own = context.packageName
         val myUser = Process.myUserHandle()
-        val packages = if (hasUsageAccess(context)) usageHistory() else null
+        // Open apps from Android's task list (one-time DUMP grant), for the dots and open-apps mode.
+        val open = if (s.runningApps || s.runningDots) OpenTasks.list(context) else null
+        runningPackages = open?.map { it.packageName }?.toSet().orEmpty()
+        val packages = if (s.runningApps && open != null) open.map { it.packageName }.distinct()
+            else if (hasUsageAccess(context)) usageHistory() else null
         val ordered: List<AppItem> = if (packages != null) {
             packages.mapNotNull { pkg ->
                 allApps.firstOrNull { it.packageName == pkg && it.user == myUser }
@@ -1654,7 +1763,15 @@ internal class AppTaskbar(private val context: Context) {
         lastResumed.entries.sortedByDescending { it.value }.map { it.key }
     }.getOrNull()
 
+    /** [android.util.LruCache] with the map-style access the bar uses. */
+    private class IconCache(size: Int) : android.util.LruCache<String, Drawable>(size) {
+        operator fun set(key: String, value: Drawable) { put(key, value) }
+        fun clear() = evictAll()
+    }
+
     companion object {
+        /** Room for every pinned and recent icon at once, with plenty to spare (counted in icons). */
+        private const val ICON_CACHE_SIZE = 48
         private const val MEDIA_CONTROLS_MS = 6_000L
         private const val MEDIA_HIDE_SETTLE_MS = 2_000L
 

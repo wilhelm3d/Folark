@@ -28,10 +28,20 @@ class AppUsageRepository @Inject constructor(
     val usage: Flow<Map<String, UsageStat>> = dataStore.data.map { it[Keys.APP_USAGE] }.distinctUntilChanged().map { parse(it) }
 
     /** Records a launch of [key] now: decays its stored score to now, then adds 1. */
-    suspend fun recordLaunch(key: String) {
+    suspend fun recordLaunch(key: String) = recordLaunches(listOf(key))
+
+    /**
+     * Records launches of [keys] (an app pair or trio) in one write instead of one per app. Apps
+     * whose score has faded to almost nothing (unused for weeks, or uninstalled) are dropped, so
+     * the stored list doesn't grow forever.
+     */
+    suspend fun recordLaunches(keys: List<String>) {
+        if (keys.isEmpty()) return
         dataStore.edit { p ->
+            val now = System.currentTimeMillis()
             val stats = parse(p[Keys.APP_USAGE]).toMutableMap()
-            stats[key] = applyLaunch(stats[key], System.currentTimeMillis())
+            for (key in keys) stats[key] = applyLaunch(stats[key], now)
+            stats.entries.removeIf { (k, stat) -> k !in keys && currentScore(stat, now) < FORGET_BELOW }
             p[Keys.APP_USAGE] = serialize(stats)
         }
     }
@@ -57,6 +67,9 @@ class AppUsageRepository @Inject constructor(
          *  exclude this volatile, device-local data from a backup (it otherwise changed the Drive
          *  dedup hash on every launch → a redundant upload each run). */
         const val USAGE_KEY = "app_usage"
+
+        /** A score this small (one launch about six weeks ago) is forgotten at the next write. */
+        const val FORGET_BELOW = 0.015f
 
         /** Half-life of the launch score; recent launches dominate within ~1–2 weeks. */
         const val HALF_LIFE_MS = 7L * 24 * 60 * 60 * 1000

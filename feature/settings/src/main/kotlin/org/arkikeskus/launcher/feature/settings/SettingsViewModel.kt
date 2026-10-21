@@ -65,10 +65,8 @@ class SettingsViewModel @Inject constructor(
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** All launchable apps (sorted), for the hidden-apps manager list. */
+    /** All launchable apps, for the hidden-apps manager list (already sorted by AppRepository). */
     val apps: StateFlow<List<AppItem>> = appRepository.apps
-        .map { list -> list.sortedBy { it.label.lowercase() } }
-        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Keys currently hidden from the drawer. */
@@ -176,7 +174,61 @@ class SettingsViewModel @Inject constructor(
     fun setLiveActivitiesTaskbar(value: Boolean) = update { repository.setLiveActivitiesTaskbar(value) }
     fun setLiveActivityEffect(value: String) = update { repository.setLiveActivityEffect(value) }
     fun setSearchActions(value: Boolean) = update { repository.setSearchActions(value) }
+    fun setRecentsEnabled(value: Boolean) = update { repository.setRecentsEnabled(value) }
+    fun setRecentsColumnsInner(value: Int) = update { repository.setRecentsColumnsInner(value) }
+    fun setRecentsColumnsOuter(value: Int) = update { repository.setRecentsColumnsOuter(value) }
+    fun setRecentsMaxApps(value: Int) = update { repository.setRecentsMaxApps(value) }
+    fun setRecentsCardHeight(value: Int) = update { repository.setRecentsCardHeight(value) }
+    fun setRecentsCornerDp(value: Int) = update { repository.setRecentsCornerDp(value) }
+    fun setRecentsBackdropDim(value: Float) = update { repository.setRecentsBackdropDim(value) }
+    fun setRecentsSort(value: String) = update { repository.setRecentsSort(value) }
+    fun setRecentsShowTime(value: Boolean) = update { repository.setRecentsShowTime(value) }
+    fun setRecentsShowActions(value: Boolean) = update { repository.setRecentsShowActions(value) }
+    fun setRecentsConfirmCloseAll(value: Boolean) = update { repository.setRecentsConfirmCloseAll(value) }
+    fun setRecentsThirdInSplit(value: Boolean) = update { repository.setRecentsThirdInSplit(value) }
+    fun setRecentsThumbnails(value: Boolean) = update { repository.setRecentsThumbnails(value) }
+    fun setRecentsRootClose(value: Boolean) = update { repository.setRecentsRootClose(value) }
+    fun setTaskbarRunningApps(value: Boolean) = update { repository.setTaskbarRunningApps(value) }
+    fun setTaskbarRunningDots(value: Boolean) = update { repository.setTaskbarRunningDots(value) }
+    fun setRecentsEnterAnimation(value: String) = update { repository.setRecentsEnterAnimation(value) }
+    fun setRecentsSelectAnimation(value: String) = update { repository.setRecentsSelectAnimation(value) }
+    fun setRecentsAnimationSpeed(value: Float) = update { repository.setRecentsAnimationSpeed(value) }
+    fun setRootEnabled(value: Boolean) = update { repository.setRootEnabled(value) }
+    fun setRecentsTheme(value: String) = update { repository.setRecentsTheme(value) }
+    fun setRecentsGlass(value: Boolean) = update { repository.setRecentsGlass(value) }
+    fun setRecentsGlassBlur(value: Int) = update { repository.setRecentsGlassBlur(value) }
+    fun setRecentsGlassTint(value: Float) = update { repository.setRecentsGlassTint(value) }
+    fun setRecentsDragDrop(value: Boolean) = update { repository.setRecentsDragDrop(value) }
+    fun setRecentsBtnClose(value: Boolean) = update { repository.setRecentsBtnClose(value) }
+    fun setRecentsBtnSplit(value: Boolean) = update { repository.setRecentsBtnSplit(value) }
+    fun setRecentsBtnPopup(value: Boolean) = update { repository.setRecentsBtnPopup(value) }
+    fun setRecentsBtnUnsplit(value: Boolean) = update { repository.setRecentsBtnUnsplit(value) }
+    fun setRecentsBtnSplitView(value: Boolean) = update { repository.setRecentsBtnSplitView(value) }
+    fun setRecentsBtnCloseAll(value: Boolean) = update { repository.setRecentsBtnCloseAll(value) }
+    fun setRecentsSwipeUpAction(value: String) = update { repository.setRecentsSwipeUpAction(value) }
+    fun setRecentsSwipeDownAction(value: String) = update { repository.setRecentsSwipeDownAction(value) }
+    fun setRecentsLongPressAction(value: String) = update { repository.setRecentsLongPressAction(value) }
+    fun setRecentsDoubleTapAction(value: String) = update { repository.setRecentsDoubleTapAction(value) }
+    fun setRecentsBtnPin(value: Boolean) = update { repository.setRecentsBtnPin(value) }
+    fun setRecentsPinKeepAlive(value: Boolean) = update { repository.setRecentsPinKeepAlive(value) }
+    fun setTaskbarHiddenApps(value: Set<String>) = update { repository.setTaskbarHiddenApps(value) }
+    fun setTaskbarAlwaysApps(value: Set<String>) = update { repository.setTaskbarAlwaysApps(value) }
+    fun setLiquidGlassEverywhere(value: Boolean) = update { repository.setLiquidGlassEverywhere(value) }
+    fun setLiquidGlassLevel(value: Float) = update { repository.setLiquidGlassLevel(value) }
+    fun setRecentsAttachedSide(value: String) = update { repository.setRecentsAttachedSide(value) }
+    fun setRecentsAttachedPeek(value: Float) = update { repository.setRecentsAttachedPeek(value) }
+    fun setTaskbarHandleHint(value: Boolean) = update { repository.setTaskbarHandleHint(value) }
+    fun setRootLockMode(value: String) = update { repository.setRootLockMode(value) }
+    fun setRootRecentsMode(value: String) = update { repository.setRootRecentsMode(value) }
+    fun setRootShadeMode(value: String) = update { repository.setRootShadeMode(value) }
+    fun setRootKeepDump(value: Boolean) = update { repository.setRootKeepDump(value) }
+    fun setRootKeepUsage(value: Boolean) = update { repository.setRootKeepUsage(value) }
+    fun setRootKeepSecureSettings(value: Boolean) = update { repository.setRootKeepSecureSettings(value) }
+    fun setRootKeepNotifications(value: Boolean) = update { repository.setRootKeepNotifications(value) }
+    fun setRootKeepAccessibility(value: Boolean) = update { repository.setRootKeepAccessibility(value) }
+    fun setRootKeepWidgets(value: Boolean) = update { repository.setRootKeepWidgets(value) }
     fun setIconNudge(value: Boolean) = update { repository.setIconNudge(value) }
+    fun setUnlockTransition(value: Boolean) = update { repository.setUnlockTransition(value) }
     fun setIconNudgeTaskbar(value: Boolean) = update { repository.setIconNudgeTaskbar(value) }
     fun setIconNudgeEffect(value: String) = update { repository.setIconNudgeEffect(value) }
     fun setIconNudgeSoftness(value: Float) = update { repository.setIconNudgeSoftness(value) }

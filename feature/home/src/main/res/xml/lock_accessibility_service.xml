@@ -4,4 +4,5 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/lock_service_description"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:canRetrieveWindowContent="false" />
+    android:canRetrieveWindowContent="false"
+    android:canPerformGestures="true" />

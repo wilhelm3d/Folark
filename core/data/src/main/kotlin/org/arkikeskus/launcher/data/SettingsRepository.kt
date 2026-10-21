@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.withLiquidGlass
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
@@ -79,7 +80,7 @@ class SettingsRepository @Inject constructor(
     private fun settingsFor(p: Preferences, screenType: ScreenType): LauncherSettings {
         val hit = settingsMemo.get(screenType.ordinal)
         if (hit != null && hit.prefs === p) return hit.settings
-        return readSettings(p, screenType).also { settingsMemo.set(screenType.ordinal, SettingsMemo(p, it)) }
+        return readSettings(p, screenType).withLiquidGlass().also { settingsMemo.set(screenType.ordinal, SettingsMemo(p, it)) }
     }
 
     /** One stored value as a flow: emits only when that value changes, then parses it. */
@@ -204,10 +205,10 @@ class SettingsRepository @Inject constructor(
                 .let { if (it.isEmpty()) LauncherSettings.DEFAULT_BATCH_TIMES else BatchSchedule.format(it) },
             allowLandscape = p[Keys.allowLandscape(screenType)] ?: false,
             swipeDownAction = (p[Keys.swipeDownAction(screenType)] ?: LauncherSettings.GESTURE_NOTIFICATIONS).let {
-                if (it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_NONE || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NOTIFICATIONS
+                if (it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_RECENTS || it == LauncherSettings.GESTURE_NONE || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NOTIFICATIONS
             },
             doubleTapAction = (p[Keys.doubleTapAction(screenType)] ?: LauncherSettings.GESTURE_NONE).let {
-                if (it == LauncherSettings.GESTURE_NOTIFICATIONS || it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NONE
+                if (it == LauncherSettings.GESTURE_NOTIFICATIONS || it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_RECENTS || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NONE
             },
             swipeUpAction = (p[Keys.swipeUpAction(screenType)] ?: LauncherSettings.GESTURE_DRAWER).let {
                 if (it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_NONE) it else LauncherSettings.GESTURE_DRAWER
@@ -333,7 +334,73 @@ class SettingsRepository @Inject constructor(
             liveActivityEffect = (p[Keys.LIVE_ACTIVITY_EFFECT] ?: LauncherSettings.LIVE_EFFECT_GLOW)
                 .let { if (it in LauncherSettings.LIVE_EFFECTS) it else LauncherSettings.LIVE_EFFECT_GLOW },
             searchActions = p[Keys.SEARCH_ACTIONS] ?: true,
+            recentsEnabled = p[Keys.RECENTS_ENABLED] ?: true,
+            recentsColumnsInner = (p[Keys.RECENTS_COLUMNS_INNER] ?: 4)
+                .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER),
+            recentsColumnsOuter = (p[Keys.RECENTS_COLUMNS_OUTER] ?: 1)
+                .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_OUTER),
+            recentsMaxApps = (p[Keys.RECENTS_MAX_APPS] ?: 12).coerceIn(LauncherSettings.MIN_RECENTS_APPS, LauncherSettings.MAX_RECENTS_APPS),
+            recentsCardHeight = (p[Keys.RECENTS_CARD_HEIGHT] ?: 300)
+                .coerceIn(LauncherSettings.MIN_RECENTS_CARD_HEIGHT, LauncherSettings.MAX_RECENTS_CARD_HEIGHT),
+            recentsCornerDp = (p[Keys.RECENTS_CORNER] ?: 26).coerceIn(0, LauncherSettings.MAX_RECENTS_CORNER_DP),
+            recentsBackdropDim = (p[Keys.RECENTS_BACKDROP] ?: 0.85f).coerceIn(0f, 1f),
+            recentsSort = (p[Keys.RECENTS_SORT] ?: LauncherSettings.RECENTS_SORT_RECENT)
+                .let { if (it == LauncherSettings.RECENTS_SORT_NAME) it else LauncherSettings.RECENTS_SORT_RECENT },
+            recentsShowTime = p[Keys.RECENTS_SHOW_TIME] ?: true,
+            recentsShowActions = p[Keys.RECENTS_SHOW_ACTIONS] ?: true,
+            recentsConfirmCloseAll = p[Keys.RECENTS_CONFIRM_CLOSE_ALL] ?: false,
+            recentsThirdInSplit = p[Keys.RECENTS_THIRD_IN_SPLIT] ?: true,
+            recentsThumbnails = p[Keys.RECENTS_THUMBNAILS] ?: true,
+            recentsRootClose = p[Keys.RECENTS_ROOT_CLOSE] ?: true,
+            taskbarRunningApps = p[Keys.TASKBAR_RUNNING_APPS] ?: false,
+            taskbarRunningDots = p[Keys.TASKBAR_RUNNING_DOTS] ?: true,
+            recentsEnterAnimation = (p[Keys.RECENTS_ENTER] ?: LauncherSettings.RECENTS_ENTER_RISE)
+                .let { if (it in LauncherSettings.RECENTS_ENTERS) it else LauncherSettings.RECENTS_ENTER_RISE },
+            recentsSelectAnimation = (p[Keys.RECENTS_SELECT] ?: LauncherSettings.RECENTS_SELECT_POP)
+                .let { if (it in LauncherSettings.RECENTS_SELECTS) it else LauncherSettings.RECENTS_SELECT_POP },
+            recentsAnimationSpeed = (p[Keys.RECENTS_ANIM_SPEED] ?: 1f)
+                .coerceIn(LauncherSettings.MIN_RECENTS_ANIM_SPEED, LauncherSettings.MAX_RECENTS_ANIM_SPEED),
+            recentsTheme = (p[Keys.RECENTS_THEME] ?: LauncherSettings.RECENTS_THEME_FOLARK)
+                .let { if (it in LauncherSettings.RECENTS_THEMES) it else LauncherSettings.RECENTS_THEME_FOLARK },
+            recentsGlass = p[Keys.RECENTS_GLASS] ?: false,
+            recentsGlassBlur = (p[Keys.RECENTS_GLASS_BLUR] ?: 28).coerceIn(0, LauncherSettings.MAX_RECENTS_GLASS_BLUR),
+            recentsGlassTint = (p[Keys.RECENTS_GLASS_TINT] ?: 0.16f)
+                .coerceIn(LauncherSettings.MIN_RECENTS_GLASS_TINT, LauncherSettings.MAX_RECENTS_GLASS_TINT),
+            recentsDragDrop = p[Keys.RECENTS_DRAG_DROP] ?: true,
+            recentsBtnClose = p[Keys.RECENTS_BTN_CLOSE] ?: true,
+            recentsBtnSplit = p[Keys.RECENTS_BTN_SPLIT] ?: true,
+            recentsBtnPopup = p[Keys.RECENTS_BTN_POPUP] ?: true,
+            recentsBtnUnsplit = p[Keys.RECENTS_BTN_UNSPLIT] ?: true,
+            recentsBtnSplitView = p[Keys.RECENTS_BTN_SPLIT_VIEW] ?: true,
+            recentsBtnCloseAll = p[Keys.RECENTS_BTN_CLOSE_ALL] ?: true,
+            recentsSwipeUpAction = recentsAction(p[Keys.RECENTS_SWIPE_UP], LauncherSettings.RECENTS_ACTION_CLOSE),
+            recentsSwipeDownAction = recentsAction(p[Keys.RECENTS_SWIPE_DOWN], LauncherSettings.RECENTS_ACTION_NONE),
+            recentsLongPressAction = recentsAction(p[Keys.RECENTS_LONG_PRESS], LauncherSettings.RECENTS_ACTION_NONE),
+            recentsDoubleTapAction = recentsAction(p[Keys.RECENTS_DOUBLE_TAP], LauncherSettings.RECENTS_ACTION_SPLIT),
+            recentsPinned = lines(p[Keys.RECENTS_PINNED]),
+            recentsBtnPin = p[Keys.RECENTS_BTN_PIN] ?: true,
+            recentsPinKeepAlive = p[Keys.RECENTS_PIN_KEEP_ALIVE] ?: true,
+            taskbarHiddenApps = lines(p[Keys.TASKBAR_HIDDEN_APPS]),
+            taskbarAlwaysApps = lines(p[Keys.TASKBAR_ALWAYS_APPS]),
+            liquidGlassEverywhere = p[Keys.LIQUID_GLASS_EVERYWHERE] ?: false,
+            liquidGlassLevel = (p[Keys.LIQUID_GLASS_LEVEL] ?: 0.5f).coerceIn(0f, 1f),
+            recentsAttachedSide = if (p[Keys.RECENTS_ATTACHED_SIDE] == LauncherSettings.RECENTS_ATTACHED_RIGHT)
+                LauncherSettings.RECENTS_ATTACHED_RIGHT else LauncherSettings.RECENTS_ATTACHED_LEFT,
+            recentsAttachedPeek = (p[Keys.RECENTS_ATTACHED_PEEK] ?: 0.12f)
+                .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
+            taskbarHandleHint = p[Keys.TASKBAR_HANDLE_HINT] ?: true,
+            rootEnabled = p[Keys.ROOT_ENABLED] ?: true,
+            rootLockMode = rootMode(p[Keys.ROOT_LOCK_MODE]),
+            rootRecentsMode = rootMode(p[Keys.ROOT_RECENTS_MODE]),
+            rootShadeMode = rootMode(p[Keys.ROOT_SHADE_MODE]),
+            rootKeepDump = p[Keys.ROOT_KEEP_DUMP] ?: false,
+            rootKeepUsage = p[Keys.ROOT_KEEP_USAGE] ?: false,
+            rootKeepSecureSettings = p[Keys.ROOT_KEEP_SECURE] ?: false,
+            rootKeepNotifications = p[Keys.ROOT_KEEP_NOTIFICATIONS] ?: false,
+            rootKeepAccessibility = p[Keys.ROOT_KEEP_ACCESSIBILITY] ?: false,
+            rootKeepWidgets = p[Keys.ROOT_KEEP_WIDGETS] ?: false,
             iconNudge = p[Keys.ICON_NUDGE] ?: true,
+            unlockTransition = p[Keys.UNLOCK_TRANSITION] ?: true,
             iconNudgeTaskbar = p[Keys.ICON_NUDGE_TASKBAR] ?: true,
             iconNudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
                 .let { if (it in LauncherSettings.NUDGE_EFFECTS) it else LauncherSettings.NUDGE_BOUNCE },
@@ -536,7 +603,88 @@ class SettingsRepository @Inject constructor(
     suspend fun setLiveActivitiesTaskbar(value: Boolean) = edit { it[Keys.LIVE_ACTIVITIES_TASKBAR] = value }
     suspend fun setLiveActivityEffect(value: String) = edit { it[Keys.LIVE_ACTIVITY_EFFECT] = value }
     suspend fun setSearchActions(value: Boolean) = edit { it[Keys.SEARCH_ACTIONS] = value }
+    suspend fun setRecentsEnabled(value: Boolean) = edit { it[Keys.RECENTS_ENABLED] = value }
+    suspend fun setRecentsColumnsInner(value: Int) = edit {
+        it[Keys.RECENTS_COLUMNS_INNER] = value.coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER)
+    }
+    suspend fun setRecentsColumnsOuter(value: Int) = edit {
+        it[Keys.RECENTS_COLUMNS_OUTER] = value.coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_OUTER)
+    }
+    suspend fun setRecentsMaxApps(value: Int) = edit {
+        it[Keys.RECENTS_MAX_APPS] = value.coerceIn(LauncherSettings.MIN_RECENTS_APPS, LauncherSettings.MAX_RECENTS_APPS)
+    }
+    suspend fun setRecentsCardHeight(value: Int) = edit {
+        it[Keys.RECENTS_CARD_HEIGHT] = value.coerceIn(LauncherSettings.MIN_RECENTS_CARD_HEIGHT, LauncherSettings.MAX_RECENTS_CARD_HEIGHT)
+    }
+    suspend fun setRecentsCornerDp(value: Int) = edit { it[Keys.RECENTS_CORNER] = value.coerceIn(0, LauncherSettings.MAX_RECENTS_CORNER_DP) }
+    suspend fun setRecentsBackdropDim(value: Float) = edit { it[Keys.RECENTS_BACKDROP] = value.coerceIn(0f, 1f) }
+    suspend fun setRecentsSort(value: String) = edit { it[Keys.RECENTS_SORT] = value }
+    suspend fun setRecentsShowTime(value: Boolean) = edit { it[Keys.RECENTS_SHOW_TIME] = value }
+    suspend fun setRecentsShowActions(value: Boolean) = edit { it[Keys.RECENTS_SHOW_ACTIONS] = value }
+    suspend fun setRecentsConfirmCloseAll(value: Boolean) = edit { it[Keys.RECENTS_CONFIRM_CLOSE_ALL] = value }
+    suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
+    suspend fun setRecentsThumbnails(value: Boolean) = edit { it[Keys.RECENTS_THUMBNAILS] = value }
+    suspend fun setRecentsRootClose(value: Boolean) = edit { it[Keys.RECENTS_ROOT_CLOSE] = value }
+    suspend fun setTaskbarRunningApps(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_APPS] = value }
+    suspend fun setTaskbarRunningDots(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_DOTS] = value }
+    suspend fun setRecentsEnterAnimation(value: String) = edit { it[Keys.RECENTS_ENTER] = value }
+    suspend fun setRecentsSelectAnimation(value: String) = edit { it[Keys.RECENTS_SELECT] = value }
+    suspend fun setRecentsAnimationSpeed(value: Float) = edit {
+        it[Keys.RECENTS_ANIM_SPEED] = value.coerceIn(LauncherSettings.MIN_RECENTS_ANIM_SPEED, LauncherSettings.MAX_RECENTS_ANIM_SPEED)
+    }
+    suspend fun setRootEnabled(value: Boolean) = edit { it[Keys.ROOT_ENABLED] = value }
+    suspend fun setRecentsTheme(value: String) = edit { it[Keys.RECENTS_THEME] = value }
+    suspend fun setRecentsGlass(value: Boolean) = edit { it[Keys.RECENTS_GLASS] = value }
+    suspend fun setRecentsGlassBlur(value: Int) = edit { it[Keys.RECENTS_GLASS_BLUR] = value.coerceIn(0, LauncherSettings.MAX_RECENTS_GLASS_BLUR) }
+    suspend fun setRecentsGlassTint(value: Float) = edit {
+        it[Keys.RECENTS_GLASS_TINT] = value.coerceIn(LauncherSettings.MIN_RECENTS_GLASS_TINT, LauncherSettings.MAX_RECENTS_GLASS_TINT)
+    }
+    suspend fun setRecentsDragDrop(value: Boolean) = edit { it[Keys.RECENTS_DRAG_DROP] = value }
+    suspend fun setRecentsBtnClose(value: Boolean) = edit { it[Keys.RECENTS_BTN_CLOSE] = value }
+    suspend fun setRecentsBtnSplit(value: Boolean) = edit { it[Keys.RECENTS_BTN_SPLIT] = value }
+    suspend fun setRecentsBtnPopup(value: Boolean) = edit { it[Keys.RECENTS_BTN_POPUP] = value }
+    suspend fun setRecentsBtnUnsplit(value: Boolean) = edit { it[Keys.RECENTS_BTN_UNSPLIT] = value }
+    suspend fun setRecentsBtnSplitView(value: Boolean) = edit { it[Keys.RECENTS_BTN_SPLIT_VIEW] = value }
+    suspend fun setRecentsBtnCloseAll(value: Boolean) = edit { it[Keys.RECENTS_BTN_CLOSE_ALL] = value }
+    suspend fun setRecentsSwipeUpAction(value: String) = edit { it[Keys.RECENTS_SWIPE_UP] = value }
+    suspend fun setRecentsSwipeDownAction(value: String) = edit { it[Keys.RECENTS_SWIPE_DOWN] = value }
+    suspend fun setRecentsLongPressAction(value: String) = edit { it[Keys.RECENTS_LONG_PRESS] = value }
+    suspend fun setRecentsDoubleTapAction(value: String) = edit { it[Keys.RECENTS_DOUBLE_TAP] = value }
+
+    suspend fun setRecentsPinned(value: Set<String>) = edit { it[Keys.RECENTS_PINNED] = value.joinToString("\n") }
+    suspend fun setRecentsBtnPin(value: Boolean) = edit { it[Keys.RECENTS_BTN_PIN] = value }
+    suspend fun setRecentsPinKeepAlive(value: Boolean) = edit { it[Keys.RECENTS_PIN_KEEP_ALIVE] = value }
+    /** Packages whose battery-optimisation exemption Folark added for a pin (and may take back). */
+    suspend fun pinExemptions(): Set<String> = lines(dataStore.data.first()[Keys.RECENTS_PIN_EXEMPT])
+    suspend fun setPinExemptions(value: Set<String>) = edit { it[Keys.RECENTS_PIN_EXEMPT] = value.joinToString("\n") }
+    suspend fun setTaskbarHiddenApps(value: Set<String>) = edit { it[Keys.TASKBAR_HIDDEN_APPS] = value.joinToString("\n") }
+    suspend fun setTaskbarAlwaysApps(value: Set<String>) = edit { it[Keys.TASKBAR_ALWAYS_APPS] = value.joinToString("\n") }
+    suspend fun setLiquidGlassEverywhere(value: Boolean) = edit { it[Keys.LIQUID_GLASS_EVERYWHERE] = value }
+    suspend fun setLiquidGlassLevel(value: Float) = edit { it[Keys.LIQUID_GLASS_LEVEL] = value.coerceIn(0f, 1f) }
+
+    private fun lines(raw: String?): Set<String> = raw?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
+    private fun recentsAction(value: String?, fallback: String): String =
+        if (value in LauncherSettings.RECENTS_ACTIONS) value!! else fallback
+    suspend fun setRecentsAttachedSide(value: String) = edit { it[Keys.RECENTS_ATTACHED_SIDE] = value }
+    suspend fun setRecentsAttachedPeek(value: Float) = edit {
+        it[Keys.RECENTS_ATTACHED_PEEK] = value.coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK)
+    }
+    suspend fun setTaskbarHandleHint(value: Boolean) = edit { it[Keys.TASKBAR_HANDLE_HINT] = value }
+    suspend fun setRootLockMode(value: String) = edit { it[Keys.ROOT_LOCK_MODE] = rootMode(value) }
+    suspend fun setRootRecentsMode(value: String) = edit { it[Keys.ROOT_RECENTS_MODE] = rootMode(value) }
+    suspend fun setRootShadeMode(value: String) = edit { it[Keys.ROOT_SHADE_MODE] = rootMode(value) }
+    suspend fun setRootKeepDump(value: Boolean) = edit { it[Keys.ROOT_KEEP_DUMP] = value }
+    suspend fun setRootKeepUsage(value: Boolean) = edit { it[Keys.ROOT_KEEP_USAGE] = value }
+    suspend fun setRootKeepSecureSettings(value: Boolean) = edit { it[Keys.ROOT_KEEP_SECURE] = value }
+    suspend fun setRootKeepNotifications(value: Boolean) = edit { it[Keys.ROOT_KEEP_NOTIFICATIONS] = value }
+    suspend fun setRootKeepAccessibility(value: Boolean) = edit { it[Keys.ROOT_KEEP_ACCESSIBILITY] = value }
+    suspend fun setRootKeepWidgets(value: Boolean) = edit { it[Keys.ROOT_KEEP_WIDGETS] = value }
+
+    private fun rootMode(value: String?): String =
+        if (value in LauncherSettings.ROOT_MODES) value!! else LauncherSettings.ROOT_MODE_FALLBACK
     suspend fun setIconNudge(value: Boolean) = edit { it[Keys.ICON_NUDGE] = value }
+    suspend fun setUnlockTransition(value: Boolean) = edit { it[Keys.UNLOCK_TRANSITION] = value }
     suspend fun setIconNudgeTaskbar(value: Boolean) = edit { it[Keys.ICON_NUDGE_TASKBAR] = value }
     suspend fun setIconNudgeEffect(value: String) = edit { it[Keys.ICON_NUDGE_EFFECT] = value }
     suspend fun setIconNudgeSoftness(value: Float) = edit { it[Keys.ICON_NUDGE_SOFTNESS] = value.coerceIn(0f, 1f) }
@@ -1233,7 +1381,63 @@ class SettingsRepository @Inject constructor(
         val LIVE_ACTIVITIES_TASKBAR = booleanPreferencesKey("live_activities_taskbar")
         val LIVE_ACTIVITY_EFFECT = stringPreferencesKey("live_activity_effect")
         val SEARCH_ACTIONS = booleanPreferencesKey("search_actions")
+        val RECENTS_ENABLED = booleanPreferencesKey("recents_enabled")
+        val RECENTS_COLUMNS_INNER = intPreferencesKey("recents_columns_inner")
+        val RECENTS_COLUMNS_OUTER = intPreferencesKey("recents_columns_outer")
+        val RECENTS_MAX_APPS = intPreferencesKey("recents_max_apps")
+        val RECENTS_CARD_HEIGHT = intPreferencesKey("recents_card_height")
+        val RECENTS_CORNER = intPreferencesKey("recents_corner")
+        val RECENTS_BACKDROP = floatPreferencesKey("recents_backdrop")
+        val RECENTS_SORT = stringPreferencesKey("recents_sort")
+        val RECENTS_SHOW_TIME = booleanPreferencesKey("recents_show_time")
+        val RECENTS_SHOW_ACTIONS = booleanPreferencesKey("recents_show_actions")
+        val RECENTS_CONFIRM_CLOSE_ALL = booleanPreferencesKey("recents_confirm_close_all")
+        val RECENTS_THIRD_IN_SPLIT = booleanPreferencesKey("recents_third_in_split")
+        val RECENTS_THUMBNAILS = booleanPreferencesKey("recents_thumbnails")
+        val RECENTS_ROOT_CLOSE = booleanPreferencesKey("recents_root_close")
+        val TASKBAR_RUNNING_APPS = booleanPreferencesKey("taskbar_running_apps")
+        val TASKBAR_RUNNING_DOTS = booleanPreferencesKey("taskbar_running_dots")
+        val RECENTS_ENTER = stringPreferencesKey("recents_enter")
+        val RECENTS_SELECT = stringPreferencesKey("recents_select")
+        val RECENTS_ANIM_SPEED = floatPreferencesKey("recents_anim_speed")
+        val ROOT_ENABLED = booleanPreferencesKey("root_enabled")
+        val RECENTS_THEME = stringPreferencesKey("recents_theme")
+        val RECENTS_GLASS = booleanPreferencesKey("recents_glass")
+        val RECENTS_GLASS_BLUR = intPreferencesKey("recents_glass_blur")
+        val RECENTS_GLASS_TINT = floatPreferencesKey("recents_glass_tint")
+        val RECENTS_DRAG_DROP = booleanPreferencesKey("recents_drag_drop")
+        val RECENTS_BTN_CLOSE = booleanPreferencesKey("recents_btn_close")
+        val RECENTS_BTN_SPLIT = booleanPreferencesKey("recents_btn_split")
+        val RECENTS_BTN_POPUP = booleanPreferencesKey("recents_btn_popup")
+        val RECENTS_BTN_UNSPLIT = booleanPreferencesKey("recents_btn_unsplit")
+        val RECENTS_BTN_SPLIT_VIEW = booleanPreferencesKey("recents_btn_split_view")
+        val RECENTS_BTN_CLOSE_ALL = booleanPreferencesKey("recents_btn_close_all")
+        val RECENTS_SWIPE_UP = stringPreferencesKey("recents_swipe_up")
+        val RECENTS_SWIPE_DOWN = stringPreferencesKey("recents_swipe_down")
+        val RECENTS_LONG_PRESS = stringPreferencesKey("recents_long_press")
+        val RECENTS_DOUBLE_TAP = stringPreferencesKey("recents_double_tap")
+        val RECENTS_PINNED = stringPreferencesKey("recents_pinned")
+        val RECENTS_BTN_PIN = booleanPreferencesKey("recents_btn_pin")
+        val RECENTS_PIN_KEEP_ALIVE = booleanPreferencesKey("recents_pin_keep_alive")
+        val RECENTS_PIN_EXEMPT = stringPreferencesKey("recents_pin_exempt")
+        val TASKBAR_HIDDEN_APPS = stringPreferencesKey("taskbar_hidden_apps")
+        val TASKBAR_ALWAYS_APPS = stringPreferencesKey("taskbar_always_apps")
+        val LIQUID_GLASS_EVERYWHERE = booleanPreferencesKey("liquid_glass_everywhere")
+        val LIQUID_GLASS_LEVEL = floatPreferencesKey("liquid_glass_level")
+        val RECENTS_ATTACHED_SIDE = stringPreferencesKey("recents_attached_side")
+        val RECENTS_ATTACHED_PEEK = floatPreferencesKey("recents_attached_peek")
+        val TASKBAR_HANDLE_HINT = booleanPreferencesKey("taskbar_handle_hint")
+        val ROOT_LOCK_MODE = stringPreferencesKey("root_lock_mode")
+        val ROOT_RECENTS_MODE = stringPreferencesKey("root_recents_mode")
+        val ROOT_SHADE_MODE = stringPreferencesKey("root_shade_mode")
+        val ROOT_KEEP_DUMP = booleanPreferencesKey("root_keep_dump")
+        val ROOT_KEEP_USAGE = booleanPreferencesKey("root_keep_usage")
+        val ROOT_KEEP_SECURE = booleanPreferencesKey("root_keep_secure")
+        val ROOT_KEEP_NOTIFICATIONS = booleanPreferencesKey("root_keep_notifications")
+        val ROOT_KEEP_ACCESSIBILITY = booleanPreferencesKey("root_keep_accessibility")
+        val ROOT_KEEP_WIDGETS = booleanPreferencesKey("root_keep_widgets")
         val ICON_NUDGE = booleanPreferencesKey("icon_nudge")
+        val UNLOCK_TRANSITION = booleanPreferencesKey("unlock_transition")
         val ICON_NUDGE_TASKBAR = booleanPreferencesKey("icon_nudge_taskbar")
         val ICON_NUDGE_EFFECT = stringPreferencesKey("icon_nudge_effect")
         val ICON_NUDGE_SOFTNESS = floatPreferencesKey("icon_nudge_softness")

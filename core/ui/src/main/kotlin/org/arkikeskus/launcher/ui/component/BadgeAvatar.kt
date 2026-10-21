@@ -14,12 +14,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 
 /**
  * The photo of whoever wrote last, per app ([org.arkikeskus.launcher.model.AppItem.badgeKey]), for
  * chat apps that attach one (Settings ▸ Notifications ▸ Sender photo on dots). Empty when off.
  */
 val LocalBadgeAvatars = compositionLocalOf { emptyMap<String, ImageBitmap>() }
+
+/** Room Folark's taskbar takes at the bottom while it stays on home (beyond the navigation bar). */
+val LocalTaskbarInset = compositionLocalOf { 0.dp }
 
 /**
  * A notification dot that shows the sender's photo, with the message count on its corner when

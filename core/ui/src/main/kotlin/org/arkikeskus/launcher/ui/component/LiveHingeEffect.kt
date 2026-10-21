@@ -106,7 +106,7 @@ fun Modifier.liveHingeEffect(progress: () -> Float, style: String, blurDp: Float
     }
 
 /** How long the timed version (outer display, after closing) takes at [speed]. */
-fun liveHingeTimedMs(speed: Float): Int = (TIMED_EFFECT_MS / speed.coerceIn(0.25f, 4f)).toInt().coerceIn(250, 1_400)
+fun liveHingeTimedMs(speed: Float): Int = (TIMED_EFFECT_MS / speed.coerceIn(0.1f, 4f)).toInt().coerceIn(250, 6_500)
 
 private const val TIMED_EFFECT_MS = 650f
 
@@ -134,9 +134,9 @@ private fun hingeRenderEffect(style: String, e: Float, blurPx: Float, width: Flo
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) water(e, width, height) else null
         LauncherSettings.LIVE_HINGE_STYLE_INK -> {
             // Starts black and white and dark, colour flows in as the phone opens.
-            val m = ColorMatrix().apply { setSaturation(1f - e) }
+            val m = inkMatrix.apply { setSaturation(1f - e) }
             val dim = 1f - 0.55f * e
-            m.postConcat(ColorMatrix().apply { setScale(dim, dim, dim, 1f) })
+            m.postConcat(inkDim.apply { setScale(dim, dim, dim, 1f) })
             RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(m))
         }
         else -> null
@@ -177,6 +177,10 @@ private val waterShader: RuntimeShader by lazy(LazyThreadSafetyMode.NONE) {
         """.trimIndent(),
     )
 }
+
+/** Reused every frame of the Ink style (only touched from the UI thread while drawing). */
+private val inkMatrix = ColorMatrix()
+private val inkDim = ColorMatrix()
 
 private const val MAX_TILT_DEG = 32f
 private const val CAMERA_DISTANCE_INCHES = 18f
