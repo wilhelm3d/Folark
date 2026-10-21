@@ -485,6 +485,11 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // The Vector module (system launcher) asks for Folark's search on a gesture-handle long press.
+        if (intent.getStringExtra(EXTRA_ACTION) == ACTION_OPEN_SEARCH) {
+            shellCommands.tryEmit(LauncherSettings.ACTION_SEARCH)
+            return
+        }
         // Not hasWindowFocus() like Launcher3 — our Compose popups are separate windows and would
         // steal focus from the activity. See [wasForeground] for why not lifecycle.currentState.
         homeSignals.tryEmit(wasForeground)
@@ -549,6 +554,8 @@ class LauncherActivity : ComponentActivity() {
     }
 
     private companion object {
+        const val EXTRA_ACTION = "org.arkikeskus.launcher.extra.ACTION"
+        const val ACTION_OPEN_SEARCH = "open_search"
         const val UNLOCK_HIDE = 0
         const val UNLOCK_PLAY = 1
         const val UNLOCK_SHOW = 2

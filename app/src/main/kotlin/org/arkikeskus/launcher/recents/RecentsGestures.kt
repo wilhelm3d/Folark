@@ -49,6 +49,10 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
     val dismissPx = with(LocalDensity.current) { 120.dp.toPx() }
     val slot = picked.indexOf(card)
     val dragging = drag.card?.key == card.key
+    // A card's long-press menu is open: that card stays bright and lifts a little, the rest dim.
+    val menuCard = menu.card
+    val isMenuSource = menuCard?.key == card.key
+    val dimForMenu = menuCard != null && !isMenuSource
     var origin by remember { mutableStateOf(Offset.Zero) }
     val s = settings
     val swipeUp = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(s.recentsSwipeUpAction, card)
@@ -81,7 +85,8 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
         .recentsSelect(s.recentsSelectAnimation, slot >= 0, slot, picked.size, accent, corner, speed)
         .graphicsLayer {
             if (closeAxis == Orientation.Vertical) translationY = offset.value else translationX = offset.value
-            alpha = (if (dragging) 0.35f else 1f) * (1f - (abs(offset.value) / (dismissPx * 2f)).coerceIn(0f, 0.8f))
+            alpha = (if (dragging) 0.35f else if (dimForMenu) 0.45f else 1f) * (1f - (abs(offset.value) / (dismissPx * 2f)).coerceIn(0f, 0.8f))
+            if (isMenuSource) { scaleX = 1.04f; scaleY = 1.04f; shadowElevation = 28f }
         }
         .semantics { onClick { env.value.onTap(card); true } }
         .pointerInput(card.key, swipeUp, swipeDown, longPress, doubleTap, canDrag, closeAxis) {

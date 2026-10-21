@@ -336,6 +336,7 @@ class SettingsRepository @Inject constructor(
             searchActions = p[Keys.SEARCH_ACTIONS] ?: true,
             recentsEnabled = p[Keys.RECENTS_ENABLED] ?: true,
             recentsReplaceSystem = p[Keys.RECENTS_REPLACE_SYSTEM] ?: false,
+            navHandleOpensSearch = p[Keys.NAV_HANDLE_SEARCH] ?: false,
             recentsColumnsInner = (p[Keys.RECENTS_COLUMNS_INNER] ?: 4)
                 .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER),
             recentsColumnsOuter = (p[Keys.RECENTS_COLUMNS_OUTER] ?: 1)
@@ -611,6 +612,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setSearchActions(value: Boolean) = edit { it[Keys.SEARCH_ACTIONS] = value }
     suspend fun setRecentsEnabled(value: Boolean) = edit { it[Keys.RECENTS_ENABLED] = value }
     suspend fun setRecentsReplaceSystem(value: Boolean) = edit { it[Keys.RECENTS_REPLACE_SYSTEM] = value }
+    suspend fun setNavHandleOpensSearch(value: Boolean) = edit { it[Keys.NAV_HANDLE_SEARCH] = value }
     suspend fun setRecentsColumnsInner(value: Int) = edit {
         it[Keys.RECENTS_COLUMNS_INNER] = value.coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER)
     }
@@ -1393,6 +1395,7 @@ class SettingsRepository @Inject constructor(
         val SEARCH_ACTIONS = booleanPreferencesKey("search_actions")
         val RECENTS_ENABLED = booleanPreferencesKey("recents_enabled")
         val RECENTS_REPLACE_SYSTEM = booleanPreferencesKey("recents_replace_system")
+        val NAV_HANDLE_SEARCH = booleanPreferencesKey("nav_handle_search")
         val RECENTS_COLUMNS_INNER = intPreferencesKey("recents_columns_inner")
         val RECENTS_COLUMNS_OUTER = intPreferencesKey("recents_columns_outer")
         val RECENTS_MAX_APPS = intPreferencesKey("recents_max_apps")

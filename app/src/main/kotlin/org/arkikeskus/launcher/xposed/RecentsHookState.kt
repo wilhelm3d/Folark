@@ -35,7 +35,10 @@ class RecentsHookState : ContentProvider() {
                 .settingsRepository().settings(ScreenType.INNER).first()
         }
         context.getSharedPreferences(PREFS, 0).edit().putLong(SEEN_AT, System.currentTimeMillis()).apply()
-        return Bundle().apply { putBoolean("replace", settings.recentsEnabled && settings.recentsReplaceSystem) }
+        return Bundle().apply {
+            putBoolean("replace", settings.recentsEnabled && settings.recentsReplaceSystem)
+            putBoolean("search", settings.navHandleOpensSearch)
+        }
     }
 
     override fun onCreate(): Boolean = true

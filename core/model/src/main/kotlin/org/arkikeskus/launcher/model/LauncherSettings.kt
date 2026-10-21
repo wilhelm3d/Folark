@@ -322,6 +322,9 @@ data class LauncherSettings(
     /** Android's own Recents (swipe up and hold, the stock taskbar, the Recents key) hands over to
      *  Folark Recents as soon as it opens (through Folark's accessibility service). */
     val recentsReplaceSystem: Boolean = false,
+    /** Vector module in the system launcher: a long press on the gesture handle opens Folark's
+     *  search instead of Android's assistant / Circle to Search. */
+    val navHandleOpensSearch: Boolean = false,
     /** Cards per row on the inner screen and on the cover screen. */
     val recentsColumnsInner: Int = 4,
     val recentsColumnsOuter: Int = 1,

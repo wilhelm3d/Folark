@@ -33,7 +33,11 @@ class RecentsHook : IXposedHookLoadPackage {
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName == FOLARK) return
         val loader = lpparam.classLoader
-        val helper = find("com.android.quickstep.OverviewCommandHelper", loader) ?: return
+        val helper = find("com.android.quickstep.OverviewCommandHelper", loader)
+        if (helper == null) {
+            log("no OverviewCommandHelper in ${lpparam.packageName}; not a Quickstep launcher")
+            return
+        }
         log("hooking Recents in ${lpparam.packageName}")
 
         XposedBridge.hookAllMethods(helper, "addCommand", object : XC_MethodHook() {
@@ -47,6 +51,17 @@ class RecentsHook : IXposedHookLoadPackage {
                 param.result = null
             }
         })
+
+        // A long press on the gesture handle: open Folark search instead of the assistant.
+        find("com.android.quickstep.inputconsumers.NavHandleLongPressHandler", loader)?.let { handler ->
+            XposedBridge.hookAllMethods(handler, "getLongPressRunnable", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val context = appContext() ?: return
+                    if (!searchOn(context)) return
+                    param.result = Runnable { openFolarkSearch(context) }
+                }
+            })
+        }
 
         find("com.android.quickstep.AbsSwipeUpHandler", loader)?.let { swipe ->
             XposedBridge.hookAllMethods(swipe, "calculateEndTarget", object : XC_MethodHook() {
@@ -71,17 +86,37 @@ class RecentsHook : IXposedHookLoadPackage {
     @Volatile private var cachedAt = 0L
     @Volatile private var cached = false
 
-    /** Whether Folark's switch is on (asked from Folark, kept for a second). */
-    private fun replaceOn(context: Context): Boolean {
+    @Volatile private var cachedSearch = false
+
+    /** Folark's two switches, asked together and kept for a second. */
+    private fun state(context: Context): Int {
         val now = SystemClock.uptimeMillis()
-        if (now - cachedAt < CACHE_MS) return cached
-        val on = runCatching {
+        if (now - cachedAt < CACHE_MS) return packed()
+        val bundle = runCatching {
             context.contentResolver.call(Uri.parse("content://$STATE_AUTHORITY"), "state", null, null)
-                ?.getBoolean("replace", false) == true
-        }.getOrDefault(false)
-        cached = on
+        }.getOrNull()
+        cached = bundle?.getBoolean("replace", false) == true
+        cachedSearch = bundle?.getBoolean("search", false) == true
         cachedAt = now
-        return on
+        return packed()
+    }
+
+    private fun packed() = (if (cached) 1 else 0) or (if (cachedSearch) 2 else 0)
+
+    private fun replaceOn(context: Context): Boolean = state(context) and 1 != 0
+    private fun searchOn(context: Context): Boolean = state(context) and 2 != 0
+
+    private fun openFolarkSearch(context: Context) {
+        runCatching {
+            context.startActivity(
+                Intent()
+                    .setComponent(ComponentName(FOLARK, "$FOLARK.LauncherActivity"))
+                    .setAction(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_HOME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .putExtra(SEARCH_EXTRA, SEARCH_ACTION),
+            )
+        }.onFailure { log("can't open Folark search: $it") }
     }
 
     private fun openFolarkRecents(context: Context, toggle: Boolean) {
@@ -105,6 +140,8 @@ class RecentsHook : IXposedHookLoadPackage {
         const val FOLARK = "org.arkikeskus.launcher"
         const val STATE_AUTHORITY = "org.arkikeskus.launcher.recentshook"
         const val EXTRA_TOGGLE = "org.arkikeskus.launcher.extra.TOGGLE"
+        const val SEARCH_EXTRA = "org.arkikeskus.launcher.extra.ACTION"
+        const val SEARCH_ACTION = "open_search"
 
         // OverviewCommandHelper's command types.
         private const val TYPE_SHOW = 1

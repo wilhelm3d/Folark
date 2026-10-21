@@ -72,7 +72,14 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsReplaceSystem,
         )
         ExpressiveRowDivider()
-        if (s.recentsReplaceSystem) {
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_nav_handle_search),
+            subtitle = stringResource(R.string.settings_nav_handle_search_desc),
+            checked = s.navHandleOpensSearch,
+            onCheckedChange = viewModel::setNavHandleOpensSearch,
+        )
+        ExpressiveRowDivider()
+        if (s.recentsReplaceSystem || s.navHandleOpensSearch) {
             // The Vector (LSPosed) module asks Folark each time it acts: seen lately = active.
             val seenAt = remember(s.recentsReplaceSystem) {
                 context.getSharedPreferences("folark_recents_hook", 0).getLong("seen_at", 0L)

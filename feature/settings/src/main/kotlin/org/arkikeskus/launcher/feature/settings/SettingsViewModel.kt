@@ -176,6 +176,7 @@ class SettingsViewModel @Inject constructor(
     fun setSearchActions(value: Boolean) = update { repository.setSearchActions(value) }
     fun setRecentsEnabled(value: Boolean) = update { repository.setRecentsEnabled(value) }
     fun setRecentsReplaceSystem(value: Boolean) = update { repository.setRecentsReplaceSystem(value) }
+    fun setNavHandleOpensSearch(value: Boolean) = update { repository.setNavHandleOpensSearch(value) }
     fun setRecentsColumnsInner(value: Int) = update { repository.setRecentsColumnsInner(value) }
     fun setRecentsColumnsOuter(value: Int) = update { repository.setRecentsColumnsOuter(value) }
     fun setRecentsMaxApps(value: Int) = update { repository.setRecentsMaxApps(value) }
