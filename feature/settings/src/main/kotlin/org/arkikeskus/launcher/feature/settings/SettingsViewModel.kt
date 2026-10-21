@@ -186,6 +186,7 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsSort(value: String) = update { repository.setRecentsSort(value) }
     fun setRecentsShowTime(value: Boolean) = update { repository.setRecentsShowTime(value) }
     fun setRecentsShowActions(value: Boolean) = update { repository.setRecentsShowActions(value) }
+    fun setRecentsCardLayout(value: String) = update { repository.setRecentsCardLayout(value) }
     fun setRecentsConfirmCloseAll(value: Boolean) = update { repository.setRecentsConfirmCloseAll(value) }
     fun setRecentsThirdInSplit(value: Boolean) = update { repository.setRecentsThirdInSplit(value) }
     fun setRecentsThumbnails(value: Boolean) = update { repository.setRecentsThumbnails(value) }

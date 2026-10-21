@@ -8,9 +8,12 @@
 # Folark Recents with root: started by name through `app_process` (RootTasks.removeTask).
 -keep class org.arkikeskus.launcher.data.root.RootMain { public static void main(java.lang.String[]); }
 
-# Folark's Vector (LSPosed) module: loaded by name from another process (the system launcher), so
-# R8 must not touch it, its nested classes, or the Xposed entry interface it implements.
--keep class org.arkikeskus.launcher.xposed.** { *; }
+# Folark's Vector (LSPosed) module: loaded by name from another process (the system launcher).
+# R8 must keep it by its exact name, keep its members and nested classes, and keep the Xposed
+# super-types so the "implements IXposedHookLoadPackage" relationship survives shrinking.
+-keep,allowoptimization class org.arkikeskus.launcher.xposed.** { *; }
 -keepclassmembers class org.arkikeskus.launcher.xposed.** { *; }
 -keep class * implements de.robv.android.xposed.IXposedHookLoadPackage { *; }
+-keep interface de.robv.android.xposed.** { *; }
+-keep class de.robv.android.xposed.** { *; }
 -dontwarn de.robv.android.xposed.**

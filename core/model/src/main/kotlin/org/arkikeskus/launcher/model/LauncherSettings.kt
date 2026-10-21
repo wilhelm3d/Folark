@@ -340,6 +340,9 @@ data class LauncherSettings(
     val recentsShowTime: Boolean = true,
     /** Split / Pop-up buttons on each card. */
     val recentsShowActions: Boolean = true,
+    /** Card look: [RECENTS_CARD_HEADER] (app row above the picture) or [RECENTS_CARD_OVERLAY]
+     *  (the picture fills the card, the app icon floats on top — a cleaner, borderless look). */
+    val recentsCardLayout: String = RECENTS_CARD_OVERLAY,
     /** "Close all" asks once more before closing everything. */
     val recentsConfirmCloseAll: Boolean = false,
     /** Split view: a third app joins the split screen (phones that allow three, like the Razr
@@ -596,6 +599,8 @@ data class LauncherSettings(
         /** Folark's own Recents screen. */
         const val TASKBAR_RECENTS_FOLARK = "folark"
 
+        const val RECENTS_CARD_HEADER = "header"
+        const val RECENTS_CARD_OVERLAY = "overlay"
         const val RECENTS_SORT_RECENT = "recent"
         const val RECENTS_SORT_NAME = "name"
         const val MIN_RECENTS_COLUMNS = 1

@@ -39,6 +39,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.arkikeskus.launcher.model.LauncherSettings
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import org.arkikeskus.launcher.R
+import androidx.compose.foundation.background
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 
@@ -61,6 +71,7 @@ private fun RecentsEnv.sizeScale(): Float = settings.recentsCardHeight / 300f
 @Composable
 internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int) {
     val corner = env.corner
+    val overlay = env.settings.recentsCardLayout == LauncherSettings.RECENTS_CARD_OVERLAY
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns.coerceAtLeast(1)),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -68,17 +79,21 @@ internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int
         contentPadding = PaddingValues(bottom = 96.dp),
     ) {
         itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .then(env.cardModifier(card, index, columns))
-                    .envSurface(env, RoundedCornerShape(corner), card in env.picked)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                CardTitle(card, env)
-                CardPicture(card, env, Modifier.fillMaxWidth().height(env.settings.recentsCardHeight.dp), (corner.value * 0.6f).dp)
-                CardActions(card, env)
+            if (overlay) {
+                OverlayCard(card, env, env.cardModifier(card, index, columns), env.settings.recentsCardHeight.dp)
+            } else {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(env.cardModifier(card, index, columns))
+                        .envSurface(env, RoundedCornerShape(corner), card in env.picked)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    CardTitle(card, env)
+                    CardPicture(card, env, Modifier.fillMaxWidth().height(env.settings.recentsCardHeight.dp), (corner.value * 0.6f).dp)
+                    CardActions(card, env)
+                }
             }
         }
     }
@@ -304,5 +319,84 @@ internal fun SwitcherTheme(cards: List<RecentsCard>, env: RecentsEnv) {
                 }
             }
         }
+    }
+}
+
+/**
+ * The clean, borderless card (Android 17 / iOS style): the app's picture fills the whole card to
+ * its rounded corners, the app icon floats on top, and small round close / pin buttons sit in the
+ * top corner. No frame, no header row.
+ */
+@Composable
+internal fun OverlayCard(card: RecentsCard, env: RecentsEnv, cardModifier: Modifier, height: Dp) {
+    val shape = RoundedCornerShape(env.corner)
+    val picked = card in env.picked
+    val slot = env.slotLabel(card)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height)
+            .then(cardModifier)
+            .clip(shape)
+            .then(if (picked) Modifier.border(2.dp, env.accent, shape) else Modifier),
+    ) {
+        CardPicture(card, env, Modifier.matchParentSize(), env.corner, iconSize = 56.dp)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(66.dp)
+                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.4f), 1f to Color.Transparent)),
+        )
+        Row(
+            Modifier.align(Alignment.TopCenter).padding(top = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy((-10).dp),
+        ) {
+            card.apps.forEach { app ->
+                Box(Modifier.graphicsLayer { shadowElevation = 12f; this.shape = CircleShape; clip = false }) {
+                    AppBadge(app, 38.dp)
+                }
+            }
+        }
+        if (!env.selecting) {
+            Row(
+                Modifier.align(Alignment.TopEnd).padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (env.settings.recentsBtnPin) {
+                    OverlayCircle(if (card.pinned) env.accent else Color.Black.copy(alpha = 0.45f), { env.onTogglePin(card) }) {
+                        PinGlyph(if (card.pinned) env.onAccent else Color.White)
+                    }
+                }
+                if (env.canClose && env.settings.recentsBtnClose && !card.pinned) {
+                    OverlayCircle(Color.Black.copy(alpha = 0.45f), { env.onClose(card) }) {
+                        CrossGlyph(Color.White)
+                    }
+                }
+            }
+        }
+        if (env.selecting) {
+            Box(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+                when {
+                    slot != null -> OverlayChip(stringResource(slot), env.accent, env.onAccent)
+                    !card.isSplit -> OverlayChip(stringResource(R.string.recents_add), Color.Black.copy(alpha = 0.5f), Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverlayCircle(bg: Color, onClick: () -> Unit, glyph: @Composable () -> Unit) {
+    Box(
+        Modifier.size(34.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { glyph() }
+}
+
+@Composable
+private fun OverlayChip(text: String, bg: Color, fg: Color) {
+    Box(Modifier.clip(RoundedCornerShape(999.dp)).background(bg).padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Text(text, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }

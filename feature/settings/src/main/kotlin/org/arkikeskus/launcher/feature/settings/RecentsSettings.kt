@@ -169,6 +169,17 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsShowTime,
         )
         ExpressiveRowDivider()
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_recents_card_layout),
+            options = listOf(
+                LauncherSettings.RECENTS_CARD_OVERLAY to stringResource(R.string.settings_recents_card_overlay),
+                LauncherSettings.RECENTS_CARD_HEADER to stringResource(R.string.settings_recents_card_header),
+            ),
+            selected = s.recentsCardLayout,
+            onSelect = viewModel::setRecentsCardLayout,
+        )
+        ExpressiveRowDivider()
+
         // ---------------------------------------------------------------- buttons and gestures
         RecentsButtonRows(s, viewModel)
         ExpressiveRowDivider()

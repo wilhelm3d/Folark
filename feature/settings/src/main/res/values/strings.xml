@@ -802,4 +802,7 @@
     <string name="settings_system_taskbar_open_desc">Android\'s taskbar comes with the system\'s gestures and quick switch. To open Folark Recents from it: Settings ▸ Recents ▸ Replace Android\'s Recents</string>
     <string name="settings_nav_handle_search">Long-press gesture handle opens Folark search</string>
     <string name="settings_nav_handle_search_desc">Instead of the assistant or Circle to Search. Needs the Vector module (Use Folark Recents system-wide)</string>
+    <string name="settings_recents_card_layout">Card style</string>
+    <string name="settings_recents_card_overlay">Icon overlay</string>
+    <string name="settings_recents_card_header">App header</string>
 </resources>

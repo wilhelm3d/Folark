@@ -350,6 +350,8 @@ class SettingsRepository @Inject constructor(
                 .let { if (it == LauncherSettings.RECENTS_SORT_NAME) it else LauncherSettings.RECENTS_SORT_RECENT },
             recentsShowTime = p[Keys.RECENTS_SHOW_TIME] ?: true,
             recentsShowActions = p[Keys.RECENTS_SHOW_ACTIONS] ?: true,
+            recentsCardLayout = if (p[Keys.RECENTS_CARD_LAYOUT] == LauncherSettings.RECENTS_CARD_HEADER)
+                LauncherSettings.RECENTS_CARD_HEADER else LauncherSettings.RECENTS_CARD_OVERLAY,
             recentsConfirmCloseAll = p[Keys.RECENTS_CONFIRM_CLOSE_ALL] ?: false,
             recentsThirdInSplit = p[Keys.RECENTS_THIRD_IN_SPLIT] ?: true,
             recentsThumbnails = p[Keys.RECENTS_THUMBNAILS] ?: true,
@@ -630,6 +632,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsSort(value: String) = edit { it[Keys.RECENTS_SORT] = value }
     suspend fun setRecentsShowTime(value: Boolean) = edit { it[Keys.RECENTS_SHOW_TIME] = value }
     suspend fun setRecentsShowActions(value: Boolean) = edit { it[Keys.RECENTS_SHOW_ACTIONS] = value }
+    suspend fun setRecentsCardLayout(value: String) = edit { it[Keys.RECENTS_CARD_LAYOUT] = value }
     suspend fun setRecentsConfirmCloseAll(value: Boolean) = edit { it[Keys.RECENTS_CONFIRM_CLOSE_ALL] = value }
     suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
     suspend fun setRecentsThumbnails(value: Boolean) = edit { it[Keys.RECENTS_THUMBNAILS] = value }
@@ -1405,6 +1408,7 @@ class SettingsRepository @Inject constructor(
         val RECENTS_SORT = stringPreferencesKey("recents_sort")
         val RECENTS_SHOW_TIME = booleanPreferencesKey("recents_show_time")
         val RECENTS_SHOW_ACTIONS = booleanPreferencesKey("recents_show_actions")
+        val RECENTS_CARD_LAYOUT = stringPreferencesKey("recents_card_layout")
         val RECENTS_CONFIRM_CLOSE_ALL = booleanPreferencesKey("recents_confirm_close_all")
         val RECENTS_THIRD_IN_SPLIT = booleanPreferencesKey("recents_third_in_split")
         val RECENTS_THUMBNAILS = booleanPreferencesKey("recents_thumbnails")
