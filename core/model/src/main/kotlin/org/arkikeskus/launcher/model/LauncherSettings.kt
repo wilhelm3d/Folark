@@ -319,6 +319,9 @@ data class LauncherSettings(
     /** Folark's own Recents screen (all shared by both displays): opened by the taskbar's Recents
      *  button ([TASKBAR_RECENTS_FOLARK]) or a home gesture ([GESTURE_RECENTS]). */
     val recentsEnabled: Boolean = true,
+    /** Android's own Recents (swipe up and hold, the stock taskbar, the Recents key) hands over to
+     *  Folark Recents as soon as it opens (through Folark's accessibility service). */
+    val recentsReplaceSystem: Boolean = false,
     /** Cards per row on the inner screen and on the cover screen. */
     val recentsColumnsInner: Int = 4,
     val recentsColumnsOuter: Int = 1,
@@ -351,6 +354,8 @@ data class LauncherSettings(
     val recentsEnterAnimation: String = RECENTS_ENTER_RISE,
     val recentsSelectAnimation: String = RECENTS_SELECT_POP,
     val recentsAnimationSpeed: Float = 1f,
+    /** How Recents' buttons (and its menu) answer a press: one of PRESS_*. */
+    val recentsPressAnimation: String = PRESS_SHRINK,
     /** Recents look: one of RECENTS_THEME_*; Liquid Glass on top of any of them (how much the
      *  backdrop is blurred, dp, and how milky the glass is). */
     val recentsTheme: String = RECENTS_THEME_FOLARK,
@@ -372,7 +377,7 @@ data class LauncherSettings(
      *  Compact list (left = up, right = down). */
     val recentsSwipeUpAction: String = RECENTS_ACTION_CLOSE,
     val recentsSwipeDownAction: String = RECENTS_ACTION_NONE,
-    val recentsLongPressAction: String = RECENTS_ACTION_NONE,
+    val recentsLongPressAction: String = RECENTS_ACTION_MENU,
     val recentsDoubleTapAction: String = RECENTS_ACTION_SPLIT,
     /** Pinned apps ("package/user"): first in Recents, never closed by Close all; with root and
      *  [recentsPinKeepAlive] also kept from being closed in the background. [recentsBtnPin]: the
@@ -616,8 +621,10 @@ data class LauncherSettings(
         const val RECENTS_ACTION_INFO = "info"
         const val RECENTS_ACTION_OPEN = "open"
         const val RECENTS_ACTION_PIN = "pin"
+        /** A menu on the card: split screen, freeform, lock, close. */
+        const val RECENTS_ACTION_MENU = "menu"
         val RECENTS_ACTIONS = listOf(
-            RECENTS_ACTION_NONE, RECENTS_ACTION_CLOSE, RECENTS_ACTION_SPLIT, RECENTS_ACTION_POPUP,
+            RECENTS_ACTION_NONE, RECENTS_ACTION_MENU, RECENTS_ACTION_CLOSE, RECENTS_ACTION_SPLIT, RECENTS_ACTION_POPUP,
             RECENTS_ACTION_UNSPLIT, RECENTS_ACTION_PIN, RECENTS_ACTION_INFO, RECENTS_ACTION_OPEN,
         )
         const val RECENTS_ATTACHED_LEFT = "left"
@@ -653,6 +660,16 @@ data class LauncherSettings(
             RECENTS_SELECT_POP, RECENTS_SELECT_RING, RECENTS_SELECT_LIFT, RECENTS_SELECT_TILT,
             RECENTS_SELECT_GLOW, RECENTS_SELECT_JIGGLE, RECENTS_SELECT_NONE,
         )
+
+        /** Button press animations: sink in, overshoot, a halo, a spreading ring, lean in, wobble. */
+        const val PRESS_SHRINK = "shrink"
+        const val PRESS_BOUNCE = "bounce"
+        const val PRESS_GLOW = "glow"
+        const val PRESS_RIPPLE = "ripple"
+        const val PRESS_TILT = "tilt"
+        const val PRESS_JELLY = "jelly"
+        const val PRESS_NONE = "none"
+        val PRESS_EFFECTS = listOf(PRESS_SHRINK, PRESS_BOUNCE, PRESS_GLOW, PRESS_RIPPLE, PRESS_TILT, PRESS_JELLY, PRESS_NONE)
 
         /** Settings ▸ Root: Android's way only, root when Android's way can't, or root first. */
         const val ROOT_MODE_OFF = "off"

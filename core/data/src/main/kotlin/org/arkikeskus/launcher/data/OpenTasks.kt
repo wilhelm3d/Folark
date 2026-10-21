@@ -26,6 +26,18 @@ object OpenTasks {
         return parse(text, context.packageName)
     }
 
+    /**
+     * The activity in front right now ("package/class"), from Android's activity list; null
+     * without the DUMP grant or when it can't be told.
+     */
+    fun topResumed(context: android.content.Context): String? {
+        val text = ShellSplit.dump(context, arrayOf("activities")) ?: return null
+        val m = TOP_RESUMED.find(text) ?: return null
+        val pkg = m.groupValues[1]
+        val cls = m.groupValues[2].let { if (it.startsWith(".")) pkg + it else it }
+        return "$pkg/$cls"
+    }
+
     /** Pure parsing, for tests. */
     fun parse(text: String, ownPackage: String): List<OpenTask> {
         val blocks = mutableListOf<StringBuilder>()
@@ -85,6 +97,7 @@ object OpenTasks {
         }
     }
 
+    private val TOP_RESUMED = Regex("""(?:topResumedActivity|ResumedActivity)\s*[=:]\s*ActivityRecord\{\S+ u\d+ ([\w.]+)/([\w.$]+)""")
     private val TASK_ID = Regex("""Task\{\S+ #(\d+)""")
     private val TASK_ID_FIELD = Regex("""\btaskId=(\d+)""")
     private val TYPE = Regex("""\btype=(\w+)""")

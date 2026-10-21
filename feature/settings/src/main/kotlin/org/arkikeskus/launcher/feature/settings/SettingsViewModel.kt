@@ -175,6 +175,7 @@ class SettingsViewModel @Inject constructor(
     fun setLiveActivityEffect(value: String) = update { repository.setLiveActivityEffect(value) }
     fun setSearchActions(value: Boolean) = update { repository.setSearchActions(value) }
     fun setRecentsEnabled(value: Boolean) = update { repository.setRecentsEnabled(value) }
+    fun setRecentsReplaceSystem(value: Boolean) = update { repository.setRecentsReplaceSystem(value) }
     fun setRecentsColumnsInner(value: Int) = update { repository.setRecentsColumnsInner(value) }
     fun setRecentsColumnsOuter(value: Int) = update { repository.setRecentsColumnsOuter(value) }
     fun setRecentsMaxApps(value: Int) = update { repository.setRecentsMaxApps(value) }
@@ -195,6 +196,7 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsAnimationSpeed(value: Float) = update { repository.setRecentsAnimationSpeed(value) }
     fun setRootEnabled(value: Boolean) = update { repository.setRootEnabled(value) }
     fun setRecentsTheme(value: String) = update { repository.setRecentsTheme(value) }
+    fun setRecentsPressAnimation(value: String) = update { repository.setRecentsPressAnimation(value) }
     fun setRecentsGlass(value: Boolean) = update { repository.setRecentsGlass(value) }
     fun setRecentsGlassBlur(value: Int) = update { repository.setRecentsGlassBlur(value) }
     fun setRecentsGlassTint(value: Float) = update { repository.setRecentsGlassTint(value) }

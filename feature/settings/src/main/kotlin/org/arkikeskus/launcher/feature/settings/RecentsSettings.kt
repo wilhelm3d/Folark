@@ -66,6 +66,14 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         }
 
         ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_replace_system),
+            subtitle = stringResource(R.string.settings_recents_replace_system_desc),
+            checked = s.recentsReplaceSystem,
+            onCheckedChange = viewModel::setRecentsReplaceSystem,
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_taskbar_button),
             subtitle = stringResource(R.string.settings_recents_taskbar_button_desc),
             checked = s.taskbarRecentsButton == LauncherSettings.TASKBAR_RECENTS_FOLARK,

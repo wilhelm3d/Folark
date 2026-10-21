@@ -121,6 +121,7 @@ private data class TaskbarSetup(
     val threeApp: Boolean,
     val hideFullScreen: Boolean,
     val hiddenApps: Set<String>,
+    val replaceRecents: Boolean,
     val alwaysApps: Set<String>,
     val liveEnabled: Boolean,
     val liveEffect: String,
@@ -309,6 +310,7 @@ internal class AppTaskbar(private val context: Context) {
                     threeApp = s.taskbarThreeApp,
                     hideFullScreen = s.taskbarHideFullScreen,
                     hiddenApps = s.taskbarHiddenApps,
+                    replaceRecents = s.recentsEnabled && s.recentsReplaceSystem,
                     alwaysApps = s.taskbarAlwaysApps,
                     liveEnabled = s.liveActivities && s.liveActivitiesTaskbar,
                     liveEffect = s.liveActivityEffect,
@@ -325,7 +327,9 @@ internal class AppTaskbar(private val context: Context) {
                 }
                 setup = next
                 // Per-app rules need to know which app is in front: only then is the service told.
-                LockAccessibilityService.watchApps(next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty())
+                // ...and so does handing Android's Recents over to Folark Recents.
+                LockAccessibilityService.replaceSystemRecents = next.replaceRecents
+                LockAccessibilityService.watchApps(next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty() || next.replaceRecents)
                 // The media session is only followed while the media icon is wanted.
                 if (next.enabled && next.mediaEnabled) media.start() else media.stop()
                 // Only Folark's own launch order moved (every launch): rebuild only if the recent apps changed.

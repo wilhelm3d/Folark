@@ -77,6 +77,10 @@ import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.IconRequest
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.ui.component.pressClick
+import org.arkikeskus.launcher.ui.component.PressStyle
+import org.arkikeskus.launcher.ui.component.LocalPressStyle
+import androidx.compose.runtime.CompositionLocalProvider
 import org.arkikeskus.launcher.ui.component.recentsEnter
 import org.arkikeskus.launcher.ui.component.recentsSelect
 import org.arkikeskus.launcher.ui.component.rememberRecentsBackdrop
@@ -99,6 +103,13 @@ internal fun slotLabels(count: Int, thirdInSplit: Boolean): List<Int> = when {
 
 internal const val MAX_PICK = 4
 
+/** Themes whose cards scroll sideways and so run to the screen's edges. */
+private val EDGE_TO_EDGE_THEMES = setOf(
+    LauncherSettings.RECENTS_THEME_IPAD,
+    LauncherSettings.RECENTS_THEME_CAROUSEL,
+    LauncherSettings.RECENTS_THEME_DECK,
+)
+
 /** Everything a Recents theme needs to draw its cards and answer touches. */
 internal class RecentsEnv(
     val settings: LauncherSettings,
@@ -119,6 +130,7 @@ internal class RecentsEnv(
     val onCombine: (RecentsCard, RecentsCard, String) -> Unit,
     val onAppInfo: (RecentsCard) -> Unit,
     val onTogglePin: (RecentsCard) -> Unit,
+    val menu: RecentsMenuState,
 ) {
     val speed: Float get() = settings.recentsAnimationSpeed
     fun thumb(taskId: Int): ImageBitmap? = if (settings.recentsThumbnails) thumbnails[taskId] else null
@@ -148,11 +160,14 @@ internal fun RecentsScreen(
     val onAccent = MaterialTheme.colorScheme.onPrimary
     val wide = LocalConfiguration.current.smallestScreenWidthDp >= 600
     val glass = settings.recentsGlass
+    /** The margin at the screen's sides (title, buttons, grid and list themes). */
+    val side = if (wide) 28.dp else 16.dp
 
     var selecting by remember { mutableStateOf(false) }
     val picked = remember { mutableStateListOf<RecentsCard>() }
     var confirmAll by remember { mutableStateOf(false) }
     val drag = remember { RecentsDrag() }
+    val menu = remember { RecentsMenuState() }
     drag.cards = state.cards
     val backdrop = rememberRecentsBackdrop(settings.recentsEnterAnimation, settings.recentsAnimationSpeed, Unit)
 
@@ -179,8 +194,10 @@ internal fun RecentsScreen(
         onCombine = onCombine,
         onAppInfo = onAppInfo,
         onTogglePin = onTogglePin,
+        menu = menu,
     )
 
+    CompositionLocalProvider(LocalPressStyle provides PressStyle(settings.recentsPressAnimation, accent, settings.recentsAnimationSpeed)) {
     Box(
         Modifier
             .fillMaxSize()
@@ -195,11 +212,15 @@ internal fun RecentsScreen(
             Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = if (wide) 28.dp else 16.dp, vertical = 16.dp),
+                .padding(vertical = 16.dp),
         ) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 // ---------------------------------------------------------------- header
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    Modifier.padding(horizontal = side),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.recents_title), color = Ink, fontSize = if (wide) 40.sp else 32.sp, fontWeight = FontWeight.Bold)
                         val count = state.cards.sumOf { it.tasks.size }
@@ -243,7 +264,9 @@ internal fun RecentsScreen(
                 }
 
                 // ---------------------------------------------------------------- body
-                Box(Modifier.weight(1f).fillMaxWidth()) {
+                // Rows of cards (iPad, Carousel, Deck) run to the screen's edges; the rest keep the margin.
+                val edgeToEdge = settings.recentsTheme in EDGE_TO_EDGE_THEMES
+                Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (edgeToEdge) 0.dp else side)) {
                     when {
                         !state.canList -> NeedsGrant(accent)
                         !state.loading && state.cards.isEmpty() -> Text(
@@ -268,6 +291,7 @@ internal fun RecentsScreen(
                 Row(
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .padding(horizontal = side)
                         .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
                         .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -289,6 +313,8 @@ internal fun RecentsScreen(
         }
 
         DragLayer(drag, env)
+        RecentsMenuLayer(menu, env)
+    }
     }
 }
 
@@ -424,9 +450,10 @@ internal fun CardTrailing(card: RecentsCard, env: RecentsEnv, showClose: Boolean
             val chip = if (env.glass) Color.White.copy(alpha = 0.16f) else Chip
             if (env.settings.recentsBtnPin) {
                 Box(
-                    Modifier.size(40.dp).clip(CircleShape)
-                        .background(if (card.pinned) env.accent else chip)
-                        .clickable { env.onTogglePin(card) },
+                    Modifier.size(40.dp)
+                        .pressClick { env.onTogglePin(card) }
+                        .clip(CircleShape)
+                        .background(if (card.pinned) env.accent else chip),
                     contentAlignment = Alignment.Center,
                 ) { PinGlyph(if (card.pinned) env.onAccent else Color(0xFFC9D6D8)) }
             } else if (card.pinned) {
@@ -435,7 +462,7 @@ internal fun CardTrailing(card: RecentsCard, env: RecentsEnv, showClose: Boolean
             // A pinned app isn't closed from here (unpin it first).
             if (env.canClose && showClose && env.settings.recentsBtnClose && !card.pinned) {
                 Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(chip).clickable { env.onClose(card) },
+                    Modifier.size(40.dp).pressClick { env.onClose(card) }.clip(CircleShape).background(chip),
                     contentAlignment = Alignment.Center,
                 ) { CrossGlyph(Color(0xFFC9D6D8)) }
             }
@@ -511,9 +538,9 @@ internal fun AppBadge(app: AppItem?, size: Dp) {
 private fun SmallAction(text: String, accent: Color, onClick: () -> Unit) {
     Box(
         Modifier
+            .pressClick(onClick)
             .clip(RoundedCornerShape(999.dp))
             .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) { Text(text, color = accent, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
 }
@@ -530,6 +557,7 @@ private fun Pill(
     val shape = RoundedCornerShape(999.dp)
     Box(
         Modifier
+            .then(if (onClick != null) Modifier.pressClick(onClick) else Modifier)
             .then(
                 when {
                     filled -> Modifier.clip(shape).background(background)
@@ -537,7 +565,6 @@ private fun Pill(
                     else -> Modifier.clip(shape).border(1.dp, color.copy(alpha = 0.6f), shape)
                 },
             )
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) { Text(text, color = color, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
 }

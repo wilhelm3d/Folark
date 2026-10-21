@@ -49,6 +49,10 @@ private fun screenAspect(): Float {
     return (c.screenWidthDp.toFloat() / c.screenHeightDp.coerceAtLeast(1)).coerceIn(0.4f, 2f)
 }
 
+/** The screen-side margin of Recents, where an edge-to-edge row's first and last card sit. */
+@Composable
+private fun edgeMargin(): Dp = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) 28.dp else 16.dp
+
 /** How much bigger than normal the cards are (Settings ▸ Recents ▸ Card height; 300 = normal). */
 private fun RecentsEnv.sizeScale(): Float = settings.recentsCardHeight / 300f
 
@@ -93,7 +97,7 @@ internal fun IpadTheme(cards: List<RecentsCard>, env: RecentsEnv) {
             Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(30.dp),
             verticalAlignment = Alignment.CenterVertically,
-            contentPadding = PaddingValues(horizontal = 24.dp),
+            contentPadding = PaddingValues(horizontal = edgeMargin()),
         ) {
             itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
                 val width = if (card.isSplit) oneWidth * 1.4f else oneWidth
@@ -198,7 +202,7 @@ internal fun DeckTheme(cards: List<RecentsCard>, env: RecentsEnv) {
             Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(-(cardWidth * 0.42f)),
             verticalAlignment = Alignment.CenterVertically,
-            contentPadding = PaddingValues(horizontal = 24.dp),
+            contentPadding = PaddingValues(horizontal = edgeMargin()),
         ) {
             itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
                 Column(

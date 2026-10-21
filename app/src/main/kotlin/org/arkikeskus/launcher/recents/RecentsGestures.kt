@@ -107,25 +107,31 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
                 if (decided == null) {
                     // ---------------------------------------------------- long press
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (canDrag) drag.start(card, origin + down.position)
+                    // The menu opens at once, under the finger; moving on drags the card instead.
+                    val withMenu = longPress == LauncherSettings.RECENTS_ACTION_MENU
+                    if (withMenu) env.value.menu.open(card, origin + down.position)
                     var travelled = 0f
+                    var dragging = false
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) break
                         val d = change.positionChange()
                         travelled += d.getDistance()
-                        if (canDrag) {
-                            change.consume()
+                        if (canDrag && !dragging && travelled > slop) {
+                            dragging = true
+                            env.value.menu.close()
+                            drag.start(card, origin + change.position)
+                        } else if (dragging) {
                             val before = drag.target
                             drag.move(d)
                             if (drag.target != before && drag.target != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         }
+                        if (dragging) change.consume()
                     }
-                    if (canDrag && travelled > slop) {
+                    if (dragging) {
                         drag.drop()?.let { (onto, how) -> env.value.onCombine(card, onto, how) }
-                    } else {
-                        if (canDrag) drag.cancel()
+                    } else if (!withMenu) {
                         env.value.perform(longPress, card)
                     }
                     return@awaitEachGesture
@@ -204,6 +210,7 @@ internal fun RecentsEnv.perform(action: String, card: RecentsCard) {
         LauncherSettings.RECENTS_ACTION_UNSPLIT -> onUnsplit(card)
         LauncherSettings.RECENTS_ACTION_INFO -> onAppInfo(card)
         LauncherSettings.RECENTS_ACTION_PIN -> onTogglePin(card)
+        LauncherSettings.RECENTS_ACTION_MENU -> menu.open(card, drag.bounds[card.key]?.center ?: Offset.Zero)
         LauncherSettings.RECENTS_ACTION_OPEN -> onTap(card)
         else -> {}
     }

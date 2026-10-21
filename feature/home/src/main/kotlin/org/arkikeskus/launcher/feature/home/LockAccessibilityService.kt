@@ -45,9 +45,59 @@ class LockAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
+        if (replaceSystemRecents && isSystemRecents(pkg, event.className?.toString())) {
+            handOverRecents()
+            return
+        }
         // System UI (shade, Recents) and the keyboard aren't apps in front.
         if (pkg == "com.android.systemui" || pkg == keyboardPackage()) return
         taskbar?.onForegroundApp(pkg)
+    }
+
+    /** Android's Recents screen: the system's Recents app (Motorola's launcher here) showing its Recents activity. */
+    private fun isSystemRecents(pkg: String, cls: String?): Boolean {
+        if (pkg == packageName || cls == null) return false
+        val recents = systemRecents
+        return if (recents != null) pkg == recents.packageName && cls == recents.className
+        else cls.endsWith(".RecentsActivity")
+    }
+
+    /** "package/class" of Android's Recents, from the system's own configuration. */
+    private val systemRecents: ComponentName? by lazy {
+        runCatching {
+            val res = android.content.res.Resources.getSystem()
+            val id = res.getIdentifier("config_recentsComponentName", "string", "android")
+            if (id == 0) null else ComponentName.unflattenFromString(res.getString(id))
+        }.getOrNull()
+    }
+
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    @Volatile private var handing = false
+
+    /**
+     * Android's Recents opened: after a moment, if it is still the activity in front (a swipe
+     * home passes through it too, and must not be taken), go home and open Folark Recents.
+     */
+    private fun handOverRecents() {
+        if (handing) return
+        handing = true
+        handler.postDelayed({
+            Thread {
+                val top = org.arkikeskus.launcher.data.OpenTasks.topResumed(this)
+                val stillRecents = top != null && top.substringBefore('/') != packageName &&
+                    (systemRecents?.let { top == it.flattenToString() } ?: top.endsWith(".RecentsActivity"))
+                handler.post {
+                    if (stillRecents && performGlobalAction(GLOBAL_ACTION_HOME)) {
+                        handler.postDelayed({
+                            org.arkikeskus.launcher.data.FolarkRecents.open(this)
+                            handing = false
+                        }, HOME_SETTLE_MS)
+                    } else {
+                        handing = false
+                    }
+                }
+            }.apply { name = "folark-recents-handover"; isDaemon = true }.start()
+        }, RECENTS_SETTLE_MS)
     }
 
     private fun keyboardPackage(): String? = runCatching {
@@ -66,6 +116,13 @@ class LockAccessibilityService : AccessibilityService() {
 
     companion object {
         private var instance: LockAccessibilityService? = null
+
+        /** Settings ▸ Recents ▸ Replace Android's Recents (kept up to date by the taskbar's settings). */
+        @Volatile var replaceSystemRecents: Boolean = false
+
+        /** How long Android's Recents must stay in front before it is taken over, and the pause after going home. */
+        private const val RECENTS_SETTLE_MS = 280L
+        private const val HOME_SETTLE_MS = 90L
 
         /** Tells the taskbar whether Folark's home screen is in front (it hides there). */
         fun setHomeVisible(visible: Boolean) {

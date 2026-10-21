@@ -12,6 +12,7 @@ import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 
 private val ACTIONS = listOf(
     LauncherSettings.RECENTS_ACTION_NONE to R.string.settings_recents_action_none,
+    LauncherSettings.RECENTS_ACTION_MENU to R.string.settings_recents_action_menu,
     LauncherSettings.RECENTS_ACTION_CLOSE to R.string.settings_recents_action_close,
     LauncherSettings.RECENTS_ACTION_SPLIT to R.string.settings_recents_action_split,
     LauncherSettings.RECENTS_ACTION_POPUP to R.string.settings_recents_action_popup,

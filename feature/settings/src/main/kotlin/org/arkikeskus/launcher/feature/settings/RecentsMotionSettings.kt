@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.component.recentsEnter
 import org.arkikeskus.launcher.ui.component.recentsSelect
+import org.arkikeskus.launcher.ui.component.pressClick
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 
@@ -85,6 +86,53 @@ internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel
         valueDisplay = "%.1f×".format(speed),
         onDragValue = { dragSpeed = it },
     )
+    ExpressiveRowDivider()
+    ExpressiveSegmentedControl(
+        title = stringResource(R.string.settings_recents_press),
+        options = PRESS_LABELS.map { (key, label) -> key to stringResource(label) },
+        selected = s.recentsPressAnimation,
+        onSelect = viewModel::setRecentsPressAnimation,
+    )
+    PressPreview(s.recentsPressAnimation, speed)
+}
+
+private val PRESS_LABELS = listOf(
+    LauncherSettings.PRESS_SHRINK to R.string.settings_recents_press_shrink,
+    LauncherSettings.PRESS_BOUNCE to R.string.settings_recents_press_bounce,
+    LauncherSettings.PRESS_GLOW to R.string.settings_recents_press_glow,
+    LauncherSettings.PRESS_RIPPLE to R.string.settings_recents_press_ripple,
+    LauncherSettings.PRESS_TILT to R.string.settings_recents_press_tilt,
+    LauncherSettings.PRESS_JELLY to R.string.settings_recents_press_jelly,
+    LauncherSettings.PRESS_NONE to R.string.settings_recents_anim_none,
+)
+
+/** Three buttons to press, answering with the chosen effect. */
+@Composable
+private fun PressPreview(effect: String, speed: Float) {
+    val accent = LocalAccent.current
+    val palette = LocalExpressivePalette.current
+    androidx.compose.runtime.CompositionLocalProvider(
+        org.arkikeskus.launcher.ui.component.LocalPressStyle provides org.arkikeskus.launcher.ui.component.PressStyle(effect, accent, speed),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color(0xFF0B1214)).padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            ) {
+                listOf(R.string.settings_recents_press_sample_split, R.string.settings_recents_press_sample_popup, R.string.settings_recents_press_sample_close)
+                    .forEachIndexed { i, label ->
+                        Box(
+                            Modifier
+                                .pressClick { }
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (i == 2) accent else Color.White.copy(alpha = 0.1f))
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                        ) { Text(stringResource(label), color = if (i == 2) Color.White else accent, fontSize = 14.sp) }
+                    }
+            }
+            Text(stringResource(R.string.settings_recents_press_hint), color = palette.faint, fontSize = 12.sp)
+        }
+    }
 }
 
 @Composable

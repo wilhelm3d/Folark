@@ -36,4 +36,9 @@
     <string name="recents_drag_hint">drop on an app</string>
     <string name="recents_close_others">Close others</string>
     <string name="recents_close_all_pins_too">Close all (pins too)</string>
+    <string name="recents_menu_split">Split screen</string>
+    <string name="recents_menu_freeform">Freeform</string>
+    <string name="recents_menu_lock">Lock</string>
+    <string name="recents_menu_unlock">Unlock</string>
+    <string name="recents_menu_close">Close app</string>
 </resources>

@@ -335,6 +335,7 @@ class SettingsRepository @Inject constructor(
                 .let { if (it in LauncherSettings.LIVE_EFFECTS) it else LauncherSettings.LIVE_EFFECT_GLOW },
             searchActions = p[Keys.SEARCH_ACTIONS] ?: true,
             recentsEnabled = p[Keys.RECENTS_ENABLED] ?: true,
+            recentsReplaceSystem = p[Keys.RECENTS_REPLACE_SYSTEM] ?: false,
             recentsColumnsInner = (p[Keys.RECENTS_COLUMNS_INNER] ?: 4)
                 .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER),
             recentsColumnsOuter = (p[Keys.RECENTS_COLUMNS_OUTER] ?: 1)
@@ -360,6 +361,8 @@ class SettingsRepository @Inject constructor(
                 .let { if (it in LauncherSettings.RECENTS_SELECTS) it else LauncherSettings.RECENTS_SELECT_POP },
             recentsAnimationSpeed = (p[Keys.RECENTS_ANIM_SPEED] ?: 1f)
                 .coerceIn(LauncherSettings.MIN_RECENTS_ANIM_SPEED, LauncherSettings.MAX_RECENTS_ANIM_SPEED),
+            recentsPressAnimation = (p[Keys.RECENTS_PRESS] ?: LauncherSettings.PRESS_SHRINK)
+                .let { if (it in LauncherSettings.PRESS_EFFECTS) it else LauncherSettings.PRESS_SHRINK },
             recentsTheme = (p[Keys.RECENTS_THEME] ?: LauncherSettings.RECENTS_THEME_FOLARK)
                 .let { if (it in LauncherSettings.RECENTS_THEMES) it else LauncherSettings.RECENTS_THEME_FOLARK },
             recentsGlass = p[Keys.RECENTS_GLASS] ?: false,
@@ -375,7 +378,7 @@ class SettingsRepository @Inject constructor(
             recentsBtnCloseAll = p[Keys.RECENTS_BTN_CLOSE_ALL] ?: true,
             recentsSwipeUpAction = recentsAction(p[Keys.RECENTS_SWIPE_UP], LauncherSettings.RECENTS_ACTION_CLOSE),
             recentsSwipeDownAction = recentsAction(p[Keys.RECENTS_SWIPE_DOWN], LauncherSettings.RECENTS_ACTION_NONE),
-            recentsLongPressAction = recentsAction(p[Keys.RECENTS_LONG_PRESS], LauncherSettings.RECENTS_ACTION_NONE),
+            recentsLongPressAction = recentsAction(p[Keys.RECENTS_LONG_PRESS], LauncherSettings.RECENTS_ACTION_MENU),
             recentsDoubleTapAction = recentsAction(p[Keys.RECENTS_DOUBLE_TAP], LauncherSettings.RECENTS_ACTION_SPLIT),
             recentsPinned = lines(p[Keys.RECENTS_PINNED]),
             recentsBtnPin = p[Keys.RECENTS_BTN_PIN] ?: true,
@@ -604,6 +607,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setLiveActivityEffect(value: String) = edit { it[Keys.LIVE_ACTIVITY_EFFECT] = value }
     suspend fun setSearchActions(value: Boolean) = edit { it[Keys.SEARCH_ACTIONS] = value }
     suspend fun setRecentsEnabled(value: Boolean) = edit { it[Keys.RECENTS_ENABLED] = value }
+    suspend fun setRecentsReplaceSystem(value: Boolean) = edit { it[Keys.RECENTS_REPLACE_SYSTEM] = value }
     suspend fun setRecentsColumnsInner(value: Int) = edit {
         it[Keys.RECENTS_COLUMNS_INNER] = value.coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER)
     }
@@ -634,6 +638,7 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setRootEnabled(value: Boolean) = edit { it[Keys.ROOT_ENABLED] = value }
     suspend fun setRecentsTheme(value: String) = edit { it[Keys.RECENTS_THEME] = value }
+    suspend fun setRecentsPressAnimation(value: String) = edit { it[Keys.RECENTS_PRESS] = value }
     suspend fun setRecentsGlass(value: Boolean) = edit { it[Keys.RECENTS_GLASS] = value }
     suspend fun setRecentsGlassBlur(value: Int) = edit { it[Keys.RECENTS_GLASS_BLUR] = value.coerceIn(0, LauncherSettings.MAX_RECENTS_GLASS_BLUR) }
     suspend fun setRecentsGlassTint(value: Float) = edit {
@@ -1382,6 +1387,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ACTIVITY_EFFECT = stringPreferencesKey("live_activity_effect")
         val SEARCH_ACTIONS = booleanPreferencesKey("search_actions")
         val RECENTS_ENABLED = booleanPreferencesKey("recents_enabled")
+        val RECENTS_REPLACE_SYSTEM = booleanPreferencesKey("recents_replace_system")
         val RECENTS_COLUMNS_INNER = intPreferencesKey("recents_columns_inner")
         val RECENTS_COLUMNS_OUTER = intPreferencesKey("recents_columns_outer")
         val RECENTS_MAX_APPS = intPreferencesKey("recents_max_apps")
@@ -1402,6 +1408,7 @@ class SettingsRepository @Inject constructor(
         val RECENTS_ANIM_SPEED = floatPreferencesKey("recents_anim_speed")
         val ROOT_ENABLED = booleanPreferencesKey("root_enabled")
         val RECENTS_THEME = stringPreferencesKey("recents_theme")
+        val RECENTS_PRESS = stringPreferencesKey("recents_press")
         val RECENTS_GLASS = booleanPreferencesKey("recents_glass")
         val RECENTS_GLASS_BLUR = intPreferencesKey("recents_glass_blur")
         val RECENTS_GLASS_TINT = floatPreferencesKey("recents_glass_tint")

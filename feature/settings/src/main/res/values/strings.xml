@@ -771,4 +771,18 @@
     <string name="settings_recents_check">Check screenshots</string>
     <string name="settings_recents_check_desc">Runs each step of getting the apps\' screenshots and shows what failed. Open a few apps first</string>
     <string name="settings_recents_check_copy">Copy</string>
+    <string name="settings_recents_action_menu">Menu</string>
+    <string name="settings_recents_press">Pressing a button</string>
+    <string name="settings_recents_press_shrink">Shrink</string>
+    <string name="settings_recents_press_bounce">Bounce</string>
+    <string name="settings_recents_press_glow">Glow</string>
+    <string name="settings_recents_press_ripple">Ripple</string>
+    <string name="settings_recents_press_tilt">Tilt</string>
+    <string name="settings_recents_press_jelly">Jelly</string>
+    <string name="settings_recents_press_sample_split">Split</string>
+    <string name="settings_recents_press_sample_popup">Pop-up</string>
+    <string name="settings_recents_press_sample_close">Close all</string>
+    <string name="settings_recents_press_hint">Press and hold the buttons to try it. Follows the animation speed</string>
+    <string name="settings_recents_replace_system">Replace Android\'s Recents</string>
+    <string name="settings_recents_replace_system_desc">Swipe up and hold, Android\'s taskbar and the Recents key open Folark Recents. Android\'s Recents shows for a moment first. Needs Folark\'s accessibility service and the one-time ADB grant</string>
 </resources>
