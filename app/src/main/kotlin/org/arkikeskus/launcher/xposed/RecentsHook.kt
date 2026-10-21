@@ -39,6 +39,9 @@ class RecentsHook : IXposedHookLoadPackage {
             return
         }
         log("hooking Recents in ${lpparam.packageName}")
+        // Tell Folark the module is live as soon as the launcher is ready (so it shows "active"
+        // without having to open Recents first). Retries until the launcher's context exists.
+        pingWhenReady(0)
 
         XposedBridge.hookAllMethods(helper, "addCommand", object : XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
@@ -106,6 +109,17 @@ class RecentsHook : IXposedHookLoadPackage {
     private fun replaceOn(context: Context): Boolean = state(context) and 1 != 0
     private fun searchOn(context: Context): Boolean = state(context) and 2 != 0
 
+    /** Pings Folark's state provider once the launcher's app context is up (announces the module). */
+    private fun pingWhenReady(tries: Int) {
+        val context = appContext()
+        if (context != null) {
+            cachedAt = 0L
+            runCatching { state(context) }
+            return
+        }
+        if (tries < PING_MAX_TRIES) main.postDelayed({ pingWhenReady(tries + 1) }, PING_RETRY_MS)
+    }
+
     private fun openFolarkSearch(context: Context) {
         runCatching {
             context.startActivity(
@@ -151,5 +165,7 @@ class RecentsHook : IXposedHookLoadPackage {
         /** Lets the launcher's own swipe-home finish before Folark Recents opens over home. */
         private const val AFTER_HOME_MS = 260L
         private const val CACHE_MS = 1_000L
+        private const val PING_RETRY_MS = 1_500L
+        private const val PING_MAX_TRIES = 12
     }
 }

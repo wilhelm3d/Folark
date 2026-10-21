@@ -58,14 +58,12 @@ android {
     buildTypes {
         debug {
             isDebuggable = false
-            isMinifyEnabled = true
+            // No R8 on debug: the Vector/LSPosed module class (loaded by name from another
+            // process) must not be shrunk, renamed or merged. Release keeps minification.
+            isMinifyEnabled = false
             vcsInfo {
                 include = false
             }
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
             signingConfig = signingConfigs.getByName("debug")
         }
         release {

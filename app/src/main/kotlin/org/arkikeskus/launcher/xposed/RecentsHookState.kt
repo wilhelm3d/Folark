@@ -30,14 +30,20 @@ class RecentsHookState : ContentProvider() {
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
         if (method != "state") return null
         val context = context ?: return null
-        val settings = runBlocking {
-            EntryPointAccessors.fromApplication(context, Deps::class.java)
-                .settingsRepository().settings(ScreenType.INNER).first()
+        // Record that the module is alive first, so Folark shows it active even if reading the
+        // settings below is briefly not ready (the launcher may call this very early).
+        runCatching {
+            context.getSharedPreferences(PREFS, 0).edit().putLong(SEEN_AT, System.currentTimeMillis()).apply()
         }
-        context.getSharedPreferences(PREFS, 0).edit().putLong(SEEN_AT, System.currentTimeMillis()).apply()
+        val settings = runCatching {
+            runBlocking {
+                EntryPointAccessors.fromApplication(context, Deps::class.java)
+                    .settingsRepository().settings(ScreenType.INNER).first()
+            }
+        }.getOrNull()
         return Bundle().apply {
-            putBoolean("replace", settings.recentsEnabled && settings.recentsReplaceSystem)
-            putBoolean("search", settings.navHandleOpensSearch)
+            putBoolean("replace", settings?.recentsEnabled == true && settings.recentsReplaceSystem)
+            putBoolean("search", settings?.navHandleOpensSearch == true)
         }
     }
 
