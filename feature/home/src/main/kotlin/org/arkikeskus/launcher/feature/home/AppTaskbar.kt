@@ -272,7 +272,8 @@ internal class AppTaskbar(private val context: Context) {
                 val byKey = all.associateBy { it.key }
                 allApps = all
                 TaskbarSetup(
-                    enabled = s.taskbarEnabled,
+                    // Android's taskbar chosen instead (Settings ▸ Taskbar): Folark's stays away.
+                    enabled = s.taskbarEnabled && s.taskbarSource == LauncherSettings.TASKBAR_SOURCE_FOLARK,
                     pinned = (s.taskbarPinnedApps ?: favorites).mapNotNull { byKey[it] }.take(MAX_PINNED),
                     recentCount = s.taskbarRecentCount,
                     iconSizeDp = s.taskbarIconSize,

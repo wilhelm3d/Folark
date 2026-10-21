@@ -86,6 +86,11 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         subtitle = stringResource(R.string.settings_category_taskbar_desc),
         sharedByBothDisplays = true,
     ) {
+        // Folark's taskbar, or Android's (with the system's gestures and quick switch).
+        SystemTaskbarRows(s, viewModel)
+        if (s.taskbarSource == LauncherSettings.TASKBAR_SOURCE_SYSTEM) return@ExpressiveCategoryContainer
+        ExpressiveRowDivider()
+
         TaskbarToggle(enabled = s.taskbarEnabled, onSetEnabled = viewModel::setTaskbarEnabled)
         ExpressiveRowDivider()
 

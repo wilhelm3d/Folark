@@ -392,6 +392,9 @@ class SettingsRepository @Inject constructor(
             recentsAttachedPeek = (p[Keys.RECENTS_ATTACHED_PEEK] ?: 0.12f)
                 .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
             taskbarHandleHint = p[Keys.TASKBAR_HANDLE_HINT] ?: true,
+            taskbarSource = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
+                LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
+            systemTaskbarMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
             rootEnabled = p[Keys.ROOT_ENABLED] ?: true,
             rootLockMode = rootMode(p[Keys.ROOT_LOCK_MODE]),
             rootRecentsMode = rootMode(p[Keys.ROOT_RECENTS_MODE]),
@@ -676,6 +679,8 @@ class SettingsRepository @Inject constructor(
         it[Keys.RECENTS_ATTACHED_PEEK] = value.coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK)
     }
     suspend fun setTaskbarHandleHint(value: Boolean) = edit { it[Keys.TASKBAR_HANDLE_HINT] = value }
+    suspend fun setTaskbarSource(value: String) = edit { it[Keys.TASKBAR_SOURCE] = value }
+    suspend fun setSystemTaskbarMode(value: Int) = edit { it[Keys.SYSTEM_TASKBAR_MODE] = value }
     suspend fun setRootLockMode(value: String) = edit { it[Keys.ROOT_LOCK_MODE] = rootMode(value) }
     suspend fun setRootRecentsMode(value: String) = edit { it[Keys.ROOT_RECENTS_MODE] = rootMode(value) }
     suspend fun setRootShadeMode(value: String) = edit { it[Keys.ROOT_SHADE_MODE] = rootMode(value) }
@@ -1434,6 +1439,8 @@ class SettingsRepository @Inject constructor(
         val RECENTS_ATTACHED_SIDE = stringPreferencesKey("recents_attached_side")
         val RECENTS_ATTACHED_PEEK = floatPreferencesKey("recents_attached_peek")
         val TASKBAR_HANDLE_HINT = booleanPreferencesKey("taskbar_handle_hint")
+        val TASKBAR_SOURCE = stringPreferencesKey("taskbar_source")
+        val SYSTEM_TASKBAR_MODE = intPreferencesKey("system_taskbar_mode")
         val ROOT_LOCK_MODE = stringPreferencesKey("root_lock_mode")
         val ROOT_RECENTS_MODE = stringPreferencesKey("root_recents_mode")
         val ROOT_SHADE_MODE = stringPreferencesKey("root_shade_mode")

@@ -783,6 +783,21 @@
     <string name="settings_recents_press_sample_popup">Pop-up</string>
     <string name="settings_recents_press_sample_close">Close all</string>
     <string name="settings_recents_press_hint">Press and hold the buttons to try it. Follows the animation speed</string>
-    <string name="settings_recents_replace_system">Replace Android\'s Recents</string>
+    <string name="settings_recents_replace_system">Use Folark Recents system-wide</string>
     <string name="settings_recents_replace_system_desc">Swipe up and hold, Android\'s taskbar and the Recents key open Folark Recents. Android\'s Recents shows for a moment first. Needs Folark\'s accessibility service and the one-time ADB grant</string>
+    <string name="settings_recents_hook_active">Vector module: active</string>
+    <string name="settings_recents_hook_active_desc">The system launcher opens Folark Recents itself: no flash of Android\'s Recents</string>
+    <string name="settings_recents_hook_missing">Vector module: not seen yet</string>
+    <string name="settings_recents_hook_missing_desc">Works now through the accessibility service (Android\'s Recents shows for a moment). For no flash: in Vector (LSPosed) enable Folark for System Launcher, then restart it. Shows active after the first Recents</string>
+    <string name="settings_taskbar_source">Which taskbar</string>
+    <string name="settings_taskbar_source_folark">Folark</string>
+    <string name="settings_taskbar_source_system">Android (Motorola)</string>
+    <string name="settings_system_taskbar_mode">Android\'s taskbar</string>
+    <string name="settings_system_taskbar_always">Always show</string>
+    <string name="settings_system_taskbar_gesture">Swipe up</string>
+    <string name="settings_system_taskbar_off">Off</string>
+    <string name="settings_system_taskbar_applied">Set. The system launcher restarted</string>
+    <string name="settings_system_taskbar_no_root">No root: choose the same on Motorola\'s page</string>
+    <string name="settings_system_taskbar_open">Motorola\'s taskbar settings</string>
+    <string name="settings_system_taskbar_open_desc">Android\'s taskbar comes with the system\'s gestures and quick switch. To open Folark Recents from it: Settings ▸ Recents ▸ Replace Android\'s Recents</string>
 </resources>

@@ -220,6 +220,8 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsAttachedSide(value: String) = update { repository.setRecentsAttachedSide(value) }
     fun setRecentsAttachedPeek(value: Float) = update { repository.setRecentsAttachedPeek(value) }
     fun setTaskbarHandleHint(value: Boolean) = update { repository.setTaskbarHandleHint(value) }
+    fun setTaskbarSource(value: String) = update { repository.setTaskbarSource(value) }
+    fun setSystemTaskbarMode(value: Int) = update { repository.setSystemTaskbarMode(value) }
     fun setRootLockMode(value: String) = update { repository.setRootLockMode(value) }
     fun setRootRecentsMode(value: String) = update { repository.setRootRecentsMode(value) }
     fun setRootShadeMode(value: String) = update { repository.setRootShadeMode(value) }

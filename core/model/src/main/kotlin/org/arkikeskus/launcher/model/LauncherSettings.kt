@@ -396,6 +396,10 @@ data class LauncherSettings(
     val recentsAttachedPeek: Float = 0.12f,
     /** Taskbar: a small visible line at the corners where a swipe up opens it (when it isn't kept open). */
     val taskbarHandleHint: Boolean = true,
+    /** Which taskbar: Folark's own, or Android's (the system launcher's, with its gestures and
+     *  quick switch); for Android's, its mode (1 always, 2 by a swipe up, 4 off). */
+    val taskbarSource: String = TASKBAR_SOURCE_FOLARK,
+    val systemTaskbarMode: Int = 1,
     /** Settings ▸ Root. [rootEnabled] off: Folark never asks for root. The modes (ROOT_MODE_*)
      *  pick Android's way or root for locking, Android's Recents key and the notification shade;
      *  the "keep" switches give (and give back) grants with root instead of ADB or settings pages. */
@@ -581,6 +585,8 @@ data class LauncherSettings(
         const val TASKBAR_MEDIA_SHAPE_CIRCLE = "circle"
         const val TASKBAR_MEDIA_SHAPE_ROUNDED = "rounded"
 
+        const val TASKBAR_SOURCE_FOLARK = "folark"
+        const val TASKBAR_SOURCE_SYSTEM = "system"
         const val TASKBAR_RECENTS_OFF = "off"
         const val TASKBAR_RECENTS_SYSTEM = "system"
         const val TASKBAR_RECENTS_DESKTOP = "desktop"

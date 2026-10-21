@@ -81,6 +81,13 @@ class RecentsActivity : ComponentActivity() {
         viewModel.refresh()
     }
 
+    /** Opened again while open: a Recents button or key pressed a second time closes it. */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        val toggle = intent.getBooleanExtra(org.arkikeskus.launcher.xposed.RecentsHook.EXTRA_TOGGLE, false)
+        if (toggle && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) leave()
+    }
+
     /** Recents is a passing screen: leaving it ends it, so it never waits in the background. */
     override fun onStop() {
         super.onStop()

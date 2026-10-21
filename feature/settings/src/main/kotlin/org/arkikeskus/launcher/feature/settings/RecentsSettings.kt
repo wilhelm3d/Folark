@@ -72,6 +72,19 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsReplaceSystem,
         )
         ExpressiveRowDivider()
+        if (s.recentsReplaceSystem) {
+            // The Vector (LSPosed) module asks Folark each time it acts: seen lately = active.
+            val seenAt = remember(s.recentsReplaceSystem) {
+                context.getSharedPreferences("folark_recents_hook", 0).getLong("seen_at", 0L)
+            }
+            val active = seenAt > 0L && System.currentTimeMillis() - seenAt < 7L * 24 * 3600 * 1000
+            ExpressiveActionItem(
+                title = stringResource(if (active) R.string.settings_recents_hook_active else R.string.settings_recents_hook_missing),
+                description = stringResource(if (active) R.string.settings_recents_hook_active_desc else R.string.settings_recents_hook_missing_desc),
+                onClick = { },
+            )
+            ExpressiveRowDivider()
+        }
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_taskbar_button),

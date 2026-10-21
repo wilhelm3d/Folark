@@ -117,13 +117,27 @@
         <!-- Folark Recents (Settings ▸ Recents): a passing screen over the wallpaper. -->
         <activity
             android:name=".recents.RecentsActivity"
-            android:exported="false"
+            android:exported="true"
+            android:permission="android.permission.START_TASKS_FROM_RECENTS"
             android:launchMode="singleTask"
             android:taskAffinity="org.arkikeskus.launcher.recents"
             android:excludeFromRecents="true"
             android:noHistory="false"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
             android:theme="@style/Theme.ArkikeskusLauncher.Recents" />
+
+        <!-- Folark's module for Vector (LSPosed): hands the system launcher's Recents over to Folark
+             Recents. Only active if you install Vector and enable Folark for the launcher there. -->
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription" android:value="@string/xposed_description" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <meta-data android:name="xposedscope" android:resource="@array/xposed_scope" />
+
+        <!-- Tells that module whether Settings ▸ Recents ▸ Replace Android's Recents is on (a yes/no only). -->
+        <provider
+            android:name=".xposed.RecentsHookState"
+            android:authorities="org.arkikeskus.launcher.recentshook"
+            android:exported="true" />
 
         <!-- Notification dots: the system binds this once the user grants notification access. -->
         <service

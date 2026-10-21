@@ -88,6 +88,8 @@ android {
 }
 
 dependencies {
+    // Vector (LSPosed) supplies the real Xposed classes inside the hooked launcher.
+    compileOnly(project(":xposed-api-stub"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:data"))
     implementation(project(":core:model"))

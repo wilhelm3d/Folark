@@ -7,3 +7,7 @@
 
 # Folark Recents with root: started by name through `app_process` (RootTasks.removeTask).
 -keep class org.arkikeskus.launcher.data.root.RootMain { public static void main(java.lang.String[]); }
+
+# Folark's Vector (LSPosed) module: named in assets/xposed_init, loaded inside the system launcher.
+-keep class org.arkikeskus.launcher.xposed.RecentsHook { *; }
+-dontwarn de.robv.android.xposed.**

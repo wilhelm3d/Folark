@@ -35,3 +35,5 @@ include(":core:ui")
 include(":feature:home")
 include(":feature:appdrawer")
 include(":feature:settings")
+// Compile-time stand-in for the Xposed API (Folark's Vector / LSPosed module); never packaged.
+include(":xposed-api-stub")
