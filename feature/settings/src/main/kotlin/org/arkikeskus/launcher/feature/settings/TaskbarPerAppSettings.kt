@@ -38,27 +38,27 @@ internal fun TaskbarPerAppRows(s: LauncherSettings, viewModel: SettingsViewModel
     var picking by remember { mutableStateOf<String?>(null) }
     ExpressiveActionItem(
         title = stringResource(R.string.settings_taskbar_hidden_apps),
-        description = countLabel(s.taskbarHiddenApps.size, R.string.settings_taskbar_hidden_apps_desc),
+        description = countLabel(s.taskbar.hiddenApps.size, R.string.settings_taskbar_hidden_apps_desc),
         onClick = { picking = HIDE },
     )
     ExpressiveRowDivider()
     ExpressiveActionItem(
         title = stringResource(R.string.settings_taskbar_always_apps),
-        description = countLabel(s.taskbarAlwaysApps.size, R.string.settings_taskbar_always_apps_desc),
+        description = countLabel(s.taskbar.alwaysApps.size, R.string.settings_taskbar_always_apps_desc),
         onClick = { picking = ALWAYS },
     )
     when (picking) {
         HIDE -> PackagePicker(
             title = stringResource(R.string.settings_taskbar_hidden_apps),
             apps = apps,
-            initial = s.taskbarHiddenApps,
+            initial = s.taskbar.hiddenApps,
             onDone = { viewModel.setTaskbarHiddenApps(it); picking = null },
             onDismiss = { picking = null },
         )
         ALWAYS -> PackagePicker(
             title = stringResource(R.string.settings_taskbar_always_apps),
             apps = apps,
-            initial = s.taskbarAlwaysApps,
+            initial = s.taskbar.alwaysApps,
             onDone = { viewModel.setTaskbarAlwaysApps(it); picking = null },
             onDismiss = { picking = null },
         )

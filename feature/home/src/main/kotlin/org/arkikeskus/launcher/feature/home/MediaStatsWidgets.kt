@@ -219,8 +219,8 @@ fun NowPlayingWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
     }
     val playing = watcher.nowPlaying
     val idle = playing == null && !watcher.accessDenied
-    FolarkWidgetSurface(theme = settings.mediaWidgetTheme, modifier = modifier, seeThrough = idle) { themeInk ->
-        val artBackground = settings.mediaWidgetArtwork && playing?.art != null
+    FolarkWidgetSurface(theme = settings.widgets.mediaTheme, modifier = modifier, seeThrough = idle) { themeInk ->
+        val artBackground = settings.widgets.mediaArtwork && playing?.art != null
         // Over cover art the text is always white on a dark veil, whatever the theme.
         val ink = if (artBackground) Color.White else themeInk
         if (artBackground) {
@@ -325,26 +325,26 @@ fun DeviceStatsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsVie
         viewModel.refreshStats()
     }
     val gauges = buildList {
-        if (settings.statsShowBattery) {
+        if (settings.widgets.statsShowBattery) {
             battery?.let {
                 add(StatGaugeData(stringResource(R.string.battery_widget_name), it.percent / 100f, launcherColors.batteryColor(it.percent), R.drawable.ic_stat_battery))
             }
         }
-        if (settings.statsShowStorage) {
+        if (settings.widgets.statsShowStorage) {
             add(StatGaugeData(stringResource(R.string.stats_widget_storage), stats.storageUsed, accent, R.drawable.ic_stat_storage))
         }
-        if (settings.statsShowMemory) {
+        if (settings.widgets.statsShowMemory) {
             add(StatGaugeData(stringResource(R.string.stats_widget_memory), stats.memoryUsed, accent, R.drawable.ic_stat_memory))
         }
-        if (settings.statsShowBluetooth) {
+        if (settings.widgets.statsShowBluetooth) {
             stats.bluetooth.forEach { (name, level) ->
                 add(StatGaugeData(name, level / 100f, launcherColors.batteryColor(level), R.drawable.ic_status_bluetooth))
             }
         }
     }
-    val needsBluetoothPermission = settings.statsShowBluetooth && stats.bluetoothNeedsPermission &&
+    val needsBluetoothPermission = settings.widgets.statsShowBluetooth && stats.bluetoothNeedsPermission &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    FolarkWidgetSurface(theme = settings.statsWidgetTheme, modifier = modifier) { ink ->
+    FolarkWidgetSurface(theme = settings.widgets.statsTheme, modifier = modifier) { ink ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
             val slots = gauges.size + if (needsBluetoothPermission) 1 else 0
             if (slots == 0) return@BoxWithConstraints

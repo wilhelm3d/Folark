@@ -67,6 +67,8 @@ data class AppDrawerUiState(
     val iconSizeScale: Float = 1f,
     /** Drawer folders shown as tabs (Settings ▸ App drawer): id to name, plus the open tab (null = All). */
     val folderTabsEnabled: Boolean = false,
+    /** An app in a tab is shown only there, not in "All" as well. */
+    val tabsExclusive: Boolean = true,
     val tabs: List<Pair<Long, String>> = emptyList(),
     val selectedTab: Long? = null,
     /** Search extras: matching app shortcuts, and whether to offer the "search the web" row. */
@@ -132,7 +134,7 @@ class AppDrawerViewModel @Inject constructor(
     val privateSpace: StateFlow<PrivateSpaceUi?> = combine(
         appRepository.privateSpace,
         appRepository.privateApps,
-        settingsRepository.settings(ScreenType.OUTER).map { it.showPrivateSpace }.distinctUntilChanged(),
+        settingsRepository.settings(ScreenType.OUTER).map { it.drawer.showPrivateSpace }.distinctUntilChanged(),
     ) { space, apps, show ->
         if (space == null || !show) null else PrivateSpaceUi(space.locked, if (space.locked) emptyList() else apps)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -170,60 +172,61 @@ class AppDrawerViewModel @Inject constructor(
         AppDrawerUiState(
             apps = apps,
             query = q,
-            columns = settings.drawerColumns,
-            rows = settings.drawerRows,
+            columns = settings.drawer.columns,
+            rows = settings.drawer.rows,
             dockKeys = favorites.filterTo(LinkedHashSet()) { it in installed },
-            dockColumns = settings.dockColumns,
+            dockColumns = settings.dock.columns,
             // Only apps placed directly on home (not folder rows or apps inside folders).
             homeKeys = homeItems
                 .filter { it.containerId == HomeItemEntity.HOME && !it.isFolder }
                 .map { it.key }
                 .toSet(),
-            showLabels = settings.showDrawerLabels,
-            showSearch = settings.showDrawerSearch,
-            showNotificationDots = settings.showNotificationDots,
-            notificationDotCount = settings.notificationDotCount,
-            notificationDotScale = settings.notificationDotScale,
-            useThemedIcons = settings.useThemedIcons,
-            iconPackPackage = settings.iconPackPackage,
-            iconShape = settings.iconShape,
-            desktopLocked = settings.desktopLocked,
-            floatingLaunchEnabled = settings.floatingLaunchEnabled,
-            splitLaunchEnabled = settings.splitLaunchEnabled,
-            iconSizeScale = settings.iconSizeScale,
-            folderTabsEnabled = settings.drawerFolderTabs,
-            searchWeb = settings.searchWeb,
-            showFrequentApps = settings.showFrequentApps,
-            appLabelTextScale = settings.appLabelTextScale,
-            twoLineLabels = settings.twoLineDrawerLabels,
-            drawerOpensAtTop = settings.drawerOpensAtTop,
-            drawerSearchPosition = settings.drawerSearchPosition,
-            drawerIndexBarEnabled = settings.drawerIndexBarEnabled,
-            azIndexPosition = settings.azIndexPosition,
-            azIndexScale = settings.azIndexScale,
-            drawerCornerRadius = settings.drawerCornerRadius,
-            drawerHandleStyle = settings.drawerHandleStyle,
-            drawerBottomSpace = settings.drawerBottomSpace,
-            drawerLetterHeaders = settings.drawerLetterHeaders,
-            drawerLargeLetterPopup = settings.drawerLargeLetterPopup,
-            drawerSwipeTabs = settings.drawerSwipeTabs,
-            drawerFlickClose = settings.drawerFlickClose,
-            drawerBackgroundBlur = settings.drawerBackgroundBlur,
-            drawerScrimOpacity = settings.drawerScrimOpacity,
-            glassBlurRadius = settings.glassBlurRadius,
-            glassDarkTint = settings.glassDarkTint,
-            drawerStyle = settings.drawerStyle,
-            drawerThemeTint = settings.drawerThemeTint,
-            drawerAccentColor = settings.drawerAccentColor,
-            drawerCustomColor = settings.drawerCustomColor,
-            drawerGlassEnabled = settings.drawerGlassEnabled,
-            drawerPanelOpacity = settings.drawerPanelOpacity,
-            drawerHeightFraction = settings.drawerHeightFraction,
-            drawerWidthFraction = settings.drawerWidthFraction,
-            drawerAlignment = settings.drawerAlignment,
-            drawerLayoutMode = settings.drawerLayoutMode,
-            dpiAppDrawer = settings.dpiAppDrawer,
-            innerSidebarAppDrawer = settings.innerSidebarAppDrawer,
+            showLabels = settings.drawer.showLabels,
+            showSearch = settings.drawer.showSearch,
+            showNotificationDots = settings.dots.enabled,
+            notificationDotCount = settings.dots.showCount,
+            notificationDotScale = settings.dots.scale,
+            useThemedIcons = settings.icons.useThemedIcons,
+            iconPackPackage = settings.icons.iconPack,
+            iconShape = settings.icons.shape,
+            desktopLocked = settings.home.desktopLocked,
+            floatingLaunchEnabled = settings.launch.floatingEnabled,
+            splitLaunchEnabled = settings.launch.splitEnabled,
+            iconSizeScale = settings.icons.sizeScale,
+            folderTabsEnabled = settings.drawer.folderTabs,
+            tabsExclusive = settings.drawer.tabsExclusive,
+            searchWeb = settings.search.web,
+            showFrequentApps = settings.drawer.showFrequentApps,
+            appLabelTextScale = settings.icons.labelTextScale,
+            twoLineLabels = settings.drawer.twoLineLabels,
+            drawerOpensAtTop = settings.drawer.opensAtTop,
+            drawerSearchPosition = settings.drawer.searchPosition,
+            drawerIndexBarEnabled = settings.drawer.indexBarEnabled,
+            azIndexPosition = settings.drawer.azIndexPosition,
+            azIndexScale = settings.drawer.azIndexScale,
+            drawerCornerRadius = settings.drawer.cornerRadius,
+            drawerHandleStyle = settings.drawer.handleStyle,
+            drawerBottomSpace = settings.drawer.bottomSpace,
+            drawerLetterHeaders = settings.drawer.letterHeaders,
+            drawerLargeLetterPopup = settings.drawer.largeLetterPopup,
+            drawerSwipeTabs = settings.drawer.swipeTabs,
+            drawerFlickClose = settings.drawer.flickClose,
+            drawerBackgroundBlur = settings.drawer.backgroundBlur,
+            drawerScrimOpacity = settings.drawer.scrimOpacity,
+            glassBlurRadius = settings.drawer.glassBlurRadius,
+            glassDarkTint = settings.drawer.glassDarkTint,
+            drawerStyle = settings.drawer.style,
+            drawerThemeTint = settings.drawer.themeTint,
+            drawerAccentColor = settings.drawer.accentColor,
+            drawerCustomColor = settings.drawer.customColor,
+            drawerGlassEnabled = settings.drawer.glassEnabled,
+            drawerPanelOpacity = settings.drawer.panelOpacity,
+            drawerHeightFraction = settings.drawer.heightFraction,
+            drawerWidthFraction = settings.drawer.widthFraction,
+            drawerAlignment = settings.drawer.alignment,
+            drawerLayoutMode = settings.drawer.layoutMode,
+            dpiAppDrawer = settings.appearance.dpiAppDrawer,
+            innerSidebarAppDrawer = settings.drawer.innerSidebar,
         )
     } }.combine(notificationBadgeRepository.badges) { state, badges ->
         state.copy(badges = badges)
@@ -236,9 +239,17 @@ class AppDrawerViewModel @Inject constructor(
         if (state.query.isNotBlank() || folders.isEmpty()) {
             state
         } else if (state.folderTabsEnabled) {
-            // Folders as tabs: "All" keeps every app in the list; a tab narrows it to that folder.
+            // Folders as tabs: a tab narrows the list to that folder; "All" shows the rest (or,
+            // with Apps in a tab leave All off, every app).
             val open = folders.firstOrNull { it.id == tab }
-            val shown = if (open == null) state.apps else {
+            val shown = if (open == null) {
+                if (state.tabsExclusive) {
+                    val inTabs = folders.flatMap { it.appKeys }.toSet()
+                    state.apps.filterNot { it.key in inTabs }
+                } else {
+                    state.apps
+                }
+            } else {
                 val byKey = state.apps.associateBy { it.key }
                 open.appKeys.mapNotNull { byKey[it] }
             }
@@ -323,13 +334,13 @@ class AppDrawerViewModel @Inject constructor(
 
     fun addToHome(appItem: AppItem) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.addToHome(appItem, s.homeColumns, s.homeRows, _screenType.value)
+        homeLayoutRepository.addToHome(appItem, s.home.columns, s.home.rows, _screenType.value)
     }
 
     /** Drag-and-drop from the drawer onto a specific home cell (free cell, or first free if taken). */
     fun addToHomeAt(appItem: AppItem, page: Int, cellX: Int, cellY: Int) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.homeColumns, s.homeRows, _screenType.value)
+        homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.home.columns, s.home.rows, _screenType.value)
     }
 
     fun removeFromHome(appItem: AppItem) = viewModelScope.launch { homeLayoutRepository.removeFromHome(appItem, _screenType.value) }
@@ -337,7 +348,7 @@ class AppDrawerViewModel @Inject constructor(
     /** Stores a pinned shortcut on home (system-level pin done by the caller, which has a Context). */
     fun addPinnedShortcut(packageName: String, shortcutId: String, userSerial: Long) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.homeColumns, s.homeRows, _screenType.value)
+        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.home.columns, s.home.rows, _screenType.value)
     }
 
     /** Pins [item] in the system (IO — the Binder round-trips must not run on the main thread) and

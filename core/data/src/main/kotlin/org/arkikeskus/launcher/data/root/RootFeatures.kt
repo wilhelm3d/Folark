@@ -19,17 +19,17 @@ object RootFeatures {
         private set
 
     fun update(s: LauncherSettings) {
-        RootShell.enabled = s.rootEnabled
-        lockMode = s.rootLockMode
-        recentsMode = s.rootRecentsMode
-        shadeMode = s.rootShadeMode
-        keep = if (!s.rootEnabled) emptySet() else buildSet {
-            if (s.rootKeepDump) add(RootGrants.DUMP)
-            if (s.rootKeepUsage) add(RootGrants.USAGE)
-            if (s.rootKeepSecureSettings) add(RootGrants.SECURE_SETTINGS)
-            if (s.rootKeepNotifications) add(RootGrants.NOTIFICATIONS)
-            if (s.rootKeepAccessibility) add(RootGrants.ACCESSIBILITY)
-            if (s.rootKeepWidgets) add(RootGrants.WIDGETS)
+        RootShell.enabled = s.root.enabled
+        lockMode = s.root.lockMode
+        recentsMode = s.root.recentsMode
+        shadeMode = s.root.shadeMode
+        keep = if (!s.root.enabled) emptySet() else buildSet {
+            if (s.root.keepDump) add(RootGrants.DUMP)
+            if (s.root.keepUsage) add(RootGrants.USAGE)
+            if (s.root.keepSecureSettings) add(RootGrants.SECURE_SETTINGS)
+            if (s.root.keepNotifications) add(RootGrants.NOTIFICATIONS)
+            if (s.root.keepAccessibility) add(RootGrants.ACCESSIBILITY)
+            if (s.root.keepWidgets) add(RootGrants.WIDGETS)
         }
     }
 }

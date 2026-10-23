@@ -162,7 +162,7 @@ internal fun MotorolaSection(s: LauncherSettings, viewModel: SettingsViewModel) 
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_moto_weather_tap),
                 subtitle = stringResource(R.string.settings_moto_weather_tap_desc),
-                checked = s.motoWeatherTap,
+                checked = s.widgets.motoWeatherTap,
                 onCheckedChange = viewModel::setMotoWeatherTap,
             )
         }

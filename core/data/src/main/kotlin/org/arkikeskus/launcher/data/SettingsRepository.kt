@@ -105,351 +105,339 @@ class SettingsRepository @Inject constructor(
         // store during development (e.g. homeColumns = 0) must never reach the layout math, where a
         // zero column count would spin firstFreeCell() in an infinite loop.
         LauncherSettings(
-            dockEnabled = p[Keys.dockEnabled(screenType)] ?: true,
-            dockColumns = (p[Keys.dockColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
-            homeColumns = (p[Keys.homeColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
-            homeRows = (p[Keys.homeRows(screenType)] ?: HomeLayoutRepository.ROWS).coerceIn(MIN_ROWS, MAX_ROWS),
-            drawerColumns = (p[Keys.drawerColumns(screenType)] ?: if (screenType == ScreenType.INNER) 6 else 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
-            drawerRows = (p[Keys.drawerRows(screenType)] ?: 6).coerceIn(MIN_DRAWER_ROWS, MAX_DRAWER_ROWS),
-            showDrawerSearch = p[Keys.showDrawerSearch(screenType)] ?: true,
-            showDockLabels = p[Keys.showDockLabels(screenType)] ?: false,
-            showHomeLabels = p[Keys.showHomeLabels(screenType)] ?: true,
-            showDrawerLabels = p[Keys.showDrawerLabels(screenType)] ?: true,
-            showFrequentApps = p[Keys.showFrequentApps(screenType)] ?: false,
-            drawerSearchPosition = (p[Keys.drawerSearchPosition(screenType)] ?: LauncherSettings.SEARCH_TOP)
-                .let { if (it == LauncherSettings.SEARCH_BOTTOM) it else LauncherSettings.SEARCH_TOP },
-            drawerIndexBarEnabled = p[Keys.drawerIndexBarEnabled(screenType)] ?: true,
-            azIndexScale = (p[Keys.azIndexScale(screenType)] ?: 1f).coerceIn(LauncherSettings.MIN_AZ_INDEX_SCALE, LauncherSettings.MAX_AZ_INDEX_SCALE),
-            drawerHandleStyle = if (p[Keys.drawerHandleStyle(screenType)] == LauncherSettings.DRAWER_HANDLE_ARROW) {
-                LauncherSettings.DRAWER_HANDLE_ARROW
-            } else LauncherSettings.DRAWER_HANDLE_BAR,
-            drawerBottomSpace = (p[Keys.drawerBottomSpace(screenType)] ?: 0).coerceIn(0, LauncherSettings.MAX_DRAWER_BOTTOM_SPACE),
-            drawerLetterHeaders = p[Keys.drawerLetterHeaders(screenType)] ?: false,
-            drawerLargeLetterPopup = p[Keys.drawerLargeLetterPopup(screenType)] ?: true,
-            drawerSwipeTabs = p[Keys.drawerSwipeTabs(screenType)] ?: true,
-            drawerFlickClose = p[Keys.drawerFlickClose(screenType)] ?: false,
-            forceThemedIcons = p[Keys.FORCE_THEMED_ICONS] ?: false,
-            themedIconStyle = (p[Keys.THEMED_ICON_STYLE] ?: LauncherSettings.THEMED_STYLE_CLASSIC)
-                .let { if (it in LauncherSettings.THEMED_STYLES) it else LauncherSettings.THEMED_STYLE_CLASSIC },
-            drawerCornerRadius = (p[Keys.drawerCornerRadius(screenType)] ?: LauncherSettings.DRAWER_CORNER_AUTO)
-                .coerceIn(LauncherSettings.DRAWER_CORNER_AUTO, LauncherSettings.MAX_DRAWER_CORNER_RADIUS),
-            azIndexPosition = (p[Keys.azIndexPosition(screenType)] ?: LauncherSettings.AZ_POSITION_VERTICAL_RIGHT).let {
-                if (it == LauncherSettings.AZ_POSITION_VERTICAL_LEFT ||
-                    it == LauncherSettings.AZ_POSITION_HORIZONTAL_TOP ||
-                    it == LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM) it
-                else LauncherSettings.AZ_POSITION_VERTICAL_RIGHT
-            },
-            drawerBackgroundBlur = (p[Keys.drawerBackgroundBlur(screenType)] ?: 0f).coerceIn(0f, 25f),
-            drawerScrimOpacity = (p[Keys.drawerScrimOpacity(screenType)] ?: 0.5f).coerceIn(0f, 1f),
-            glassBlurRadius = (p[Keys.glassBlurRadius(screenType)] ?: 25.0f).coerceIn(0f, 50f),
-            glassDarkTint = (p[Keys.glassDarkTint(screenType)] ?: 0.45f).coerceIn(0f, 0.9f),
-            drawerStyle = (p[Keys.drawerStyle(screenType)] ?: LauncherSettings.DRAWER_STYLE_STANDARD_GRID)
-                .let {
-                    if (it == LauncherSettings.DRAWER_STYLE_HORIZONTAL ||
-                        it == LauncherSettings.DRAWER_STYLE_ONE_UI ||
-                        it == LauncherSettings.DRAWER_STYLE_NOTHING_OS ||
-                        it == LauncherSettings.DRAWER_STYLE_VERTICAL ||
-                        it == LauncherSettings.DRAWER_STYLE_MOTO ||
-                        it == LauncherSettings.DRAWER_STYLE_STANDARD_GRID) it
-                    else LauncherSettings.DRAWER_STYLE_STANDARD_GRID
+            dock = LauncherSettings.Dock(
+                enabled = p[Keys.dockEnabled(screenType)] ?: true,
+                columns = (p[Keys.dockColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
+                showLabels = p[Keys.showDockLabels(screenType)] ?: false,
+                backgroundOpacity = (p[Keys.dockBackgroundOpacity(screenType)] ?: 0.35f).coerceIn(0f, 1f),
+                innerAlignment = (p[Keys.innerDockAlignment(screenType)] ?: LauncherSettings.DOCK_ALIGNMENT_CENTER).let {
+                    if (it == LauncherSettings.DOCK_ALIGNMENT_LEFT || it == LauncherSettings.DOCK_ALIGNMENT_RIGHT || it == LauncherSettings.DOCK_ALIGNMENT_FLOATING) it else LauncherSettings.DOCK_ALIGNMENT_CENTER
                 },
-            drawerThemeTint = (p[Keys.drawerThemeTint(screenType)] ?: LauncherSettings.DRAWER_THEME_SYSTEM)
-                .let { if (it in LauncherSettings.DRAWER_THEMES) it else LauncherSettings.DRAWER_THEME_SYSTEM },
-            drawerAccentColor = p[Keys.drawerAccentColor(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_ACCENT,
-            drawerCustomColor = p[Keys.drawerCustomColor(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_CUSTOM_COLOR,
-            drawerGlassEnabled = p[Keys.drawerGlassEnabled(screenType)] ?: false,
-            drawerPanelOpacity = (p[Keys.drawerPanelOpacity(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_PANEL_OPACITY)
-                .coerceIn(LauncherSettings.MIN_DRAWER_PANEL_OPACITY, LauncherSettings.MAX_DRAWER_PANEL_OPACITY),
-            drawerHeightFraction = (p[Keys.drawerHeightFraction(screenType)] ?: 1.0f).coerceIn(0.4f, 1.0f),
-            drawerWidthFraction = (p[Keys.drawerWidthFraction(screenType)] ?: 1.0f).coerceIn(0.4f, 1.0f),
-            drawerAlignment = (p[Keys.drawerAlignment(screenType)] ?: LauncherSettings.DRAWER_ALIGNMENT_CENTER).let {
-                if (it == LauncherSettings.DRAWER_ALIGNMENT_LEFT || it == LauncherSettings.DRAWER_ALIGNMENT_RIGHT) it else LauncherSettings.DRAWER_ALIGNMENT_CENTER
+            ),
+            home = LauncherSettings.Home(
+                columns = (p[Keys.homeColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
+                rows = (p[Keys.homeRows(screenType)] ?: HomeLayoutRepository.ROWS).coerceIn(MIN_ROWS, MAX_ROWS),
+                showLabels = p[Keys.showHomeLabels(screenType)] ?: true,
+                parallaxWallpaper = p[Keys.parallaxWallpaper(screenType)] ?: false,
+                showPageIndicator = p[Keys.showPageIndicator(screenType)] ?: true,
+                leftSwipeAppKey = p[Keys.leftSwipeAppKey(screenType)] ?: "",
+                rightSwipeAppKey = p[Keys.rightSwipeAppKey(screenType)] ?: "",
+                desktopLocked = p[Keys.DESKTOP_LOCKED] ?: false,
+                twoLineLabels = p[Keys.twoLineHomeLabels(screenType)] ?: false,
+                page = (p[Keys.homePage(screenType)] ?: 0).coerceIn(0, HomeLayoutRepository.MAX_PAGES),
+                pageCount = (p[Keys.homePageCount(screenType)] ?: 0).coerceIn(0, HomeLayoutRepository.MAX_PAGES),
+                allowLandscape = p[Keys.allowLandscape(screenType)] ?: false,
+                swipeDownAction = (p[Keys.swipeDownAction(screenType)] ?: LauncherSettings.GESTURE_NOTIFICATIONS).let {
+                    if (it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_RECENTS || it == LauncherSettings.GESTURE_NONE || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NOTIFICATIONS
+                },
+                doubleTapAction = (p[Keys.doubleTapAction(screenType)] ?: LauncherSettings.GESTURE_NONE).let {
+                    if (it == LauncherSettings.GESTURE_NOTIFICATIONS || it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_RECENTS || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NONE
+                },
+                swipeUpAction = (p[Keys.swipeUpAction(screenType)] ?: LauncherSettings.GESTURE_DRAWER).let {
+                    if (it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_NONE) it else LauncherSettings.GESTURE_DRAWER
+                },
+                minusOneScreen = p[Keys.MINUS_ONE_SCREEN] ?: LauncherSettings.MINUS_ONE_NONE,
+                pageBounceEnabled = p[Keys.pageBounceEnabled(screenType)] ?: true,
+                wallpaperDim = (p[Keys.homeWallpaperDim(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_DIM),
+                wallpaperBlur = (p[Keys.homeWallpaperBlur(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_BLUR),
+                backgroundImage = p[Keys.homeBackgroundImage(screenType)] ?: "",
+                iconSwipeUpAction = (p[Keys.iconSwipeUpAction(screenType)] ?: LauncherSettings.ICON_SWIPE_NONE).let { if (it in LauncherSettings.ICON_SWIPES) it else LauncherSettings.ICON_SWIPE_NONE },
+                autoRemoveEmptyPages = p[Keys.autoRemoveEmptyPages(screenType)] ?: false,
+                newPageOnDrag = p[Keys.newPageOnDrag(screenType)] ?: false,
+                pageScrollEffect = (p[Keys.PAGE_SCROLL_EFFECT] ?: LauncherSettings.PAGE_EFFECT_SLIDE)
+                    .let { if (it in LauncherSettings.PAGE_EFFECTS) it else LauncherSettings.PAGE_EFFECT_SLIDE },
+                innerDualPage = p[Keys.innerDualPageWorkspace(screenType)] ?: false,
+            ),
+            drawer = LauncherSettings.Drawer(
+                columns = (p[Keys.drawerColumns(screenType)] ?: if (screenType == ScreenType.INNER) 6 else 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
+                rows = (p[Keys.drawerRows(screenType)] ?: 6).coerceIn(MIN_DRAWER_ROWS, MAX_DRAWER_ROWS),
+                showSearch = p[Keys.showDrawerSearch(screenType)] ?: true,
+                showLabels = p[Keys.showDrawerLabels(screenType)] ?: true,
+                showFrequentApps = p[Keys.showFrequentApps(screenType)] ?: false,
+                searchPosition = (p[Keys.drawerSearchPosition(screenType)] ?: LauncherSettings.SEARCH_TOP)
+                    .let { if (it == LauncherSettings.SEARCH_BOTTOM) it else LauncherSettings.SEARCH_TOP },
+                indexBarEnabled = p[Keys.drawerIndexBarEnabled(screenType)] ?: true,
+                azIndexScale = (p[Keys.azIndexScale(screenType)] ?: 1f).coerceIn(LauncherSettings.MIN_AZ_INDEX_SCALE, LauncherSettings.MAX_AZ_INDEX_SCALE),
+                handleStyle = if (p[Keys.drawerHandleStyle(screenType)] == LauncherSettings.DRAWER_HANDLE_ARROW) {
+                    LauncherSettings.DRAWER_HANDLE_ARROW
+                } else LauncherSettings.DRAWER_HANDLE_BAR,
+                bottomSpace = (p[Keys.drawerBottomSpace(screenType)] ?: 0).coerceIn(0, LauncherSettings.MAX_DRAWER_BOTTOM_SPACE),
+                letterHeaders = p[Keys.drawerLetterHeaders(screenType)] ?: false,
+                largeLetterPopup = p[Keys.drawerLargeLetterPopup(screenType)] ?: true,
+                swipeTabs = p[Keys.drawerSwipeTabs(screenType)] ?: true,
+                flickClose = p[Keys.drawerFlickClose(screenType)] ?: false,
+                cornerRadius = (p[Keys.drawerCornerRadius(screenType)] ?: LauncherSettings.DRAWER_CORNER_AUTO)
+                    .coerceIn(LauncherSettings.DRAWER_CORNER_AUTO, LauncherSettings.MAX_DRAWER_CORNER_RADIUS),
+                azIndexPosition = (p[Keys.azIndexPosition(screenType)] ?: LauncherSettings.AZ_POSITION_VERTICAL_RIGHT).let {
+                    if (it == LauncherSettings.AZ_POSITION_VERTICAL_LEFT ||
+                        it == LauncherSettings.AZ_POSITION_HORIZONTAL_TOP ||
+                        it == LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM) it
+                    else LauncherSettings.AZ_POSITION_VERTICAL_RIGHT
+                },
+                backgroundBlur = (p[Keys.drawerBackgroundBlur(screenType)] ?: 0f).coerceIn(0f, 25f),
+                scrimOpacity = (p[Keys.drawerScrimOpacity(screenType)] ?: 0.5f).coerceIn(0f, 1f),
+                glassBlurRadius = (p[Keys.glassBlurRadius(screenType)] ?: 25.0f).coerceIn(0f, 50f),
+                glassDarkTint = (p[Keys.glassDarkTint(screenType)] ?: 0.45f).coerceIn(0f, 0.9f),
+                style = (p[Keys.drawerStyle(screenType)] ?: LauncherSettings.DRAWER_STYLE_STANDARD_GRID)
+                    .let {
+                        if (it == LauncherSettings.DRAWER_STYLE_HORIZONTAL ||
+                            it == LauncherSettings.DRAWER_STYLE_ONE_UI ||
+                            it == LauncherSettings.DRAWER_STYLE_NOTHING_OS ||
+                            it == LauncherSettings.DRAWER_STYLE_VERTICAL ||
+                            it == LauncherSettings.DRAWER_STYLE_MOTO ||
+                            it == LauncherSettings.DRAWER_STYLE_STANDARD_GRID) it
+                        else LauncherSettings.DRAWER_STYLE_STANDARD_GRID
+                    },
+                themeTint = (p[Keys.drawerThemeTint(screenType)] ?: LauncherSettings.DRAWER_THEME_SYSTEM)
+                    .let { if (it in LauncherSettings.DRAWER_THEMES) it else LauncherSettings.DRAWER_THEME_SYSTEM },
+                accentColor = p[Keys.drawerAccentColor(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_ACCENT,
+                customColor = p[Keys.drawerCustomColor(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_CUSTOM_COLOR,
+                glassEnabled = p[Keys.drawerGlassEnabled(screenType)] ?: false,
+                panelOpacity = (p[Keys.drawerPanelOpacity(screenType)] ?: LauncherSettings.DEFAULT_DRAWER_PANEL_OPACITY)
+                    .coerceIn(LauncherSettings.MIN_DRAWER_PANEL_OPACITY, LauncherSettings.MAX_DRAWER_PANEL_OPACITY),
+                heightFraction = (p[Keys.drawerHeightFraction(screenType)] ?: 1.0f).coerceIn(0.4f, 1.0f),
+                widthFraction = (p[Keys.drawerWidthFraction(screenType)] ?: 1.0f).coerceIn(0.4f, 1.0f),
+                alignment = (p[Keys.drawerAlignment(screenType)] ?: LauncherSettings.DRAWER_ALIGNMENT_CENTER).let {
+                    if (it == LauncherSettings.DRAWER_ALIGNMENT_LEFT || it == LauncherSettings.DRAWER_ALIGNMENT_RIGHT) it else LauncherSettings.DRAWER_ALIGNMENT_CENTER
+                },
+                layoutMode = (p[Keys.drawerLayoutMode(screenType)] ?: LauncherSettings.DRAWER_LAYOUT_GRID).let {
+                    if (it == LauncherSettings.DRAWER_LAYOUT_LIST) it else LauncherSettings.DRAWER_LAYOUT_GRID
+                },
+                opensAtTop = p[Keys.drawerOpensAtTop(screenType)] ?: true,
+                twoLineLabels = p[Keys.twoLineDrawerLabels(screenType)] ?: true,
+                folderTabs = p[Keys.drawerFolderTabs(screenType)] ?: false,
+                tabsExclusive = p[Keys.DRAWER_TABS_EXCLUSIVE] ?: true,
+                showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
+                innerSidebar = p[Keys.innerSidebarAppDrawer(screenType)] ?: false,
+            ),
+            search = LauncherSettings.Search(
+                contacts = p[Keys.SEARCH_CONTACTS] ?: false,
+                shortcuts = p[Keys.SEARCH_SHORTCUTS] ?: true,
+                web = p[Keys.SEARCH_WEB] ?: true,
+                actions = p[Keys.SEARCH_ACTIONS] ?: true,
+            ),
+            icons = LauncherSettings.Icons(
+                forceThemedIcons = p[Keys.FORCE_THEMED_ICONS] ?: false,
+                themedIconStyle = (p[Keys.THEMED_ICON_STYLE] ?: LauncherSettings.THEMED_STYLE_CLASSIC)
+                    .let { if (it in LauncherSettings.THEMED_STYLES) it else LauncherSettings.THEMED_STYLE_CLASSIC },
+                useThemedIcons = p[Keys.useThemedIcons(screenType)] ?: false,
+                iconPack = p[Keys.iconPackPackage(screenType)] ?: "",
+                labelTextScale = (p[Keys.appLabelTextScale(screenType)] ?: 1.0f).coerceIn(MIN_LABEL_SCALE, MAX_LABEL_SCALE),
+                labelColor = p[Keys.appLabelColor(screenType)] ?: 0xFFFFFFFF.toInt(),
+                sizeScale = (p[Keys.iconSizeScale(screenType)] ?: 1.0f)
+                    .coerceIn(LauncherSettings.MIN_ICON_SIZE_SCALE, LauncherSettings.MAX_ICON_SIZE_SCALE),
+                shape = (p[Keys.ICON_SHAPE] ?: LauncherSettings.ICON_SHAPE_SYSTEM)
+                    .let { if (it in LauncherSettings.ICON_SHAPES) it else LauncherSettings.ICON_SHAPE_SYSTEM },
+                nudge = p[Keys.ICON_NUDGE] ?: true,
+                nudgeTaskbar = p[Keys.ICON_NUDGE_TASKBAR] ?: true,
+                nudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
+                    .let { if (it in LauncherSettings.NUDGE_EFFECTS) it else LauncherSettings.NUDGE_BOUNCE },
+                nudgeSoftness = (p[Keys.ICON_NUDGE_SOFTNESS] ?: 0.5f).coerceIn(0f, 1f),
+            ),
+            dots = LauncherSettings.Dots(
+                enabled = p[Keys.showNotificationDots(screenType)] ?: true,
+                showCount = p[Keys.notificationDotCount(screenType)] ?: true,
+                scale = (p[Keys.notificationDotScale(screenType)] ?: 1.0f).coerceIn(MIN_DOT_SCALE, MAX_DOT_SCALE),
+                shape = (p[Keys.dotShape(screenType)] ?: LauncherSettings.DOT_SHAPE_CIRCLE).let { if (it in LauncherSettings.DOT_SHAPES) it else LauncherSettings.DOT_SHAPE_CIRCLE },
+                color = (p[Keys.dotColor(screenType)] ?: LauncherSettings.DOT_COLOR_RED).let { if (it in LauncherSettings.DOT_COLORS) it else LauncherSettings.DOT_COLOR_RED },
+                position = (p[Keys.dotPosition(screenType)] ?: LauncherSettings.DOT_POSITION_TOP_END).let { if (it in LauncherSettings.DOT_POSITIONS) it else LauncherSettings.DOT_POSITION_TOP_END },
+                avatars = p[Keys.DOT_AVATARS] ?: true,
+            ),
+            folders = LauncherSettings.Folders(
+                shape = (p[Keys.folderShape(screenType)] ?: LauncherSettings.FOLDER_SHAPE_SQUIRCLE)
+                    .let { if (it in LauncherSettings.FOLDER_SHAPES) it else LauncherSettings.FOLDER_SHAPE_SQUIRCLE },
+                theme = (p[Keys.folderTheme(screenType)] ?: LauncherSettings.FOLDER_THEME_GLASS)
+                    .let { if (it in LauncherSettings.FOLDER_THEMES) it else LauncherSettings.FOLDER_THEME_GLASS },
+                preview = (p[Keys.folderPreview(screenType)] ?: LauncherSettings.FOLDER_PREVIEW_GRID_2)
+                    .let { if (it in LauncherSettings.FOLDER_PREVIEWS) it else LauncherSettings.FOLDER_PREVIEW_GRID_2 },
+                openColumns = (p[Keys.folderOpenColumns(screenType)] ?: 4)
+                    .coerceIn(LauncherSettings.MIN_FOLDER_OPEN_COLUMNS, LauncherSettings.MAX_FOLDER_OPEN_COLUMNS),
+                openSize = (p[Keys.folderOpenSize(screenType)] ?: LauncherSettings.FOLDER_OPEN_MEDIUM)
+                    .let { if (it in LauncherSettings.FOLDER_OPEN_SIZES) it else LauncherSettings.FOLDER_OPEN_MEDIUM },
+                tapFirstApp = p[Keys.folderTapFirstApp(screenType)] ?: false,
+                openAnimation = (p[Keys.FOLDER_OPEN_ANIMATION] ?: LauncherSettings.FOLDER_ANIM_SHEET)
+                    .let { if (it in LauncherSettings.FOLDER_ANIMS) it else LauncherSettings.FOLDER_ANIM_SHEET },
+            ),
+            widgets = LauncherSettings.Widgets(
+                showWeather = p[Keys.showWeather(screenType)] ?: true,
+                tonalBackground = p[Keys.widgetTonalBackground(screenType)] ?: false,
+                notificationCountStyle = (p[Keys.notificationWidgetCountStyle(screenType)] ?: LauncherSettings.COUNT_NUMBER)
+                    .let { if (it == LauncherSettings.COUNT_DOT || it == LauncherSettings.COUNT_NONE) it else LauncherSettings.COUNT_NUMBER },
+                peoplePrivacy = (p[Keys.PEOPLE_PRIVACY] ?: LauncherSettings.PRIVACY_ALL).let {
+                    if (it == LauncherSettings.PRIVACY_SENDER || it == LauncherSettings.PRIVACY_COUNT) it
+                    else LauncherSettings.PRIVACY_ALL
+                },
+                peopleBatchEnabled = p[Keys.PEOPLE_BATCH_ENABLED] ?: false,
+                peopleShowApps = p[Keys.PEOPLE_SHOW_APPS] ?: true,
+                peopleBatchTimes = (p[Keys.PEOPLE_BATCH_TIMES] ?: LauncherSettings.DEFAULT_BATCH_TIMES)
+                    .let { BatchSchedule.parse(it) }
+                    .let { if (it.isEmpty()) LauncherSettings.DEFAULT_BATCH_TIMES else BatchSchedule.format(it) },
+                stackAutoRotateSeconds = (p[Keys.stackAutoRotateSeconds(screenType)] ?: 0).coerceIn(0, LauncherSettings.MAX_STACK_AUTO_ROTATE_SECONDS),
+                stackCornerRadius = (p[Keys.stackCornerRadius(screenType)] ?: 24).coerceIn(0, LauncherSettings.MAX_STACK_CORNER_RADIUS),
+                stackIndicator = (p[Keys.stackIndicator(screenType)] ?: LauncherSettings.STACK_INDICATOR_DOTS).let { if (it in LauncherSettings.STACK_INDICATORS) it else LauncherSettings.STACK_INDICATOR_DOTS },
+                stackShowPill = p[Keys.stackShowPill(screenType)] ?: false,
+                mediaTheme = (p[Keys.MEDIA_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                    .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+                appsTheme = (p[Keys.APPS_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                    .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+                statsTheme = (p[Keys.STATS_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                    .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+                noteTheme = (p[Keys.NOTE_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
+                    .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
+                mediaArtwork = p[Keys.MEDIA_WIDGET_ARTWORK] ?: true,
+                appsLabels = p[Keys.APPS_WIDGET_LABELS] ?: false,
+                statsShowBattery = p[Keys.STATS_SHOW_BATTERY] ?: true,
+                statsShowStorage = p[Keys.STATS_SHOW_STORAGE] ?: true,
+                statsShowMemory = p[Keys.STATS_SHOW_MEMORY] ?: true,
+                statsShowBluetooth = p[Keys.STATS_SHOW_BLUETOOTH] ?: true,
+                noteTextSize = (p[Keys.NOTE_WIDGET_TEXT_SIZE] ?: LauncherSettings.FOLDER_OPEN_MEDIUM)
+                    .let { if (it in LauncherSettings.FOLDER_OPEN_SIZES) it else LauncherSettings.FOLDER_OPEN_MEDIUM },
+                noteText = p[Keys.NOTE_WIDGET_TEXT] ?: "",
+                motoWeatherTap = p[Keys.MOTO_WEATHER_TAP] ?: true,
+                weatherAnimated = p[Keys.WEATHER_WIDGET_ANIMATED] ?: true,
+                clockDarkText = p[Keys.CLOCK_WIDGET_DARK_TEXT] ?: false,
+                clockGlassEffect = p[Keys.CLOCK_WIDGET_GLASS_EFFECT] ?: true,
+                clockMinuteColor = (p[Keys.CLOCK_MINUTE_COLOR] ?: LauncherSettings.CLOCK_MINUTE_STYLE).let {
+                    if (it in LauncherSettings.CLOCK_MINUTE_COLORS) it else LauncherSettings.CLOCK_MINUTE_STYLE
+                },
+                clockMinuteOpacity = (p[Keys.CLOCK_MINUTE_OPACITY] ?: 1f).coerceIn(0.1f, 1f),
+                clockStyle = (p[Keys.CLOCK_WIDGET_STYLE] ?: LauncherSettings.CLOCK_STYLE_CLASSIC)
+                    .let { if (it in LauncherSettings.CLOCK_STYLES) it else LauncherSettings.CLOCK_STYLE_CLASSIC },
+                backgroundOpacity = (p[Keys.WIDGET_BACKGROUND_OPACITY] ?: 0f).coerceIn(0f, 1f),
+            ),
+            statusBar = LauncherSettings.StatusBar(
+                enabled = p[Keys.showStatusBar(screenType)] ?: false,
+                hideSystem = p[Keys.hideSystemStatusBar(screenType)] ?: false,
+                scrimOpacity = (p[Keys.statusBarScrimOpacity(screenType)] ?: 0.6f).coerceIn(0f, 1f),
+            ),
+            fold = LauncherSettings.Fold(
+                halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
+                hingeTilt = p[Keys.HINGE_TILT] ?: true,
+                foldAction = (p[Keys.foldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
+                    if (it == LauncherSettings.ACTION_PAGE_0 || it == LauncherSettings.ACTION_LOCK) it else LauncherSettings.ACTION_STAY
+                },
+                unfoldAction = (p[Keys.unfoldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
+                    if (it == LauncherSettings.ACTION_SEARCH || it == LauncherSettings.ACTION_DRAWER) it else LauncherSettings.ACTION_STAY
+                },
+                transitionSpeed = (p[Keys.foldTransitionSpeed(screenType)] ?: 1f)
+                    .coerceIn(LauncherSettings.MIN_FOLD_TRANSITION_SPEED, LauncherSettings.MAX_FOLD_TRANSITION_SPEED),
+                transitionStyle = (p[Keys.foldTransitionStyle(screenType)] ?: LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP).let {
+                    if (it == LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP ||
+                        it == LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE ||
+                        it == LauncherSettings.TRANSITION_CROSSFADE ||
+                        it == LauncherSettings.TRANSITION_SCALE ||
+                        it == LauncherSettings.TRANSITION_SLIDE ||
+                        it == LauncherSettings.TRANSITION_LIVE_HINGE ||
+                        it == LauncherSettings.TRANSITION_MORPH_SCALE_FADE) it else LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP
+                },
+                liveHingeEndAngle = (p[Keys.LIVE_HINGE_END_ANGLE] ?: 165).coerceIn(LauncherSettings.MIN_LIVE_HINGE_END_ANGLE, 180),
+                liveHingeSmoothingMs = (p[Keys.LIVE_HINGE_SMOOTHING] ?: 50).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_SMOOTHING_MS),
+                liveHingeStyle = (p[Keys.LIVE_HINGE_STYLE] ?: LauncherSettings.LIVE_HINGE_STYLE_PAGES)
+                    .let { if (it in LauncherSettings.LIVE_HINGE_STYLES) it else LauncherSettings.LIVE_HINGE_STYLE_PAGES },
+                liveHingeOuterStyle = (p[Keys.LIVE_HINGE_OUTER_STYLE] ?: LauncherSettings.LIVE_HINGE_STYLE_WATER)
+                    .let { if (it in LauncherSettings.LIVE_HINGE_STYLES) it else LauncherSettings.LIVE_HINGE_STYLE_WATER },
+                liveHingeBlurDp = (p[Keys.LIVE_HINGE_BLUR] ?: 24).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_BLUR_DP),
+                liveHingeFrost = (p[Keys.LIVE_HINGE_FROST] ?: 0.2f).coerceIn(0f, LauncherSettings.MAX_LIVE_HINGE_FROST),
+            ),
+            motion = LauncherSettings.Motion(
+                aquamorphicTouchEnabled = p[Keys.aquamorphicTouchEnabled(screenType)] ?: true,
+                appLaunchZoomEnabled = p[Keys.appLaunchZoomEnabled(screenType)] ?: true,
+                animationSpeed = (p[Keys.ANIMATION_SPEED] ?: 1f).coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED),
+                appOpenAnimation = (p[Keys.APP_OPEN_ANIMATION] ?: LauncherSettings.APP_OPEN_ICON)
+                    .let { if (it in LauncherSettings.APP_OPENS) it else LauncherSettings.APP_OPEN_ICON },
+                unlockTransition = p[Keys.UNLOCK_TRANSITION] ?: true,
+                unlockSystemHook = p[Keys.UNLOCK_SYSTEM_HOOK] ?: true,
+                unlockStyle = (p[Keys.UNLOCK_STYLE] ?: LauncherSettings.UNLOCK_STYLE_DISPLAY)
+                    .let { if (it in LauncherSettings.UNLOCK_STYLES) it else LauncherSettings.UNLOCK_STYLE_DISPLAY },
+                batterySaverMode = when (p[Keys.BATTERY_SAVER_MODE]) {
+                    LauncherSettings.BATTERY_SAVER_OFF -> LauncherSettings.BATTERY_SAVER_OFF
+                    LauncherSettings.BATTERY_SAVER_ON -> LauncherSettings.BATTERY_SAVER_ON
+                    else -> LauncherSettings.BATTERY_SAVER_AUTO
+                },
+            ),
+            appearance = LauncherSettings.Appearance(
+                amoledDark = p[Keys.amoledDark(screenType)] ?: false,
+                popupTheme = (p[Keys.popupTheme(screenType)] ?: LauncherSettings.POPUP_THEME_CLASSIC).let { if (it in LauncherSettings.POPUP_THEMES) it else LauncherSettings.POPUP_THEME_CLASSIC },
+                settingsStyle = p[Keys.SETTINGS_STYLE] ?: LauncherSettings.SETTINGS_STYLE_STUDIO,
+                liquidGlassEverywhere = p[Keys.LIQUID_GLASS_EVERYWHERE] ?: false,
+                liquidGlassLevel = (p[Keys.LIQUID_GLASS_LEVEL] ?: 0.5f).coerceIn(0f, 1f),
+                fontFamily = (p[Keys.appFontFamily(screenType)] ?: LauncherSettings.FONT_FAMILY_DEFAULT).let {
+                    if (it in LauncherSettings.FONT_FAMILIES) it else LauncherSettings.FONT_FAMILY_DEFAULT
+                },
+                fontBold = p[Keys.appFontBold(screenType)] ?: false,
+                fontSizeScale = (p[Keys.appFontSizeScale(screenType)] ?: 1.0f).coerceIn(0.7f, 1.4f),
+                dpiWorkspace = (p[Keys.dpiWorkspace(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
+                dpiAppDrawer = (p[Keys.dpiAppDrawer(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
+                dpiSettings = (p[Keys.dpiSettings(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
+            ),
+            taskbar = LauncherSettings.Taskbar(
+                enabled = p[Keys.TASKBAR_ENABLED] ?: false,
+                pinnedApps = p[Keys.TASKBAR_PINNED]?.split("\n")?.filter { it.isNotEmpty() },
+                recentCount = (p[Keys.TASKBAR_RECENTS] ?: 4).coerceIn(0, 6),
+                iconSize = (p[Keys.TASKBAR_ICON_SIZE] ?: 48).coerceIn(32, 72),
+                iconSpacing = (p[Keys.TASKBAR_SPACING] ?: 8).coerceIn(0, 24),
+                bottomOffset = (p[Keys.TASKBAR_BOTTOM] ?: 12).coerceIn(0, 64),
+                theme = (p[Keys.TASKBAR_THEME] ?: LauncherSettings.TASKBAR_THEME_CLEAR).let {
+                    if (it in LauncherSettings.TASKBAR_THEMES) it else LauncherSettings.TASKBAR_THEME_CLEAR
+                },
+                opacity = (p[Keys.TASKBAR_OPACITY] ?: 0.8f).coerceIn(0.1f, 1f),
+                handles = p[Keys.TASKBAR_HANDLES] ?: LauncherSettings.TASKBAR_HANDLES_BOTH,
+                onHome = p[Keys.TASKBAR_ON_HOME] ?: true,
+                keepOpen = p[Keys.TASKBAR_KEEP_OPEN] ?: false,
+                mediaEnabled = p[Keys.TASKBAR_MEDIA] ?: true,
+                mediaShowPaused = p[Keys.TASKBAR_MEDIA_PAUSED] ?: true,
+                mediaPosition = p[Keys.TASKBAR_MEDIA_POSITION] ?: LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE,
+                mediaTap = p[Keys.TASKBAR_MEDIA_TAP] ?: LauncherSettings.TASKBAR_MEDIA_TAP_OPEN,
+                mediaControls = p[Keys.TASKBAR_MEDIA_CONTROLS] ?: true,
+                mediaShape = p[Keys.TASKBAR_MEDIA_SHAPE] ?: LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE,
+                mediaBadge = p[Keys.TASKBAR_MEDIA_BADGE] ?: true,
+                systemDrag = p[Keys.TASKBAR_SYSTEM_DRAG] ?: true,
+                recentsButton = p[Keys.TASKBAR_RECENTS_BUTTON] ?: LauncherSettings.TASKBAR_RECENTS_SYSTEM,
+                quickSwitch = p[Keys.TASKBAR_QUICK_SWITCH] ?: true,
+                splitControls = p[Keys.TASKBAR_SPLIT_CONTROLS] ?: true,
+                splitSide = p[Keys.TASKBAR_SPLIT_SIDE] ?: LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT,
+                threeApp = p[Keys.TASKBAR_THREE_APP] ?: true,
+                hideFullScreen = p[Keys.TASKBAR_HIDE_FULL_SCREEN] ?: true,
+                runningApps = p[Keys.TASKBAR_RUNNING_APPS] ?: false,
+                runningDots = p[Keys.TASKBAR_RUNNING_DOTS] ?: true,
+                hiddenApps = lines(p[Keys.TASKBAR_HIDDEN_APPS]),
+                alwaysApps = lines(p[Keys.TASKBAR_ALWAYS_APPS]),
+                handleHint = p[Keys.TASKBAR_HANDLE_HINT] ?: true,
+                source = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
+                    LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
+                systemMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
+                pinnedPairs = p[Keys.TASKBAR_PAIRS]?.split("\n")?.filter { it.isNotEmpty() }.orEmpty(),
+            ),
+            live = LauncherSettings.Live(
+                popupNotifications = p[Keys.POPUP_NOTIFICATIONS] ?: true,
+                activities = p[Keys.LIVE_ACTIVITIES] ?: true,
+                activitiesTaskbar = p[Keys.LIVE_ACTIVITIES_TASKBAR] ?: true,
+                expandOnLongPress = p[Keys.LIVE_EXPAND] ?: true,
+                activityEffect = (p[Keys.LIVE_ACTIVITY_EFFECT] ?: LauncherSettings.LIVE_EFFECT_GLOW)
+                    .let { if (it in LauncherSettings.LIVE_EFFECTS) it else LauncherSettings.LIVE_EFFECT_GLOW },
+            ),
+            recents = readRecents(p).let { r ->
+                if (p[Keys.RECENTS_OUTER_LOOK] == true) r.copy(outerLookEnabled = true, outerLook = readRecents(coverLook(p))) else r
             },
-            parallaxWallpaper = p[Keys.parallaxWallpaper(screenType)] ?: false,
-            drawerLayoutMode = (p[Keys.drawerLayoutMode(screenType)] ?: LauncherSettings.DRAWER_LAYOUT_GRID).let {
-                if (it == LauncherSettings.DRAWER_LAYOUT_LIST) it else LauncherSettings.DRAWER_LAYOUT_GRID
-            },
-            dockBackgroundOpacity = (p[Keys.dockBackgroundOpacity(screenType)] ?: 0.35f).coerceIn(0f, 1f),
-            showPageIndicator = p[Keys.showPageIndicator(screenType)] ?: true,
-            showNotificationDots = p[Keys.showNotificationDots(screenType)] ?: true,
-            notificationDotCount = p[Keys.notificationDotCount(screenType)] ?: true,
-            notificationDotScale = (p[Keys.notificationDotScale(screenType)] ?: 1.0f).coerceIn(MIN_DOT_SCALE, MAX_DOT_SCALE),
-            useThemedIcons = p[Keys.useThemedIcons(screenType)] ?: false,
-            iconPackPackage = p[Keys.iconPackPackage(screenType)] ?: "",
-            searchContacts = p[Keys.SEARCH_CONTACTS] ?: false,
-            leftSwipeAppKey = p[Keys.leftSwipeAppKey(screenType)] ?: "",
-            rightSwipeAppKey = p[Keys.rightSwipeAppKey(screenType)] ?: "",
-            desktopLocked = p[Keys.DESKTOP_LOCKED] ?: false,
-            drawerOpensAtTop = p[Keys.drawerOpensAtTop(screenType)] ?: true,
-            appLabelTextScale = (p[Keys.appLabelTextScale(screenType)] ?: 1.0f).coerceIn(MIN_LABEL_SCALE, MAX_LABEL_SCALE),
-            twoLineHomeLabels = p[Keys.twoLineHomeLabels(screenType)] ?: false,
-            twoLineDrawerLabels = p[Keys.twoLineDrawerLabels(screenType)] ?: true,
-            appLabelColor = p[Keys.appLabelColor(screenType)] ?: 0xFFFFFFFF.toInt(),
-            showStatusBar = p[Keys.showStatusBar(screenType)] ?: false,
-            showWeather = p[Keys.showWeather(screenType)] ?: true,
-            hideSystemStatusBar = p[Keys.hideSystemStatusBar(screenType)] ?: false,
-            statusBarScrimOpacity = (p[Keys.statusBarScrimOpacity(screenType)] ?: 0.6f).coerceIn(0f, 1f),
-            widgetTonalBackground = p[Keys.widgetTonalBackground(screenType)] ?: false,
-            notificationWidgetCountStyle = (p[Keys.notificationWidgetCountStyle(screenType)] ?: LauncherSettings.COUNT_NUMBER)
-                .let { if (it == LauncherSettings.COUNT_DOT || it == LauncherSettings.COUNT_NONE) it else LauncherSettings.COUNT_NUMBER },
-            peoplePrivacy = (p[Keys.PEOPLE_PRIVACY] ?: LauncherSettings.PRIVACY_ALL).let {
-                if (it == LauncherSettings.PRIVACY_SENDER || it == LauncherSettings.PRIVACY_COUNT) it
-                else LauncherSettings.PRIVACY_ALL
-            },
-            peopleBatchEnabled = p[Keys.PEOPLE_BATCH_ENABLED] ?: false,
-            peopleShowApps = p[Keys.PEOPLE_SHOW_APPS] ?: true,
-            homePage = (p[Keys.homePage(screenType)] ?: 0).coerceIn(0, HomeLayoutRepository.MAX_PAGES),
-            homePageCount = (p[Keys.homePageCount(screenType)] ?: 0).coerceIn(0, HomeLayoutRepository.MAX_PAGES),
-            peopleBatchTimes = (p[Keys.PEOPLE_BATCH_TIMES] ?: LauncherSettings.DEFAULT_BATCH_TIMES)
-                .let { BatchSchedule.parse(it) }
-                .let { if (it.isEmpty()) LauncherSettings.DEFAULT_BATCH_TIMES else BatchSchedule.format(it) },
-            allowLandscape = p[Keys.allowLandscape(screenType)] ?: false,
-            swipeDownAction = (p[Keys.swipeDownAction(screenType)] ?: LauncherSettings.GESTURE_NOTIFICATIONS).let {
-                if (it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_RECENTS || it == LauncherSettings.GESTURE_NONE || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NOTIFICATIONS
-            },
-            doubleTapAction = (p[Keys.doubleTapAction(screenType)] ?: LauncherSettings.GESTURE_NONE).let {
-                if (it == LauncherSettings.GESTURE_NOTIFICATIONS || it == LauncherSettings.GESTURE_DRAWER || it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_LOCK || it == LauncherSettings.GESTURE_RECENTS || it in LauncherSettings.MOTO_GESTURES) it else LauncherSettings.GESTURE_NONE
-            },
-            swipeUpAction = (p[Keys.swipeUpAction(screenType)] ?: LauncherSettings.GESTURE_DRAWER).let {
-                if (it == LauncherSettings.GESTURE_SEARCH || it == LauncherSettings.GESTURE_NONE) it else LauncherSettings.GESTURE_DRAWER
-            },
-            halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
-            hingeTilt = p[Keys.HINGE_TILT] ?: true,
-            splitLaunchEnabled = p[Keys.SPLIT_LAUNCH_ENABLED] ?: true,
-            floatingLaunchEnabled = p[Keys.FLOATING_LAUNCH_ENABLED] ?: true,
-            minusOneScreen = p[Keys.MINUS_ONE_SCREEN] ?: LauncherSettings.MINUS_ONE_NONE,
-            amoledDark = p[Keys.amoledDark(screenType)] ?: false,
-            foldAction = (p[Keys.foldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
-                if (it == LauncherSettings.ACTION_PAGE_0 || it == LauncherSettings.ACTION_LOCK) it else LauncherSettings.ACTION_STAY
-            },
-            unfoldAction = (p[Keys.unfoldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
-                if (it == LauncherSettings.ACTION_SEARCH || it == LauncherSettings.ACTION_DRAWER) it else LauncherSettings.ACTION_STAY
-            },
-            foldTransitionSpeed = (p[Keys.foldTransitionSpeed(screenType)] ?: 1f)
-                .coerceIn(LauncherSettings.MIN_FOLD_TRANSITION_SPEED, LauncherSettings.MAX_FOLD_TRANSITION_SPEED),
-            foldTransitionStyle = (p[Keys.foldTransitionStyle(screenType)] ?: LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP).let {
-                if (it == LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP ||
-                    it == LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE ||
-                    it == LauncherSettings.TRANSITION_CROSSFADE ||
-                    it == LauncherSettings.TRANSITION_SCALE ||
-                    it == LauncherSettings.TRANSITION_SLIDE ||
-                    it == LauncherSettings.TRANSITION_LIVE_HINGE ||
-                    it == LauncherSettings.TRANSITION_MORPH_SCALE_FADE) it else LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP
-            },
-            aquamorphicTouchEnabled = p[Keys.aquamorphicTouchEnabled(screenType)] ?: true,
-            appLaunchZoomEnabled = p[Keys.appLaunchZoomEnabled(screenType)] ?: true,
-            pageBounceEnabled = p[Keys.pageBounceEnabled(screenType)] ?: true,
-            iconSizeScale = (p[Keys.iconSizeScale(screenType)] ?: 1.0f)
-                .coerceIn(LauncherSettings.MIN_ICON_SIZE_SCALE, LauncherSettings.MAX_ICON_SIZE_SCALE),
-            folderShape = (p[Keys.folderShape(screenType)] ?: LauncherSettings.FOLDER_SHAPE_SQUIRCLE)
-                .let { if (it in LauncherSettings.FOLDER_SHAPES) it else LauncherSettings.FOLDER_SHAPE_SQUIRCLE },
-            folderTheme = (p[Keys.folderTheme(screenType)] ?: LauncherSettings.FOLDER_THEME_GLASS)
-                .let { if (it in LauncherSettings.FOLDER_THEMES) it else LauncherSettings.FOLDER_THEME_GLASS },
-            folderPreview = (p[Keys.folderPreview(screenType)] ?: LauncherSettings.FOLDER_PREVIEW_GRID_2)
-                .let { if (it in LauncherSettings.FOLDER_PREVIEWS) it else LauncherSettings.FOLDER_PREVIEW_GRID_2 },
-            folderOpenColumns = (p[Keys.folderOpenColumns(screenType)] ?: 4)
-                .coerceIn(LauncherSettings.MIN_FOLDER_OPEN_COLUMNS, LauncherSettings.MAX_FOLDER_OPEN_COLUMNS),
-            folderOpenSize = (p[Keys.folderOpenSize(screenType)] ?: LauncherSettings.FOLDER_OPEN_MEDIUM)
-                .let { if (it in LauncherSettings.FOLDER_OPEN_SIZES) it else LauncherSettings.FOLDER_OPEN_MEDIUM },
-            folderTapFirstApp = p[Keys.folderTapFirstApp(screenType)] ?: false,
-            popupTheme = (p[Keys.popupTheme(screenType)] ?: LauncherSettings.POPUP_THEME_CLASSIC).let { if (it in LauncherSettings.POPUP_THEMES) it else LauncherSettings.POPUP_THEME_CLASSIC },
-            stackAutoRotateSeconds = (p[Keys.stackAutoRotateSeconds(screenType)] ?: 0).coerceIn(0, LauncherSettings.MAX_STACK_AUTO_ROTATE_SECONDS),
-            stackCornerRadius = (p[Keys.stackCornerRadius(screenType)] ?: 24).coerceIn(0, LauncherSettings.MAX_STACK_CORNER_RADIUS),
-            stackIndicator = (p[Keys.stackIndicator(screenType)] ?: LauncherSettings.STACK_INDICATOR_DOTS).let { if (it in LauncherSettings.STACK_INDICATORS) it else LauncherSettings.STACK_INDICATOR_DOTS },
-            stackShowPill = p[Keys.stackShowPill(screenType)] ?: false,
-            dotShape = (p[Keys.dotShape(screenType)] ?: LauncherSettings.DOT_SHAPE_CIRCLE).let { if (it in LauncherSettings.DOT_SHAPES) it else LauncherSettings.DOT_SHAPE_CIRCLE },
-            dotColor = (p[Keys.dotColor(screenType)] ?: LauncherSettings.DOT_COLOR_RED).let { if (it in LauncherSettings.DOT_COLORS) it else LauncherSettings.DOT_COLOR_RED },
-            dotPosition = (p[Keys.dotPosition(screenType)] ?: LauncherSettings.DOT_POSITION_TOP_END).let { if (it in LauncherSettings.DOT_POSITIONS) it else LauncherSettings.DOT_POSITION_TOP_END },
-            homeWallpaperDim = (p[Keys.homeWallpaperDim(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_DIM),
-            homeWallpaperBlur = (p[Keys.homeWallpaperBlur(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_BLUR),
-            homeBackgroundImage = p[Keys.homeBackgroundImage(screenType)] ?: "",
-            iconSwipeUpAction = (p[Keys.iconSwipeUpAction(screenType)] ?: LauncherSettings.ICON_SWIPE_NONE).let { if (it in LauncherSettings.ICON_SWIPES) it else LauncherSettings.ICON_SWIPE_NONE },
-            autoRemoveEmptyPages = p[Keys.autoRemoveEmptyPages(screenType)] ?: false,
-            newPageOnDrag = p[Keys.newPageOnDrag(screenType)] ?: false,
-            drawerFolderTabs = p[Keys.drawerFolderTabs(screenType)] ?: false,
-            floatingWindowSize = (p[Keys.FLOATING_WINDOW_SIZE] ?: LauncherSettings.FLOATING_SIZE_MEDIUM)
-                .let { if (it in LauncherSettings.FLOATING_SIZES) it else LauncherSettings.FLOATING_SIZE_MEDIUM },
-            mediaWidgetTheme = (p[Keys.MEDIA_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
-                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
-            appsWidgetTheme = (p[Keys.APPS_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
-                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
-            statsWidgetTheme = (p[Keys.STATS_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
-                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
-            noteWidgetTheme = (p[Keys.NOTE_WIDGET_THEME] ?: LauncherSettings.WIDGET_THEME_DEFAULT)
-                .let { if (it in LauncherSettings.WIDGET_THEMES) it else LauncherSettings.WIDGET_THEME_DEFAULT },
-            mediaWidgetArtwork = p[Keys.MEDIA_WIDGET_ARTWORK] ?: true,
-            appsWidgetLabels = p[Keys.APPS_WIDGET_LABELS] ?: false,
-            statsShowBattery = p[Keys.STATS_SHOW_BATTERY] ?: true,
-            statsShowStorage = p[Keys.STATS_SHOW_STORAGE] ?: true,
-            statsShowMemory = p[Keys.STATS_SHOW_MEMORY] ?: true,
-            statsShowBluetooth = p[Keys.STATS_SHOW_BLUETOOTH] ?: true,
-            noteWidgetTextSize = (p[Keys.NOTE_WIDGET_TEXT_SIZE] ?: LauncherSettings.FOLDER_OPEN_MEDIUM)
-                .let { if (it in LauncherSettings.FOLDER_OPEN_SIZES) it else LauncherSettings.FOLDER_OPEN_MEDIUM },
-            noteWidgetText = p[Keys.NOTE_WIDGET_TEXT] ?: "",
-            searchShortcuts = p[Keys.SEARCH_SHORTCUTS] ?: true,
-            searchWeb = p[Keys.SEARCH_WEB] ?: true,
-            animationSpeed = (p[Keys.ANIMATION_SPEED] ?: 1f).coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED),
-            appOpenAnimation = (p[Keys.APP_OPEN_ANIMATION] ?: LauncherSettings.APP_OPEN_ICON)
-                .let { if (it in LauncherSettings.APP_OPENS) it else LauncherSettings.APP_OPEN_ICON },
-            folderOpenAnimation = (p[Keys.FOLDER_OPEN_ANIMATION] ?: LauncherSettings.FOLDER_ANIM_SHEET)
-                .let { if (it in LauncherSettings.FOLDER_ANIMS) it else LauncherSettings.FOLDER_ANIM_SHEET },
-            pageScrollEffect = (p[Keys.PAGE_SCROLL_EFFECT] ?: LauncherSettings.PAGE_EFFECT_SLIDE)
-                .let { if (it in LauncherSettings.PAGE_EFFECTS) it else LauncherSettings.PAGE_EFFECT_SLIDE },
-            taskbarEnabled = p[Keys.TASKBAR_ENABLED] ?: false,
-            taskbarPinnedApps = p[Keys.TASKBAR_PINNED]?.split("\n")?.filter { it.isNotEmpty() },
-            taskbarRecentCount = (p[Keys.TASKBAR_RECENTS] ?: 4).coerceIn(0, 6),
-            taskbarIconSize = (p[Keys.TASKBAR_ICON_SIZE] ?: 48).coerceIn(32, 72),
-            taskbarIconSpacing = (p[Keys.TASKBAR_SPACING] ?: 8).coerceIn(0, 24),
-            taskbarBottomOffset = (p[Keys.TASKBAR_BOTTOM] ?: 12).coerceIn(0, 64),
-            taskbarTheme = (p[Keys.TASKBAR_THEME] ?: LauncherSettings.TASKBAR_THEME_CLEAR).let {
-                if (it in LauncherSettings.TASKBAR_THEMES) it else LauncherSettings.TASKBAR_THEME_CLEAR
-            },
-            taskbarOpacity = (p[Keys.TASKBAR_OPACITY] ?: 0.8f).coerceIn(0.1f, 1f),
-            taskbarHandles = p[Keys.TASKBAR_HANDLES] ?: LauncherSettings.TASKBAR_HANDLES_BOTH,
-            taskbarOnHome = p[Keys.TASKBAR_ON_HOME] ?: true,
-            taskbarKeepOpen = p[Keys.TASKBAR_KEEP_OPEN] ?: false,
-            taskbarMediaEnabled = p[Keys.TASKBAR_MEDIA] ?: true,
-            taskbarMediaShowPaused = p[Keys.TASKBAR_MEDIA_PAUSED] ?: true,
-            taskbarMediaPosition = p[Keys.TASKBAR_MEDIA_POSITION] ?: LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE,
-            taskbarMediaTap = p[Keys.TASKBAR_MEDIA_TAP] ?: LauncherSettings.TASKBAR_MEDIA_TAP_OPEN,
-            taskbarMediaControls = p[Keys.TASKBAR_MEDIA_CONTROLS] ?: true,
-            taskbarMediaShape = p[Keys.TASKBAR_MEDIA_SHAPE] ?: LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE,
-            taskbarMediaBadge = p[Keys.TASKBAR_MEDIA_BADGE] ?: true,
-            taskbarSystemDrag = p[Keys.TASKBAR_SYSTEM_DRAG] ?: true,
-            taskbarRecentsButton = p[Keys.TASKBAR_RECENTS_BUTTON] ?: LauncherSettings.TASKBAR_RECENTS_SYSTEM,
-            taskbarQuickSwitch = p[Keys.TASKBAR_QUICK_SWITCH] ?: true,
-            taskbarSplitControls = p[Keys.TASKBAR_SPLIT_CONTROLS] ?: true,
-            taskbarSplitSide = p[Keys.TASKBAR_SPLIT_SIDE] ?: LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT,
-            taskbarThreeApp = p[Keys.TASKBAR_THREE_APP] ?: true,
-            taskbarHideFullScreen = p[Keys.TASKBAR_HIDE_FULL_SCREEN] ?: true,
-            settingsStyle = p[Keys.SETTINGS_STYLE] ?: LauncherSettings.SETTINGS_STYLE_STUDIO,
-            iconShape = (p[Keys.ICON_SHAPE] ?: LauncherSettings.ICON_SHAPE_SYSTEM)
-                .let { if (it in LauncherSettings.ICON_SHAPES) it else LauncherSettings.ICON_SHAPE_SYSTEM },
-            motoWeatherTap = p[Keys.MOTO_WEATHER_TAP] ?: true,
-            showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
-            popupNotifications = p[Keys.POPUP_NOTIFICATIONS] ?: true,
-            dotAvatars = p[Keys.DOT_AVATARS] ?: true,
-            liveActivities = p[Keys.LIVE_ACTIVITIES] ?: true,
-            liveActivitiesTaskbar = p[Keys.LIVE_ACTIVITIES_TASKBAR] ?: true,
-            liveActivityEffect = (p[Keys.LIVE_ACTIVITY_EFFECT] ?: LauncherSettings.LIVE_EFFECT_GLOW)
-                .let { if (it in LauncherSettings.LIVE_EFFECTS) it else LauncherSettings.LIVE_EFFECT_GLOW },
-            searchActions = p[Keys.SEARCH_ACTIONS] ?: true,
-            recentsEnabled = p[Keys.RECENTS_ENABLED] ?: true,
-            recentsReplaceSystem = p[Keys.RECENTS_REPLACE_SYSTEM] ?: false,
-            navHandleOpensSearch = p[Keys.NAV_HANDLE_SEARCH] ?: false,
-            recentsColumnsInner = (p[Keys.RECENTS_COLUMNS_INNER] ?: 4)
-                .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER),
-            recentsColumnsOuter = (p[Keys.RECENTS_COLUMNS_OUTER] ?: 1)
-                .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_OUTER),
-            recentsMaxApps = (p[Keys.RECENTS_MAX_APPS] ?: 12).coerceIn(LauncherSettings.MIN_RECENTS_APPS, LauncherSettings.MAX_RECENTS_APPS),
-            recentsCardHeight = (p[Keys.RECENTS_CARD_HEIGHT] ?: 300)
-                .coerceIn(LauncherSettings.MIN_RECENTS_CARD_HEIGHT, LauncherSettings.MAX_RECENTS_CARD_HEIGHT),
-            recentsCornerDp = (p[Keys.RECENTS_CORNER] ?: 26).coerceIn(0, LauncherSettings.MAX_RECENTS_CORNER_DP),
-            recentsBackdropDim = (p[Keys.RECENTS_BACKDROP] ?: 0.85f).coerceIn(0f, 1f),
-            recentsSort = (p[Keys.RECENTS_SORT] ?: LauncherSettings.RECENTS_SORT_RECENT)
-                .let { if (it == LauncherSettings.RECENTS_SORT_NAME) it else LauncherSettings.RECENTS_SORT_RECENT },
-            recentsShowTime = p[Keys.RECENTS_SHOW_TIME] ?: true,
-            recentsShowActions = p[Keys.RECENTS_SHOW_ACTIONS] ?: true,
-            recentsCardLayout = if (p[Keys.RECENTS_CARD_LAYOUT] == LauncherSettings.RECENTS_CARD_HEADER)
-                LauncherSettings.RECENTS_CARD_HEADER else LauncherSettings.RECENTS_CARD_OVERLAY,
-            recentsConfirmCloseAll = p[Keys.RECENTS_CONFIRM_CLOSE_ALL] ?: false,
-            recentsThirdInSplit = p[Keys.RECENTS_THIRD_IN_SPLIT] ?: true,
-            recentsThumbnails = p[Keys.RECENTS_THUMBNAILS] ?: true,
-            recentsRootClose = p[Keys.RECENTS_ROOT_CLOSE] ?: true,
-            taskbarRunningApps = p[Keys.TASKBAR_RUNNING_APPS] ?: false,
-            taskbarRunningDots = p[Keys.TASKBAR_RUNNING_DOTS] ?: true,
-            recentsEnterAnimation = (p[Keys.RECENTS_ENTER] ?: LauncherSettings.RECENTS_ENTER_RISE)
-                .let { if (it in LauncherSettings.RECENTS_ENTERS) it else LauncherSettings.RECENTS_ENTER_RISE },
-            recentsSelectAnimation = (p[Keys.RECENTS_SELECT] ?: LauncherSettings.RECENTS_SELECT_POP)
-                .let { if (it in LauncherSettings.RECENTS_SELECTS) it else LauncherSettings.RECENTS_SELECT_POP },
-            recentsAnimationSpeed = (p[Keys.RECENTS_ANIM_SPEED] ?: 1f)
-                .coerceIn(LauncherSettings.MIN_RECENTS_ANIM_SPEED, LauncherSettings.MAX_RECENTS_ANIM_SPEED),
-            recentsPressAnimation = (p[Keys.RECENTS_PRESS] ?: LauncherSettings.PRESS_SHRINK)
-                .let { if (it in LauncherSettings.PRESS_EFFECTS) it else LauncherSettings.PRESS_SHRINK },
-            recentsTheme = (p[Keys.RECENTS_THEME] ?: LauncherSettings.RECENTS_THEME_FOLARK)
-                .let { if (it in LauncherSettings.RECENTS_THEMES) it else LauncherSettings.RECENTS_THEME_FOLARK },
-            recentsGlass = p[Keys.RECENTS_GLASS] ?: false,
-            recentsGlassBlur = (p[Keys.RECENTS_GLASS_BLUR] ?: 28).coerceIn(0, LauncherSettings.MAX_RECENTS_GLASS_BLUR),
-            recentsGlassTint = (p[Keys.RECENTS_GLASS_TINT] ?: 0.16f)
-                .coerceIn(LauncherSettings.MIN_RECENTS_GLASS_TINT, LauncherSettings.MAX_RECENTS_GLASS_TINT),
-            recentsDragDrop = p[Keys.RECENTS_DRAG_DROP] ?: true,
-            recentsBtnClose = p[Keys.RECENTS_BTN_CLOSE] ?: true,
-            recentsBtnSplit = p[Keys.RECENTS_BTN_SPLIT] ?: true,
-            recentsBtnPopup = p[Keys.RECENTS_BTN_POPUP] ?: true,
-            recentsBtnUnsplit = p[Keys.RECENTS_BTN_UNSPLIT] ?: true,
-            recentsBtnSplitView = p[Keys.RECENTS_BTN_SPLIT_VIEW] ?: true,
-            recentsBtnCloseAll = p[Keys.RECENTS_BTN_CLOSE_ALL] ?: true,
-            recentsSwipeUpAction = recentsAction(p[Keys.RECENTS_SWIPE_UP], LauncherSettings.RECENTS_ACTION_CLOSE),
-            recentsSwipeDownAction = recentsAction(p[Keys.RECENTS_SWIPE_DOWN], LauncherSettings.RECENTS_ACTION_NONE),
-            recentsLongPressAction = recentsAction(p[Keys.RECENTS_LONG_PRESS], LauncherSettings.RECENTS_ACTION_MENU),
-            recentsDoubleTapAction = recentsAction(p[Keys.RECENTS_DOUBLE_TAP], LauncherSettings.RECENTS_ACTION_SPLIT),
-            recentsPinned = lines(p[Keys.RECENTS_PINNED]),
-            recentsBtnPin = p[Keys.RECENTS_BTN_PIN] ?: true,
-            recentsPinKeepAlive = p[Keys.RECENTS_PIN_KEEP_ALIVE] ?: true,
-            taskbarHiddenApps = lines(p[Keys.TASKBAR_HIDDEN_APPS]),
-            taskbarAlwaysApps = lines(p[Keys.TASKBAR_ALWAYS_APPS]),
-            liquidGlassEverywhere = p[Keys.LIQUID_GLASS_EVERYWHERE] ?: false,
-            liquidGlassLevel = (p[Keys.LIQUID_GLASS_LEVEL] ?: 0.5f).coerceIn(0f, 1f),
-            recentsAttachedSide = if (p[Keys.RECENTS_ATTACHED_SIDE] == LauncherSettings.RECENTS_ATTACHED_RIGHT)
-                LauncherSettings.RECENTS_ATTACHED_RIGHT else LauncherSettings.RECENTS_ATTACHED_LEFT,
-            recentsAttachedPeek = (p[Keys.RECENTS_ATTACHED_PEEK] ?: 0.12f)
-                .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
-            taskbarHandleHint = p[Keys.TASKBAR_HANDLE_HINT] ?: true,
-            taskbarSource = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
-                LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
-            systemTaskbarMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
-            rootEnabled = p[Keys.ROOT_ENABLED] ?: true,
-            rootLockMode = rootMode(p[Keys.ROOT_LOCK_MODE]),
-            rootRecentsMode = rootMode(p[Keys.ROOT_RECENTS_MODE]),
-            rootShadeMode = rootMode(p[Keys.ROOT_SHADE_MODE]),
-            rootKeepDump = p[Keys.ROOT_KEEP_DUMP] ?: false,
-            rootKeepUsage = p[Keys.ROOT_KEEP_USAGE] ?: false,
-            rootKeepSecureSettings = p[Keys.ROOT_KEEP_SECURE] ?: false,
-            rootKeepNotifications = p[Keys.ROOT_KEEP_NOTIFICATIONS] ?: false,
-            rootKeepAccessibility = p[Keys.ROOT_KEEP_ACCESSIBILITY] ?: false,
-            rootKeepWidgets = p[Keys.ROOT_KEEP_WIDGETS] ?: false,
-            iconNudge = p[Keys.ICON_NUDGE] ?: true,
-            unlockTransition = p[Keys.UNLOCK_TRANSITION] ?: true,
-            iconNudgeTaskbar = p[Keys.ICON_NUDGE_TASKBAR] ?: true,
-            iconNudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
-                .let { if (it in LauncherSettings.NUDGE_EFFECTS) it else LauncherSettings.NUDGE_BOUNCE },
-            iconNudgeSoftness = (p[Keys.ICON_NUDGE_SOFTNESS] ?: 0.5f).coerceIn(0f, 1f),
-            liveHingeEndAngle = (p[Keys.LIVE_HINGE_END_ANGLE] ?: 165).coerceIn(LauncherSettings.MIN_LIVE_HINGE_END_ANGLE, 180),
-            liveHingeSmoothingMs = (p[Keys.LIVE_HINGE_SMOOTHING] ?: 50).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_SMOOTHING_MS),
-            liveHingeStyle = (p[Keys.LIVE_HINGE_STYLE] ?: LauncherSettings.LIVE_HINGE_STYLE_PAGES)
-                .let { if (it in LauncherSettings.LIVE_HINGE_STYLES) it else LauncherSettings.LIVE_HINGE_STYLE_PAGES },
-            liveHingeOuterStyle = (p[Keys.LIVE_HINGE_OUTER_STYLE] ?: LauncherSettings.LIVE_HINGE_STYLE_WATER)
-                .let { if (it in LauncherSettings.LIVE_HINGE_STYLES) it else LauncherSettings.LIVE_HINGE_STYLE_WATER },
-            liveHingeBlurDp = (p[Keys.LIVE_HINGE_BLUR] ?: 24).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_BLUR_DP),
-            liveHingeFrost = (p[Keys.LIVE_HINGE_FROST] ?: 0.2f).coerceIn(0f, LauncherSettings.MAX_LIVE_HINGE_FROST),
-            weatherWidgetAnimated = p[Keys.WEATHER_WIDGET_ANIMATED] ?: true,
-            clockWidgetDarkText = p[Keys.CLOCK_WIDGET_DARK_TEXT] ?: false,
-            clockWidgetGlassEffect = p[Keys.CLOCK_WIDGET_GLASS_EFFECT] ?: true,
-            clockMinuteColor = (p[Keys.CLOCK_MINUTE_COLOR] ?: LauncherSettings.CLOCK_MINUTE_STYLE).let {
-                if (it in LauncherSettings.CLOCK_MINUTE_COLORS) it else LauncherSettings.CLOCK_MINUTE_STYLE
-            },
-            clockMinuteOpacity = (p[Keys.CLOCK_MINUTE_OPACITY] ?: 1f).coerceIn(0.1f, 1f),
-            batterySaverMode = when (p[Keys.BATTERY_SAVER_MODE]) {
-                LauncherSettings.BATTERY_SAVER_OFF -> LauncherSettings.BATTERY_SAVER_OFF
-                LauncherSettings.BATTERY_SAVER_ON -> LauncherSettings.BATTERY_SAVER_ON
-                else -> LauncherSettings.BATTERY_SAVER_AUTO
-            },
-            clockWidgetStyle = (p[Keys.CLOCK_WIDGET_STYLE] ?: LauncherSettings.CLOCK_STYLE_CLASSIC)
-                .let { if (it in LauncherSettings.CLOCK_STYLES) it else LauncherSettings.CLOCK_STYLE_CLASSIC },
-            appFontFamily = (p[Keys.appFontFamily(screenType)] ?: LauncherSettings.FONT_FAMILY_DEFAULT).let {
-                if (it in LauncherSettings.FONT_FAMILIES) it else LauncherSettings.FONT_FAMILY_DEFAULT
-            },
-            appFontBold = p[Keys.appFontBold(screenType)] ?: false,
-            appFontSizeScale = (p[Keys.appFontSizeScale(screenType)] ?: 1.0f).coerceIn(0.7f, 1.4f),
-            widgetBackgroundOpacity = (p[Keys.WIDGET_BACKGROUND_OPACITY] ?: 0f).coerceIn(0f, 1f),
-            dpiWorkspace = (p[Keys.dpiWorkspace(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
-            dpiAppDrawer = (p[Keys.dpiAppDrawer(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
-            dpiSettings = (p[Keys.dpiSettings(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
-            innerDualPageWorkspace = p[Keys.innerDualPageWorkspace(screenType)] ?: false,
-            innerSidebarAppDrawer = p[Keys.innerSidebarAppDrawer(screenType)] ?: false,
-            innerDockAlignment = (p[Keys.innerDockAlignment(screenType)] ?: LauncherSettings.DOCK_ALIGNMENT_CENTER).let {
-                if (it == LauncherSettings.DOCK_ALIGNMENT_LEFT || it == LauncherSettings.DOCK_ALIGNMENT_RIGHT || it == LauncherSettings.DOCK_ALIGNMENT_FLOATING) it else LauncherSettings.DOCK_ALIGNMENT_CENTER
-            },
+            root = LauncherSettings.Root(
+                enabled = p[Keys.ROOT_ENABLED] ?: true,
+                lockMode = rootMode(p[Keys.ROOT_LOCK_MODE]),
+                recentsMode = rootMode(p[Keys.ROOT_RECENTS_MODE]),
+                shadeMode = rootMode(p[Keys.ROOT_SHADE_MODE]),
+                keepDump = p[Keys.ROOT_KEEP_DUMP] ?: false,
+                keepUsage = p[Keys.ROOT_KEEP_USAGE] ?: false,
+                keepSecureSettings = p[Keys.ROOT_KEEP_SECURE] ?: false,
+                keepNotifications = p[Keys.ROOT_KEEP_NOTIFICATIONS] ?: false,
+                keepAccessibility = p[Keys.ROOT_KEEP_ACCESSIBILITY] ?: false,
+                keepWidgets = p[Keys.ROOT_KEEP_WIDGETS] ?: false,
+            ),
+            launch = LauncherSettings.Launch(
+                splitEnabled = p[Keys.SPLIT_LAUNCH_ENABLED] ?: true,
+                floatingEnabled = p[Keys.FLOATING_LAUNCH_ENABLED] ?: true,
+                floatingWindowSize = (p[Keys.FLOATING_WINDOW_SIZE] ?: LauncherSettings.FLOATING_SIZE_MEDIUM)
+                    .let { if (it in LauncherSettings.FLOATING_SIZES) it else LauncherSettings.FLOATING_SIZE_MEDIUM },
+                threeAppSplit = p[Keys.THREE_APP_SPLIT] ?: true,
+            ),
         )
     }
 
@@ -465,6 +453,10 @@ class SettingsRepository @Inject constructor(
     suspend fun deleteAppPair(id: String) = edit { p ->
         val current = parseAppPairs(p[Keys.APP_PAIRS])
         p[Keys.APP_PAIRS] = serializeAppPairs(current.filterNot { it.id == id })
+        // A deleted pair leaves the taskbar too.
+        p[Keys.TASKBAR_PAIRS]?.let { raw ->
+            p[Keys.TASKBAR_PAIRS] = raw.split("\n").filter { it.isNotEmpty() && it != id }.joinToString("\n")
+        }
     }
 
     private fun parseAppPairs(raw: String?): List<AppPair> =
@@ -487,6 +479,7 @@ class SettingsRepository @Inject constructor(
                 app3Package = parts.getOrNull(11).orEmpty(),
                 app3ClassName = parts.getOrNull(12).orEmpty(),
                 app3UserSerial = parts.getOrNull(13)?.toLongOrNull() ?: 0L,
+                peek = parts.getOrNull(14) == "1",
             )
         } ?: emptyList()
 
@@ -507,6 +500,7 @@ class SettingsRepository @Inject constructor(
                 p.app3Package,
                 p.app3ClassName,
                 p.app3UserSerial.toString(),
+                if (p.peek) "1" else "0",
             ).joinToString("\t")
         }
 
@@ -551,7 +545,10 @@ class SettingsRepository @Inject constructor(
     suspend fun setNewPageOnDrag(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.newPageOnDrag(screenType)] = value }
     suspend fun setAutoRemoveEmptyPages(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.autoRemoveEmptyPages(screenType)] = value }
     suspend fun setDrawerFolderTabs(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerFolderTabs(screenType)] = value }
+    suspend fun setDrawerTabsExclusive(value: Boolean) = edit { it[Keys.DRAWER_TABS_EXCLUSIVE] = value }
     suspend fun setFloatingWindowSize(value: String) = edit { it[Keys.FLOATING_WINDOW_SIZE] = value }
+    suspend fun setThreeAppSplit(value: Boolean) = edit { it[Keys.THREE_APP_SPLIT] = value }
+    suspend fun setTaskbarPairs(ids: List<String>) = edit { it[Keys.TASKBAR_PAIRS] = ids.distinct().joinToString("\n") }
     suspend fun setSearchShortcuts(value: Boolean) = edit { it[Keys.SEARCH_SHORTCUTS] = value }
     suspend fun setSearchWeb(value: Boolean) = edit { it[Keys.SEARCH_WEB] = value }
     suspend fun setAnimationSpeed(value: Float) = edit {
@@ -610,6 +607,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setDotAvatars(value: Boolean) = edit { it[Keys.DOT_AVATARS] = value }
     suspend fun setLiveActivities(value: Boolean) = edit { it[Keys.LIVE_ACTIVITIES] = value }
     suspend fun setLiveActivitiesTaskbar(value: Boolean) = edit { it[Keys.LIVE_ACTIVITIES_TASKBAR] = value }
+    suspend fun setLiveExpand(value: Boolean) = edit { it[Keys.LIVE_EXPAND] = value }
     suspend fun setLiveActivityEffect(value: String) = edit { it[Keys.LIVE_ACTIVITY_EFFECT] = value }
     suspend fun setSearchActions(value: Boolean) = edit { it[Keys.SEARCH_ACTIONS] = value }
     suspend fun setRecentsEnabled(value: Boolean) = edit { it[Keys.RECENTS_ENABLED] = value }
@@ -624,48 +622,55 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsMaxApps(value: Int) = edit {
         it[Keys.RECENTS_MAX_APPS] = value.coerceIn(LauncherSettings.MIN_RECENTS_APPS, LauncherSettings.MAX_RECENTS_APPS)
     }
-    suspend fun setRecentsCardHeight(value: Int) = edit {
-        it[Keys.RECENTS_CARD_HEIGHT] = value.coerceIn(LauncherSettings.MIN_RECENTS_CARD_HEIGHT, LauncherSettings.MAX_RECENTS_CARD_HEIGHT)
+    suspend fun setRecentsCardHeight(value: Int, cover: Boolean = false) = edit {
+        it[if (cover) Keys.RECENTS_OUTER_CARD_HEIGHT else Keys.RECENTS_CARD_HEIGHT] = value.coerceIn(LauncherSettings.MIN_RECENTS_CARD_HEIGHT, LauncherSettings.MAX_RECENTS_CARD_HEIGHT)
     }
-    suspend fun setRecentsCornerDp(value: Int) = edit { it[Keys.RECENTS_CORNER] = value.coerceIn(0, LauncherSettings.MAX_RECENTS_CORNER_DP) }
-    suspend fun setRecentsBackdropDim(value: Float) = edit { it[Keys.RECENTS_BACKDROP] = value.coerceIn(0f, 1f) }
+    suspend fun setRecentsCornerDp(value: Int, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_CORNER else Keys.RECENTS_CORNER] = value.coerceIn(0, LauncherSettings.MAX_RECENTS_CORNER_DP) }
+    suspend fun setRecentsBackdropDim(value: Float, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BACKDROP else Keys.RECENTS_BACKDROP] = value.coerceIn(0f, 1f) }
     suspend fun setRecentsSort(value: String) = edit { it[Keys.RECENTS_SORT] = value }
-    suspend fun setRecentsShowTime(value: Boolean) = edit { it[Keys.RECENTS_SHOW_TIME] = value }
-    suspend fun setRecentsShowActions(value: Boolean) = edit { it[Keys.RECENTS_SHOW_ACTIONS] = value }
-    suspend fun setRecentsCardLayout(value: String) = edit { it[Keys.RECENTS_CARD_LAYOUT] = value }
+    suspend fun setRecentsShowTime(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SHOW_TIME else Keys.RECENTS_SHOW_TIME] = value }
+    suspend fun setRecentsShowActions(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SHOW_ACTIONS else Keys.RECENTS_SHOW_ACTIONS] = value }
+    suspend fun setRecentsCardLayout(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_CARD_LAYOUT else Keys.RECENTS_CARD_LAYOUT] = value }
     suspend fun setRecentsConfirmCloseAll(value: Boolean) = edit { it[Keys.RECENTS_CONFIRM_CLOSE_ALL] = value }
     suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
     suspend fun setRecentsThumbnails(value: Boolean) = edit { it[Keys.RECENTS_THUMBNAILS] = value }
     suspend fun setRecentsRootClose(value: Boolean) = edit { it[Keys.RECENTS_ROOT_CLOSE] = value }
     suspend fun setTaskbarRunningApps(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_APPS] = value }
     suspend fun setTaskbarRunningDots(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_DOTS] = value }
-    suspend fun setRecentsEnterAnimation(value: String) = edit { it[Keys.RECENTS_ENTER] = value }
-    suspend fun setRecentsSelectAnimation(value: String) = edit { it[Keys.RECENTS_SELECT] = value }
-    suspend fun setRecentsAnimationSpeed(value: Float) = edit {
-        it[Keys.RECENTS_ANIM_SPEED] = value.coerceIn(LauncherSettings.MIN_RECENTS_ANIM_SPEED, LauncherSettings.MAX_RECENTS_ANIM_SPEED)
+    suspend fun setRecentsEnterAnimation(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_ENTER else Keys.RECENTS_ENTER] = value }
+    suspend fun setRecentsSelectAnimation(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SELECT else Keys.RECENTS_SELECT] = value }
+    suspend fun setRecentsAnimationSpeed(value: Float, cover: Boolean = false) = edit {
+        it[if (cover) Keys.RECENTS_OUTER_ANIM_SPEED else Keys.RECENTS_ANIM_SPEED] = value.coerceIn(LauncherSettings.MIN_RECENTS_ANIM_SPEED, LauncherSettings.MAX_RECENTS_ANIM_SPEED)
     }
     suspend fun setRootEnabled(value: Boolean) = edit { it[Keys.ROOT_ENABLED] = value }
-    suspend fun setRecentsTheme(value: String) = edit { it[Keys.RECENTS_THEME] = value }
-    suspend fun setRecentsPressAnimation(value: String) = edit { it[Keys.RECENTS_PRESS] = value }
-    suspend fun setRecentsGlass(value: Boolean) = edit { it[Keys.RECENTS_GLASS] = value }
-    suspend fun setRecentsGlassBlur(value: Int) = edit { it[Keys.RECENTS_GLASS_BLUR] = value.coerceIn(0, LauncherSettings.MAX_RECENTS_GLASS_BLUR) }
-    suspend fun setRecentsGlassTint(value: Float) = edit {
-        it[Keys.RECENTS_GLASS_TINT] = value.coerceIn(LauncherSettings.MIN_RECENTS_GLASS_TINT, LauncherSettings.MAX_RECENTS_GLASS_TINT)
+    suspend fun setRecentsTheme(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_THEME else Keys.RECENTS_THEME] = value }
+    suspend fun setRecentsPressAnimation(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_PRESS else Keys.RECENTS_PRESS] = value }
+    suspend fun setRecentsGlass(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_GLASS else Keys.RECENTS_GLASS] = value }
+    suspend fun setRecentsGlassBlur(value: Int, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_GLASS_BLUR else Keys.RECENTS_GLASS_BLUR] = value.coerceIn(0, LauncherSettings.MAX_RECENTS_GLASS_BLUR) }
+    suspend fun setRecentsGlassTint(value: Float, cover: Boolean = false) = edit {
+        it[if (cover) Keys.RECENTS_OUTER_GLASS_TINT else Keys.RECENTS_GLASS_TINT] = value.coerceIn(LauncherSettings.MIN_RECENTS_GLASS_TINT, LauncherSettings.MAX_RECENTS_GLASS_TINT)
     }
     suspend fun setRecentsDragDrop(value: Boolean) = edit { it[Keys.RECENTS_DRAG_DROP] = value }
-    suspend fun setRecentsBtnClose(value: Boolean) = edit { it[Keys.RECENTS_BTN_CLOSE] = value }
-    suspend fun setRecentsBtnSplit(value: Boolean) = edit { it[Keys.RECENTS_BTN_SPLIT] = value }
-    suspend fun setRecentsBtnPopup(value: Boolean) = edit { it[Keys.RECENTS_BTN_POPUP] = value }
-    suspend fun setRecentsBtnUnsplit(value: Boolean) = edit { it[Keys.RECENTS_BTN_UNSPLIT] = value }
-    suspend fun setRecentsBtnSplitView(value: Boolean) = edit { it[Keys.RECENTS_BTN_SPLIT_VIEW] = value }
-    suspend fun setRecentsBtnCloseAll(value: Boolean) = edit { it[Keys.RECENTS_BTN_CLOSE_ALL] = value }
+    suspend fun setRecentsOverlayLabels(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_OVERLAY_LABELS else Keys.RECENTS_OVERLAY_LABELS] = value }
+    suspend fun setRecentsMenuMotion(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_MENU_MOTION else Keys.RECENTS_MENU_MOTION] = value }
+    suspend fun setRecentsBtnClose(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_CLOSE else Keys.RECENTS_BTN_CLOSE] = value }
+    suspend fun setRecentsBtnSplit(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_SPLIT else Keys.RECENTS_BTN_SPLIT] = value }
+    suspend fun setRecentsBtnPopup(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_POPUP else Keys.RECENTS_BTN_POPUP] = value }
+    suspend fun setRecentsBtnUnsplit(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_UNSPLIT else Keys.RECENTS_BTN_UNSPLIT] = value }
+    suspend fun setRecentsBtnSplitView(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_SPLIT_VIEW else Keys.RECENTS_BTN_SPLIT_VIEW] = value }
+    suspend fun setRecentsBtnCloseAll(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_CLOSE_ALL else Keys.RECENTS_BTN_CLOSE_ALL] = value }
     suspend fun setRecentsSwipeUpAction(value: String) = edit { it[Keys.RECENTS_SWIPE_UP] = value }
     suspend fun setRecentsSwipeDownAction(value: String) = edit { it[Keys.RECENTS_SWIPE_DOWN] = value }
     suspend fun setRecentsLongPressAction(value: String) = edit { it[Keys.RECENTS_LONG_PRESS] = value }
     suspend fun setRecentsDoubleTapAction(value: String) = edit { it[Keys.RECENTS_DOUBLE_TAP] = value }
+    suspend fun setRecentsOuterGestures(value: Boolean) = edit { it[Keys.RECENTS_OUTER_GESTURES] = value }
+    suspend fun setRecentsOuterSwipeUpAction(value: String) = edit { it[Keys.RECENTS_OUTER_SWIPE_UP] = value }
+    suspend fun setRecentsOuterSwipeDownAction(value: String) = edit { it[Keys.RECENTS_OUTER_SWIPE_DOWN] = value }
+    suspend fun setRecentsOuterLongPressAction(value: String) = edit { it[Keys.RECENTS_OUTER_LONG_PRESS] = value }
+    suspend fun setRecentsOuterDoubleTapAction(value: String) = edit { it[Keys.RECENTS_OUTER_DOUBLE_TAP] = value }
 
     suspend fun setRecentsPinned(value: Set<String>) = edit { it[Keys.RECENTS_PINNED] = value.joinToString("\n") }
-    suspend fun setRecentsBtnPin(value: Boolean) = edit { it[Keys.RECENTS_BTN_PIN] = value }
+    suspend fun setRecentsBtnPin(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_PIN else Keys.RECENTS_BTN_PIN] = value }
     suspend fun setRecentsPinKeepAlive(value: Boolean) = edit { it[Keys.RECENTS_PIN_KEEP_ALIVE] = value }
     /** Packages whose battery-optimisation exemption Folark added for a pin (and may take back). */
     suspend fun pinExemptions(): Set<String> = lines(dataStore.data.first()[Keys.RECENTS_PIN_EXEMPT])
@@ -676,6 +681,82 @@ class SettingsRepository @Inject constructor(
     suspend fun setLiquidGlassLevel(value: Float) = edit { it[Keys.LIQUID_GLASS_LEVEL] = value.coerceIn(0f, 1f) }
 
     private fun lines(raw: String?): Set<String> = raw?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
+    /** Settings ▸ Recents, read from [p]. */
+    private fun readRecents(p: Preferences): LauncherSettings.Recents =
+    LauncherSettings.Recents(
+        enabled = p[Keys.RECENTS_ENABLED] ?: true,
+        replaceSystem = p[Keys.RECENTS_REPLACE_SYSTEM] ?: false,
+        navHandleOpensSearch = p[Keys.NAV_HANDLE_SEARCH] ?: false,
+        columnsInner = (p[Keys.RECENTS_COLUMNS_INNER] ?: 4)
+            .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_INNER),
+        columnsOuter = (p[Keys.RECENTS_COLUMNS_OUTER] ?: 1)
+            .coerceIn(LauncherSettings.MIN_RECENTS_COLUMNS, LauncherSettings.MAX_RECENTS_COLUMNS_OUTER),
+        maxApps = (p[Keys.RECENTS_MAX_APPS] ?: 12).coerceIn(LauncherSettings.MIN_RECENTS_APPS, LauncherSettings.MAX_RECENTS_APPS),
+        cardHeight = (p[Keys.RECENTS_CARD_HEIGHT] ?: 300)
+            .coerceIn(LauncherSettings.MIN_RECENTS_CARD_HEIGHT, LauncherSettings.MAX_RECENTS_CARD_HEIGHT),
+        cornerDp = (p[Keys.RECENTS_CORNER] ?: 26).coerceIn(0, LauncherSettings.MAX_RECENTS_CORNER_DP),
+        backdropDim = (p[Keys.RECENTS_BACKDROP] ?: 0.85f).coerceIn(0f, 1f),
+        sort = (p[Keys.RECENTS_SORT] ?: LauncherSettings.RECENTS_SORT_RECENT)
+            .let { if (it == LauncherSettings.RECENTS_SORT_NAME) it else LauncherSettings.RECENTS_SORT_RECENT },
+        showTime = p[Keys.RECENTS_SHOW_TIME] ?: true,
+        showActions = p[Keys.RECENTS_SHOW_ACTIONS] ?: true,
+        cardLayout = if (p[Keys.RECENTS_CARD_LAYOUT] == LauncherSettings.RECENTS_CARD_HEADER)
+            LauncherSettings.RECENTS_CARD_HEADER else LauncherSettings.RECENTS_CARD_OVERLAY,
+        confirmCloseAll = p[Keys.RECENTS_CONFIRM_CLOSE_ALL] ?: false,
+        thirdInSplit = p[Keys.RECENTS_THIRD_IN_SPLIT] ?: true,
+        thumbnails = p[Keys.RECENTS_THUMBNAILS] ?: true,
+        rootClose = p[Keys.RECENTS_ROOT_CLOSE] ?: true,
+        enterAnimation = (p[Keys.RECENTS_ENTER] ?: LauncherSettings.RECENTS_ENTER_RISE)
+            .let { if (it in LauncherSettings.RECENTS_ENTERS) it else LauncherSettings.RECENTS_ENTER_RISE },
+        selectAnimation = (p[Keys.RECENTS_SELECT] ?: LauncherSettings.RECENTS_SELECT_POP)
+            .let { if (it in LauncherSettings.RECENTS_SELECTS) it else LauncherSettings.RECENTS_SELECT_POP },
+        animationSpeed = (p[Keys.RECENTS_ANIM_SPEED] ?: 1f)
+            .coerceIn(LauncherSettings.MIN_RECENTS_ANIM_SPEED, LauncherSettings.MAX_RECENTS_ANIM_SPEED),
+        pressAnimation = (p[Keys.RECENTS_PRESS] ?: LauncherSettings.PRESS_SHRINK)
+            .let { if (it in LauncherSettings.PRESS_EFFECTS) it else LauncherSettings.PRESS_SHRINK },
+        theme = (p[Keys.RECENTS_THEME] ?: LauncherSettings.RECENTS_THEME_FOLARK)
+            .let { if (it in LauncherSettings.RECENTS_THEMES) it else LauncherSettings.RECENTS_THEME_FOLARK },
+        glass = p[Keys.RECENTS_GLASS] ?: false,
+        glassBlur = (p[Keys.RECENTS_GLASS_BLUR] ?: 28).coerceIn(0, LauncherSettings.MAX_RECENTS_GLASS_BLUR),
+        glassTint = (p[Keys.RECENTS_GLASS_TINT] ?: 0.16f)
+            .coerceIn(LauncherSettings.MIN_RECENTS_GLASS_TINT, LauncherSettings.MAX_RECENTS_GLASS_TINT),
+        dragDrop = p[Keys.RECENTS_DRAG_DROP] ?: true,
+        overlayLabels = p[Keys.RECENTS_OVERLAY_LABELS] ?: true,
+        menuMotion = p[Keys.RECENTS_MENU_MOTION] ?: true,
+        btnClose = p[Keys.RECENTS_BTN_CLOSE] ?: true,
+        btnSplit = p[Keys.RECENTS_BTN_SPLIT] ?: true,
+        btnPopup = p[Keys.RECENTS_BTN_POPUP] ?: true,
+        btnUnsplit = p[Keys.RECENTS_BTN_UNSPLIT] ?: true,
+        btnSplitView = p[Keys.RECENTS_BTN_SPLIT_VIEW] ?: true,
+        btnCloseAll = p[Keys.RECENTS_BTN_CLOSE_ALL] ?: true,
+        swipeUpAction = recentsAction(p[Keys.RECENTS_SWIPE_UP], LauncherSettings.RECENTS_ACTION_CLOSE),
+        swipeDownAction = recentsAction(p[Keys.RECENTS_SWIPE_DOWN], LauncherSettings.RECENTS_ACTION_NONE),
+        longPressAction = recentsAction(p[Keys.RECENTS_LONG_PRESS], LauncherSettings.RECENTS_ACTION_MENU),
+        doubleTapAction = recentsAction(p[Keys.RECENTS_DOUBLE_TAP], LauncherSettings.RECENTS_ACTION_SPLIT),
+        outerGestures = p[Keys.RECENTS_OUTER_GESTURES] ?: true,
+        outerSwipeUpAction = recentsAction(p[Keys.RECENTS_OUTER_SWIPE_UP], LauncherSettings.RECENTS_ACTION_CLOSE),
+        outerSwipeDownAction = recentsAction(p[Keys.RECENTS_OUTER_SWIPE_DOWN], LauncherSettings.RECENTS_ACTION_OPEN),
+        outerLongPressAction = recentsAction(p[Keys.RECENTS_OUTER_LONG_PRESS], LauncherSettings.RECENTS_ACTION_MENU),
+        outerDoubleTapAction = recentsAction(p[Keys.RECENTS_OUTER_DOUBLE_TAP], LauncherSettings.RECENTS_ACTION_POPUP),
+        pinned = lines(p[Keys.RECENTS_PINNED]),
+        btnPin = p[Keys.RECENTS_BTN_PIN] ?: true,
+        pinKeepAlive = p[Keys.RECENTS_PIN_KEEP_ALIVE] ?: true,
+        attachedSide = if (p[Keys.RECENTS_ATTACHED_SIDE] == LauncherSettings.RECENTS_ATTACHED_RIGHT)
+            LauncherSettings.RECENTS_ATTACHED_RIGHT else LauncherSettings.RECENTS_ATTACHED_LEFT,
+        attachedPeek = (p[Keys.RECENTS_ATTACHED_PEEK] ?: 0.12f)
+            .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
+    )
+
+    /** [p] with every Recents look setting the cover screen has its own value for replaced by it. */
+    @Suppress("UNCHECKED_CAST")
+    private fun coverLook(p: Preferences): Preferences = p.toMutablePreferences().apply {
+        Keys.RECENTS_LOOK_KEYS.forEach { (unfolded, cover) ->
+            p[cover as Preferences.Key<Any>]?.let { this[unfolded as Preferences.Key<Any>] = it }
+        }
+    }
+
+    suspend fun setRecentsOuterLook(value: Boolean) = edit { it[Keys.RECENTS_OUTER_LOOK] = value }
 
     private fun recentsAction(value: String?, fallback: String): String =
         if (value in LauncherSettings.RECENTS_ACTIONS) value!! else fallback
@@ -700,6 +781,8 @@ class SettingsRepository @Inject constructor(
         if (value in LauncherSettings.ROOT_MODES) value!! else LauncherSettings.ROOT_MODE_FALLBACK
     suspend fun setIconNudge(value: Boolean) = edit { it[Keys.ICON_NUDGE] = value }
     suspend fun setUnlockTransition(value: Boolean) = edit { it[Keys.UNLOCK_TRANSITION] = value }
+    suspend fun setUnlockSystemHook(value: Boolean) = edit { it[Keys.UNLOCK_SYSTEM_HOOK] = value }
+    suspend fun setUnlockStyle(value: String) = edit { it[Keys.UNLOCK_STYLE] = value }
     suspend fun setIconNudgeTaskbar(value: Boolean) = edit { it[Keys.ICON_NUDGE_TASKBAR] = value }
     suspend fun setIconNudgeEffect(value: String) = edit { it[Keys.ICON_NUDGE_EFFECT] = value }
     suspend fun setIconNudgeSoftness(value: Float) = edit { it[Keys.ICON_NUDGE_SOFTNESS] = value.coerceIn(0f, 1f) }
@@ -1346,6 +1429,9 @@ class SettingsRepository @Inject constructor(
         fun appFontBold(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "app_font_bold" else "app_font_bold_inner")
         fun appFontSizeScale(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "app_font_size_scale" else "app_font_size_scale_inner")
         val FLOATING_WINDOW_SIZE = stringPreferencesKey("floating_window_size")
+        val THREE_APP_SPLIT = booleanPreferencesKey("three_app_split")
+        val DRAWER_TABS_EXCLUSIVE = booleanPreferencesKey("drawer_tabs_exclusive")
+        val TASKBAR_PAIRS = stringPreferencesKey("taskbar_pairs")
         val SEARCH_SHORTCUTS = booleanPreferencesKey("search_shortcuts")
         val SEARCH_WEB = booleanPreferencesKey("search_web")
         val ANIMATION_SPEED = floatPreferencesKey("animation_speed")
@@ -1394,6 +1480,7 @@ class SettingsRepository @Inject constructor(
         val DOT_AVATARS = booleanPreferencesKey("dot_avatars")
         val LIVE_ACTIVITIES = booleanPreferencesKey("live_activities")
         val LIVE_ACTIVITIES_TASKBAR = booleanPreferencesKey("live_activities_taskbar")
+        val LIVE_EXPAND = booleanPreferencesKey("live_expand")
         val LIVE_ACTIVITY_EFFECT = stringPreferencesKey("live_activity_effect")
         val SEARCH_ACTIONS = booleanPreferencesKey("search_actions")
         val RECENTS_ENABLED = booleanPreferencesKey("recents_enabled")
@@ -1403,12 +1490,18 @@ class SettingsRepository @Inject constructor(
         val RECENTS_COLUMNS_OUTER = intPreferencesKey("recents_columns_outer")
         val RECENTS_MAX_APPS = intPreferencesKey("recents_max_apps")
         val RECENTS_CARD_HEIGHT = intPreferencesKey("recents_card_height")
+        val RECENTS_OUTER_CARD_HEIGHT = intPreferencesKey("recents_outer_card_height")
         val RECENTS_CORNER = intPreferencesKey("recents_corner")
+        val RECENTS_OUTER_CORNER = intPreferencesKey("recents_outer_corner")
         val RECENTS_BACKDROP = floatPreferencesKey("recents_backdrop")
+        val RECENTS_OUTER_BACKDROP = floatPreferencesKey("recents_outer_backdrop")
         val RECENTS_SORT = stringPreferencesKey("recents_sort")
         val RECENTS_SHOW_TIME = booleanPreferencesKey("recents_show_time")
+        val RECENTS_OUTER_SHOW_TIME = booleanPreferencesKey("recents_outer_show_time")
         val RECENTS_SHOW_ACTIONS = booleanPreferencesKey("recents_show_actions")
+        val RECENTS_OUTER_SHOW_ACTIONS = booleanPreferencesKey("recents_outer_show_actions")
         val RECENTS_CARD_LAYOUT = stringPreferencesKey("recents_card_layout")
+        val RECENTS_OUTER_CARD_LAYOUT = stringPreferencesKey("recents_outer_card_layout")
         val RECENTS_CONFIRM_CLOSE_ALL = booleanPreferencesKey("recents_confirm_close_all")
         val RECENTS_THIRD_IN_SPLIT = booleanPreferencesKey("recents_third_in_split")
         val RECENTS_THUMBNAILS = booleanPreferencesKey("recents_thumbnails")
@@ -1416,27 +1509,81 @@ class SettingsRepository @Inject constructor(
         val TASKBAR_RUNNING_APPS = booleanPreferencesKey("taskbar_running_apps")
         val TASKBAR_RUNNING_DOTS = booleanPreferencesKey("taskbar_running_dots")
         val RECENTS_ENTER = stringPreferencesKey("recents_enter")
+        val RECENTS_OUTER_ENTER = stringPreferencesKey("recents_outer_enter")
         val RECENTS_SELECT = stringPreferencesKey("recents_select")
+        val RECENTS_OUTER_SELECT = stringPreferencesKey("recents_outer_select")
         val RECENTS_ANIM_SPEED = floatPreferencesKey("recents_anim_speed")
+        val RECENTS_OUTER_ANIM_SPEED = floatPreferencesKey("recents_outer_anim_speed")
         val ROOT_ENABLED = booleanPreferencesKey("root_enabled")
         val RECENTS_THEME = stringPreferencesKey("recents_theme")
+        val RECENTS_OUTER_THEME = stringPreferencesKey("recents_outer_theme")
         val RECENTS_PRESS = stringPreferencesKey("recents_press")
+        val RECENTS_OUTER_PRESS = stringPreferencesKey("recents_outer_press")
         val RECENTS_GLASS = booleanPreferencesKey("recents_glass")
+        val RECENTS_OUTER_GLASS = booleanPreferencesKey("recents_outer_glass")
         val RECENTS_GLASS_BLUR = intPreferencesKey("recents_glass_blur")
+        val RECENTS_OUTER_GLASS_BLUR = intPreferencesKey("recents_outer_glass_blur")
         val RECENTS_GLASS_TINT = floatPreferencesKey("recents_glass_tint")
+        val RECENTS_OUTER_GLASS_TINT = floatPreferencesKey("recents_outer_glass_tint")
         val RECENTS_DRAG_DROP = booleanPreferencesKey("recents_drag_drop")
+        val RECENTS_OVERLAY_LABELS = booleanPreferencesKey("recents_overlay_labels")
+        val RECENTS_OUTER_OVERLAY_LABELS = booleanPreferencesKey("recents_outer_overlay_labels")
+        val RECENTS_MENU_MOTION = booleanPreferencesKey("recents_menu_motion")
+        val RECENTS_OUTER_MENU_MOTION = booleanPreferencesKey("recents_outer_menu_motion")
         val RECENTS_BTN_CLOSE = booleanPreferencesKey("recents_btn_close")
+        val RECENTS_OUTER_BTN_CLOSE = booleanPreferencesKey("recents_outer_btn_close")
         val RECENTS_BTN_SPLIT = booleanPreferencesKey("recents_btn_split")
+        val RECENTS_OUTER_BTN_SPLIT = booleanPreferencesKey("recents_outer_btn_split")
         val RECENTS_BTN_POPUP = booleanPreferencesKey("recents_btn_popup")
+        val RECENTS_OUTER_BTN_POPUP = booleanPreferencesKey("recents_outer_btn_popup")
         val RECENTS_BTN_UNSPLIT = booleanPreferencesKey("recents_btn_unsplit")
+        val RECENTS_OUTER_BTN_UNSPLIT = booleanPreferencesKey("recents_outer_btn_unsplit")
         val RECENTS_BTN_SPLIT_VIEW = booleanPreferencesKey("recents_btn_split_view")
+        val RECENTS_OUTER_BTN_SPLIT_VIEW = booleanPreferencesKey("recents_outer_btn_split_view")
         val RECENTS_BTN_CLOSE_ALL = booleanPreferencesKey("recents_btn_close_all")
+        val RECENTS_OUTER_BTN_CLOSE_ALL = booleanPreferencesKey("recents_outer_btn_close_all")
         val RECENTS_SWIPE_UP = stringPreferencesKey("recents_swipe_up")
         val RECENTS_SWIPE_DOWN = stringPreferencesKey("recents_swipe_down")
         val RECENTS_LONG_PRESS = stringPreferencesKey("recents_long_press")
         val RECENTS_DOUBLE_TAP = stringPreferencesKey("recents_double_tap")
+        val RECENTS_OUTER_GESTURES = booleanPreferencesKey("recents_outer_gestures")
+        val RECENTS_OUTER_LOOK = booleanPreferencesKey("recents_outer_look")
+
+        /** Each Recents look setting with its cover-screen key (Settings ▸ Recents ▸ Own look on the cover screen). */
+        val RECENTS_LOOK_KEYS: List<Pair<Preferences.Key<*>, Preferences.Key<*>>> by lazy {
+            listOf(
+                RECENTS_THEME to RECENTS_OUTER_THEME,
+                RECENTS_CARD_LAYOUT to RECENTS_OUTER_CARD_LAYOUT,
+                RECENTS_OVERLAY_LABELS to RECENTS_OUTER_OVERLAY_LABELS,
+                RECENTS_CARD_HEIGHT to RECENTS_OUTER_CARD_HEIGHT,
+                RECENTS_CORNER to RECENTS_OUTER_CORNER,
+                RECENTS_BACKDROP to RECENTS_OUTER_BACKDROP,
+                RECENTS_SHOW_TIME to RECENTS_OUTER_SHOW_TIME,
+                RECENTS_SHOW_ACTIONS to RECENTS_OUTER_SHOW_ACTIONS,
+                RECENTS_GLASS to RECENTS_OUTER_GLASS,
+                RECENTS_GLASS_BLUR to RECENTS_OUTER_GLASS_BLUR,
+                RECENTS_GLASS_TINT to RECENTS_OUTER_GLASS_TINT,
+                RECENTS_ENTER to RECENTS_OUTER_ENTER,
+                RECENTS_SELECT to RECENTS_OUTER_SELECT,
+                RECENTS_ANIM_SPEED to RECENTS_OUTER_ANIM_SPEED,
+                RECENTS_PRESS to RECENTS_OUTER_PRESS,
+                RECENTS_MENU_MOTION to RECENTS_OUTER_MENU_MOTION,
+                RECENTS_BTN_CLOSE to RECENTS_OUTER_BTN_CLOSE,
+                RECENTS_BTN_SPLIT to RECENTS_OUTER_BTN_SPLIT,
+                RECENTS_BTN_POPUP to RECENTS_OUTER_BTN_POPUP,
+                RECENTS_BTN_UNSPLIT to RECENTS_OUTER_BTN_UNSPLIT,
+                RECENTS_BTN_PIN to RECENTS_OUTER_BTN_PIN,
+                RECENTS_BTN_SPLIT_VIEW to RECENTS_OUTER_BTN_SPLIT_VIEW,
+                RECENTS_BTN_CLOSE_ALL to RECENTS_OUTER_BTN_CLOSE_ALL,
+            )
+        }
+        val RECENTS_OUTER_SWIPE_UP = stringPreferencesKey("recents_outer_swipe_up")
+        val RECENTS_OUTER_SWIPE_DOWN = stringPreferencesKey("recents_outer_swipe_down")
+        val RECENTS_OUTER_LONG_PRESS = stringPreferencesKey("recents_outer_long_press")
+        val RECENTS_OUTER_DOUBLE_TAP = stringPreferencesKey("recents_outer_double_tap")
         val RECENTS_PINNED = stringPreferencesKey("recents_pinned")
         val RECENTS_BTN_PIN = booleanPreferencesKey("recents_btn_pin")
+        val RECENTS_OUTER_BTN_PIN = booleanPreferencesKey("recents_outer_btn_pin")
         val RECENTS_PIN_KEEP_ALIVE = booleanPreferencesKey("recents_pin_keep_alive")
         val RECENTS_PIN_EXEMPT = stringPreferencesKey("recents_pin_exempt")
         val TASKBAR_HIDDEN_APPS = stringPreferencesKey("taskbar_hidden_apps")
@@ -1459,6 +1606,8 @@ class SettingsRepository @Inject constructor(
         val ROOT_KEEP_WIDGETS = booleanPreferencesKey("root_keep_widgets")
         val ICON_NUDGE = booleanPreferencesKey("icon_nudge")
         val UNLOCK_TRANSITION = booleanPreferencesKey("unlock_transition")
+        val UNLOCK_SYSTEM_HOOK = booleanPreferencesKey("unlock_system_hook")
+        val UNLOCK_STYLE = stringPreferencesKey("unlock_style")
         val ICON_NUDGE_TASKBAR = booleanPreferencesKey("icon_nudge_taskbar")
         val ICON_NUDGE_EFFECT = stringPreferencesKey("icon_nudge_effect")
         val ICON_NUDGE_SOFTNESS = floatPreferencesKey("icon_nudge_softness")

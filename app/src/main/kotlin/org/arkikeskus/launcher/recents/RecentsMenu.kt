@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.recents
 
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -50,29 +52,51 @@ import org.arkikeskus.launcher.ui.component.liquidGlass
 import org.arkikeskus.launcher.ui.component.pressClick
 import kotlin.math.roundToInt
 
-/** The card whose long-press menu is open, and where the finger was (screen coordinates). */
+/**
+ * The card whose long-press menu is open, and where the finger was (screen coordinates). Closing
+ * is animated: the menu stays drawn while [closing], and [finish] removes it once it has gone.
+ */
 @Stable
 internal class RecentsMenuState {
     var card by mutableStateOf<RecentsCard?>(null)
         private set
     var at by mutableStateOf(Offset.Zero)
         private set
+    var closing by mutableStateOf(false)
+        private set
+
+    /** Open and not on its way out (the cards behind it dim and the source card lifts only then). */
+    val isOpen: Boolean get() = card != null && !closing
 
     fun open(card: RecentsCard, at: Offset) {
         this.card = card
         this.at = at
+        closing = false
     }
 
     fun close() {
-        card = null
+        if (card != null) closing = true
     }
+
+    fun finish() {
+        card = null
+        closing = false
+    }
+}
+
+/** Where the menu grows from, as a fraction of its own size (set while it is placed). */
+private class Pivot {
+    var x = 0.5f
+    var y = 0f
 }
 
 /**
  * A card's long-press menu, in Liquid Glass. It names the app at the top, then the things you can
  * do with it: Open, Split screen, Freeform, Lock, App info, Close app — each shown only where it
- * can be done (Close needs root and isn't offered for a locked app). It grows from under the
- * finger, dims the cards behind it, and closes on a tap outside.
+ * can be done (Close needs root and isn't offered for a locked app). It grows out of the point
+ * under the finger with a little spring, its rows slide in one after another, and it shrinks back
+ * toward that point when it closes (Settings ▸ Recents ▸ Animate the long-press menu; off: it just
+ * appears and goes). A tap outside closes it.
  */
 @Composable
 internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
@@ -80,39 +104,53 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
     val items = buildList {
         add(MenuItem(R.string.recents_menu_open, Glyph.OPEN) { env.onTap(card) })
         if (!card.isSplit) add(MenuItem(R.string.recents_menu_split, Glyph.SPLIT) { env.onSplit(card) })
+        if (!card.isSplit && env.settings.launch.threeAppSplit) {
+            add(MenuItem(R.string.recents_menu_split_three, Glyph.SPLIT3) { env.onSplitThree(card) })
+        }
+        // Android's peek view: one app big, the other peeking in from the edge (a strip to tap).
+        add(MenuItem(R.string.recents_menu_peek, Glyph.PEEK) { if (card.isSplit) env.onPeekSplit(card) else env.onPeekPick(card) })
         if (!card.isSplit) add(MenuItem(R.string.recents_menu_freeform, Glyph.FREEFORM) { env.onPopUp(card) })
         if (card.isSplit) add(MenuItem(R.string.recents_menu_unsplit, Glyph.UNSPLIT) { env.onUnsplit(card) })
         add(MenuItem(if (card.pinned) R.string.recents_menu_unlock else R.string.recents_menu_lock, Glyph.LOCK) { env.onTogglePin(card) })
         add(MenuItem(R.string.recents_menu_info, Glyph.INFO) { env.onAppInfo(card) })
         if (env.canClose && !card.pinned) add(MenuItem(R.string.recents_menu_close, Glyph.CLOSE, danger = true) { env.onClose(card) })
     }
-    val grow = remember(card.key) { Animatable(0.82f) }
-    val dim = remember(card.key) { Animatable(0f) }
-    LaunchedEffect(card.key) {
-        dim.animateTo(1f, tween(140))
-    }
-    LaunchedEffect(card.key) {
-        grow.animateTo(1f, spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMedium))
+    val motion = env.settings.recents.menuMotion
+    val speed = env.speed.coerceIn(0.25f, 4f)
+    val progress = remember(card.key) { Animatable(if (motion) 0f else 1f) }
+    val pivot = remember(card.key) { Pivot() }
+    LaunchedEffect(card.key, menu.closing) {
+        if (!menu.closing) {
+            if (motion) progress.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 420f * speed * speed))
+            else progress.snapTo(1f)
+        } else {
+            if (motion) progress.animateTo(0f, tween((150 / speed).toInt(), easing = FastOutLinearInEasing))
+            menu.finish()
+        }
     }
     val shape = RoundedCornerShape(26.dp)
-    val tint = env.settings.recentsGlassTint
+    val tint = env.settings.recents.glassTint
     val accent = env.accent
+    val rise = with(LocalDensity.current) { 10.dp.toPx() }
+    /** A row's own share of the animation: each starts a little after the one above. */
+    fun rowIn(i: Int): Float = ((progress.value - 0.12f - i * 0.07f) / 0.45f).coerceIn(0f, 1f)
     Box(
         Modifier
             .fillMaxSize()
             // A soft dim behind the menu makes it the focus; tapping it closes the menu.
-            .drawBehind { drawRect(Color.Black.copy(alpha = 0.32f * dim.value)) }
+            .drawBehind { drawRect(Color.Black.copy(alpha = 0.32f * progress.value.coerceIn(0f, 1f))) }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { menu.close() },
     ) {
         Column(
             Modifier
-                .placeNear(menu.at)
+                .placeNear(menu.at, pivot)
                 .graphicsLayer {
-                    val k = grow.value
-                    scaleX = k; scaleY = k
-                    alpha = ((k - 0.82f) / 0.18f).coerceIn(0f, 1f)
-                    transformOrigin = TransformOrigin(0.5f, 0f)
-                    shadowElevation = 30f
+                    val k = progress.value
+                    val sc = 0.55f + 0.45f * k
+                    scaleX = sc; scaleY = sc
+                    alpha = (k * 1.8f).coerceIn(0f, 1f)
+                    transformOrigin = TransformOrigin(pivot.x, pivot.y)
+                    shadowElevation = 30f * k.coerceIn(0f, 1f)
                     this.shape = shape
                     clip = false
                 }
@@ -127,7 +165,10 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
         ) {
             // Header: which app (or split pair) this menu is about.
             Row(
-                Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 8.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { val t = rowIn(0); alpha = t; translationY = (1f - t) * rise }
+                    .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -138,12 +179,14 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
                 if (card.pinned) PinGlyph(accent)
             }
             Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-            items.forEach { item ->
+            items.forEachIndexed { i, item ->
                 val color = if (item.danger) Color(0xFFFF6B6B) else Ink
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .graphicsLayer { val t = rowIn(i + 1); alpha = t; translationY = (1f - t) * rise }
                         .pressClick {
+                            if (menu.closing) return@pressClick
                             menu.close()
                             item.action()
                         }
@@ -161,10 +204,13 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
 
 private class MenuItem(val label: Int, val glyph: Glyph, val danger: Boolean = false, val action: () -> Unit)
 
-private enum class Glyph { OPEN, SPLIT, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE }
+private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE }
 
-/** Places the menu just below [at], centred on it, always fully on screen (above it if no room below). */
-private fun Modifier.placeNear(at: Offset): Modifier = layout { measurable, constraints ->
+/**
+ * Places the menu just below [at], centred on it, always fully on screen (above it if no room
+ * below), and notes in [pivot] where [at] falls on the menu, so it grows out of that very point.
+ */
+private fun Modifier.placeNear(at: Offset, pivot: Pivot): Modifier = layout { measurable, constraints ->
     val p = measurable.measure(Constraints())
     val margin = 16.dp.roundToPx()
     val gap = 12.dp.roundToPx()
@@ -173,6 +219,8 @@ private fun Modifier.placeNear(at: Offset): Modifier = layout { measurable, cons
     val x = (at.x.roundToInt() - p.width / 2).coerceIn(margin, (maxW - p.width - margin).coerceAtLeast(margin))
     val below = at.y.roundToInt() + gap
     val y = if (below + p.height + margin <= maxH) below else (at.y.roundToInt() - gap - p.height).coerceAtLeast(margin)
+    pivot.x = ((at.x - x) / p.width.coerceAtLeast(1)).coerceIn(0f, 1f)
+    pivot.y = ((at.y - y) / p.height.coerceAtLeast(1)).coerceIn(0f, 1f)
     layout(maxW, maxH) { p.place(x, y) }
 }
 
@@ -201,6 +249,16 @@ private fun DrawScope.drawGlyph(glyph: Glyph, color: Color, locked: Boolean) {
         Glyph.SPLIT -> {
             drawRoundRect(color, Offset(w * 0.06f, w * 0.14f), Size(w * 0.38f, w * 0.72f), r, style = stroke)
             drawRoundRect(color, Offset(w * 0.56f, w * 0.14f), Size(w * 0.38f, w * 0.72f), r, style = stroke)
+        }
+        Glyph.SPLIT3 -> {
+            // Three panes side by side.
+            val pw = w * 0.25f
+            for (i in 0..2) drawRoundRect(color, Offset(w * 0.06f + i * (pw + w * 0.065f), w * 0.14f), Size(pw, w * 0.72f), r, style = stroke)
+        }
+        Glyph.PEEK -> {
+            // A big pane and a thin strip at its edge.
+            drawRoundRect(color, Offset(w * 0.26f, w * 0.14f), Size(w * 0.68f, w * 0.72f), r, style = stroke)
+            drawRoundRect(color, Offset(w * 0.06f, w * 0.22f), Size(w * 0.1f, w * 0.56f), CornerRadius(w * 0.05f))
         }
         Glyph.FREEFORM -> {
             drawRoundRect(color, Offset(w * 0.06f, w * 0.1f), Size(w * 0.88f, w * 0.8f), r, style = stroke)

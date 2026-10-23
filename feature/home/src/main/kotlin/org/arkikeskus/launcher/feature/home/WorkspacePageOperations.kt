@@ -17,20 +17,20 @@ internal class WorkspacePageOperations(
 ) {
     private val mutex = Mutex()
 
-    private suspend fun pageCount(s: LauncherSettings): Int = permanentPageCount(occupiedPages(), s.homePageCount)
+    private suspend fun pageCount(s: LauncherSettings): Int = permanentPageCount(occupiedPages(), s.home.pageCount)
 
     suspend fun insert(at: Int): Int = mutex.withLock {
         val s = settings()
         val count = pageCount(s)
         if (count >= HomeLayoutRepository.MAX_PAGES) return@withLock -1
         val index = at.coerceIn(0, count)
-        val home = s.homePage.coerceIn(0, count - 1)
+        val home = s.home.page.coerceIn(0, count - 1)
         // A disappearing UI coroutine must not abandon the counters after shifting the rows, and a
         // counter write that fails must not leave the rows shifted: the new page is closed again.
         withContext(NonCancellable) {
             insertRows(index)
             try {
-                save(if (home >= index) home + 1 else home, explicitPageCountAfterInsert(s.homePageCount, index))
+                save(if (home >= index) home + 1 else home, explicitPageCountAfterInsert(s.home.pageCount, index))
             } catch (e: Exception) {
                 runCatching { removeRows(index, false) }
                 throw e
@@ -46,7 +46,7 @@ internal class WorkspacePageOperations(
         val count = pageCount(s)
         if (count <= 1 || page !in 0 until count) return@withLock null
         val target = page.coerceAtMost(count - 2)
-        val home = s.homePage.coerceIn(0, count - 1)
+        val home = s.home.page.coerceIn(0, count - 1)
         withContext(NonCancellable) {
             if (!removeRows(page, purge)) return@withContext null
             try {
@@ -56,7 +56,7 @@ internal class WorkspacePageOperations(
                         home == page -> target
                         else -> home
                     },
-                    explicitPageCountAfterRemove(s.homePageCount, page),
+                    explicitPageCountAfterRemove(s.home.pageCount, page),
                 )
             } catch (e: Exception) {
                 // Reopen the gap so the rows match the counters that were never written.
@@ -69,6 +69,6 @@ internal class WorkspacePageOperations(
 
     suspend fun setHome(page: Int) = mutex.withLock {
         val s = settings()
-        save(page.coerceIn(0, pageCount(s) - 1), s.homePageCount)
+        save(page.coerceIn(0, pageCount(s) - 1), s.home.pageCount)
     }
 }

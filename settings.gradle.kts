@@ -35,5 +35,5 @@ include(":core:ui")
 include(":feature:home")
 include(":feature:appdrawer")
 include(":feature:settings")
-// Compile-time stand-in for the Xposed API (Folark's Vector / LSPosed module); never packaged.
-include(":xposed-api-stub")
+// The Xposed API stand-in is consumed by :app as a compile-only JAR (app/libs/xposed-api-stub.jar),
+// not as a module, so it is never packaged into the APK. Source lives in xposed-api-stub/src.

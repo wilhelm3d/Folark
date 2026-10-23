@@ -223,4 +223,7 @@
     <string name="mixer_per_app">Per-app volume</string>
     <string name="mixer_nothing_playing">Nothing is playing</string>
     <string name="mixer_media_volume">Media volume</string>
+    <string name="taskbar_split_peek_left">Left app peeks in</string>
+    <string name="taskbar_split_peek_right">Right app peeks in</string>
+    <string name="taskbar_split_even">Half and half</string>
 </resources>

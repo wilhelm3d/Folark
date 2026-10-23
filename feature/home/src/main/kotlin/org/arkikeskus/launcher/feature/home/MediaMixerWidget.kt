@@ -216,7 +216,7 @@ fun MediaMixerWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
         runCatching { context.packageManager.getActivityInfo(MOTO_PER_APP_VOLUME, 0) }.isSuccess
     }
 
-    FolarkWidgetSurface(theme = settings.mediaWidgetTheme, modifier = modifier) { ink ->
+    FolarkWidgetSurface(theme = settings.widgets.mediaTheme, modifier = modifier) { ink ->
         Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(

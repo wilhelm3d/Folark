@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.data.SplitThree
+import org.arkikeskus.launcher.model.AppPair
 import android.annotation.SuppressLint
 import org.arkikeskus.launcher.data.LaunchOrigin
 import org.arkikeskus.launcher.data.IconShapes
@@ -125,9 +127,13 @@ private data class TaskbarSetup(
     val alwaysApps: Set<String>,
     val liveEnabled: Boolean,
     val liveEffect: String,
+    val liveExpand: Boolean,
     val nudgeEnabled: Boolean,
     val nudgeEffect: String,
     val nudgeSoftness: Float,
+    /** Saved app pairs / trios pinned on the bar (ids from settings, then the pairs themselves). */
+    val pairIds: List<String>,
+    val pairs: List<AppPair> = emptyList(),
 )
 
 /**
@@ -273,52 +279,56 @@ internal class AppTaskbar(private val context: Context) {
                 allApps = all
                 TaskbarSetup(
                     // Android's taskbar chosen instead (Settings ▸ Taskbar): Folark's stays away.
-                    enabled = s.taskbarEnabled && s.taskbarSource == LauncherSettings.TASKBAR_SOURCE_FOLARK,
-                    pinned = (s.taskbarPinnedApps ?: favorites).mapNotNull { byKey[it] }.take(MAX_PINNED),
-                    recentCount = s.taskbarRecentCount,
-                    iconSizeDp = s.taskbarIconSize,
-                    spacingDp = s.taskbarIconSpacing,
-                    bottomDp = s.taskbarBottomOffset,
-                    theme = s.taskbarTheme,
-                    opacity = s.taskbarOpacity,
-                    handles = s.taskbarHandles,
-                    handleHint = s.taskbarHandleHint,
-                    onHome = s.taskbarOnHome,
-                    keepOpen = s.taskbarKeepOpen,
-                    themedIcons = s.useThemedIcons,
-                    iconPack = s.iconPackPackage,
+                    enabled = s.taskbar.enabled && s.taskbar.source == LauncherSettings.TASKBAR_SOURCE_FOLARK,
+                    pinned = (s.taskbar.pinnedApps ?: favorites).mapNotNull { byKey[it] }.take(MAX_PINNED),
+                    recentCount = s.taskbar.recentCount,
+                    iconSizeDp = s.taskbar.iconSize,
+                    spacingDp = s.taskbar.iconSpacing,
+                    bottomDp = s.taskbar.bottomOffset,
+                    theme = s.taskbar.theme,
+                    opacity = s.taskbar.opacity,
+                    handles = s.taskbar.handles,
+                    handleHint = s.taskbar.handleHint,
+                    onHome = s.taskbar.onHome,
+                    keepOpen = s.taskbar.keepOpen,
+                    themedIcons = s.icons.useThemedIcons,
+                    iconPack = s.icons.iconPack,
                     customIcons = custom,
-                    iconShape = s.iconShape,
+                    iconShape = s.icons.shape,
                     // Apps opened through Folark, newest first: the recent apps without Usage access.
                     launchHistory = usage.entries.sortedByDescending { it.value.lastUsed }.map { it.key }.take(24),
-                    mediaEnabled = s.taskbarMediaEnabled,
-                    mediaShowPaused = s.taskbarMediaShowPaused,
-                    mediaPosition = s.taskbarMediaPosition,
-                    mediaTap = s.taskbarMediaTap,
-                    mediaControls = s.taskbarMediaControls,
-                    mediaShape = s.taskbarMediaShape,
-                    mediaBadge = s.taskbarMediaBadge,
-                    systemDrag = s.taskbarSystemDrag,
+                    mediaEnabled = s.taskbar.mediaEnabled,
+                    mediaShowPaused = s.taskbar.mediaShowPaused,
+                    mediaPosition = s.taskbar.mediaPosition,
+                    mediaTap = s.taskbar.mediaTap,
+                    mediaControls = s.taskbar.mediaControls,
+                    mediaShape = s.taskbar.mediaShape,
+                    mediaBadge = s.taskbar.mediaBadge,
+                    systemDrag = s.taskbar.systemDrag,
                     // Folark Recents switched off: the button opens Android's again.
-                    recentsButton = s.taskbarRecentsButton.let {
-                        if (it == LauncherSettings.TASKBAR_RECENTS_FOLARK && !s.recentsEnabled) LauncherSettings.TASKBAR_RECENTS_SYSTEM else it
+                    recentsButton = s.taskbar.recentsButton.let {
+                        if (it == LauncherSettings.TASKBAR_RECENTS_FOLARK && !s.recents.enabled) LauncherSettings.TASKBAR_RECENTS_SYSTEM else it
                     },
-                    runningApps = s.taskbarRunningApps,
-                    runningDots = s.taskbarRunningDots,
-                    quickSwitch = s.taskbarQuickSwitch,
-                    splitControls = s.taskbarSplitControls,
-                    splitSide = s.taskbarSplitSide,
-                    threeApp = s.taskbarThreeApp,
-                    hideFullScreen = s.taskbarHideFullScreen,
-                    hiddenApps = s.taskbarHiddenApps,
-                    replaceRecents = s.recentsEnabled && s.recentsReplaceSystem,
-                    alwaysApps = s.taskbarAlwaysApps,
-                    liveEnabled = s.liveActivities && s.liveActivitiesTaskbar,
-                    liveEffect = s.liveActivityEffect,
-                    nudgeEnabled = s.iconNudge && s.iconNudgeTaskbar,
-                    nudgeEffect = s.iconNudgeEffect,
-                    nudgeSoftness = s.iconNudgeSoftness,
+                    runningApps = s.taskbar.runningApps,
+                    runningDots = s.taskbar.runningDots,
+                    quickSwitch = s.taskbar.quickSwitch,
+                    splitControls = s.taskbar.splitControls,
+                    splitSide = s.taskbar.splitSide,
+                    threeApp = s.taskbar.threeApp,
+                    hideFullScreen = s.taskbar.hideFullScreen,
+                    hiddenApps = s.taskbar.hiddenApps,
+                    replaceRecents = s.recents.enabled && s.recents.replaceSystem,
+                    alwaysApps = s.taskbar.alwaysApps,
+                    liveEnabled = s.live.activities && s.live.activitiesTaskbar,
+                    liveEffect = s.live.activityEffect,
+                    liveExpand = s.live.expandOnLongPress,
+                    nudgeEnabled = s.icons.nudge && s.icons.nudgeTaskbar,
+                    nudgeEffect = s.icons.nudgeEffect,
+                    nudgeSoftness = s.icons.nudgeSoftness,
+                    pairIds = s.taskbar.pinnedPairs,
                 )
+            }.combine(appRepository.appPairs) { setup, saved ->
+                setup.copy(pairs = setup.pairIds.mapNotNull { id -> saved.firstOrNull { it.id == id } })
             }.distinctUntilChanged().collect { next ->
                 val previous = setup
                 val style = "${next.themedIcons}|${next.iconPack}|${next.customIcons.hashCode()}|${next.iconShape}"
@@ -395,7 +405,7 @@ internal class AppTaskbar(private val context: Context) {
         // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
         ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty()) && screenOn && largeScreen())
         val active = s != null && s.enabled && screenOn && largeScreen() && keyguard?.isKeyguardLocked != true &&
-            (s.pinned.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
+            (s.pinned.isNotEmpty() || s.pairs.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
         if (!active || s == null) {
             expanded = false
             remove()
@@ -612,6 +622,12 @@ internal class AppTaskbar(private val context: Context) {
                 marginEnd = dp(s.spacingDp) / 2
             })
         }
+        fun addPairIcon(pair: AppPair) {
+            row.addView(pairView(pair, s, size), LinearLayout.LayoutParams(size, size).apply {
+                marginStart = dp(s.spacingDp) / 2
+                marginEnd = dp(s.spacingDp) / 2
+            })
+        }
         val showMedia = mediaShown(s)
         mediaWasShown = showMedia
         val controls = if (showMedia) mediaControlsView(s) else null
@@ -634,8 +650,14 @@ internal class AppTaskbar(private val context: Context) {
                         refresh()
                     }
                 }
-                // A long press shows the next one when there are several.
+                // A long press opens it up (Settings ▸ Notifications), or else shows the next one.
                 setOnLongClickListener {
+                    if (s.liveExpand) {
+                        val current = activity ?: return@setOnLongClickListener false
+                        performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        showLiveDetails(current, this, s, fixed)
+                        return@setOnLongClickListener true
+                    }
                     if (live.size < 2) return@setOnLongClickListener false
                     liveIndex = (liveIndex + 1) % live.size
                     activity = live[liveIndex]
@@ -649,9 +671,10 @@ internal class AppTaskbar(private val context: Context) {
         }
         if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_START) addMedia()
         s.pinned.forEach(::addIcon)
+        s.pairs.forEach(::addPairIcon)
         if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE) addMedia()
         val recentApps = recents.filter { r -> s.pinned.none { it.key == r.key } }
-        if (s.pinned.isNotEmpty() && recentApps.isNotEmpty()) {
+        if ((s.pinned.isNotEmpty() || s.pairs.isNotEmpty()) && recentApps.isNotEmpty()) {
             val divider = View(context).apply {
                 setBackgroundColor(if (lightTheme) Color.argb(90, 0, 0, 0) else Color.argb(110, 255, 255, 255))
             }
@@ -779,6 +802,53 @@ internal class AppTaskbar(private val context: Context) {
     }
 
     @SuppressLint("ClickableViewAccessibility")
+    /**
+     * A saved app pair (or trio) on the bar: its apps' icons together on one rounded tile. A tap
+     * opens them in split screen — with a third app as a third pane where Folark's Vector module
+     * runs in SystemUI, floating otherwise (see AppRepository.launchAppPair).
+     */
+    private fun pairView(pair: AppPair, s: TaskbarSetup, size: Int): View {
+        val keys = listOfNotNull(pair.app1Key, pair.app2Key, pair.app3Key.takeIf { pair.hasThirdApp })
+        val frame = FrameLayout(context).apply {
+            contentDescription = pair.name
+            background = GradientDrawable().apply {
+                cornerRadius = size * 0.28f
+                val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+                setColor(if (light) Color.argb(36, 0, 0, 0) else Color.argb(44, 255, 255, 255))
+            }
+            setOnClickListener {
+                performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                repository?.launchAppPair(pair)
+            }
+        }
+        val three = keys.size == 3
+        val small = (size * if (three) 0.46f else 0.54f).toInt()
+        val spots = if (three) {
+            listOf(Gravity.TOP or Gravity.CENTER_HORIZONTAL, Gravity.BOTTOM or Gravity.START, Gravity.BOTTOM or Gravity.END)
+        } else {
+            listOf(Gravity.TOP or Gravity.START, Gravity.BOTTOM or Gravity.END)
+        }
+        val pad = size / 14
+        keys.forEachIndexed { i, key ->
+            val app = allApps.firstOrNull { it.key == key } ?: return@forEachIndexed
+            val image = ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
+            val cached = iconCache[app.key]
+            if (cached != null) {
+                image.setImageDrawable(cached)
+            } else {
+                scope.launch {
+                    val drawable = withContext(Dispatchers.IO) { loadIcon(app, s) }
+                    if (drawable != null) {
+                        iconCache[app.key] = drawable
+                        image.setImageDrawable(drawable)
+                    }
+                }
+            }
+            frame.addView(image, FrameLayout.LayoutParams(small, small, spots[i]).apply { setMargins(pad, pad, pad, pad) })
+        }
+        return frame
+    }
+
     private fun iconView(app: AppItem, s: TaskbarSetup, size: Int, hint: TextView, fixed: Boolean): ImageView {
         val icon = ImageView(context).apply {
             contentDescription = app.label
@@ -981,6 +1051,21 @@ internal class AppTaskbar(private val context: Context) {
                     rows += context.getString(R.string.taskbar_split_swap) to {
                         scope.launch(Dispatchers.IO) { ShellSplit.swapSides(context) }
                         Unit
+                    }
+                    // Android's peek view, one tap (Folark's Vector module in SystemUI).
+                    if (tasks.size == 2 && SplitThree.ready(context)) {
+                        rows += context.getString(R.string.taskbar_split_peek_left) to {
+                            scope.launch { SplitThree.snap(context, SplitThree.SNAP_PEEK_LEFT) }
+                            Unit
+                        }
+                        rows += context.getString(R.string.taskbar_split_peek_right) to {
+                            scope.launch { SplitThree.snap(context, SplitThree.SNAP_PEEK_RIGHT) }
+                            Unit
+                        }
+                        rows += context.getString(R.string.taskbar_split_even) to {
+                            scope.launch { SplitThree.snap(context, SplitThree.SNAP_EVEN) }
+                            Unit
+                        }
                     }
                     tasks.forEach { task ->
                         val label = allApps.firstOrNull { it.packageName == task.packageName }?.label ?: task.packageName
@@ -1189,6 +1274,9 @@ internal class AppTaskbar(private val context: Context) {
 
     private var shortcutWindow: View? = null
 
+    /** How long the opened-up live pill stays over the bar. */
+    private val LIVE_PANEL_IDLE_MS = 10_000L
+
     /** The app's shortcuts in a card above [anchor]: tap one to open it, drag it (over an app) to split. */
     @SuppressLint("ClickableViewAccessibility")
     private fun showShortcuts(app: AppItem, anchor: View, s: TaskbarSetup, fixed: Boolean) {
@@ -1302,6 +1390,112 @@ internal class AppTaskbar(private val context: Context) {
                 this.y = y
             }
             if (runCatching { windowManager.addView(panel, params) }.isSuccess) shortcutWindow = panel
+        }
+    }
+
+    /**
+     * The live pill opened up, as a small panel over the bar: the app, a big readout (clock, ETA,
+     * percentage), the title and text, a progress bar, and the notification's buttons plus Open.
+     * Closes on a touch outside it, a choice, or after a while.
+     */
+    private fun showLiveDetails(item: org.arkikeskus.launcher.model.LiveActivity, anchor: View, s: TaskbarSetup, fixed: Boolean) {
+        hideShortcuts()
+        handler.removeCallbacks(collapse)
+        val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+        val ink = if (light) Color.rgb(20, 20, 24) else Color.WHITE
+        val soft = if (light) Color.argb(170, 20, 20, 24) else Color.argb(190, 255, 255, 255)
+        val accent = item.color ?: Color.rgb(143, 211, 255)
+        val panel = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dpf(24f)
+                setColor(if (light) Color.argb(248, 242, 243, 246) else Color.argb(242, 22, 28, 31))
+                setStroke(dp(1), if (light) Color.argb(40, 0, 0, 0) else Color.argb(45, 255, 255, 255))
+            }
+            setPadding(dp(18), dp(14), dp(18), dp(14))
+            elevation = dpf(10f)
+            minimumWidth = dp(260)
+        }
+        fun text(value: CharSequence, sizeSp: Float, color: Int, bold: Boolean = false, lines: Int = 1) = TextView(context).apply {
+            text = value
+            textSize = sizeSp
+            setTextColor(color)
+            maxLines = lines
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        panel.addView(text(item.appLabel.ifBlank { item.packageName }, 12f, soft))
+        val now = System.currentTimeMillis()
+        item.shortText(now).takeIf { it != item.title && it != item.text }?.let {
+            panel.addView(text(it, 28f, ink, bold = true).apply {
+                if (item.ticks || item.progress != null) typeface = android.graphics.Typeface.MONOSPACE
+            })
+        }
+        panel.addView(text(item.title, 15f, ink, bold = true, lines = 2))
+        val body = item.bigText ?: item.text
+        if (body.isNotBlank() && body != item.title) panel.addView(text(body, 13f, soft, lines = 3))
+        if (item.progress != null || item.indeterminate) {
+            val bar = android.widget.ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+                isIndeterminate = item.indeterminate
+                max = 1000
+                progress = ((item.progress ?: 0f) * 1000).toInt()
+                progressTintList = android.content.res.ColorStateList.valueOf(accent)
+                indeterminateTintList = android.content.res.ColorStateList.valueOf(accent)
+            }
+            panel.addView(bar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(14)).apply { topMargin = dp(8) })
+        }
+        val buttons = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
+        fun button(label: String, filled: Boolean, onClick: () -> Unit) = text(label, 14f, if (filled) Color.WHITE else ink, bold = true).apply {
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply {
+                cornerRadius = dpf(999f)
+                setColor(if (filled) accent else if (light) Color.argb(26, 0, 0, 0) else Color.argb(32, 255, 255, 255))
+            }
+            setOnClickListener {
+                hideShortcuts()
+                onClick()
+                if (!fixed) handler.postDelayed(collapse, AUTO_COLLAPSE_MS)
+            }
+        }
+        item.actions.take(3).forEach { action ->
+            buttons.addView(button(action.title, false) { sendNotificationIntent(context, action.intent) },
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(6) })
+        }
+        buttons.addView(button(org.arkikeskus.launcher.model.LiveActivity.OPEN_LABEL, true) {
+            item.contentIntent?.let { sendNotificationIntent(context, it) }
+        })
+        panel.addView(buttons, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(12) })
+        panel.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+                hideShortcuts()
+                if (!fixed) handler.postDelayed(collapse, AUTO_COLLAPSE_MS)
+            }
+            false
+        }
+        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val at = IntArray(2)
+        anchor.getLocationOnScreen(at)
+        val screenWidth = context.resources.displayMetrics.widthPixels
+        val width = panel.measuredWidth.coerceAtMost(dp(380))
+        val x = (at[0] + anchor.width / 2 - width / 2).coerceIn(dp(8), (screenWidth - width - dp(8)).coerceAtLeast(dp(8)))
+        val y = (at[1] - panel.measuredHeight - dp(12)).coerceAtLeast(dp(8))
+        val params = WindowManager.LayoutParams(
+            width,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            this.x = x
+            this.y = y
+        }
+        if (runCatching { windowManager.addView(panel, params) }.isSuccess) {
+            shortcutWindow = panel
+            handler.postDelayed({ if (shortcutWindow === panel) hideShortcuts() }, LIVE_PANEL_IDLE_MS)
         }
     }
 

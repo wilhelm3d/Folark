@@ -9,11 +9,11 @@
 -keep class org.arkikeskus.launcher.data.root.RootMain { public static void main(java.lang.String[]); }
 
 # Folark's Vector (LSPosed) module: loaded by name from another process (the system launcher).
-# R8 must keep it by its exact name, keep its members and nested classes, and keep the Xposed
-# super-types so the "implements IXposedHookLoadPackage" relationship survives shrinking.
+# R8 must keep it by its exact name and keep its members and nested classes so the module entry
+# class and its hooks survive shrinking/renaming.
 -keep,allowoptimization class org.arkikeskus.launcher.xposed.** { *; }
 -keepclassmembers class org.arkikeskus.launcher.xposed.** { *; }
--keep class * implements de.robv.android.xposed.IXposedHookLoadPackage { *; }
--keep interface de.robv.android.xposed.** { *; }
--keep class de.robv.android.xposed.** { *; }
+# The de.robv.android.xposed.* classes are PROVIDED by Vector at runtime and are compile-only here.
+# We only silence warnings about them — we must NOT -keep them, or R8 would copy the compile-only
+# stub into the APK, duplicating Vector's framework classes and breaking module loading.
 -dontwarn de.robv.android.xposed.**

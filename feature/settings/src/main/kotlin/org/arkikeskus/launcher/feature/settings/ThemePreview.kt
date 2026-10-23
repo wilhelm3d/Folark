@@ -89,12 +89,18 @@ internal val LocalPreviewOverrides = staticCompositionLocalOf<PreviewOverrides?>
 
 /** [this] settings with the values being dragged right now. */
 internal fun LauncherSettings.withPreview(o: PreviewOverrides?): LauncherSettings = if (o == null) this else copy(
-    glassBlurRadius = o.glassBlur ?: glassBlurRadius,
-    glassDarkTint = o.glassTint ?: glassDarkTint,
-    homeWallpaperDim = o.homeDim ?: homeWallpaperDim,
-    homeWallpaperBlur = o.homeBlur ?: homeWallpaperBlur,
-    stackCornerRadius = o.stackCorner?.roundToInt() ?: stackCornerRadius,
-    widgetBackgroundOpacity = o.widgetOpacity ?: widgetBackgroundOpacity,
+    drawer = drawer.copy(
+        glassBlurRadius = o.glassBlur ?: drawer.glassBlurRadius,
+        glassDarkTint = o.glassTint ?: drawer.glassDarkTint,
+    ),
+    home = home.copy(
+        wallpaperDim = o.homeDim ?: home.wallpaperDim,
+        wallpaperBlur = o.homeBlur ?: home.wallpaperBlur,
+    ),
+    widgets = widgets.copy(
+        stackCornerRadius = o.stackCorner?.roundToInt() ?: widgets.stackCornerRadius,
+        backgroundOpacity = o.widgetOpacity ?: widgets.backgroundOpacity,
+    ),
 )
 
 // ------------------------------------------------------------------ the mini home screen
@@ -108,9 +114,9 @@ internal fun LauncherSettings.withPreview(o: PreviewOverrides?): LauncherSetting
 internal fun HomeThemePreview(settings: LauncherSettings, modifier: Modifier = Modifier) {
     val s = settings.withPreview(LocalPreviewOverrides.current)
     val apps = LocalPreviewApps.current
-    val labelColor = Color(s.appLabelColor)
+    val labelColor = Color(s.icons.labelColor)
     PreviewFrame(height = 250.dp, modifier = modifier) {
-        Backdrop(path = s.homeBackgroundImage, blur = s.homeWallpaperBlur, dim = s.homeWallpaperDim)
+        Backdrop(path = s.home.backgroundImage, blur = s.home.wallpaperBlur, dim = s.home.wallpaperDim)
         Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
             Text("12:30", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Light)
             Text(previewDate(), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
@@ -127,7 +133,7 @@ internal fun HomeThemePreview(settings: LauncherSettings, modifier: Modifier = M
                         appItem = app,
                         labelColor = labelColor,
                         iconSize = 40.dp,
-                        showLabel = s.showHomeLabels,
+                        showLabel = s.home.showLabels,
                         maxLabelLines = 1,
                         aquamorphicTouchEnabled = false,
                         modifier = Modifier.width(62.dp),
@@ -135,7 +141,7 @@ internal fun HomeThemePreview(settings: LauncherSettings, modifier: Modifier = M
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(62.dp)) {
                     FolderTile(s, apps.drop(3).take(4), 40.dp)
-                    if (s.showHomeLabels) {
+                    if (s.home.showLabels) {
                         Text(
                             stringResource(R.string.settings_preview_folder),
                             color = labelColor,
@@ -153,7 +159,7 @@ internal fun HomeThemePreview(settings: LauncherSettings, modifier: Modifier = M
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(22.dp))
-                    .background(Color.Black.copy(alpha = s.dockBackgroundOpacity.coerceIn(0f, 1f)))
+                    .background(Color.Black.copy(alpha = s.dock.backgroundOpacity.coerceIn(0f, 1f)))
                     .padding(vertical = 8.dp),
             ) {
                 apps.drop(7).take(4).ifEmpty { apps.take(4) }.forEach { app ->
@@ -168,7 +174,7 @@ internal fun HomeThemePreview(settings: LauncherSettings, modifier: Modifier = M
             }
         }
         MenuCard(
-            theme = s.popupTheme,
+            theme = s.appearance.popupTheme,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 14.dp, end = 14.dp)
@@ -186,8 +192,8 @@ internal fun GlassBlurPreview(settings: LauncherSettings, modifier: Modifier = M
     PreviewFrame(height = 104.dp, modifier = modifier.padding(vertical = 6.dp)) {
         Backdrop(path = "", blur = 0f, dim = 0f)
         LiquidGlassContainer(
-            blurRadiusDp = s.glassBlurRadius,
-            darkTintAlpha = s.glassDarkTint,
+            blurRadiusDp = s.drawer.glassBlurRadius,
+            darkTintAlpha = s.drawer.glassDarkTint,
             shape = RoundedCornerShape(18.dp),
             modifier = Modifier
                 .fillMaxSize()
@@ -207,8 +213,8 @@ internal fun GlassBlurPreview(settings: LauncherSettings, modifier: Modifier = M
                     Text(
                         stringResource(
                             R.string.settings_preview_glass_values,
-                            (s.glassBlurRadius * 2).roundToInt(),
-                            (s.glassDarkTint * 100).roundToInt(),
+                            (s.drawer.glassBlurRadius * 2).roundToInt(),
+                            (s.drawer.glassDarkTint * 100).roundToInt(),
                         ),
                         color = Color.White.copy(alpha = 0.75f),
                         fontSize = 11.5.sp,
@@ -224,7 +230,7 @@ internal fun GlassBlurPreview(settings: LauncherSettings, modifier: Modifier = M
 internal fun BackdropPreview(settings: LauncherSettings, modifier: Modifier = Modifier) {
     val s = settings.withPreview(LocalPreviewOverrides.current)
     PreviewFrame(height = 96.dp, modifier = modifier.padding(vertical = 6.dp)) {
-        Backdrop(path = s.homeBackgroundImage, blur = s.homeWallpaperBlur, dim = s.homeWallpaperDim)
+        Backdrop(path = s.home.backgroundImage, blur = s.home.wallpaperBlur, dim = s.home.wallpaperDim)
         Text(
             "12:30",
             color = Color.White,
@@ -352,10 +358,10 @@ private fun previewDate(): String = remember {
 /** A widget card: the stack corner radius, and the widget background (tonal or dark, its opacity). */
 @Composable
 private fun WidgetCard(s: LauncherSettings, modifier: Modifier, solid: Boolean = false) {
-    val shape = RoundedCornerShape(s.stackCornerRadius.coerceAtLeast(0).dp)
-    val base = if (s.widgetTonalBackground) MaterialTheme.colorScheme.surfaceContainer else Color.Black.copy(alpha = 0.15f)
+    val shape = RoundedCornerShape(s.widgets.stackCornerRadius.coerceAtLeast(0).dp)
+    val base = if (s.widgets.tonalBackground) MaterialTheme.colorScheme.surfaceContainer else Color.Black.copy(alpha = 0.15f)
     // A transparent widget background would hide the corners: the preview shows them faintly.
-    val opacity = if (solid) s.widgetBackgroundOpacity.coerceAtLeast(0.6f) else s.widgetBackgroundOpacity
+    val opacity = if (solid) s.widgets.backgroundOpacity.coerceAtLeast(0.6f) else s.widgets.backgroundOpacity
     Box(
         modifier = modifier
             .clip(shape)
@@ -372,7 +378,7 @@ private fun WidgetCard(s: LauncherSettings, modifier: Modifier, solid: Boolean =
             Column {
                 Text(stringResource(R.string.settings_preview_widget), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "%d dp".format(s.stackCornerRadius),
+                    "%d dp".format(s.widgets.stackCornerRadius),
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
@@ -386,8 +392,8 @@ private fun WidgetCard(s: LauncherSettings, modifier: Modifier, solid: Boolean =
 @Composable
 private fun FolderTile(s: LauncherSettings, apps: List<AppItem>, size: Dp) {
     val scale = size / 52.dp
-    val circle = s.folderShape == LauncherSettings.FOLDER_SHAPE_CIRCLE
-    val shape: Shape = when (s.folderShape) {
+    val circle = s.folders.shape == LauncherSettings.FOLDER_SHAPE_CIRCLE
+    val shape: Shape = when (s.folders.shape) {
         LauncherSettings.FOLDER_SHAPE_CIRCLE -> CircleShape
         LauncherSettings.FOLDER_SHAPE_SQUARE -> RoundedCornerShape(6.dp * scale)
         else -> RoundedCornerShape(15.dp * scale)
@@ -414,7 +420,7 @@ private fun FolderTile(s: LauncherSettings, apps: List<AppItem>, size: Dp) {
             }
         }
     }
-    val solid = when (s.folderTheme) {
+    val solid = when (s.folders.theme) {
         LauncherSettings.FOLDER_THEME_DARK -> Color(0xE6131418)
         LauncherSettings.FOLDER_THEME_LIGHT -> Color(0xEBF5F5F7)
         LauncherSettings.FOLDER_THEME_ACCENT -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
@@ -422,8 +428,8 @@ private fun FolderTile(s: LauncherSettings, apps: List<AppItem>, size: Dp) {
     }
     if (solid == null) {
         LiquidGlassContainer(
-            blurRadiusDp = s.glassBlurRadius,
-            darkTintAlpha = s.glassDarkTint,
+            blurRadiusDp = s.drawer.glassBlurRadius,
+            darkTintAlpha = s.drawer.glassDarkTint,
             shape = shape,
             modifier = Modifier.size(size),
         ) { inside() }

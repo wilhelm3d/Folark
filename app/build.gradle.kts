@@ -92,7 +92,11 @@ android {
 
 dependencies {
     // Vector (LSPosed) supplies the real Xposed classes inside the hooked launcher.
-    compileOnly(project(":xposed-api-stub"))
+    // Xposed API: a compile-only JAR, the canonical LSPosed-module pattern. It must NOT be packaged
+    // into the APK — at runtime Vector provides the real de.robv.android.xposed classes, and a second
+    // copy bundled here would make RecentsHook implement the wrong interface ("Failed to load class").
+    // A project() compileOnly dep leaked the stub into classes.dex; files() never does.
+    compileOnly(files("libs/xposed-api-stub.jar"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:data"))
     implementation(project(":core:model"))

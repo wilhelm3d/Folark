@@ -33,15 +33,15 @@ import org.arkikeskus.launcher.ui.drawer.rememberDrawerColors
 @Composable
 fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
     val colors = rememberDrawerColors(
-        theme = s.drawerThemeTint,
-        accentArgb = s.drawerAccentColor,
-        customArgb = s.drawerCustomColor,
-        glass = s.drawerGlassEnabled,
-        panelOpacity = s.drawerPanelOpacity,
+        theme = s.drawer.themeTint,
+        accentArgb = s.drawer.accentColor,
+        customArgb = s.drawer.customColor,
+        glass = s.drawer.glassEnabled,
+        panelOpacity = s.drawer.panelOpacity,
     )
-    val style = drawerStyleSpec(s.drawerStyle)
-    val corner = (if (s.drawerCornerRadius >= 0) s.drawerCornerRadius.dp else style.corner) * 0.6f
-    val searchAtBottom = s.drawerSearchPosition == LauncherSettings.SEARCH_BOTTOM
+    val style = drawerStyleSpec(s.drawer.style)
+    val corner = (if (s.drawer.cornerRadius >= 0) s.drawer.cornerRadius.dp else style.corner) * 0.6f
+    val searchAtBottom = s.drawer.searchPosition == LauncherSettings.SEARCH_BOTTOM
 
     Box(
         modifier = modifier
@@ -59,7 +59,7 @@ fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = (s.drawerScrimOpacity * 0.7f).coerceIn(0f, 0.8f))),
+                .background(Color.Black.copy(alpha = (s.drawer.scrimOpacity * 0.7f).coerceIn(0f, 0.8f))),
         )
         Box(
             modifier = Modifier
@@ -83,7 +83,7 @@ fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
                         .size(width = style.handleWidth * 0.6f, height = 3.dp)
                         .background(colors.contentDim.copy(alpha = 0.5f), CircleShape),
                 )
-                if (s.showDrawerSearch && !searchAtBottom) PreviewSearch(colors.field, colors.accent)
+                if (s.drawer.showSearch && !searchAtBottom) PreviewSearch(colors.field, colors.accent)
                 repeat(2) { row ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -103,7 +103,7 @@ fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
                                             RoundedCornerShape(9.dp),
                                         ),
                                 )
-                                if (s.showDrawerLabels) {
+                                if (s.drawer.showLabels) {
                                     Box(
                                         Modifier
                                             .size(width = 22.dp, height = 3.dp)
@@ -114,7 +114,7 @@ fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
                         }
                     }
                 }
-                if (s.showDrawerSearch && searchAtBottom) PreviewSearch(colors.field, colors.accent)
+                if (s.drawer.showSearch && searchAtBottom) PreviewSearch(colors.field, colors.accent)
             }
         }
     }

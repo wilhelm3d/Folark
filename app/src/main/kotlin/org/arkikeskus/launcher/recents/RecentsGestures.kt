@@ -1,5 +1,9 @@
 package org.arkikeskus.launcher.recents
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -51,15 +55,29 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
     val dragging = drag.card?.key == card.key
     // A card's long-press menu is open: that card stays bright and lifts a little, the rest dim.
     val menuCard = menu.card
-    val isMenuSource = menuCard?.key == card.key
-    val dimForMenu = menuCard != null && !isMenuSource
+    val isMenuSource = menu.isOpen && menuCard?.key == card.key
+    val dimForMenu = menu.isOpen && !isMenuSource
+    // The card being dragged over lifts to meet the held one.
+    val targeted = drag.target == card.key && !drag.settling
+    val lift by animateFloatAsState(
+        when {
+            isMenuSource -> 1f
+            targeted -> 0.75f
+            else -> 0f
+        },
+        spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "lift",
+    )
+    val heldOut by animateFloatAsState(if (dragging) 1f else 0f, tween((160 / speed.coerceIn(0.25f, 4f)).toInt()), label = "held")
+    val dim by animateFloatAsState(if (dimForMenu) 1f else 0f, tween((160 / speed.coerceIn(0.25f, 4f)).toInt()), label = "dim")
     var origin by remember { mutableStateOf(Offset.Zero) }
     val s = settings
-    val swipeUp = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(s.recentsSwipeUpAction, card)
-    val swipeDown = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(s.recentsSwipeDownAction, card)
-    val longPress = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(s.recentsLongPressAction, card)
-    val doubleTap = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(s.recentsDoubleTapAction, card)
-    val canDrag = s.recentsDragDrop && !selecting && !card.isSplit
+    // The gestures of the screen Recents is on (the cover screen may have its own).
+    val swipeUp = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeUpAction, card)
+    val swipeDown = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeDownAction, card)
+    val longPress = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(longPressAction, card)
+    val doubleTap = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(doubleTapAction, card)
+    val canDrag = s.recents.dragDrop && !selecting && !card.isSplit
     val env = rememberUpdatedState(this)
 
     /** A finished swipe: flies away for Close, springs back for anything else. */
@@ -81,12 +99,16 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
             drag.bounds[card.key] = r
             origin = r.topLeft
         }
-        .recentsEnter(s.recentsEnterAnimation, index, columns.coerceIn(1, 6), speed, Unit)
-        .recentsSelect(s.recentsSelectAnimation, slot >= 0, slot, picked.size, accent, corner, speed)
+        .recentsEnter(s.recents.enterAnimation, index, columns.coerceIn(1, 6), speed, Unit)
+        .recentsSelect(s.recents.selectAnimation, slot >= 0, slot, picked.size, accent, corner, speed)
         .graphicsLayer {
             if (closeAxis == Orientation.Vertical) translationY = offset.value else translationX = offset.value
-            alpha = (if (dragging) 0.35f else if (dimForMenu) 0.45f else 1f) * (1f - (abs(offset.value) / (dismissPx * 2f)).coerceIn(0f, 0.8f))
-            if (isMenuSource) { scaleX = 1.04f; scaleY = 1.04f; shadowElevation = 28f }
+            // Held for a drag: lifted out of its place (faint, a little smaller) until it lands.
+            val faint = (1f - 0.6f * heldOut) * (1f - 0.55f * dim)
+            alpha = faint * (1f - (abs(offset.value) / (dismissPx * 2f)).coerceIn(0f, 0.8f))
+            val k = 1f + 0.04f * lift - 0.08f * heldOut
+            scaleX = k; scaleY = k
+            shadowElevation = 28f * lift
         }
         .semantics { onClick { env.value.onTap(card); true } }
         .pointerInput(card.key, swipeUp, swipeDown, longPress, doubleTap, canDrag, closeAxis) {
@@ -129,13 +151,18 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
                             drag.start(card, origin + change.position)
                         } else if (dragging) {
                             val before = drag.target
+                            val beforeMode = drag.mode
                             drag.move(d)
-                            if (drag.target != before && drag.target != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            // A tick on reaching a card, and again on moving between its two halves.
+                            if (drag.target != null && (drag.target != before || drag.mode != beforeMode)) {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
                         }
                         if (dragging) change.consume()
                     }
                     if (dragging) {
-                        drag.drop()?.let { (onto, how) -> env.value.onCombine(card, onto, how) }
+                        // Lands first (DragLayer), then opens the two together.
+                        drag.release()
                     } else if (!withMenu) {
                         env.value.perform(longPress, card)
                     }

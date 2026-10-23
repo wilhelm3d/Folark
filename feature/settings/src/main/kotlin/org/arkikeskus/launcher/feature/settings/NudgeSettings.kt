@@ -52,15 +52,15 @@ internal fun IconNudgeRows(s: LauncherSettings, viewModel: SettingsViewModel, pr
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_icon_nudge),
         subtitle = stringResource(R.string.settings_icon_nudge_desc),
-        checked = s.iconNudge,
+        checked = s.icons.nudge,
         onCheckedChange = viewModel::setIconNudge,
         shared = true,
     )
-    if (!s.iconNudge) return
+    if (!s.icons.nudge) return
     ExpressiveRowDivider()
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_icon_nudge_taskbar),
-        checked = s.iconNudgeTaskbar,
+        checked = s.icons.nudgeTaskbar,
         onCheckedChange = viewModel::setIconNudgeTaskbar,
         shared = true,
     )
@@ -68,22 +68,22 @@ internal fun IconNudgeRows(s: LauncherSettings, viewModel: SettingsViewModel, pr
 
     // The slider's value while dragging, so the preview follows the finger before it is saved.
     var dragSoftness by remember { mutableStateOf<Float?>(null) }
-    val softness = dragSoftness ?: s.iconNudgeSoftness
-    NudgePreview(previewIcon, s.iconNudgeEffect, softness)
+    val softness = dragSoftness ?: s.icons.nudgeSoftness
+    NudgePreview(previewIcon, s.icons.nudgeEffect, softness)
     ExpressiveRowDivider()
 
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_icon_nudge_effect),
         options = NUDGE_LABELS.map { (key, label) -> key to stringResource(label) },
-        selected = s.iconNudgeEffect,
+        selected = s.icons.nudgeEffect,
         onSelect = viewModel::setIconNudgeEffect,
     )
-    if (s.iconNudgeEffect in SOFTENABLE) {
+    if (s.icons.nudgeEffect in SOFTENABLE) {
         ExpressiveRowDivider()
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_icon_nudge_softness),
             subtitle = stringResource(R.string.settings_icon_nudge_softness_desc),
-            value = s.iconNudgeSoftness,
+            value = s.icons.nudgeSoftness,
             valueRange = 0f..1f,
             onValueChange = {
                 viewModel.setIconNudgeSoftness((it * 100f).roundToInt() / 100f)
@@ -94,7 +94,7 @@ internal fun IconNudgeRows(s: LauncherSettings, viewModel: SettingsViewModel, pr
         )
     }
     ExpressiveRowDivider()
-    NudgeGallery(previewIcon, s.iconNudgeEffect, softness, onPick = viewModel::setIconNudgeEffect)
+    NudgeGallery(previewIcon, s.icons.nudgeEffect, softness, onPick = viewModel::setIconNudgeEffect)
 }
 
 /** The chosen effect on a big icon, replaying every few seconds and on a tap. */

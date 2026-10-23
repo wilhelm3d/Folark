@@ -324,9 +324,9 @@ internal fun FolarkWidgetSurface(
 fun TopAppsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val apps by viewModel.topApps.collectAsStateWithLifecycle()
-    FolarkWidgetSurface(theme = settings.appsWidgetTheme, modifier = modifier) { ink ->
+    FolarkWidgetSurface(theme = settings.widgets.appsTheme, modifier = modifier) { ink ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center) {
-            val labels = settings.appsWidgetLabels
+            val labels = settings.widgets.appsLabels
             val cellWidth = 64.dp
             val cellHeight = if (labels) 78.dp else 56.dp
             val columns = (maxWidth / cellWidth).toInt().coerceAtLeast(1)
@@ -366,19 +366,19 @@ fun TopAppsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewMod
 fun NoteWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
-    val fontSize = when (settings.noteWidgetTextSize) {
+    val fontSize = when (settings.widgets.noteTextSize) {
         LauncherSettings.FOLDER_OPEN_SMALL -> 13.sp
         LauncherSettings.FOLDER_OPEN_LARGE -> 20.sp
         else -> 16.sp
     }
-    FolarkWidgetSurface(theme = settings.noteWidgetTheme, modifier = modifier) { ink ->
+    FolarkWidgetSurface(theme = settings.widgets.noteTheme, modifier = modifier) { ink ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable { editing = true }
                 .padding(14.dp),
         ) {
-            val text = settings.noteWidgetText
+            val text = settings.widgets.noteText
             Text(
                 text = text.ifBlank { stringResource(R.string.note_widget_hint) },
                 color = if (text.isBlank()) ink.copy(alpha = 0.6f) else ink,
@@ -391,7 +391,7 @@ fun NoteWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel 
     if (editing) {
         // Edited in a dialog, not in place: a text field on the home screen would fight the
         // launcher's own gestures and leave the keyboard over the icons.
-        var draft by remember { mutableStateOf(settings.noteWidgetText) }
+        var draft by remember { mutableStateOf(settings.widgets.noteText) }
         AlertDialog(
             onDismissRequest = { editing = false },
             title = { Text(stringResource(R.string.note_widget_name)) },

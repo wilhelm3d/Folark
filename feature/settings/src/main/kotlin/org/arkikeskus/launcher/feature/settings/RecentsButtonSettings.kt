@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.settings
 
+import androidx.compose.ui.text.font.FontWeight
+import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -33,13 +35,13 @@ internal fun RecentsButtonRows(s: LauncherSettings, viewModel: SettingsViewModel
         stringResource(R.string.settings_recents_buttons),
         color = palette.text, fontSize = 15.sp, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
     )
-    ButtonSwitch(R.string.settings_recents_btn_close, R.string.settings_recents_btn_close_desc, s.recentsBtnClose, viewModel::setRecentsBtnClose)
-    ButtonSwitch(R.string.settings_recents_btn_split, null, s.recentsBtnSplit, viewModel::setRecentsBtnSplit)
-    ButtonSwitch(R.string.settings_recents_btn_popup, null, s.recentsBtnPopup, viewModel::setRecentsBtnPopup)
-    ButtonSwitch(R.string.settings_recents_btn_unsplit, R.string.settings_recents_btn_unsplit_desc, s.recentsBtnUnsplit, viewModel::setRecentsBtnUnsplit)
-    ButtonSwitch(R.string.settings_recents_btn_pin, R.string.settings_recents_btn_pin_desc, s.recentsBtnPin, viewModel::setRecentsBtnPin)
-    ButtonSwitch(R.string.settings_recents_btn_split_view, null, s.recentsBtnSplitView, viewModel::setRecentsBtnSplitView)
-    ButtonSwitch(R.string.settings_recents_btn_close_all, null, s.recentsBtnCloseAll, viewModel::setRecentsBtnCloseAll)
+    ButtonSwitch(R.string.settings_recents_btn_close, R.string.settings_recents_btn_close_desc, s.recents.btnClose, viewModel::setRecentsBtnClose)
+    ButtonSwitch(R.string.settings_recents_btn_split, null, s.recents.btnSplit, viewModel::setRecentsBtnSplit)
+    ButtonSwitch(R.string.settings_recents_btn_popup, null, s.recents.btnPopup, viewModel::setRecentsBtnPopup)
+    ButtonSwitch(R.string.settings_recents_btn_unsplit, R.string.settings_recents_btn_unsplit_desc, s.recents.btnUnsplit, viewModel::setRecentsBtnUnsplit)
+    ButtonSwitch(R.string.settings_recents_btn_pin, R.string.settings_recents_btn_pin_desc, s.recents.btnPin, viewModel::setRecentsBtnPin)
+    ButtonSwitch(R.string.settings_recents_btn_split_view, null, s.recents.btnSplitView, viewModel::setRecentsBtnSplitView)
+    ButtonSwitch(R.string.settings_recents_btn_close_all, null, s.recents.btnCloseAll, viewModel::setRecentsBtnCloseAll)
     ExpressiveRowDivider()
 
     Text(
@@ -50,13 +52,43 @@ internal fun RecentsButtonRows(s: LauncherSettings, viewModel: SettingsViewModel
         stringResource(R.string.settings_recents_gestures_desc),
         color = palette.faint, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp),
     )
-    GesturePicker(R.string.settings_recents_gesture_swipe_up, s.recentsSwipeUpAction, viewModel::setRecentsSwipeUpAction)
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_recents_outer_gestures),
+        subtitle = stringResource(R.string.settings_recents_outer_gestures_desc),
+        checked = s.recents.outerGestures,
+        onCheckedChange = viewModel::setRecentsOuterGestures,
+    )
     ExpressiveRowDivider()
-    GesturePicker(R.string.settings_recents_gesture_swipe_down, s.recentsSwipeDownAction, viewModel::setRecentsSwipeDownAction)
+    // With the cover screen's own set, this first set is the unfolded screen's.
+    if (s.recents.outerGestures) ScreenHeading(R.string.settings_recents_gestures_inner)
+    GesturePicker(R.string.settings_recents_gesture_swipe_up, s.recents.swipeUpAction, viewModel::setRecentsSwipeUpAction)
     ExpressiveRowDivider()
-    GesturePicker(R.string.settings_recents_gesture_long_press, s.recentsLongPressAction, viewModel::setRecentsLongPressAction)
+    GesturePicker(R.string.settings_recents_gesture_swipe_down, s.recents.swipeDownAction, viewModel::setRecentsSwipeDownAction)
     ExpressiveRowDivider()
-    GesturePicker(R.string.settings_recents_gesture_double_tap, s.recentsDoubleTapAction, viewModel::setRecentsDoubleTapAction)
+    GesturePicker(R.string.settings_recents_gesture_long_press, s.recents.longPressAction, viewModel::setRecentsLongPressAction)
+    ExpressiveRowDivider()
+    GesturePicker(R.string.settings_recents_gesture_double_tap, s.recents.doubleTapAction, viewModel::setRecentsDoubleTapAction)
+    if (s.recents.outerGestures) {
+        ExpressiveRowDivider()
+        ScreenHeading(R.string.settings_recents_gestures_outer)
+        GesturePicker(R.string.settings_recents_gesture_swipe_up, s.recents.outerSwipeUpAction, viewModel::setRecentsOuterSwipeUpAction)
+        ExpressiveRowDivider()
+        GesturePicker(R.string.settings_recents_gesture_swipe_down, s.recents.outerSwipeDownAction, viewModel::setRecentsOuterSwipeDownAction)
+        ExpressiveRowDivider()
+        GesturePicker(R.string.settings_recents_gesture_long_press, s.recents.outerLongPressAction, viewModel::setRecentsOuterLongPressAction)
+        ExpressiveRowDivider()
+        GesturePicker(R.string.settings_recents_gesture_double_tap, s.recents.outerDoubleTapAction, viewModel::setRecentsOuterDoubleTapAction)
+    }
+}
+
+/** "Unfolded screen" / "Cover screen" above a set of gestures. */
+@Composable
+private fun ScreenHeading(label: Int) {
+    Text(
+        stringResource(label),
+        color = LocalAccent.current, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+    )
 }
 
 @Composable

@@ -426,6 +426,17 @@ class LauncherAppsSource @Inject constructor(
         return ShellSplit.moveToSide(context, id, right = true)
     }
 
+    /**
+     * Puts the third app of [pair] into the split screen as a real third pane (Folark's Vector
+     * module in SystemUI, see [SplitThree]); false when that isn't possible here.
+     */
+    suspend fun launchAppPairThirdInSplit(pair: AppPair): Boolean =
+        SplitThree.ready(context) &&
+            SplitThree.addThird(context, component = pair.app3ComponentName, user = userForSerial(pair.app3UserSerial))
+
+    /** Switches the split showing now to Android's layout [snap] (see [SplitThree.snap]). */
+    suspend fun snapSplit(snap: Int): Boolean = SplitThree.ready(context) && SplitThree.snap(context, snap)
+
     /** Opens the optional third app of [pair] in a floating window over the split pair. */
     fun launchAppPairThird(pair: AppPair, size: String): Result<Unit> = runCatching {
         launcherApps.startMainActivity(

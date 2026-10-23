@@ -1,5 +1,8 @@
 package org.arkikeskus.launcher.feature.settings
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -91,10 +94,17 @@ class SettingsViewModel @Inject constructor(
             pair.app1Package,
             org.arkikeskus.launcher.data.local.HomeItemEntity.appPairShortcutId(pair.id),
             pair.app1UserSerial,
-            s.homeColumns, s.homeRows, type,
+            s.home.columns, s.home.rows, type,
         )
     }
     fun launchAppPair(pair: AppPair) = appRepository.launchAppPair(pair)
+    fun setThreeAppSplit(value: Boolean) = update { repository.setThreeAppSplit(value) }
+
+    /** Pins [pair] on Folark's taskbar, or takes it off again. */
+    fun toggleTaskbarPair(pair: AppPair) = update {
+        val current = settings.value.taskbar.pinnedPairs
+        repository.setTaskbarPairs(if (pair.id in current) current - pair.id else current + pair.id)
+    }
 
     fun setFoldAction(value: String, screenType: ScreenType = _screenType.value) = update { repository.setFoldAction(value, screenType) }
     fun setUnfoldAction(value: String, screenType: ScreenType = _screenType.value) = update { repository.setUnfoldAction(value, screenType) }
@@ -124,6 +134,7 @@ class SettingsViewModel @Inject constructor(
     fun setNewPageOnDrag(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setNewPageOnDrag(value, screenType) }
     fun setAutoRemoveEmptyPages(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setAutoRemoveEmptyPages(value, screenType) }
     fun setDrawerFolderTabs(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerFolderTabs(value, screenType) }
+    fun setDrawerTabsExclusive(value: Boolean) = update { repository.setDrawerTabsExclusive(value) }
     fun setHomeBackgroundImage(value: String, screenType: ScreenType = _screenType.value) = update { repository.setHomeBackgroundImage(value, screenType) }
     fun setFloatingWindowSize(value: String) = update { repository.setFloatingWindowSize(value) }
     fun setSearchShortcuts(value: Boolean) = update { repository.setSearchShortcuts(value) }
@@ -172,6 +183,7 @@ class SettingsViewModel @Inject constructor(
     fun setDotAvatars(value: Boolean) = update { repository.setDotAvatars(value) }
     fun setLiveActivities(value: Boolean) = update { repository.setLiveActivities(value) }
     fun setLiveActivitiesTaskbar(value: Boolean) = update { repository.setLiveActivitiesTaskbar(value) }
+    fun setLiveExpand(value: Boolean) = update { repository.setLiveExpand(value) }
     fun setLiveActivityEffect(value: String) = update { repository.setLiveActivityEffect(value) }
     fun setSearchActions(value: Boolean) = update { repository.setSearchActions(value) }
     fun setRecentsEnabled(value: Boolean) = update { repository.setRecentsEnabled(value) }
@@ -180,40 +192,54 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsColumnsInner(value: Int) = update { repository.setRecentsColumnsInner(value) }
     fun setRecentsColumnsOuter(value: Int) = update { repository.setRecentsColumnsOuter(value) }
     fun setRecentsMaxApps(value: Int) = update { repository.setRecentsMaxApps(value) }
-    fun setRecentsCardHeight(value: Int) = update { repository.setRecentsCardHeight(value) }
-    fun setRecentsCornerDp(value: Int) = update { repository.setRecentsCornerDp(value) }
-    fun setRecentsBackdropDim(value: Float) = update { repository.setRecentsBackdropDim(value) }
+    fun setRecentsCardHeight(value: Int) = editRecentsCover.let { cover -> update { repository.setRecentsCardHeight(value, cover = cover) } }
+    fun setRecentsCornerDp(value: Int) = editRecentsCover.let { cover -> update { repository.setRecentsCornerDp(value, cover = cover) } }
+    fun setRecentsBackdropDim(value: Float) = editRecentsCover.let { cover -> update { repository.setRecentsBackdropDim(value, cover = cover) } }
     fun setRecentsSort(value: String) = update { repository.setRecentsSort(value) }
-    fun setRecentsShowTime(value: Boolean) = update { repository.setRecentsShowTime(value) }
-    fun setRecentsShowActions(value: Boolean) = update { repository.setRecentsShowActions(value) }
-    fun setRecentsCardLayout(value: String) = update { repository.setRecentsCardLayout(value) }
+    fun setRecentsShowTime(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsShowTime(value, cover = cover) } }
+    fun setRecentsShowActions(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsShowActions(value, cover = cover) } }
+    fun setRecentsCardLayout(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsCardLayout(value, cover = cover) } }
     fun setRecentsConfirmCloseAll(value: Boolean) = update { repository.setRecentsConfirmCloseAll(value) }
     fun setRecentsThirdInSplit(value: Boolean) = update { repository.setRecentsThirdInSplit(value) }
     fun setRecentsThumbnails(value: Boolean) = update { repository.setRecentsThumbnails(value) }
     fun setRecentsRootClose(value: Boolean) = update { repository.setRecentsRootClose(value) }
     fun setTaskbarRunningApps(value: Boolean) = update { repository.setTaskbarRunningApps(value) }
     fun setTaskbarRunningDots(value: Boolean) = update { repository.setTaskbarRunningDots(value) }
-    fun setRecentsEnterAnimation(value: String) = update { repository.setRecentsEnterAnimation(value) }
-    fun setRecentsSelectAnimation(value: String) = update { repository.setRecentsSelectAnimation(value) }
-    fun setRecentsAnimationSpeed(value: Float) = update { repository.setRecentsAnimationSpeed(value) }
+    fun setRecentsEnterAnimation(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsEnterAnimation(value, cover = cover) } }
+    fun setRecentsSelectAnimation(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsSelectAnimation(value, cover = cover) } }
+    fun setRecentsAnimationSpeed(value: Float) = editRecentsCover.let { cover -> update { repository.setRecentsAnimationSpeed(value, cover = cover) } }
     fun setRootEnabled(value: Boolean) = update { repository.setRootEnabled(value) }
-    fun setRecentsTheme(value: String) = update { repository.setRecentsTheme(value) }
-    fun setRecentsPressAnimation(value: String) = update { repository.setRecentsPressAnimation(value) }
-    fun setRecentsGlass(value: Boolean) = update { repository.setRecentsGlass(value) }
-    fun setRecentsGlassBlur(value: Int) = update { repository.setRecentsGlassBlur(value) }
-    fun setRecentsGlassTint(value: Float) = update { repository.setRecentsGlassTint(value) }
+    fun setRecentsTheme(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsTheme(value, cover = cover) } }
+    fun setRecentsPressAnimation(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsPressAnimation(value, cover = cover) } }
+    fun setRecentsGlass(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsGlass(value, cover = cover) } }
+    fun setRecentsGlassBlur(value: Int) = editRecentsCover.let { cover -> update { repository.setRecentsGlassBlur(value, cover = cover) } }
+    fun setRecentsGlassTint(value: Float) = editRecentsCover.let { cover -> update { repository.setRecentsGlassTint(value, cover = cover) } }
     fun setRecentsDragDrop(value: Boolean) = update { repository.setRecentsDragDrop(value) }
-    fun setRecentsBtnClose(value: Boolean) = update { repository.setRecentsBtnClose(value) }
-    fun setRecentsBtnSplit(value: Boolean) = update { repository.setRecentsBtnSplit(value) }
-    fun setRecentsBtnPopup(value: Boolean) = update { repository.setRecentsBtnPopup(value) }
-    fun setRecentsBtnUnsplit(value: Boolean) = update { repository.setRecentsBtnUnsplit(value) }
-    fun setRecentsBtnSplitView(value: Boolean) = update { repository.setRecentsBtnSplitView(value) }
-    fun setRecentsBtnCloseAll(value: Boolean) = update { repository.setRecentsBtnCloseAll(value) }
+    fun setRecentsOverlayLabels(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsOverlayLabels(value, cover = cover) } }
+    fun setRecentsMenuMotion(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsMenuMotion(value, cover = cover) } }
+    fun setRecentsBtnClose(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnClose(value, cover = cover) } }
+    fun setRecentsBtnSplit(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnSplit(value, cover = cover) } }
+    fun setRecentsBtnPopup(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnPopup(value, cover = cover) } }
+    fun setRecentsBtnUnsplit(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnUnsplit(value, cover = cover) } }
+    fun setRecentsBtnSplitView(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnSplitView(value, cover = cover) } }
+    fun setRecentsBtnCloseAll(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnCloseAll(value, cover = cover) } }
     fun setRecentsSwipeUpAction(value: String) = update { repository.setRecentsSwipeUpAction(value) }
     fun setRecentsSwipeDownAction(value: String) = update { repository.setRecentsSwipeDownAction(value) }
     fun setRecentsLongPressAction(value: String) = update { repository.setRecentsLongPressAction(value) }
     fun setRecentsDoubleTapAction(value: String) = update { repository.setRecentsDoubleTapAction(value) }
-    fun setRecentsBtnPin(value: Boolean) = update { repository.setRecentsBtnPin(value) }
+    fun setRecentsOuterGestures(value: Boolean) = update { repository.setRecentsOuterGestures(value) }
+
+    /** Settings ▸ Recents: the look being edited is the cover screen's (with its own look on). */
+    var editRecentsCover by mutableStateOf(false)
+    fun setRecentsOuterLook(value: Boolean) {
+        if (!value) editRecentsCover = false
+        update { repository.setRecentsOuterLook(value) }
+    }
+    fun setRecentsOuterSwipeUpAction(value: String) = update { repository.setRecentsOuterSwipeUpAction(value) }
+    fun setRecentsOuterSwipeDownAction(value: String) = update { repository.setRecentsOuterSwipeDownAction(value) }
+    fun setRecentsOuterLongPressAction(value: String) = update { repository.setRecentsOuterLongPressAction(value) }
+    fun setRecentsOuterDoubleTapAction(value: String) = update { repository.setRecentsOuterDoubleTapAction(value) }
+    fun setRecentsBtnPin(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnPin(value, cover = cover) } }
     fun setRecentsPinKeepAlive(value: Boolean) = update { repository.setRecentsPinKeepAlive(value) }
     fun setTaskbarHiddenApps(value: Set<String>) = update { repository.setTaskbarHiddenApps(value) }
     fun setTaskbarAlwaysApps(value: Set<String>) = update { repository.setTaskbarAlwaysApps(value) }
@@ -235,6 +261,8 @@ class SettingsViewModel @Inject constructor(
     fun setRootKeepWidgets(value: Boolean) = update { repository.setRootKeepWidgets(value) }
     fun setIconNudge(value: Boolean) = update { repository.setIconNudge(value) }
     fun setUnlockTransition(value: Boolean) = update { repository.setUnlockTransition(value) }
+    fun setUnlockSystemHook(value: Boolean) = update { repository.setUnlockSystemHook(value) }
+    fun setUnlockStyle(value: String) = update { repository.setUnlockStyle(value) }
     fun setIconNudgeTaskbar(value: Boolean) = update { repository.setIconNudgeTaskbar(value) }
     fun setIconNudgeEffect(value: String) = update { repository.setIconNudgeEffect(value) }
     fun setIconNudgeSoftness(value: Float) = update { repository.setIconNudgeSoftness(value) }
@@ -312,7 +340,7 @@ class SettingsViewModel @Inject constructor(
         repository.setDrawerGlassEnabled(value, screenType)
         // Glass without a blurred backdrop is hard to read, so switching it on from a profile that
         // has no blur yet starts with a sensible one. An existing blur value is left alone.
-        if (value && repository.settings(screenType).first().drawerBackgroundBlur <= 0f) {
+        if (value && repository.settings(screenType).first().drawer.backgroundBlur <= 0f) {
             repository.setDrawerBackgroundBlur(DEFAULT_GLASS_BLUR, screenType)
         }
     }
@@ -337,14 +365,14 @@ class SettingsViewModel @Inject constructor(
         // Shrinking the grid can leave shortcuts at an out-of-range cellX; repack them back on-screen
         // before the new (smaller) column count reaches the home screen, so nothing draws off-grid.
         val s = repository.settings(screenType).first()
-        if (value < s.homeColumns) homeLayoutRepository.reflow(value, s.homeRows, screenType)
+        if (value < s.home.columns) homeLayoutRepository.reflow(value, s.home.rows, screenType)
         repository.setHomeColumns(value, screenType)
     }
 
     fun setHomeRows(value: Int, screenType: ScreenType = _screenType.value) = viewModelScope.launch {
         // Same off-grid guard as the column stepper, on the vertical axis.
         val s = repository.settings(screenType).first()
-        if (value < s.homeRows) homeLayoutRepository.reflow(s.homeColumns, value, screenType)
+        if (value < s.home.rows) homeLayoutRepository.reflow(s.home.columns, value, screenType)
         repository.setHomeRows(value, screenType)
     }
     fun setShowDockLabels(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setShowDockLabels(value, screenType) }

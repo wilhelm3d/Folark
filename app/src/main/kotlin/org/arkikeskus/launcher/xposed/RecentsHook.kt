@@ -33,6 +33,12 @@ class RecentsHook : IXposedHookLoadPackage {
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName == FOLARK) return
         val loader = lpparam.classLoader
+        // SystemUI: only the unlock sync lives there (UnlockHook); the Recents hooks are launcher-only.
+        if (lpparam.packageName == SYSTEMUI) {
+            UnlockHook.install(loader, ::log)
+            SplitThreeHook.install(loader, ::log)
+            return
+        }
         val helper = find("com.android.quickstep.OverviewCommandHelper", loader)
         if (helper == null) {
             log("no OverviewCommandHelper in ${lpparam.packageName}; not a Quickstep launcher")
@@ -84,7 +90,11 @@ class RecentsHook : IXposedHookLoadPackage {
     private fun find(name: String, loader: ClassLoader): Class<*>? =
         runCatching { XposedHelpers.findClass(name, loader) }.getOrNull()
 
-    private val main = Handler(Looper.getMainLooper())
+    // Lazy, NOT a plain field initializer: Vector instantiates this module class very early during
+    // bootstrap (XposedInit.initModule), and building a Handler in the constructor there throws and
+    // makes Vector report "Failed to load class". First touch happens inside handleLoadPackage, by
+    // which point the launcher's main looper is ready.
+    private val main by lazy { Handler(Looper.getMainLooper()) }
 
     @Volatile private var cachedAt = 0L
     @Volatile private var cached = false
@@ -148,10 +158,13 @@ class RecentsHook : IXposedHookLoadPackage {
         Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as? Context
     }.getOrNull()
 
-    private fun log(text: String) = runCatching { XposedBridge.log("Folark: $text") }
+    private fun log(text: String) {
+        runCatching { XposedBridge.log("Folark: $text") }
+    }
 
     companion object {
         const val FOLARK = "org.arkikeskus.launcher"
+        const val SYSTEMUI = "com.android.systemui"
         const val STATE_AUTHORITY = "org.arkikeskus.launcher.recentshook"
         const val EXTRA_TOGGLE = "org.arkikeskus.launcher.extra.TOGGLE"
         const val SEARCH_EXTRA = "org.arkikeskus.launcher.extra.ACTION"

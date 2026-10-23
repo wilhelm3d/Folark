@@ -88,16 +88,16 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
     ) {
         // Folark's taskbar, or Android's (with the system's gestures and quick switch).
         SystemTaskbarRows(s, viewModel)
-        if (s.taskbarSource == LauncherSettings.TASKBAR_SOURCE_SYSTEM) return@ExpressiveCategoryContainer
+        if (s.taskbar.source == LauncherSettings.TASKBAR_SOURCE_SYSTEM) return@ExpressiveCategoryContainer
         ExpressiveRowDivider()
 
-        TaskbarToggle(enabled = s.taskbarEnabled, onSetEnabled = viewModel::setTaskbarEnabled)
+        TaskbarToggle(enabled = s.taskbar.enabled, onSetEnabled = viewModel::setTaskbarEnabled)
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_on_home),
             subtitle = stringResource(R.string.settings_taskbar_on_home_desc),
-            checked = s.taskbarOnHome,
+            checked = s.taskbar.onHome,
             onCheckedChange = viewModel::setTaskbarOnHome,
         )
         ExpressiveRowDivider()
@@ -105,16 +105,16 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_keep_open),
             subtitle = stringResource(R.string.settings_taskbar_keep_open_desc),
-            checked = s.taskbarKeepOpen,
+            checked = s.taskbar.keepOpen,
             onCheckedChange = viewModel::setTaskbarKeepOpen,
         )
         ExpressiveRowDivider()
 
-        if (s.taskbarKeepOpen) {
+        if (s.taskbar.keepOpen) {
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_taskbar_hide_full_screen),
                 subtitle = stringResource(R.string.settings_taskbar_hide_full_screen_desc),
-                checked = s.taskbarHideFullScreen,
+                checked = s.taskbar.hideFullScreen,
                 onCheckedChange = viewModel::setTaskbarHideFullScreen,
             )
             ExpressiveRowDivider()
@@ -127,17 +127,17 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_HANDLES_LEFT to stringResource(R.string.settings_taskbar_handles_left),
                 LauncherSettings.TASKBAR_HANDLES_RIGHT to stringResource(R.string.settings_taskbar_handles_right),
             ),
-            selected = s.taskbarHandles,
+            selected = s.taskbar.handles,
             onSelect = viewModel::setTaskbarHandles,
             icon = null,
         )
         ExpressiveRowDivider()
 
-        if (!s.taskbarKeepOpen) {
+        if (!s.taskbar.keepOpen) {
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_taskbar_handle_hint),
                 subtitle = stringResource(R.string.settings_taskbar_handle_hint_desc),
-                checked = s.taskbarHandleHint,
+                checked = s.taskbar.handleHint,
                 onCheckedChange = viewModel::setTaskbarHandleHint,
             )
             ExpressiveRowDivider()
@@ -146,7 +146,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         TaskbarPerAppRows(s, viewModel, apps)
         ExpressiveRowDivider()
 
-        val pinnedCount = s.taskbarPinnedApps?.size
+        val pinnedCount = s.taskbar.pinnedApps?.size
         ExpressiveActionItem(
             title = stringResource(R.string.settings_taskbar_pinned),
             description = if (pinnedCount == null) {
@@ -179,7 +179,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_system_drag),
             subtitle = stringResource(R.string.settings_taskbar_system_drag_desc),
-            checked = s.taskbarSystemDrag,
+            checked = s.taskbar.systemDrag,
             onCheckedChange = viewModel::setTaskbarSystemDrag,
         )
         ExpressiveRowDivider()
@@ -187,7 +187,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_three_app),
             subtitle = stringResource(R.string.settings_taskbar_three_app_desc),
-            checked = s.taskbarThreeApp,
+            checked = s.taskbar.threeApp,
             onCheckedChange = viewModel::setTaskbarThreeApp,
         )
         ExpressiveRowDivider()
@@ -198,7 +198,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT to stringResource(R.string.settings_taskbar_split_side_left),
                 LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT to stringResource(R.string.settings_taskbar_split_side_right),
             ),
-            selected = s.taskbarSplitSide,
+            selected = s.taskbar.splitSide,
             onSelect = viewModel::setTaskbarSplitSide,
             icon = null,
         )
@@ -207,7 +207,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_split_controls),
             subtitle = stringResource(R.string.settings_taskbar_split_controls_desc),
-            checked = s.taskbarSplitControls,
+            checked = s.taskbar.splitControls,
             onCheckedChange = viewModel::setTaskbarSplitControls,
         )
         ExpressiveRowDivider()
@@ -220,7 +220,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_RECENTS_DESKTOP to stringResource(R.string.settings_taskbar_recents_button_desktop),
                 LauncherSettings.TASKBAR_RECENTS_FOLARK to stringResource(R.string.settings_taskbar_recents_button_folark),
             ),
-            selected = s.taskbarRecentsButton,
+            selected = s.taskbar.recentsButton,
             onSelect = viewModel::setTaskbarRecentsButton,
             icon = null,
         )
@@ -229,19 +229,19 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_quick_switch),
             subtitle = stringResource(R.string.settings_taskbar_quick_switch_desc),
-            checked = s.taskbarQuickSwitch,
+            checked = s.taskbar.quickSwitch,
             onCheckedChange = viewModel::setTaskbarQuickSwitch,
         )
         ExpressiveRowDivider()
 
         ExpressiveStepperRow(
             title = stringResource(R.string.settings_taskbar_recents),
-            value = s.taskbarRecentCount,
+            value = s.taskbar.recentCount,
             min = 0,
             max = 6,
             onValueChange = viewModel::setTaskbarRecentCount,
         )
-        if (s.taskbarRecentCount > 0 && !usageAccess) {
+        if (s.taskbar.recentCount > 0 && !usageAccess) {
             ExpressiveActionItem(
                 title = stringResource(R.string.settings_taskbar_usage_access),
                 description = stringResource(R.string.settings_taskbar_usage_access_desc),
@@ -253,15 +253,15 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_media),
             subtitle = stringResource(R.string.settings_taskbar_media_desc),
-            checked = s.taskbarMediaEnabled,
+            checked = s.taskbar.mediaEnabled,
             onCheckedChange = viewModel::setTaskbarMediaEnabled,
         )
-        if (s.taskbarMediaEnabled) {
+        if (s.taskbar.mediaEnabled) {
             ExpressiveRowDivider()
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_taskbar_media_paused),
                 subtitle = stringResource(R.string.settings_taskbar_media_paused_desc),
-                checked = s.taskbarMediaShowPaused,
+                checked = s.taskbar.mediaShowPaused,
                 onCheckedChange = viewModel::setTaskbarMediaShowPaused,
             )
             ExpressiveRowDivider()
@@ -272,7 +272,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                     LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE to stringResource(R.string.settings_taskbar_media_position_middle),
                     LauncherSettings.TASKBAR_MEDIA_POS_END to stringResource(R.string.settings_taskbar_media_position_end),
                 ),
-                selected = s.taskbarMediaPosition,
+                selected = s.taskbar.mediaPosition,
                 onSelect = viewModel::setTaskbarMediaPosition,
                 icon = null,
             )
@@ -283,7 +283,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                     LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE to stringResource(R.string.settings_taskbar_media_shape_circle),
                     LauncherSettings.TASKBAR_MEDIA_SHAPE_ROUNDED to stringResource(R.string.settings_taskbar_media_shape_rounded),
                 ),
-                selected = s.taskbarMediaShape,
+                selected = s.taskbar.mediaShape,
                 onSelect = viewModel::setTaskbarMediaShape,
                 icon = null,
             )
@@ -291,7 +291,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_taskbar_media_badge),
                 subtitle = stringResource(R.string.settings_taskbar_media_badge_desc),
-                checked = s.taskbarMediaBadge,
+                checked = s.taskbar.mediaBadge,
                 onCheckedChange = viewModel::setTaskbarMediaBadge,
             )
         }
@@ -307,46 +307,46 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_THEME_ACCENT to stringResource(R.string.settings_taskbar_theme_accent),
                 LauncherSettings.TASKBAR_THEME_GLASS to stringResource(R.string.settings_taskbar_theme_glass),
             ),
-            selected = s.taskbarTheme,
+            selected = s.taskbar.theme,
             onSelect = viewModel::setTaskbarTheme,
             icon = null,
         )
-        if (s.taskbarTheme != LauncherSettings.TASKBAR_THEME_CLEAR) {
+        if (s.taskbar.theme != LauncherSettings.TASKBAR_THEME_CLEAR) {
             ExpressiveRowDivider()
             ExpressiveSliderRow(
                 title = stringResource(R.string.settings_taskbar_opacity),
-                value = s.taskbarOpacity,
+                value = s.taskbar.opacity,
                 onValueChange = viewModel::setTaskbarOpacity,
                 valueRange = 0.1f..1f,
-                valueDisplay = "${(s.taskbarOpacity * 100).roundToInt()}%",
+                valueDisplay = "${(s.taskbar.opacity * 100).roundToInt()}%",
             )
         }
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_taskbar_icon_size),
-            value = s.taskbarIconSize.toFloat(),
+            value = s.taskbar.iconSize.toFloat(),
             onValueChange = { viewModel.setTaskbarIconSize(it.roundToInt()) },
             valueRange = 32f..72f,
-            valueDisplay = "${s.taskbarIconSize} dp",
+            valueDisplay = "${s.taskbar.iconSize} dp",
         )
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_taskbar_spacing),
-            value = s.taskbarIconSpacing.toFloat(),
+            value = s.taskbar.iconSpacing.toFloat(),
             onValueChange = { viewModel.setTaskbarIconSpacing(it.roundToInt()) },
             valueRange = 0f..24f,
-            valueDisplay = "${s.taskbarIconSpacing} dp",
+            valueDisplay = "${s.taskbar.iconSpacing} dp",
         )
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_taskbar_bottom),
-            value = s.taskbarBottomOffset.toFloat(),
+            value = s.taskbar.bottomOffset.toFloat(),
             onValueChange = { viewModel.setTaskbarBottomOffset(it.roundToInt()) },
             valueRange = 0f..64f,
-            valueDisplay = "${s.taskbarBottomOffset} dp",
+            valueDisplay = "${s.taskbar.bottomOffset} dp",
         )
         ExpressiveRowDivider()
 
@@ -361,7 +361,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
     if (picking) {
         TaskbarPinnedPicker(
             apps = apps,
-            initial = s.taskbarPinnedApps,
+            initial = s.taskbar.pinnedApps,
             onDone = { keys ->
                 viewModel.setTaskbarPinned(keys)
                 picking = false

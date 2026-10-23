@@ -61,26 +61,26 @@ private val SELECT_LABELS = listOf(
 @Composable
 internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel) {
     var dragSpeed by remember { mutableStateOf<Float?>(null) }
-    val speed = dragSpeed ?: s.recentsAnimationSpeed
-    RecentsMotionPreview(s.recentsEnterAnimation, s.recentsSelectAnimation, speed)
+    val speed = dragSpeed ?: s.recents.animationSpeed
+    RecentsMotionPreview(s.recents.enterAnimation, s.recents.selectAnimation, speed)
     ExpressiveRowDivider()
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_recents_enter),
         options = ENTER_LABELS.map { (key, label) -> key to stringResource(label) },
-        selected = s.recentsEnterAnimation,
+        selected = s.recents.enterAnimation,
         onSelect = viewModel::setRecentsEnterAnimation,
     )
     ExpressiveRowDivider()
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_recents_select),
         options = SELECT_LABELS.map { (key, label) -> key to stringResource(label) },
-        selected = s.recentsSelectAnimation,
+        selected = s.recents.selectAnimation,
         onSelect = viewModel::setRecentsSelectAnimation,
     )
     ExpressiveRowDivider()
     ExpressiveSliderRow(
         title = stringResource(R.string.settings_recents_anim_speed),
-        value = s.recentsAnimationSpeed,
+        value = s.recents.animationSpeed,
         onValueChange = viewModel::setRecentsAnimationSpeed,
         valueRange = LauncherSettings.MIN_RECENTS_ANIM_SPEED..LauncherSettings.MAX_RECENTS_ANIM_SPEED,
         valueDisplay = "%.1f×".format(speed),
@@ -90,10 +90,17 @@ internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_recents_press),
         options = PRESS_LABELS.map { (key, label) -> key to stringResource(label) },
-        selected = s.recentsPressAnimation,
+        selected = s.recents.pressAnimation,
         onSelect = viewModel::setRecentsPressAnimation,
     )
-    PressPreview(s.recentsPressAnimation, speed)
+    PressPreview(s.recents.pressAnimation, speed)
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_recents_menu_motion),
+        subtitle = stringResource(R.string.settings_recents_menu_motion_desc),
+        checked = s.recents.menuMotion,
+        onCheckedChange = viewModel::setRecentsMenuMotion,
+    )
 }
 
 private val PRESS_LABELS = listOf(

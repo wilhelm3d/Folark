@@ -10,7 +10,7 @@ import javax.inject.Inject
 class ActionSearchProvider @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) : SearchProvider {
-    override suspend fun isEnabled(): Boolean = settingsRepository.settings(ScreenType.OUTER).first().searchActions
+    override suspend fun isEnabled(): Boolean = settingsRepository.settings(ScreenType.OUTER).first().search.actions
 
     override suspend fun query(query: String): List<SearchResult> = SearchActions.parse(query)
 }

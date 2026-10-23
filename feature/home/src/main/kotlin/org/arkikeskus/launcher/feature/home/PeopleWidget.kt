@@ -200,7 +200,7 @@ class PeopleWidgetViewModel @Inject constructor(
 
     val privacy: StateFlow<String> = _screenType.flatMapLatest { screenType ->
         settingsRepository.settings(screenType)
-            .map { it.peoplePrivacy }
+            .map { it.widgets.peoplePrivacy }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.PRIVACY_ALL)
 
     /** The user's "same person" links (alias key → target key); tiles with links can be split again. */
@@ -224,7 +224,7 @@ class PeopleWidgetViewModel @Inject constructor(
     /** Live groups with the user's aliases applied, app groups dropped when the setting is off. */
     private val liveGroups: Flow<List<PersonTileState>> = combine(
         badgeRepository.people, settingsRepository.peopleAliases, _screenType.flatMapLatest { screenType ->
-            settingsRepository.settings(screenType).map { it.peopleShowApps }
+            settingsRepository.settings(screenType).map { it.widgets.peopleShowApps }
         },
     ) { grouped, aliases, showApps ->
         PeopleGrouping.merge(grouped, aliases).filter { showApps || it.newest.kind != PersonEventKind.APP }

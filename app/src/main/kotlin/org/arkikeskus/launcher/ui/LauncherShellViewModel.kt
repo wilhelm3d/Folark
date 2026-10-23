@@ -59,16 +59,16 @@ class LauncherShellViewModel @Inject constructor(
     // The rest are cut from that one stream: each settings(...) collection reads every setting
     // again on every write to the store.
     val iconStyle: StateFlow<IconStyle> = settings
-        .map { IconStyle(it.iconPackPackage, it.useThemedIcons, it.iconShape) }
+        .map { IconStyle(it.icons.iconPack, it.icons.useThemedIcons, it.icons.shape) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IconStyle())
 
-    val drawerHeightFraction: StateFlow<Float> = settings.map { it.drawerHeightFraction }
+    val drawerHeightFraction: StateFlow<Float> = settings.map { it.drawer.heightFraction }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0f)
 
-    val drawerWidthFraction: StateFlow<Float> = settings.map { it.drawerWidthFraction }
+    val drawerWidthFraction: StateFlow<Float> = settings.map { it.drawer.widthFraction }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0f)
 
-    val drawerAlignment: StateFlow<String> = settings.map { it.drawerAlignment }
+    val drawerAlignment: StateFlow<String> = settings.map { it.drawer.alignment }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.DRAWER_ALIGNMENT_CENTER)
 
     val iconEpochs: StateFlow<IconEpochs> = launcherAppsSource.iconEpochs
@@ -85,7 +85,7 @@ class LauncherShellViewModel @Inject constructor(
     val nudges: SharedFlow<NotificationNudge> = badgeRepository.nudges
 
     /** Sender photos for chat apps' dots (app badgeKey → photo), loaded off the main thread. */
-    val avatars: StateFlow<Map<String, ImageBitmap>> = settings.map { it.dotAvatars }.distinctUntilChanged()
+    val avatars: StateFlow<Map<String, ImageBitmap>> = settings.map { it.dots.avatars }.distinctUntilChanged()
         .flatMapLatest { on ->
             if (!on) flowOf(emptyMap()) else badgeRepository.people.map(::loadAvatars).flowOn(Dispatchers.IO)
         }

@@ -48,12 +48,12 @@ internal fun LiveHingeRows(s: LauncherSettings, viewModel: SettingsViewModel, in
     // Slider values while dragging, so the preview follows the finger before they are saved.
     var blur by remember { mutableStateOf<Float?>(null) }
     var frost by remember { mutableStateOf<Float?>(null) }
-    val shownSpeed = s.foldTransitionSpeed
-    val shownBlur = blur ?: s.liveHingeBlurDp.toFloat()
-    val shownFrost = frost ?: s.liveHingeFrost
+    val shownSpeed = s.fold.transitionSpeed
+    val shownBlur = blur ?: s.fold.liveHingeBlurDp.toFloat()
+    val shownFrost = frost ?: s.fold.liveHingeFrost
 
     // Each display picks its own effect; speed, blur and frost are shared.
-    val style = if (inner) s.liveHingeStyle else s.liveHingeOuterStyle
+    val style = if (inner) s.fold.liveHingeStyle else s.fold.liveHingeOuterStyle
     ExpressiveRowDivider()
     LiveHingePreview(s = s, style = style, speed = shownSpeed, blurDp = shownBlur, frost = shownFrost)
     ExpressiveRowDivider()
@@ -70,20 +70,20 @@ internal fun LiveHingeRows(s: LauncherSettings, viewModel: SettingsViewModel, in
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_live_hinge_blur),
             subtitle = stringResource(R.string.settings_live_hinge_blur_desc),
-            value = s.liveHingeBlurDp.toFloat(),
+            value = s.fold.liveHingeBlurDp.toFloat(),
             valueRange = 0f..LauncherSettings.MAX_LIVE_HINGE_BLUR_DP.toFloat(),
             onValueChange = { viewModel.setLiveHingeBlur(it.roundToInt()) },
-            valueDisplay = "%d dp".format(s.liveHingeBlurDp),
+            valueDisplay = "%d dp".format(s.fold.liveHingeBlurDp),
             onDragValue = { blur = it },
         )
         ExpressiveRowDivider()
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_live_hinge_frost),
             subtitle = stringResource(R.string.settings_live_hinge_frost_desc),
-            value = s.liveHingeFrost,
+            value = s.fold.liveHingeFrost,
             valueRange = 0f..LauncherSettings.MAX_LIVE_HINGE_FROST,
             onValueChange = { viewModel.setLiveHingeFrost((it * 100f).roundToInt() / 100f) },
-            valueDisplay = "%d%%".format((s.liveHingeFrost * 100).roundToInt()),
+            valueDisplay = "%d%%".format((s.fold.liveHingeFrost * 100).roundToInt()),
             onDragValue = { frost = it },
         )
     }
@@ -101,19 +101,19 @@ internal fun LiveHingeRows(s: LauncherSettings, viewModel: SettingsViewModel, in
     ExpressiveSliderRow(
         title = stringResource(R.string.settings_live_hinge_end),
         subtitle = stringResource(R.string.settings_live_hinge_end_desc),
-        value = s.liveHingeEndAngle.toFloat(),
+        value = s.fold.liveHingeEndAngle.toFloat(),
         valueRange = LauncherSettings.MIN_LIVE_HINGE_END_ANGLE.toFloat()..180f,
         onValueChange = { viewModel.setLiveHingeEndAngle(it.roundToInt()) },
-        valueDisplay = "%d°".format(s.liveHingeEndAngle),
+        valueDisplay = "%d°".format(s.fold.liveHingeEndAngle),
     )
     ExpressiveRowDivider()
     ExpressiveSliderRow(
         title = stringResource(R.string.settings_live_hinge_smoothing),
         subtitle = stringResource(R.string.settings_live_hinge_smoothing_desc),
-        value = s.liveHingeSmoothingMs.toFloat(),
+        value = s.fold.liveHingeSmoothingMs.toFloat(),
         valueRange = 0f..LauncherSettings.MAX_LIVE_HINGE_SMOOTHING_MS.toFloat(),
         onValueChange = { viewModel.setLiveHingeSmoothing(it.roundToInt()) },
-        valueDisplay = "%d ms".format(s.liveHingeSmoothingMs),
+        valueDisplay = "%d ms".format(s.fold.liveHingeSmoothingMs),
     )
 }
 
@@ -176,9 +176,9 @@ internal fun TransitionSpeedRow(s: LauncherSettings, viewModel: SettingsViewMode
     ExpressiveSliderRow(
         title = stringResource(R.string.settings_transition_speed),
         subtitle = stringResource(R.string.settings_transition_speed_desc),
-        value = s.foldTransitionSpeed,
+        value = s.fold.transitionSpeed,
         valueRange = LauncherSettings.MIN_FOLD_TRANSITION_SPEED..LauncherSettings.MAX_FOLD_TRANSITION_SPEED,
         onValueChange = { viewModel.setFoldTransitionSpeed((it * 10f).roundToInt() / 10f, screenType) },
-        valueDisplay = "%.1fx".format(s.foldTransitionSpeed),
+        valueDisplay = "%.1fx".format(s.fold.transitionSpeed),
     )
 }

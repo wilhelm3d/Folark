@@ -35,7 +35,7 @@ fun interface PermissionChecker {
 }
 
 /**
- * Searches contacts, gated by the [SettingsRepository.searchContacts] setting AND the READ_CONTACTS
+ * Searches contacts, gated by the [SettingsRepository.search.contacts] setting AND the READ_CONTACTS
  * runtime permission. Never throws for normal input; a revoked-permission ContentResolver failure is
  * swallowed by the [SearchAggregator]'s runCatching.
  */
@@ -46,7 +46,7 @@ class ContactSearchProvider @Inject constructor(
 ) : SearchProvider {
 
     override suspend fun isEnabled(): Boolean =
-        settingsRepository.settings(ScreenType.OUTER).first().searchContacts &&
+        settingsRepository.settings(ScreenType.OUTER).first().search.contacts &&
             permissionChecker.has(Manifest.permission.READ_CONTACTS)
 
     override suspend fun query(query: String): List<SearchResult> =

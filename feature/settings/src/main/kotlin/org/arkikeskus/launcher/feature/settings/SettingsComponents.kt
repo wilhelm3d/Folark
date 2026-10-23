@@ -176,6 +176,7 @@ fun ExpressiveSwitchRow(
 
     Row(
         modifier = modifier
+            .searchFocus(title)
             .fillMaxWidth()
             // The whole row toggles, not just the small switch — easier to hit on a cover screen.
             .clip(RoundedCornerShape(14.dp))
@@ -242,6 +243,7 @@ fun ExpressiveStepperRow(
 
     Row(
         modifier = modifier
+            .searchFocus(title)
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -354,6 +356,7 @@ fun ExpressiveSliderRow(
 
     Column(
         modifier = modifier
+            .searchFocus(title)
             .fillMaxWidth()
             .padding(vertical = 4.dp),
     ) {
@@ -448,6 +451,7 @@ fun ExpressiveActionItem(
 
     Row(
         modifier = modifier
+            .searchFocus(title)
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)

@@ -18,6 +18,8 @@ data class AppPair(
     val app3Package: String = "",
     val app3ClassName: String = "",
     val app3UserSerial: Long = 0L,
+    /** Opens as Android's peek view: the first app big, the second peeking in from the edge. */
+    val peek: Boolean = false,
 ) {
     val hasThirdApp: Boolean get() = app3Package.isNotEmpty() && app3ClassName.isNotEmpty()
     val app3ComponentName: ComponentName get() = ComponentName(app3Package, app3ClassName)

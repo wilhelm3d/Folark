@@ -195,7 +195,7 @@ class NotificationDotListenerService : NotificationListenerService() {
                 settingsRepository.settings(ScreenType.OUTER), settingsRepository.pinnedPeople, settingsRepository.peopleAliases,
             ) { s, pinned, aliases ->
                 val pins = pinned.map { it.key }.toSet()
-                Triple(s.peopleBatchEnabled, BatchSchedule.parse(s.peopleBatchTimes), pins + aliases.filterValues { it in pins }.keys)
+                Triple(s.widgets.peopleBatchEnabled, BatchSchedule.parse(s.widgets.peopleBatchTimes), pins + aliases.filterValues { it in pins }.keys)
             }.distinctUntilChanged().onEach { (enabled, times, vips) ->
                 batchEnabled = enabled
                 batchTimes = times
@@ -760,8 +760,19 @@ class NotificationDotListenerService : NotificationListenerService() {
             category = category,
             postTime = sbn.postTime,
             contentIntent = n.contentIntent,
+            appLabel = appLabel(sbn.packageName),
+            subText = extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.takeIf { it.isNotBlank() },
+            bigText = extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.takeIf { it.isNotBlank() },
+            actions = liveActions(n),
         )
     }
+
+    /** Up to three of [n]'s buttons that just do something (no reply boxes), for the opened-up pill. */
+    private fun liveActions(n: Notification): List<LiveActivity.Action> =
+        n.actions.orEmpty()
+            .filter { it.actionIntent != null && it.remoteInputs.isNullOrEmpty() && !it.title.isNullOrBlank() }
+            .take(3)
+            .map { LiveActivity.Action(it.title.toString(), it.actionIntent) }
 
     /** Live updates and calls first, then navigation and clocks, then progress bars. */
     private fun livePriority(a: LiveActivity): Int = when {

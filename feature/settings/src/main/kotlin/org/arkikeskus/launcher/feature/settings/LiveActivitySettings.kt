@@ -34,27 +34,35 @@ internal fun LiveActivityRows(s: LauncherSettings, viewModel: SettingsViewModel)
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_live_activities),
         subtitle = stringResource(R.string.settings_live_activities_desc),
-        checked = s.liveActivities,
+        checked = s.live.activities,
         onCheckedChange = viewModel::setLiveActivities,
         shared = true,
     )
-    if (!s.liveActivities) return
+    if (!s.live.activities) return
     ExpressiveRowDivider()
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_live_activities_taskbar),
-        checked = s.liveActivitiesTaskbar,
+        checked = s.live.activitiesTaskbar,
         onCheckedChange = viewModel::setLiveActivitiesTaskbar,
+        shared = true,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_live_expand),
+        subtitle = stringResource(R.string.settings_live_expand_desc),
+        checked = s.live.expandOnLongPress,
+        onCheckedChange = viewModel::setLiveExpand,
         shared = true,
     )
     ExpressiveRowDivider()
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_live_effect),
         options = LIVE_EFFECT_LABELS.map { (key, label) -> key to stringResource(label) },
-        selected = s.liveActivityEffect,
+        selected = s.live.activityEffect,
         onSelect = viewModel::setLiveActivityEffect,
     )
     ExpressiveRowDivider()
-    LiveActivityPreview(s.liveActivityEffect)
+    LiveActivityPreview(s.live.activityEffect)
 }
 
 @Composable

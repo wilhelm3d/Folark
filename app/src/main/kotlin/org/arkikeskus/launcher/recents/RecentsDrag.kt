@@ -14,6 +14,10 @@ internal const val COMBINE_ATTACHED = "attached"
 /**
  * Dragging one Recents card onto another (hold a card, then move it): which card is held, where
  * the finger is (in the screen's coordinates), and which card and which half it is over.
+ *
+ * Letting go doesn't act at once: the held card's miniature first flies into the card it was
+ * dropped on (or back to its own place when dropped on nothing), and only when it has landed does
+ * the split / attached view open — see DragLayer, which calls [finish].
  */
 @Stable
 internal class RecentsDrag {
@@ -26,17 +30,35 @@ internal class RecentsDrag {
     var mode by mutableStateOf(COMBINE_SPLIT)
         private set
 
+    /** Where the held card was when it was picked up (where it flies back to). */
+    var origin by mutableStateOf<Rect?>(null)
+        private set
+
+    /** Let go: the miniature is flying to [landing] (the target card, or [origin]). */
+    var settling by mutableStateOf(false)
+        private set
+    var landing by mutableStateOf<Rect?>(null)
+        private set
+
+    /** The drop to carry out once the miniature has landed (null: it flies home, nothing happens). */
+    private var pending: Pair<RecentsCard, String>? = null
+
     /** Where each card is on screen, kept up to date as they are laid out. */
     val bounds = HashMap<Int, Rect>()
     var cards: List<RecentsCard> = emptyList()
 
     fun start(card: RecentsCard, at: Offset) {
         this.card = card
+        origin = bounds[card.key]
         pointer = at
+        settling = false
+        landing = null
+        pending = null
         update()
     }
 
     fun move(by: Offset) {
+        if (settling) return
         pointer += by
         update()
     }
@@ -48,16 +70,30 @@ internal class RecentsDrag {
         if (hit != null) mode = if (pointer.x < bounds.getValue(hit.key).center.x) COMBINE_SPLIT else COMBINE_ATTACHED
     }
 
-    /** The card dropped on and how, or null when let go over nothing. */
-    fun drop(): Pair<RecentsCard, String>? {
+    /** Let go of the card: it will land on the card under the finger, or fly home. */
+    fun release() {
+        if (card == null || settling) return
         val onto = cards.firstOrNull { it.key == target }
-        val how = mode
+        pending = onto?.let { it to mode }
+        landing = onto?.let { bounds[it.key] } ?: origin
+        target = null
+        settling = true
+    }
+
+    /** The miniature has landed: the drop to perform (held, onto, how), or null; then all is cleared. */
+    fun finish(): Triple<RecentsCard, RecentsCard, String>? {
+        val held = card
+        val drop = pending
         cancel()
-        return onto?.let { it to how }
+        return if (held != null && drop != null) Triple(held, drop.first, drop.second) else null
     }
 
     fun cancel() {
         card = null
         target = null
+        origin = null
+        landing = null
+        settling = false
+        pending = null
     }
 }

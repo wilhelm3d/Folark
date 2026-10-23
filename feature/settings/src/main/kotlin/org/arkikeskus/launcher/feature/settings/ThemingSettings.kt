@@ -108,18 +108,18 @@ internal fun ThemingExtrasSection(
                 LauncherSettings.POPUP_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
                 LauncherSettings.POPUP_THEME_GLASS to stringResource(R.string.settings_folder_theme_glass),
             ),
-            selected = s.popupTheme,
+            selected = s.appearance.popupTheme,
             onSelect = { viewModel.setPopupTheme(it, screenType) },
         )
-        PopupThemePreview(s.popupTheme)
+        PopupThemePreview(s.appearance.popupTheme)
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_stack_corner),
-            value = s.stackCornerRadius.toFloat(),
+            value = s.widgets.stackCornerRadius.toFloat(),
             onValueChange = { viewModel.setStackCornerRadius(it.roundToInt(), screenType) },
             valueRange = 0f..LauncherSettings.MAX_STACK_CORNER_RADIUS.toFloat(),
-            valueDisplay = "%d dp".format(s.stackCornerRadius),
+            valueDisplay = "%d dp".format(s.widgets.stackCornerRadius),
             onDragValue = { overrides?.stackCorner = it },
         )
         CornerPreview(s)
@@ -127,11 +127,11 @@ internal fun ThemingExtrasSection(
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_stack_auto_rotate),
-            value = s.stackAutoRotateSeconds.toFloat(),
+            value = s.widgets.stackAutoRotateSeconds.toFloat(),
             // Steps of five seconds; 0 switches it off.
             onValueChange = { viewModel.setStackAutoRotateSeconds((it / 5f).roundToInt() * 5, screenType) },
             valueRange = 0f..LauncherSettings.MAX_STACK_AUTO_ROTATE_SECONDS.toFloat(),
-            valueDisplay = if (s.stackAutoRotateSeconds == 0) stringResource(R.string.settings_stack_auto_rotate_off) else "%d s".format(s.stackAutoRotateSeconds),
+            valueDisplay = if (s.widgets.stackAutoRotateSeconds == 0) stringResource(R.string.settings_stack_auto_rotate_off) else "%d s".format(s.widgets.stackAutoRotateSeconds),
             subtitle = stringResource(R.string.settings_stack_auto_rotate_desc),
         )
         ExpressiveRowDivider()
@@ -143,7 +143,7 @@ internal fun ThemingExtrasSection(
                 LauncherSettings.STACK_INDICATOR_BAR to stringResource(R.string.settings_stack_indicator_bar),
                 LauncherSettings.STACK_INDICATOR_NONE to stringResource(R.string.settings_stack_indicator_none),
             ),
-            selected = s.stackIndicator,
+            selected = s.widgets.stackIndicator,
             onSelect = { viewModel.setStackIndicator(it, screenType) },
         )
         ExpressiveRowDivider()
@@ -151,7 +151,7 @@ internal fun ThemingExtrasSection(
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_stack_pill),
             subtitle = stringResource(R.string.settings_stack_pill_desc),
-            checked = s.stackShowPill,
+            checked = s.widgets.stackShowPill,
             onCheckedChange = { viewModel.setStackShowPill(it, screenType) },
         )
     }
@@ -196,20 +196,20 @@ internal fun ThemingExtrasSection(
     ) {
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_home_dim),
-            value = s.homeWallpaperDim,
+            value = s.home.wallpaperDim,
             onValueChange = { viewModel.setHomeWallpaperDim(it, screenType) },
             valueRange = 0f..LauncherSettings.MAX_HOME_WALLPAPER_DIM,
-            valueDisplay = "%d%%".format((s.homeWallpaperDim * 100).roundToInt()),
+            valueDisplay = "%d%%".format((s.home.wallpaperDim * 100).roundToInt()),
             onDragValue = { overrides?.homeDim = it },
         )
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_home_blur),
-            value = s.homeWallpaperBlur,
+            value = s.home.wallpaperBlur,
             onValueChange = { viewModel.setHomeWallpaperBlur(it, screenType) },
             valueRange = 0f..LauncherSettings.MAX_HOME_WALLPAPER_BLUR,
-            valueDisplay = "%d dp".format(s.homeWallpaperBlur.roundToInt()),
+            valueDisplay = "%d dp".format(s.home.wallpaperBlur.roundToInt()),
             subtitle = stringResource(R.string.settings_home_blur_desc),
             onDragValue = { overrides?.homeBlur = it },
         )
@@ -219,7 +219,7 @@ internal fun ThemingExtrasSection(
         ExpressiveActionItem(
             title = stringResource(R.string.settings_home_background),
             description = stringResource(
-                if (s.homeBackgroundImage.isBlank()) R.string.settings_home_background_none
+                if (s.home.backgroundImage.isBlank()) R.string.settings_home_background_none
                 else R.string.settings_home_background_set,
             ),
             onClick = { runCatching { pickBackground.launch("image/*") } },
@@ -238,7 +238,7 @@ internal fun ThemingExtrasSection(
                 onClick = { showPhoneWallpapers = true },
             )
         }
-        if (s.homeBackgroundImage.isNotBlank()) {
+        if (s.home.backgroundImage.isNotBlank()) {
             ExpressiveRowDivider()
             ExpressiveActionItem(
                 title = stringResource(R.string.settings_home_background_remove),
@@ -287,7 +287,7 @@ internal fun TypographySection(
                 LauncherSettings.FONT_FAMILY_MOTO_EXO2 to stringResource(R.string.settings_font_moto_exo2),
                 LauncherSettings.FONT_FAMILY_MOTO_ROBOTO_SLAB to stringResource(R.string.settings_font_moto_roboto_slab),
             ).filter { (key, _) -> phoneFonts.getValue(key) },
-            selected = s.appFontFamily,
+            selected = s.appearance.fontFamily,
             onSelect = { viewModel.setAppFontFamily(it, screenType) },
             icon = null,
         )
@@ -296,17 +296,17 @@ internal fun TypographySection(
         ExpressiveSwitchRow(
             title = "Bold Font Style",
             subtitle = "Apply bold font weight across launcher labels and titles",
-            checked = s.appFontBold,
+            checked = s.appearance.fontBold,
             onCheckedChange = { viewModel.setAppFontBold(it, screenType) },
         )
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
             title = "Font Size Scale",
-            value = s.appFontSizeScale,
+            value = s.appearance.fontSizeScale,
             onValueChange = { viewModel.setAppFontSizeScale(it, screenType) },
             valueRange = 0.7f..1.4f,
-            valueDisplay = "%.2fx".format(s.appFontSizeScale),
+            valueDisplay = "%.2fx".format(s.appearance.fontSizeScale),
         )
     }
 }
@@ -326,7 +326,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_weather_animated),
             subtitle = stringResource(R.string.settings_weather_animated_desc),
-            checked = s.weatherWidgetAnimated,
+            checked = s.widgets.weatherAnimated,
             onCheckedChange = viewModel::setWeatherWidgetAnimated,
         )
         ExpressiveRowDivider()
@@ -348,7 +348,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 LauncherSettings.CLOCK_STYLE_NEUMORPHIC to "Embossed Glass",
                 LauncherSettings.CLOCK_STYLE_NOTHING_NDOT to "Nothing NDot 57",
             ),
-            selected = s.clockWidgetStyle,
+            selected = s.widgets.clockStyle,
             onSelect = viewModel::setClockWidgetStyle,
             icon = null,
         )
@@ -357,7 +357,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSwitchRow(
             title = "Glass Card Effect",
             subtitle = "Render a frosted liquid glass card behind clock digits",
-            checked = s.clockWidgetGlassEffect,
+            checked = s.widgets.clockGlassEffect,
             onCheckedChange = viewModel::setClockWidgetGlassEffect,
         )
         ExpressiveRowDivider()
@@ -368,7 +368,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 false to stringResource(R.string.settings_clock_text_white),
                 true to stringResource(R.string.settings_clock_text_dark),
             ),
-            selected = s.clockWidgetDarkText,
+            selected = s.widgets.clockDarkText,
             onSelect = viewModel::setClockWidgetDarkText,
             icon = null,
         )
@@ -384,7 +384,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 LauncherSettings.CLOCK_MINUTE_DARK_GREY to stringResource(R.string.settings_clock_minutes_dark_grey),
                 LauncherSettings.CLOCK_MINUTE_BLACK to stringResource(R.string.settings_clock_minutes_black),
             ),
-            selected = s.clockMinuteColor,
+            selected = s.widgets.clockMinuteColor,
             onSelect = viewModel::setClockMinuteColor,
             icon = null,
         )
@@ -392,10 +392,10 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
 
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_clock_minutes_opacity),
-            value = s.clockMinuteOpacity,
+            value = s.widgets.clockMinuteOpacity,
             onValueChange = viewModel::setClockMinuteOpacity,
             valueRange = 0.1f..1f,
-            valueDisplay = "${(s.clockMinuteOpacity * 100).roundToInt()}%",
+            valueDisplay = "${(s.widgets.clockMinuteOpacity * 100).roundToInt()}%",
         )
         ExpressiveRowDivider()
 
@@ -407,7 +407,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
                 LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
-            selected = s.mediaWidgetTheme,
+            selected = s.widgets.mediaTheme,
             onSelect = viewModel::setMediaWidgetTheme,
             icon = null,
         )
@@ -415,7 +415,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_media_artwork),
-            checked = s.mediaWidgetArtwork,
+            checked = s.widgets.mediaArtwork,
             onCheckedChange = viewModel::setMediaWidgetArtwork,
         )
         ExpressiveRowDivider()
@@ -428,7 +428,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
                 LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
-            selected = s.appsWidgetTheme,
+            selected = s.widgets.appsTheme,
             onSelect = viewModel::setAppsWidgetTheme,
             icon = null,
         )
@@ -436,7 +436,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_apps_labels),
-            checked = s.appsWidgetLabels,
+            checked = s.widgets.appsLabels,
             onCheckedChange = viewModel::setAppsWidgetLabels,
         )
         ExpressiveRowDivider()
@@ -449,7 +449,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
                 LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
-            selected = s.statsWidgetTheme,
+            selected = s.widgets.statsTheme,
             onSelect = viewModel::setStatsWidgetTheme,
             icon = null,
         )
@@ -457,28 +457,28 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_stats_battery),
-            checked = s.statsShowBattery,
+            checked = s.widgets.statsShowBattery,
             onCheckedChange = viewModel::setStatsShowBattery,
         )
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_stats_storage),
-            checked = s.statsShowStorage,
+            checked = s.widgets.statsShowStorage,
             onCheckedChange = viewModel::setStatsShowStorage,
         )
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_stats_memory),
-            checked = s.statsShowMemory,
+            checked = s.widgets.statsShowMemory,
             onCheckedChange = viewModel::setStatsShowMemory,
         )
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_stats_bluetooth),
-            checked = s.statsShowBluetooth,
+            checked = s.widgets.statsShowBluetooth,
             onCheckedChange = viewModel::setStatsShowBluetooth,
         )
         ExpressiveRowDivider()
@@ -491,7 +491,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
                 LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
-            selected = s.noteWidgetTheme,
+            selected = s.widgets.noteTheme,
             onSelect = viewModel::setNoteWidgetTheme,
             icon = null,
         )
@@ -504,7 +504,7 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
                 LauncherSettings.FOLDER_OPEN_MEDIUM to stringResource(R.string.settings_folder_open_medium),
                 LauncherSettings.FOLDER_OPEN_LARGE to stringResource(R.string.settings_folder_open_large),
             ),
-            selected = s.noteWidgetTextSize,
+            selected = s.widgets.noteTextSize,
             onSelect = viewModel::setNoteWidgetTextSize,
             icon = null,
         )
@@ -521,7 +521,7 @@ internal fun NotificationDotStyleRows(s: LauncherSettings, viewModel: SettingsVi
             LauncherSettings.DOT_SHAPE_SQUIRCLE to stringResource(R.string.settings_folder_shape_squircle),
             LauncherSettings.DOT_SHAPE_SQUARE to stringResource(R.string.settings_folder_shape_square),
         ),
-        selected = s.dotShape,
+        selected = s.dots.shape,
         onSelect = { viewModel.setDotShape(it, screenType) },
     )
     ExpressiveRowDivider()
@@ -533,7 +533,7 @@ internal fun NotificationDotStyleRows(s: LauncherSettings, viewModel: SettingsVi
             LauncherSettings.DOT_COLOR_ACCENT to stringResource(R.string.settings_folder_theme_accent),
             LauncherSettings.DOT_COLOR_WHITE to stringResource(R.string.settings_dot_color_white),
         ),
-        selected = s.dotColor,
+        selected = s.dots.color,
         onSelect = { viewModel.setDotColor(it, screenType) },
     )
     ExpressiveRowDivider()
@@ -546,7 +546,7 @@ internal fun NotificationDotStyleRows(s: LauncherSettings, viewModel: SettingsVi
             LauncherSettings.DOT_POSITION_BOTTOM_END to stringResource(R.string.settings_dot_position_bottom_end),
             LauncherSettings.DOT_POSITION_BOTTOM_START to stringResource(R.string.settings_dot_position_bottom_start),
         ),
-        selected = s.dotPosition,
+        selected = s.dots.position,
         onSelect = { viewModel.setDotPosition(it, screenType) },
     )
 }
@@ -562,7 +562,7 @@ internal fun IconSwipeRow(s: LauncherSettings, viewModel: SettingsViewModel, scr
             LauncherSettings.ICON_SWIPE_FLOATING to stringResource(R.string.settings_icon_swipe_floating),
             LauncherSettings.ICON_SWIPE_SPLIT to stringResource(R.string.settings_icon_swipe_split),
         ),
-        selected = s.iconSwipeUpAction,
+        selected = s.home.iconSwipeUpAction,
         onSelect = { viewModel.setIconSwipeUpAction(it, screenType) },
     )
 }
@@ -573,14 +573,14 @@ internal fun AutoRemovePagesRow(s: LauncherSettings, viewModel: SettingsViewMode
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_auto_remove_pages),
         subtitle = stringResource(R.string.settings_auto_remove_pages_desc),
-        checked = s.autoRemoveEmptyPages,
+        checked = s.home.autoRemoveEmptyPages,
         onCheckedChange = { viewModel.setAutoRemoveEmptyPages(it, screenType) },
     )
     ExpressiveRowDivider()
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_new_page_on_drag),
         subtitle = stringResource(R.string.settings_new_page_on_drag_desc),
-        checked = s.newPageOnDrag,
+        checked = s.home.newPageOnDrag,
         onCheckedChange = { viewModel.setNewPageOnDrag(it, screenType) },
     )
 }
@@ -591,15 +591,25 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_drawer_tabs),
         subtitle = stringResource(R.string.settings_drawer_tabs_desc),
-        checked = s.drawerFolderTabs,
+        checked = s.drawer.folderTabs,
         onCheckedChange = { viewModel.setDrawerFolderTabs(it, screenType) },
     )
     ExpressiveRowDivider()
+    if (s.drawer.folderTabs) {
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_tabs_exclusive),
+            subtitle = stringResource(R.string.settings_drawer_tabs_exclusive_desc),
+            checked = s.drawer.tabsExclusive,
+            onCheckedChange = viewModel::setDrawerTabsExclusive,
+            shared = true,
+        )
+        ExpressiveRowDivider()
+    }
 
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_search_shortcuts),
         subtitle = stringResource(R.string.settings_search_shortcuts_desc),
-        checked = s.searchShortcuts,
+        checked = s.search.shortcuts,
         onCheckedChange = viewModel::setSearchShortcuts,
         shared = true,
     )
@@ -607,7 +617,7 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
 
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_search_web),
-        checked = s.searchWeb,
+        checked = s.search.web,
         onCheckedChange = viewModel::setSearchWeb,
         shared = true,
     )
@@ -618,7 +628,7 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_private_space),
             subtitle = stringResource(R.string.settings_private_space_desc),
-            checked = s.showPrivateSpace,
+            checked = s.drawer.showPrivateSpace,
             onCheckedChange = viewModel::setShowPrivateSpace,
             shared = true,
         )
@@ -635,7 +645,7 @@ internal fun FloatingSizeRow(s: LauncherSettings, viewModel: SettingsViewModel) 
             LauncherSettings.FLOATING_SIZE_MEDIUM to stringResource(R.string.settings_folder_open_medium),
             LauncherSettings.FLOATING_SIZE_LARGE to stringResource(R.string.settings_folder_open_large),
         ),
-        selected = s.floatingWindowSize,
+        selected = s.launch.floatingWindowSize,
         onSelect = viewModel::setFloatingWindowSize,
     )
 }
@@ -684,7 +694,7 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
             LauncherSettings.BATTERY_SAVER_AUTO to stringResource(R.string.settings_battery_saver_auto),
             LauncherSettings.BATTERY_SAVER_ON to stringResource(R.string.settings_battery_saver_on),
         ),
-        selected = s.batterySaverMode,
+        selected = s.motion.batterySaverMode,
         onSelect = viewModel::setBatterySaverMode,
     )
     Text(
@@ -696,10 +706,10 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
     ExpressiveRowDivider()
     ExpressiveSliderRow(
         title = stringResource(R.string.settings_animation_speed),
-        value = s.animationSpeed,
+        value = s.motion.animationSpeed,
         onValueChange = { viewModel.setAnimationSpeed((it * 4f).roundToInt() / 4f) },
         valueRange = LauncherSettings.MIN_ANIMATION_SPEED..LauncherSettings.MAX_ANIMATION_SPEED,
-        valueDisplay = "%.2f×".format(s.animationSpeed),
+        valueDisplay = "%.2f×".format(s.motion.animationSpeed),
         subtitle = stringResource(R.string.settings_animation_speed_desc),
     )
     ExpressiveRowDivider()
@@ -714,7 +724,7 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
             LauncherSettings.APP_OPEN_FADE to stringResource(R.string.settings_anim_fade),
             LauncherSettings.APP_OPEN_NONE to stringResource(R.string.settings_anim_none),
         ),
-        selected = s.appOpenAnimation,
+        selected = s.motion.appOpenAnimation,
         onSelect = viewModel::setAppOpenAnimation,
     )
     ExpressiveRowDivider()
@@ -726,7 +736,7 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
             LauncherSettings.FOLDER_ANIM_FADE to stringResource(R.string.settings_anim_fade),
             LauncherSettings.FOLDER_ANIM_NONE to stringResource(R.string.settings_anim_none),
         ),
-        selected = s.folderOpenAnimation,
+        selected = s.folders.openAnimation,
         onSelect = viewModel::setFolderOpenAnimation,
     )
     ExpressiveRowDivider()
@@ -739,7 +749,7 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
             LauncherSettings.PAGE_EFFECT_CUBE to stringResource(R.string.settings_anim_cube),
             LauncherSettings.PAGE_EFFECT_STACK to stringResource(R.string.settings_anim_stack),
         ),
-        selected = s.pageScrollEffect,
+        selected = s.home.pageScrollEffect,
         onSelect = viewModel::setPageScrollEffect,
     )
 }

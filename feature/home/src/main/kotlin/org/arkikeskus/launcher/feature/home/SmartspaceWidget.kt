@@ -91,7 +91,7 @@ class SmartspaceViewModel @Inject constructor(
     /** Weather slot enabled in Settings ▸ Home (the permission gate is separate). */
     @OptIn(ExperimentalCoroutinesApi::class)
     val showWeather: StateFlow<Boolean> = _screenType.flatMapLatest { screenType ->
-        settingsRepository.settings(screenType).map { it.showWeather }
+        settingsRepository.settings(screenType).map { it.widgets.showWeather }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     val weather: StateFlow<CurrentWeather?> =
@@ -106,7 +106,7 @@ class SmartspaceViewModel @Inject constructor(
         // Gate on the PERSISTED setting, not the StateFlow: at process start the stateIn initial
         // value (true) would fire one location read + network query even with weather turned off.
         viewModelScope.launch {
-            if (settingsRepository.settings(_screenType.value).first().showWeather) weatherRepository.refresh()
+            if (settingsRepository.settings(_screenType.value).first().widgets.showWeather) weatherRepository.refresh()
         }
     }
 

@@ -26,10 +26,10 @@ internal fun SystemTaskbarRows(s: LauncherSettings, viewModel: SettingsViewModel
             LauncherSettings.TASKBAR_SOURCE_FOLARK to stringResource(R.string.settings_taskbar_source_folark),
             LauncherSettings.TASKBAR_SOURCE_SYSTEM to stringResource(R.string.settings_taskbar_source_system),
         ),
-        selected = s.taskbarSource,
+        selected = s.taskbar.source,
         onSelect = viewModel::setTaskbarSource,
     )
-    if (s.taskbarSource != LauncherSettings.TASKBAR_SOURCE_SYSTEM) return
+    if (s.taskbar.source != LauncherSettings.TASKBAR_SOURCE_SYSTEM) return
     ExpressiveRowDivider()
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_system_taskbar_mode),
@@ -38,7 +38,7 @@ internal fun SystemTaskbarRows(s: LauncherSettings, viewModel: SettingsViewModel
             SystemTaskbar.MODE_GESTURE to stringResource(R.string.settings_system_taskbar_gesture),
             SystemTaskbar.MODE_OFF to stringResource(R.string.settings_system_taskbar_off),
         ),
-        selected = s.systemTaskbarMode,
+        selected = s.taskbar.systemMode,
         onSelect = { mode ->
             viewModel.setSystemTaskbarMode(mode)
             scope.launch {

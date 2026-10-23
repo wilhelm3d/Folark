@@ -1,5 +1,6 @@
 plugins {
     id("arkikeskus.android.library")
+    id("arkikeskus.android.compose")
 }
 
 android {
@@ -7,5 +8,4 @@ android {
 }
 
 dependencies {
-    implementation("androidx.compose.runtime:runtime:1.6.8")
 }

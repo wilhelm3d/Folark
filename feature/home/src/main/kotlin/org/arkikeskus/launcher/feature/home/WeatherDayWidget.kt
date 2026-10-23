@@ -177,7 +177,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
     val time = remember { mutableFloatStateOf(0f) }
     val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
     // Not while the drawer covers the home screen, and not in battery saver (the sky then stands still).
-    val animate = settings.weatherWidgetAnimated && resumed && current != null &&
+    val animate = settings.widgets.weatherAnimated && resumed && current != null &&
         !LocalBatterySaver.current && !LocalHomeCovered.current
     // Rain, snow and storms move fast and get about 30 frames a second; sun, stars, clouds and fog
     // drift slowly and look the same at about 15.
@@ -209,7 +209,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                     runCatching { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }
                 } else if (current == null) {
                     viewModel.refresh(force = true)
-                } else if (!(settings.motoWeatherTap && MotoLinks.open(context, MotoLinks.WEATHER))) {
+                } else if (!(settings.widgets.motoWeatherTap && MotoLinks.open(context, MotoLinks.WEATHER))) {
                     runCatching {
                         val query = Uri.encode("weather " + current?.city.orEmpty())
                         context.startActivity(
@@ -220,7 +220,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                 }
             },
     ) {
-        if (settings.weatherWidgetAnimated && current != null) {
+        if (settings.widgets.weatherAnimated && current != null) {
             Canvas(Modifier.fillMaxSize().graphicsLayer()) { drawSky(sky, isDay, time.floatValue) }
         }
         if (current == null) {

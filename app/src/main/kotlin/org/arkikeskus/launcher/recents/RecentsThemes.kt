@@ -1,5 +1,14 @@
 package org.arkikeskus.launcher.recents
 
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -64,14 +73,14 @@ private fun screenAspect(): Float {
 private fun edgeMargin(): Dp = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) 28.dp else 16.dp
 
 /** How much bigger than normal the cards are (Settings ▸ Recents ▸ Card height; 300 = normal). */
-private fun RecentsEnv.sizeScale(): Float = settings.recentsCardHeight / 300f
+private fun RecentsEnv.sizeScale(): Float = settings.recents.cardHeight / 300f
 
 // ---------------------------------------------------------------------------- Folark: cards in a grid
 
 @Composable
 internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int) {
     val corner = env.corner
-    val overlay = env.settings.recentsCardLayout == LauncherSettings.RECENTS_CARD_OVERLAY
+    val overlay = env.settings.recents.cardLayout == LauncherSettings.RECENTS_CARD_OVERLAY
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns.coerceAtLeast(1)),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -80,7 +89,7 @@ internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int
     ) {
         itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
             if (overlay) {
-                OverlayCard(card, env, env.cardModifier(card, index, columns), env.settings.recentsCardHeight.dp)
+                OverlayCard(card, env, env.cardModifier(card, index, columns), env.settings.recents.cardHeight.dp)
             } else {
                 Column(
                     Modifier
@@ -91,7 +100,7 @@ internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     CardTitle(card, env)
-                    CardPicture(card, env, Modifier.fillMaxWidth().height(env.settings.recentsCardHeight.dp), (corner.value * 0.6f).dp)
+                    CardPicture(card, env, Modifier.fillMaxWidth().height(env.settings.recents.cardHeight.dp), (corner.value * 0.6f).dp)
                     CardActions(card, env)
                 }
             }
@@ -116,7 +125,9 @@ internal fun IpadTheme(cards: List<RecentsCard>, env: RecentsEnv) {
         ) {
             itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
                 val width = if (card.isSplit) oneWidth * 1.4f else oneWidth
-                Column(
+                if (env.overlay) {
+                    OverlayCard(card, env, Modifier.width(width).then(env.cardModifier(card, index, cards.size)), pictureHeight)
+                } else Column(
                     Modifier.width(width).then(env.cardModifier(card, index, cards.size)),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -162,8 +173,7 @@ internal fun CarouselTheme(cards: List<RecentsCard>, env: RecentsEnv) {
             contentPadding = PaddingValues(horizontal = side),
         ) {
             itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
-                Column(
-                    Modifier
+                val carouselModifier = Modifier
                         .width(cardWidth)
                         // Smaller and dimmer away from the middle (read while drawing: smooth scrolling).
                         .graphicsLayer {
@@ -178,14 +188,18 @@ internal fun CarouselTheme(cards: List<RecentsCard>, env: RecentsEnv) {
                                 alpha = 1f - 0.45f * d
                             }
                         }
-                        .then(env.cardModifier(card, index, cards.size)),
+                        .then(env.cardModifier(card, index, cards.size))
+                if (env.overlay) {
+                    OverlayCard(card, env, carouselModifier, pictureHeight)
+                } else Column(
+                    carouselModifier,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         card.apps.forEach { AppBadge(it, 34.dp) }
                         Column(Modifier.weight(1f)) {
                             Text(card.label, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (env.settings.recentsShowTime) Text(timeLabel(LocalContext.current, card.inactiveMs), color = Muted, fontSize = 11.sp, fontFamily = Mono)
+                            if (env.settings.recents.showTime) Text(timeLabel(LocalContext.current, card.inactiveMs), color = Muted, fontSize = 11.sp, fontFamily = Mono)
                         }
                         CardTrailing(card, env)
                     }
@@ -220,15 +234,18 @@ internal fun DeckTheme(cards: List<RecentsCard>, env: RecentsEnv) {
             contentPadding = PaddingValues(horizontal = edgeMargin()),
         ) {
             itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
-                Column(
-                    Modifier
+                val deckModifier = Modifier
                         .width(cardWidth)
                         .graphicsLayer {
                             rotationY = -7f
                             cameraDistance = 18f * density
                             shadowElevation = 28f
                         }
-                        .then(env.cardModifier(card, index, cards.size)),
+                        .then(env.cardModifier(card, index, cards.size))
+                if (env.overlay) {
+                    OverlayCard(card, env, deckModifier, pictureHeight)
+                } else Column(
+                    deckModifier,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -324,64 +341,108 @@ internal fun SwitcherTheme(cards: List<RecentsCard>, env: RecentsEnv) {
 
 /**
  * The clean, borderless card (Android 17 / iOS style): the app's picture fills the whole card to
- * its rounded corners, the app icon floats on top, and small round close / pin buttons sit in the
- * top corner. No frame, no header row.
+ * its rounded corners and casts a soft shadow, the app icon floats on top over a faint shade (just
+ * behind the icon, not a band across the card), and small round close / pin buttons sit in the top
+ * corner. No frame, no header row; the app's name can sit underneath (Settings ▸ Recents ▸ App
+ * names under the cards). Picked for split view, the card shrinks a touch inside an accent ring
+ * that floats just outside it — the card itself never gets a border.
  */
 @Composable
-internal fun OverlayCard(card: RecentsCard, env: RecentsEnv, cardModifier: Modifier, height: Dp) {
+internal fun OverlayCard(
+    card: RecentsCard,
+    env: RecentsEnv,
+    cardModifier: Modifier,
+    height: Dp,
+    showLabel: Boolean = env.settings.recents.overlayLabels,
+) {
     val shape = RoundedCornerShape(env.corner)
     val picked = card in env.picked
     val slot = env.slotLabel(card)
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(height)
-            .then(cardModifier)
-            .clip(shape)
-            .then(if (picked) Modifier.border(2.dp, env.accent, shape) else Modifier),
-    ) {
-        CardPicture(card, env, Modifier.matchParentSize(), env.corner, iconSize = 56.dp)
+    val pick by animateFloatAsState(
+        if (picked) 1f else 0f,
+        spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "pick",
+    )
+    Column(cardModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(66.dp)
-                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.4f), 1f to Color.Transparent)),
-        )
-        Row(
-            Modifier.align(Alignment.TopCenter).padding(top = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy((-10).dp),
+                .height(height)
+                .drawBehind {
+                    if (pick > 0.01f) {
+                        val gap = 4.dp.toPx()
+                        drawRoundRect(
+                            color = env.accent.copy(alpha = pick),
+                            topLeft = Offset(-gap, -gap),
+                            size = Size(size.width + 2 * gap, size.height + 2 * gap),
+                            cornerRadius = CornerRadius(env.corner.toPx() + gap),
+                            style = Stroke(width = 2.5.dp.toPx()),
+                        )
+                    }
+                }
+                .graphicsLayer {
+                    val k = 1f - 0.05f * pick
+                    scaleX = k; scaleY = k
+                    shadowElevation = 14f
+                    this.shape = shape
+                    clip = true
+                },
         ) {
-            card.apps.forEach { app ->
-                Box(Modifier.graphicsLayer { shadowElevation = 12f; this.shape = CircleShape; clip = false }) {
-                    AppBadge(app, 38.dp)
-                }
-            }
-        }
-        if (!env.selecting) {
+            CardPicture(card, env, Modifier.matchParentSize(), env.corner, iconSize = 56.dp)
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .size(124.dp, 76.dp)
+                    .background(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent))),
+            )
             Row(
-                Modifier.align(Alignment.TopEnd).padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy((-10).dp),
             ) {
-                if (env.settings.recentsBtnPin) {
-                    OverlayCircle(if (card.pinned) env.accent else Color.Black.copy(alpha = 0.45f), { env.onTogglePin(card) }) {
-                        PinGlyph(if (card.pinned) env.onAccent else Color.White)
+                card.apps.forEach { app ->
+                    Box(Modifier.graphicsLayer { shadowElevation = 12f; this.shape = CircleShape; clip = false }) {
+                        AppBadge(app, 38.dp)
                     }
                 }
-                if (env.canClose && env.settings.recentsBtnClose && !card.pinned) {
-                    OverlayCircle(Color.Black.copy(alpha = 0.45f), { env.onClose(card) }) {
-                        CrossGlyph(Color.White)
+            }
+            if (!env.selecting) {
+                Row(
+                    Modifier.align(Alignment.TopEnd).padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (env.settings.recents.btnPin) {
+                        OverlayCircle(if (card.pinned) env.accent else Color.Black.copy(alpha = 0.38f), { env.onTogglePin(card) }) {
+                            PinGlyph(if (card.pinned) env.onAccent else Color.White)
+                        }
+                    }
+                    if (env.canClose && env.settings.recents.btnClose && !card.pinned) {
+                        OverlayCircle(Color.Black.copy(alpha = 0.38f), { env.onClose(card) }) {
+                            CrossGlyph(Color.White)
+                        }
+                    }
+                }
+            }
+            if (env.selecting) {
+                Box(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+                    when {
+                        slot != null -> OverlayChip(stringResource(slot), env.accent, env.onAccent)
+                        !card.isSplit -> OverlayChip(stringResource(R.string.recents_add), Color.Black.copy(alpha = 0.5f), Color.White)
                     }
                 }
             }
         }
-        if (env.selecting) {
-            Box(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
-                when {
-                    slot != null -> OverlayChip(stringResource(slot), env.accent, env.onAccent)
-                    !card.isSplit -> OverlayChip(stringResource(R.string.recents_add), Color.Black.copy(alpha = 0.5f), Color.White)
-                }
-            }
+        if (showLabel) {
+            Text(
+                card.label,
+                color = Ink,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp, start = 6.dp, end = 6.dp),
+            )
         }
     }
 }
@@ -389,7 +450,7 @@ internal fun OverlayCard(card: RecentsCard, env: RecentsEnv, cardModifier: Modif
 @Composable
 private fun OverlayCircle(bg: Color, onClick: () -> Unit, glyph: @Composable () -> Unit) {
     Box(
-        Modifier.size(34.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
+        Modifier.size(30.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { glyph() }
 }

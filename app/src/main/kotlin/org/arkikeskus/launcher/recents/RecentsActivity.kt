@@ -37,18 +37,18 @@ class RecentsActivity : ComponentActivity() {
             val state by viewModel.state.collectAsStateWithLifecycle()
             val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
             // Liquid Glass: Android blurs whatever is behind Recents (home, or the app).
-            val blurPx = if (settings.recentsGlass) (settings.recentsGlassBlur * resources.displayMetrics.density).toInt() else 0
+            val blurPx = if (settings.recents.glass) (settings.recents.glassBlur * resources.displayMetrics.density).toInt() else 0
             LaunchedEffect(blurPx) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) runCatching { window.setBackgroundBlurRadius(blurPx) }
             }
             LauncherTheme(
                 darkTheme = true,
-                amoledDark = settings.amoledDark,
-                fontFamily = settings.appFontFamily
+                amoledDark = settings.appearance.amoledDark,
+                fontFamily = settings.appearance.fontFamily
                     .takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT }
                     ?.let { LauncherFontFamily.resolve(it) },
-                boldText = settings.appFontBold,
-                fontScale = settings.appFontSizeScale,
+                boldText = settings.appearance.fontBold,
+                fontScale = settings.appearance.fontSizeScale,
             ) {
                 RecentsScreen(
                     state = state,
@@ -59,12 +59,22 @@ class RecentsActivity : ComponentActivity() {
                     onCloseAll = { viewModel.closeAll(); leave() },
                     onPopUp = { card -> viewModel.popUp(card); leave() },
                     onUnsplit = { card -> viewModel.unsplit(card); viewModel.open(card); leave() },
-                    onOpenTogether = { cards -> viewModel.openTogether(cards, settings.recentsThirdInSplit); leave() },
+                    onOpenTogether = { cards ->
+                        viewModel.openTogether(cards, settings.recents.thirdInSplit, settings.launch.threeAppSplit)
+                        leave()
+                    },
+                    // "Split 3 apps" from a card's menu: the third always joins the split.
+                    onOpenThree = { cards -> viewModel.openTogether(cards, thirdInSplit = true, threeApp = settings.launch.threeAppSplit); leave() },
+                    onPeek = { main, peek ->
+                        viewModel.openAttached(main, peek, settings.recents.attachedSide, settings.recents.attachedPeek, windowManager.maximumWindowMetrics.bounds)
+                        leave()
+                    },
+                    onPeekSplit = { card -> viewModel.peekSplit(card, settings.recents.attachedSide); leave() },
                     onCombine = { dragged, target, how ->
                         if (how == COMBINE_ATTACHED) {
-                            viewModel.openAttached(dragged, target, settings.recentsAttachedSide, settings.recentsAttachedPeek, windowManager.maximumWindowMetrics.bounds)
+                            viewModel.openAttached(dragged, target, settings.recents.attachedSide, settings.recents.attachedPeek, windowManager.maximumWindowMetrics.bounds)
                         } else {
-                            viewModel.openTogether(listOf(target, dragged), settings.recentsThirdInSplit)
+                            viewModel.openTogether(listOf(target, dragged), settings.recents.thirdInSplit, settings.launch.threeAppSplit)
                         }
                         leave()
                     },

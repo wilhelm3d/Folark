@@ -122,11 +122,15 @@ open class AppRepository @Inject constructor(
                 if (source.launchAppPairSecond(pair).isSuccess) {
                     launched += pair.app2Key
                     settleIntoSplit(pair.app2ComponentName.packageName)
+                    // A peek pair: the second app slides off to peek in from the right edge.
+                    if (pair.peek && !pair.hasThirdApp) source.snapSplit(SplitThree.SNAP_PEEK_RIGHT)
                 }
                 if (pair.hasThirdApp) {
-                    // The third app floats over the pair once the split has settled.
+                    // The third app joins the split as a third pane (Vector module in SystemUI), or
+                    // else floats over the pair once the split has settled.
                     delay(SPLIT_THIRD_APP_DELAY_MS)
-                    if (source.launchAppPairThird(pair, floatingWindowSize()).isSuccess) {
+                    val inSplit = cachedThreeAppSplit && source.launchAppPairThirdInSplit(pair)
+                    if (inSplit || source.launchAppPairThird(pair, floatingWindowSize()).isSuccess) {
                         launched += pair.app3Key
                     }
                 }
@@ -197,17 +201,21 @@ open class AppRepository @Inject constructor(
 
     private fun floatingWindowSize(): String = cachedFloatingSize
 
+    @Volatile
+    private var cachedThreeAppSplit: Boolean = true
+
     init {
         scope.launch {
             runCatching {
                 settingsRepository.settings(ScreenType.OUTER).collect {
-                    cachedFloatingSize = it.floatingWindowSize
-                    cachedOpenAnimation = it.appOpenAnimation
-                    cachedAnimationSpeed = it.animationSpeed
+                    cachedFloatingSize = it.launch.floatingWindowSize
+                    cachedThreeAppSplit = it.launch.threeAppSplit
+                    cachedOpenAnimation = it.motion.appOpenAnimation
+                    cachedAnimationSpeed = it.motion.animationSpeed
                     // "Theme all icons" changes how icons are drawn: re-render them when it flips.
-                    if (source.forceThemedIcons != it.forceThemedIcons || source.themedIconStyle != it.themedIconStyle) {
-                        source.forceThemedIcons = it.forceThemedIcons
-                        source.themedIconStyle = it.themedIconStyle
+                    if (source.forceThemedIcons != it.icons.forceThemedIcons || source.themedIconStyle != it.icons.themedIconStyle) {
+                        source.forceThemedIcons = it.icons.forceThemedIcons
+                        source.themedIconStyle = it.icons.themedIconStyle
                         source.invalidateCachesAndReload()
                     }
                 }

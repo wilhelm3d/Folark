@@ -168,11 +168,11 @@ fun WidgetPickerScreen(
 
     // Resolve drawer colors from inner app drawer settings
     val drawerColors = rememberDrawerColors(
-        theme = settings.drawerThemeTint,
-        accentArgb = settings.drawerAccentColor,
-        customArgb = settings.drawerCustomColor,
-        glass = settings.drawerGlassEnabled,
-        panelOpacity = settings.drawerPanelOpacity,
+        theme = settings.drawer.themeTint,
+        accentArgb = settings.drawer.accentColor,
+        customArgb = settings.drawer.customColor,
+        glass = settings.drawer.glassEnabled,
+        panelOpacity = settings.drawer.panelOpacity,
     )
 
     val configuration = LocalConfiguration.current
@@ -239,12 +239,12 @@ private fun InnerWidgetGalleryPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val sidebar = settings.innerSidebarAppDrawer
+    val sidebar = settings.drawer.innerSidebar
     val effectiveHeightFraction =
-        if (sidebar) 1f else settings.drawerHeightFraction.coerceIn(0.4f, 1.0f)
-    val effectiveWidthFraction = settings.drawerWidthFraction.coerceIn(0.4f, 1.0f)
+        if (sidebar) 1f else settings.drawer.heightFraction.coerceIn(0.4f, 1.0f)
+    val effectiveWidthFraction = settings.drawer.widthFraction.coerceIn(0.4f, 1.0f)
         .let { if (sidebar) it.coerceAtMost(0.5f) else it }
-    val effectiveAlignment = settings.drawerAlignment.let {
+    val effectiveAlignment = settings.drawer.alignment.let {
         if (sidebar && it != LauncherSettings.DRAWER_ALIGNMENT_LEFT) LauncherSettings.DRAWER_ALIGNMENT_RIGHT else it
     }
 
@@ -254,12 +254,12 @@ private fun InnerWidgetGalleryPanel(
         else -> Alignment.BottomCenter
     }
 
-    val drawerStyle = remember(settings.drawerStyle) { drawerStyleSpec(settings.drawerStyle) }
+    val drawerStyle = remember(settings.drawer.style) { drawerStyleSpec(settings.drawer.style) }
     val systemDensity = LocalDensity.current
-    val drawerDensity = remember(systemDensity, settings.dpiAppDrawer) {
+    val drawerDensity = remember(systemDensity, settings.appearance.dpiAppDrawer) {
         Density(
-            density = systemDensity.density * settings.dpiAppDrawer,
-            fontScale = systemDensity.fontScale * settings.dpiAppDrawer,
+            density = systemDensity.density * settings.appearance.dpiAppDrawer,
+            fontScale = systemDensity.fontScale * settings.appearance.dpiAppDrawer,
         )
     }
 
@@ -274,8 +274,8 @@ private fun InnerWidgetGalleryPanel(
     var selectedCategoryIndex by remember { mutableIntStateOf(0) } // 0 = All, 1 = Expressive, 2+ = App groups
 
     // Glass blur behind the open gallery (matching inner app drawer)
-    if (settings.drawerGlassEnabled) {
-        WindowBlurBehind(maxRadiusDp = settings.drawerBackgroundBlur * 2f) { 1f }
+    if (settings.drawer.glassEnabled) {
+        WindowBlurBehind(maxRadiusDp = settings.drawer.backgroundBlur * 2f) { 1f }
     }
 
     val dragging = dragController.moving
@@ -289,11 +289,11 @@ private fun InnerWidgetGalleryPanel(
         contentAlignment = sheetAlignment,
     ) {
         // Scrim backdrop (matching inner app drawer)
-        if (settings.drawerScrimOpacity > 0f || effectiveHeightFraction < 1.0f || effectiveWidthFraction < 1.0f) {
+        if (settings.drawer.scrimOpacity > 0f || effectiveHeightFraction < 1.0f || effectiveWidthFraction < 1.0f) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = (settings.drawerScrimOpacity * 0.7f).coerceIn(0f, 0.8f)))
+                    .background(Color.Black.copy(alpha = (settings.drawer.scrimOpacity * 0.7f).coerceIn(0f, 0.8f)))
                     .pointerInput(Unit) {
                         detectTapGestures { onDismiss() }
                     }

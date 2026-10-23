@@ -1,5 +1,17 @@
 package org.arkikeskus.launcher.recents
 
+import androidx.compose.ui.res.pluralStringResource
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.VectorConverter
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -108,6 +120,8 @@ private val EDGE_TO_EDGE_THEMES = setOf(
     LauncherSettings.RECENTS_THEME_IPAD,
     LauncherSettings.RECENTS_THEME_CAROUSEL,
     LauncherSettings.RECENTS_THEME_DECK,
+    LauncherSettings.RECENTS_THEME_ARC,
+    LauncherSettings.RECENTS_THEME_FILMSTRIP,
 )
 
 /** Everything a Recents theme needs to draw its cards and answer touches. */
@@ -131,12 +145,28 @@ internal class RecentsEnv(
     val onAppInfo: (RecentsCard) -> Unit,
     val onTogglePin: (RecentsCard) -> Unit,
     val menu: RecentsMenuState,
+    /** "Split 3 apps": pick two more, then the three open in a three-way split. */
+    val onSplitThree: (RecentsCard) -> Unit = {},
+    /** "Peek view" on one app: pick the app that peeks in; on a split card: that split as peek view. */
+    val onPeekPick: (RecentsCard) -> Unit = {},
+    val onPeekSplit: (RecentsCard) -> Unit = {},
 ) {
-    val speed: Float get() = settings.recentsAnimationSpeed
-    fun thumb(taskId: Int): ImageBitmap? = if (settings.recentsThumbnails) thumbnails[taskId] else null
+    val speed: Float get() = settings.recents.animationSpeed
+
+    /** On the cover screen (the narrow one), where Recents may have gestures of its own. */
+    var coverScreen: Boolean = false
+
+    /** The card gestures for the screen Recents is on (Settings ▸ Recents ▸ Gestures on a card). */
+    val swipeUpAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeUpAction else it.swipeUpAction }
+    val swipeDownAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeDownAction else it.swipeDownAction }
+    val longPressAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerLongPressAction else it.longPressAction }
+    val doubleTapAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerDoubleTapAction else it.doubleTapAction }
+    /** Borderless cards (Settings ▸ Recents ▸ Card layout). */
+    val overlay: Boolean get() = settings.recents.cardLayout == LauncherSettings.RECENTS_CARD_OVERLAY
+    fun thumb(taskId: Int): ImageBitmap? = if (settings.recents.thumbnails) thumbnails[taskId] else null
     fun slotLabel(card: RecentsCard): Int? {
         val slot = picked.indexOf(card)
-        return if (slot >= 0) slotLabels(picked.size, settings.recentsThirdInSplit).getOrNull(slot) else null
+        return if (slot >= 0) slotLabels(picked.size, settings.recents.thirdInSplit).getOrNull(slot) else null
     }
 }
 
@@ -151,6 +181,9 @@ internal fun RecentsScreen(
     onPopUp: (RecentsCard) -> Unit,
     onUnsplit: (RecentsCard) -> Unit,
     onOpenTogether: (List<RecentsCard>) -> Unit,
+    onOpenThree: (List<RecentsCard>) -> Unit,
+    onPeek: (main: RecentsCard, peek: RecentsCard) -> Unit,
+    onPeekSplit: (RecentsCard) -> Unit,
     onCombine: (dragged: RecentsCard, target: RecentsCard, mode: String) -> Unit,
     onAppInfo: (RecentsCard) -> Unit,
     onTogglePin: (RecentsCard) -> Unit,
@@ -159,25 +192,48 @@ internal fun RecentsScreen(
     val accent = MaterialTheme.colorScheme.primary
     val onAccent = MaterialTheme.colorScheme.onPrimary
     val wide = LocalConfiguration.current.smallestScreenWidthDp >= 600
-    val glass = settings.recentsGlass
+    // On the cover screen, its own look when it has one (Settings ▸ Recents ▸ Own look on the cover screen).
+    @Suppress("NAME_SHADOWING")
+    val settings = if (!wide && settings.recents.outerLookEnabled) settings.copy(recents = settings.recents.outerLook ?: settings.recents) else settings
+    val glass = settings.recents.glass
     /** The margin at the screen's sides (title, buttons, grid and list themes). */
     val side = if (wide) 28.dp else 16.dp
 
     var selecting by remember { mutableStateOf(false) }
     val picked = remember { mutableStateListOf<RecentsCard>() }
+    /**
+     * How the picked apps open (chips on the picking bar): opens by itself once [openAt] are
+     * picked — two side by side, three in a three-way split, or two as peek view ([peekPick]);
+     * 0 = pick freely and press Open.
+     */
+    var openAt by remember { mutableIntStateOf(2) }
+    var peekPick by remember { mutableStateOf(false) }
+    LaunchedEffect(picked.size, openAt, peekPick) {
+        if (openAt > 0 && picked.size >= openAt) {
+            delay(220)
+            val chosen = picked.toList()
+            when {
+                peekPick -> onPeek(chosen[0], chosen[1])
+                openAt >= 3 -> onOpenThree(chosen)
+                else -> onOpenTogether(chosen)
+            }
+            openAt = 2
+            peekPick = false
+        }
+    }
     var confirmAll by remember { mutableStateOf(false) }
     val drag = remember { RecentsDrag() }
     val menu = remember { RecentsMenuState() }
     drag.cards = state.cards
-    val backdrop = rememberRecentsBackdrop(settings.recentsEnterAnimation, settings.recentsAnimationSpeed, Unit)
+    val backdrop = rememberRecentsBackdrop(settings.recents.enterAnimation, settings.recents.animationSpeed, Unit)
 
     val env = RecentsEnv(
         settings = settings,
         thumbnails = thumbnails,
         accent = accent,
         onAccent = onAccent,
-        corner = settings.recentsCornerDp.dp,
-        canClose = state.root && settings.recentsRootClose,
+        corner = settings.recents.cornerDp.dp,
+        canClose = state.root && settings.recents.rootClose,
         selecting = selecting,
         picked = picked,
         drag = drag,
@@ -185,27 +241,31 @@ internal fun RecentsScreen(
         onTap = { card ->
             if (!selecting) onOpen(card)
             else if (card in picked) picked.remove(card)
-            else if (picked.size < MAX_PICK && !card.isSplit) picked.add(card)
+            else if ((if (openAt > 0) openAt else MAX_PICK) > picked.size && !card.isSplit) picked.add(card)
         },
         onClose = onClose,
-        onSplit = { card -> selecting = true; picked.clear(); picked.add(card) },
+        onSplit = { card -> selecting = true; openAt = 2; peekPick = false; picked.clear(); picked.add(card) },
         onPopUp = onPopUp,
         onUnsplit = onUnsplit,
         onCombine = onCombine,
         onAppInfo = onAppInfo,
         onTogglePin = onTogglePin,
         menu = menu,
+        onSplitThree = { card -> selecting = true; peekPick = false; picked.clear(); picked.add(card); openAt = 3 },
+        onPeekPick = { card -> selecting = true; peekPick = true; picked.clear(); picked.add(card); openAt = 2 },
+        onPeekSplit = onPeekSplit,
     )
+    env.coverScreen = !wide
 
-    CompositionLocalProvider(LocalPressStyle provides PressStyle(settings.recentsPressAnimation, accent, settings.recentsAnimationSpeed)) {
+    CompositionLocalProvider(LocalPressStyle provides PressStyle(settings.recents.pressAnimation, accent, settings.recents.animationSpeed)) {
     Box(
         Modifier
             .fillMaxSize()
             // The backdrop fades in with the cards (read while drawing: no recomposition per frame).
-            .drawBehind { drawRect(Color(0xFF05090A).copy(alpha = settings.recentsBackdropDim * backdrop())) }
+            .drawBehind { drawRect(Color(0xFF05090A).copy(alpha = settings.recents.backdropDim * backdrop())) }
             // A tap on empty space goes back home.
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                if (selecting) { selecting = false; picked.clear() } else onDismiss()
+                if (selecting) { selecting = false; openAt = 2; peekPick = false; picked.clear() } else onDismiss()
             },
     ) {
         Box(
@@ -234,7 +294,7 @@ internal fun RecentsScreen(
                             color = Muted, fontSize = 12.sp, fontFamily = Mono,
                         )
                     }
-                    if (state.cards.size >= 2 && (settings.recentsBtnSplitView || selecting)) {
+                    if (state.cards.size >= 2 && (settings.recents.btnSplitView || selecting)) {
                         Pill(
                             text = stringResource(if (selecting) R.string.recents_cancel else R.string.recents_split_view),
                             color = if (selecting) onAccent else accent,
@@ -244,7 +304,7 @@ internal fun RecentsScreen(
                             onClick = { selecting = !selecting; picked.clear() },
                         )
                     }
-                    if (state.cards.isNotEmpty() && !selecting && settings.recentsBtnCloseAll) {
+                    if (state.cards.isNotEmpty() && !selecting && settings.recents.btnCloseAll) {
                         Pill(
                             text = stringResource(
                                 when {
@@ -256,7 +316,7 @@ internal fun RecentsScreen(
                             ),
                             color = onAccent, background = accent, filled = true, glass = false,
                             onClick = {
-                                if (settings.recentsConfirmCloseAll && !confirmAll) confirmAll = true
+                                if (settings.recents.confirmCloseAll && !confirmAll) confirmAll = true
                                 else { confirmAll = false; onCloseAll() }
                             },
                         )
@@ -265,7 +325,7 @@ internal fun RecentsScreen(
 
                 // ---------------------------------------------------------------- body
                 // Rows of cards (iPad, Carousel, Deck) run to the screen's edges; the rest keep the margin.
-                val edgeToEdge = settings.recentsTheme in EDGE_TO_EDGE_THEMES
+                val edgeToEdge = settings.recents.theme in EDGE_TO_EDGE_THEMES
                 Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (edgeToEdge) 0.dp else side)) {
                     when {
                         !state.canList -> NeedsGrant(accent)
@@ -273,13 +333,17 @@ internal fun RecentsScreen(
                             stringResource(R.string.recents_nothing_open_long),
                             color = Muted, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center),
                         )
-                        else -> when (settings.recentsTheme) {
+                        else -> when (settings.recents.theme) {
                             LauncherSettings.RECENTS_THEME_IPAD -> IpadTheme(state.cards, env)
                             LauncherSettings.RECENTS_THEME_CAROUSEL -> CarouselTheme(state.cards, env)
                             LauncherSettings.RECENTS_THEME_DECK -> DeckTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_COMPACT -> CompactTheme(state.cards, env, if (wide) settings.recentsColumnsInner.coerceAtMost(3) else 1)
+                            LauncherSettings.RECENTS_THEME_COMPACT -> CompactTheme(state.cards, env, if (wide) settings.recents.columnsInner.coerceAtMost(3) else 1)
                             LauncherSettings.RECENTS_THEME_SWITCHER -> SwitcherTheme(state.cards, env)
-                            else -> FolarkTheme(state.cards, env, if (wide) settings.recentsColumnsInner else settings.recentsColumnsOuter)
+                            LauncherSettings.RECENTS_THEME_STACK -> StackTheme(state.cards, env)
+                            LauncherSettings.RECENTS_THEME_ARC -> ArcTheme(state.cards, env)
+                            LauncherSettings.RECENTS_THEME_BENTO -> BentoTheme(state.cards, env)
+                            LauncherSettings.RECENTS_THEME_FILMSTRIP -> FilmstripTheme(state.cards, env)
+                            else -> FolarkTheme(state.cards, env, if (wide) settings.recents.columnsInner else settings.recents.columnsOuter)
                         }
                     }
                 }
@@ -287,27 +351,66 @@ internal fun RecentsScreen(
 
             // ---------------------------------------------------------------- split view bar
             if (selecting) {
-                val labels = slotLabels(picked.size, settings.recentsThirdInSplit)
-                Row(
+                val labels = slotLabels(picked.size, settings.recents.thirdInSplit)
+                Column(
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(horizontal = side)
+                        .padding(horizontal = side),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                // How the picked apps open: the chosen one is filled; each opens by itself when enough are picked.
+                Row(
+                    Modifier
+                        .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
+                        .padding(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val modes = buildList {
+                        add(Triple(R.string.recents_mode_two, 2, false))
+                        if (settings.launch.threeAppSplit) add(Triple(R.string.recents_mode_three, 3, false))
+                        add(Triple(R.string.recents_mode_peek, 2, true))
+                        add(Triple(R.string.recents_mode_free, 0, false))
+                    }
+                    modes.forEach { (label, count, peek) ->
+                        val on = openAt == count && peekPick == peek
+                        Pill(
+                            text = stringResource(label),
+                            color = if (on) onAccent else Ink,
+                            background = if (on) accent else Color.White.copy(alpha = 0.08f),
+                            filled = true, glass = false,
+                            onClick = {
+                                openAt = count
+                                peekPick = peek
+                                // Peek view and two side by side take two: keep the first two picked.
+                                while (count in 1 until picked.size) picked.removeAt(picked.lastIndex)
+                            },
+                        )
+                    }
+                }
+                Row(
+                    Modifier
                         .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
                         .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Text(
-                        if (picked.isEmpty()) stringResource(R.string.recents_pick_hint)
+                        if (peekPick && picked.size < 2) stringResource(R.string.recents_pick_peek)
+                        else if (openAt > 0 && picked.size < openAt) pluralStringResource(R.plurals.recents_pick_more, openAt - picked.size, openAt - picked.size)
+                        else if (picked.isEmpty()) stringResource(R.string.recents_pick_hint)
                         else picked.mapIndexed { i, c -> "${stringResource(labels[i])} · ${c.label}" }.joinToString("   "),
                         color = accent, fontFamily = Mono, fontSize = 13.sp, maxLines = 2,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    Pill(
-                        text = stringResource(R.string.recents_open_together),
-                        color = onAccent, background = if (picked.size >= 2) accent else accent.copy(alpha = 0.35f), filled = true, glass = false,
-                        onClick = { if (picked.size >= 2) onOpenTogether(picked.toList()) },
-                    )
+                    if (openAt == 0) {
+                        Pill(
+                            text = stringResource(R.string.recents_open_together),
+                            color = onAccent, background = if (picked.size >= 2) accent else accent.copy(alpha = 0.35f), filled = true, glass = false,
+                            onClick = { if (picked.size >= 2) onOpenTogether(picked.toList()) },
+                        )
+                    }
+                }
                 }
             }
         }
@@ -355,62 +458,141 @@ internal fun Modifier.recentsSurface(
 
 /** [recentsSurface] with this Recents' look (Liquid Glass and its tint from the settings). */
 internal fun Modifier.envSurface(env: RecentsEnv, shape: Shape, picked: Boolean): Modifier =
-    recentsSurface(shape, env.glass, picked, env.accent, tint = env.settings.recentsGlassTint)
+    recentsSurface(shape, env.glass, picked, env.accent, tint = env.settings.recents.glassTint)
 
-/** The held card follows the finger; the card under it shows its two halves: split, attached. */
+/**
+ * The held card as a small copy of its own picture, following the finger on a spring and leaning
+ * into the direction it moves. The card under it lifts and shows its two halves — split view and
+ * attached view — with the half under the finger lit; moving across slides the light over. Let go
+ * and the copy flies into that card (then the two open together), or home when over nothing.
+ */
 @Composable
 private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
     val held = drag.card ?: return
     val density = LocalDensity.current
-    Box(Modifier.fillMaxSize()) {
-        val target = drag.target?.let { drag.bounds[it] }
-        if (target != null) {
-            val w = with(density) { target.width.toDp() }
-            val h = with(density) { target.height.toDp() }
-            Row(
-                Modifier
-                    .offset { IntOffset(target.left.roundToInt(), target.top.roundToInt()) }
-                    .size(w, h)
-                    .clip(RoundedCornerShape(env.corner))
-                    .background(Color(0xCC05090A)),
-            ) {
-                DropHalf(R.string.recents_drop_split, drag.mode == COMBINE_SPLIT, env.accent, Modifier.weight(1f))
-                Box(Modifier.width(2.dp).fillMaxHeight().padding(vertical = 18.dp).background(env.accent.copy(alpha = 0.5f)))
-                DropHalf(R.string.recents_drop_attached, drag.mode == COMBINE_ATTACHED, env.accent, Modifier.weight(1f))
+    val speed = env.speed.coerceIn(0.25f, 4f)
+    val origin = drag.origin
+    // The miniature: about half the card, never bigger than 190 dp or smaller than 110 dp wide.
+    val maxW = with(density) { 190.dp.toPx() }
+    val minW = with(density) { 110.dp.toPx() }
+    val baseW = ((origin?.width ?: maxW) * 0.55f).coerceIn(minW, maxW)
+    val baseH = baseW * ((origin?.height ?: baseW) / (origin?.width ?: baseW).coerceAtLeast(1f)).coerceIn(0.4f, 2.4f)
+
+    val pos = remember(held.key) { Animatable(drag.pointer, Offset.VectorConverter) }
+    val land = remember(held.key) { Animatable(0f) }
+    LaunchedEffect(held.key) {
+        snapshotFlow { drag.pointer }.collect { p ->
+            if (!drag.settling) launch { pos.animateTo(p, spring(dampingRatio = 0.82f, stiffness = 1100f * speed * speed)) }
+        }
+    }
+    LaunchedEffect(held.key, drag.settling) {
+        if (!drag.settling) return@LaunchedEffect
+        try {
+            val to = drag.landing
+            if (to != null) {
+                launch { pos.animateTo(to.center, spring(dampingRatio = 0.86f, stiffness = 520f * speed * speed)) }
+                land.animateTo(1f, tween((260 / speed).toInt(), easing = FastOutSlowInEasing))
+            }
+        } finally {
+            // Only this drag's landing (a new hold may have started meanwhile).
+            if (drag.card?.key == held.key && drag.settling) {
+                drag.finish()?.let { (from, onto, how) -> env.onCombine(from, onto, how) }
             }
         }
-        // The held app, a little card under the finger.
+    }
+
+    // The card under the finger: a dark veil with the two ways to combine.
+    var shownRect by remember(held.key) { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val targetRect = drag.target?.let { drag.bounds[it] }
+    if (targetRect != null) shownRect = targetRect
+    val veil by animateFloatAsState(if (targetRect != null) 1f else 0f, tween((150 / speed).toInt()), label = "veil")
+    val attached by animateFloatAsState(
+        if (drag.mode == COMBINE_ATTACHED) 1f else 0f,
+        spring(dampingRatio = 0.8f, stiffness = 700f * speed * speed),
+        label = "half",
+    )
+    Box(Modifier.fillMaxSize()) {
+        val r = shownRect
+        if (r != null && veil > 0.01f) {
+            val w = with(density) { r.width.toDp() }
+            val h = with(density) { r.height.toDp() }
+            Row(
+                Modifier
+                    .offset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
+                    .size(w, h)
+                    .graphicsLayer { alpha = veil; scaleX = 1.03f; scaleY = 1.03f }
+                    .clip(RoundedCornerShape(env.corner))
+                    .background(Color(0xD905090A)),
+            ) {
+                DropHalf(R.string.recents_drop_split, 1f - attached, env.accent, attachedDiagram = false, env, Modifier.weight(1f))
+                DropHalf(R.string.recents_drop_attached, attached, env.accent, attachedDiagram = true, env, Modifier.weight(1f))
+            }
+        }
+
+        // The miniature of the held card.
+        val k = land.value
+        val to = drag.landing
+        val scaleTo = if (to != null) (to.width / baseW).coerceIn(0.3f, 3f) else 1f
+        val scale = 1.06f + (scaleTo - 1.06f) * k
         val app = held.apps.firstOrNull()
-        Row(
+        Box(
             Modifier
-                .offset { IntOffset((drag.pointer.x - with(density) { 70.dp.toPx() }).roundToInt(), (drag.pointer.y - with(density) { 36.dp.toPx() }).roundToInt()) }
-                .graphicsLayer { scaleX = 1.05f; scaleY = 1.05f; shadowElevation = 24f }
-                .envSurface(env, RoundedCornerShape(22.dp), true)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .offset { IntOffset((pos.value.x - baseW / 2).roundToInt(), (pos.value.y - baseH / 2).roundToInt()) }
+                .size(with(density) { baseW.toDp() }, with(density) { baseH.toDp() })
+                .graphicsLayer {
+                    scaleX = scale; scaleY = scale
+                    // Leans into the movement, settles upright when it lands.
+                    rotationZ = (pos.velocity.x / 260f).coerceIn(-9f, 9f) * (1f - k)
+                    alpha = 1f - 0.85f * k * k
+                    shadowElevation = 34f * (1f - k)
+                    shape = RoundedCornerShape(env.corner * 0.7f)
+                    clip = true
+                },
         ) {
-            AppBadge(app, 36.dp)
-            Text(held.label, color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            CardPicture(held, env, Modifier.matchParentSize(), env.corner * 0.7f, iconSize = 40.dp)
+            Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp)) { AppBadge(app, 30.dp) }
         }
     }
 }
 
+/** One half of the drop target: a small drawing of the result and its name; lit by [active] 0..1. */
 @Composable
-private fun DropHalf(label: Int, active: Boolean, accent: Color, modifier: Modifier) {
-    Box(
+private fun DropHalf(label: Int, active: Float, accent: Color, attachedDiagram: Boolean, env: RecentsEnv, modifier: Modifier) {
+    val attachedLeft = env.settings.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_LEFT
+    Column(
         modifier
             .fillMaxHeight()
             .padding(8.dp)
+            .graphicsLayer { val k = 0.94f + 0.06f * active; scaleX = k; scaleY = k }
             .clip(RoundedCornerShape(16.dp))
-            .background(if (active) accent.copy(alpha = 0.38f) else Color.White.copy(alpha = 0.06f)),
-        contentAlignment = Alignment.Center,
+            .background(accent.copy(alpha = 0.06f + 0.30f * active)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
+        val ink = Color.White.copy(alpha = 0.45f + 0.55f * active)
+        Canvas(Modifier.size(52.dp, 40.dp)) {
+            val stroke = Stroke(width = 2.2.dp.toPx())
+            val r = CornerRadius(5.dp.toPx())
+            val gap = 4.dp.toPx()
+            if (!attachedDiagram) {
+                val half = (size.width - gap) / 2
+                drawRoundRect(ink, Offset.Zero, Size(half, size.height), r, style = stroke)
+                drawRoundRect(ink, Offset(half + gap, 0f), Size(half, size.height), r, style = stroke)
+            } else {
+                // The main app, with the other one peeking in at the chosen side.
+                val peek = size.width * 0.26f
+                val main = size.width - peek - gap
+                val mainX = if (attachedLeft) peek + gap else 0f
+                val peekX = if (attachedLeft) 0f else main + gap
+                drawRoundRect(ink, Offset(mainX, 0f), Size(main, size.height), r, style = stroke)
+                drawRoundRect(ink.copy(alpha = ink.alpha * 0.7f), Offset(peekX, 0f), Size(peek, size.height), r)
+            }
+        }
         Text(
             stringResource(label),
-            color = if (active) Ink else Muted,
-            fontSize = 15.sp,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            color = if (active > 0.5f) Ink else Muted,
+            fontSize = 14.sp,
+            fontWeight = if (active > 0.5f) FontWeight.Bold else FontWeight.Medium,
         )
     }
 }
@@ -427,7 +609,7 @@ internal fun CardTitle(card: RecentsCard, env: RecentsEnv, iconSize: Dp = 32.dp,
             Text(card.label, color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val sub = buildList {
                 if (card.isSplit) add(stringResource(R.string.recents_split_card))
-                if (env.settings.recentsShowTime) add(timeLabel(LocalContext.current, card.inactiveMs))
+                if (env.settings.recents.showTime) add(timeLabel(LocalContext.current, card.inactiveMs))
             }.filter { it.isNotEmpty() }.joinToString(" · ")
             if (sub.isNotEmpty()) Text(sub, color = Muted, fontSize = 11.sp, fontFamily = Mono, maxLines = 1)
         }
@@ -448,7 +630,7 @@ internal fun CardTrailing(card: RecentsCard, env: RecentsEnv, showClose: Boolean
         ) { Text(stringResource(R.string.recents_add), color = env.accent, fontSize = 12.sp) }
         !env.selecting -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             val chip = if (env.glass) Color.White.copy(alpha = 0.16f) else Chip
-            if (env.settings.recentsBtnPin) {
+            if (env.settings.recents.btnPin) {
                 Box(
                     Modifier.size(40.dp)
                         .pressClick { env.onTogglePin(card) }
@@ -460,7 +642,7 @@ internal fun CardTrailing(card: RecentsCard, env: RecentsEnv, showClose: Boolean
                 PinGlyph(env.accent)
             }
             // A pinned app isn't closed from here (unpin it first).
-            if (env.canClose && showClose && env.settings.recentsBtnClose && !card.pinned) {
+            if (env.canClose && showClose && env.settings.recents.btnClose && !card.pinned) {
                 Box(
                     Modifier.size(40.dp).pressClick { env.onClose(card) }.clip(CircleShape).background(chip),
                     contentAlignment = Alignment.Center,
@@ -494,14 +676,14 @@ internal fun CardPicture(card: RecentsCard, env: RecentsEnv, modifier: Modifier,
 internal fun CardActions(card: RecentsCard, env: RecentsEnv) {
     if (env.selecting) return
     val s = env.settings
-    val any = if (card.isSplit) s.recentsBtnUnsplit else s.recentsBtnSplit || s.recentsBtnPopup
+    val any = if (card.isSplit) s.recents.btnUnsplit else s.recents.btnSplit || s.recents.btnPopup
     if (!any) return
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (card.isSplit) {
             SmallAction(stringResource(R.string.recents_unsplit), env.accent) { env.onUnsplit(card) }
         } else {
-            if (s.recentsBtnSplit) SmallAction(stringResource(R.string.recents_split), env.accent) { env.onSplit(card) }
-            if (s.recentsBtnPopup) SmallAction(stringResource(R.string.recents_popup), env.accent) { env.onPopUp(card) }
+            if (s.recents.btnSplit) SmallAction(stringResource(R.string.recents_split), env.accent) { env.onSplit(card) }
+            if (s.recents.btnPopup) SmallAction(stringResource(R.string.recents_popup), env.accent) { env.onPopUp(card) }
         }
     }
 }

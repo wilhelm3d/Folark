@@ -42,18 +42,18 @@ internal fun LiquidGlassEverywhereSection(s: LauncherSettings, viewModel: Settin
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_liquid_glass_everywhere),
             subtitle = stringResource(R.string.settings_liquid_glass_everywhere_desc),
-            checked = s.liquidGlassEverywhere,
+            checked = s.appearance.liquidGlassEverywhere,
             onCheckedChange = viewModel::setLiquidGlassEverywhere,
         )
-        if (!s.liquidGlassEverywhere) return@ExpressiveCategoryContainer
+        if (!s.appearance.liquidGlassEverywhere) return@ExpressiveCategoryContainer
         ExpressiveRowDivider()
         var dragLevel by remember { mutableStateOf<Float?>(null) }
-        val level = dragLevel ?: s.liquidGlassLevel
+        val level = dragLevel ?: s.appearance.liquidGlassLevel
         GlassPreview(level)
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_liquid_glass_level),
             subtitle = stringResource(R.string.settings_liquid_glass_level_desc),
-            value = s.liquidGlassLevel,
+            value = s.appearance.liquidGlassLevel,
             onValueChange = viewModel::setLiquidGlassLevel,
             valueRange = 0f..1f,
             valueDisplay = "${(level * 100).roundToInt()} %",

@@ -1,5 +1,16 @@
 package org.arkikeskus.launcher.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedContent
+import org.arkikeskus.launcher.ui.component.LiveCard
 import androidx.activity.compose.PredictiveBackHandler
 import kotlinx.coroutines.CancellationException
 import androidx.compose.animation.core.Animatable
@@ -201,12 +212,12 @@ fun LauncherShell(
 
     // Liquid Glass backdrop: blur the wallpaper behind the launcher window as the drawer opens.
     // While an icon is dragged out of the drawer the home screen must be sharp again.
-    val glassDrawer = shellSettings.drawerGlassEnabled
+    val glassDrawer = shellSettings.drawer.glassEnabled
     // The home screen can carry a resting blur of its own (Settings ▸ Appearance); the drawer then
     // deepens it from there to its own radius as it opens.
     val batterySaver = LocalBatterySaver.current
-    val homeBlurDp = if (batterySaver) 0f else shellSettings.homeWallpaperBlur
-    val drawerBlurDp = if (batterySaver) 0f else maxOf(shellSettings.drawerBackgroundBlur * 2f, homeBlurDp)
+    val homeBlurDp = if (batterySaver) 0f else shellSettings.home.wallpaperBlur
+    val drawerBlurDp = if (batterySaver) 0f else maxOf(shellSettings.drawer.backgroundBlur * 2f, homeBlurDp)
     // The drawer (almost) fully open: what is underneath can stop animating.
     val homeCovered by remember { derivedStateOf { currentProgress > 0.97f } }
     WindowBlurBehind(maxRadiusDp = drawerBlurDp) {
@@ -216,8 +227,8 @@ fun LauncherShell(
 
     // Each app's notifications for its long-press menu (Settings ▸ Notifications), sender photos
     // for the dots: provided to home, dock and drawer alike.
-    val popupNotifications = remember(statusNotifications, shellSettings.popupNotifications) {
-        if (!shellSettings.popupNotifications) {
+    val popupNotifications = remember(statusNotifications, shellSettings.live.popupNotifications) {
+        if (!shellSettings.live.popupNotifications) {
             emptyList()
         } else {
             statusNotifications.mapNotNull { n ->
@@ -246,9 +257,9 @@ fun LauncherShell(
         var id = 0L
         viewModel.nudges.collect { n -> nudgeEvents[n.badgeKey] = IconNudgeEvent(n.badgeKey, n.color, n.time, ++id) }
     }
-    val iconNudges = remember(shellSettings.iconNudge, shellSettings.iconNudgeEffect, shellSettings.iconNudgeSoftness, batterySaver) {
-        if (shellSettings.iconNudge && !batterySaver) {
-            IconNudges(shellSettings.iconNudgeEffect, shellSettings.iconNudgeSoftness, nudgeEvents)
+    val iconNudges = remember(shellSettings.icons.nudge, shellSettings.icons.nudgeEffect, shellSettings.icons.nudgeSoftness, batterySaver) {
+        if (shellSettings.icons.nudge && !batterySaver) {
+            IconNudges(shellSettings.icons.nudgeEffect, shellSettings.icons.nudgeSoftness, nudgeEvents)
         } else {
             null
         }
@@ -282,7 +293,7 @@ fun LauncherShell(
         // Behind the home screen: this display's own background picture (drawn over the system
         // wallpaper, which a launcher cannot swap per display without re-theming the whole system),
         // then the dim layer that keeps icons and labels readable on a busy wallpaper.
-        val backgroundPath = shellSettings.homeBackgroundImage
+        val backgroundPath = shellSettings.home.backgroundImage
         if (backgroundPath.isNotBlank() && isVideoBackground(backgroundPath)) {
             // A looping silent video, playing only while home is in view (VideoBackground.kt).
             VideoBackground(
@@ -298,11 +309,11 @@ fun LauncherShell(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        if (shellSettings.homeWallpaperDim > 0f) {
+        if (shellSettings.home.wallpaperDim > 0f) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = shellSettings.homeWallpaperDim)),
+                    .background(Color.Black.copy(alpha = shellSettings.home.wallpaperDim)),
             )
         }
         CompositionLocalProvider(LocalHomeCovered provides homeCovered) {
@@ -331,23 +342,70 @@ fun LauncherShell(
         }
 
         // What is going on right now (a timer, navigation, a download): a live pill on top of home.
-        if (shellSettings.liveActivities && live.isNotEmpty() && !homeCovered) {
+        if (shellSettings.live.activities && live.isNotEmpty() && !homeCovered) {
             var liveIndex by remember { mutableIntStateOf(0) }
+            var liveOpen by remember { mutableStateOf(false) }
             val shownLive = live[liveIndex % live.size]
-            LivePill(
-                activity = shownLive,
-                effect = shellSettings.liveActivityEffect,
-                animate = !batterySaver,
-                light = false,
-                extra = live.size - 1,
-                onClick = { shownLive.contentIntent?.let { openNotificationIntent(context, it) } },
-                // Several at once: a long press shows the next.
-                onLongPress = if (live.size > 1) ({ liveIndex++ }) else null,
+            val canOpenUp = shellSettings.live.expandOnLongPress
+            // Opened up, it closes again on its own after a while without a touch.
+            LaunchedEffect(liveOpen, liveIndex) {
+                if (liveOpen) {
+                    kotlinx.coroutines.delay(LIVE_CARD_IDLE_MS)
+                    liveOpen = false
+                }
+            }
+            if (liveOpen) {
+                // A tap anywhere else closes the card.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.28f))
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { liveOpen = false },
+                )
+            }
+            AnimatedContent(
+                targetState = liveOpen && canOpenUp,
+                transitionSpec = {
+                    (fadeIn(tween(180)) + scaleIn(tween(260), initialScale = 0.86f, transformOrigin = TransformOrigin(0.5f, 0f)))
+                        .togetherWith(fadeOut(tween(140)) + scaleOut(tween(180), targetScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 0f)))
+                        .using(SizeTransform(clip = false))
+                },
+                contentAlignment = Alignment.TopCenter,
+                label = "live",
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 4.dp),
-            )
+                    .padding(top = 4.dp, start = 16.dp, end = 16.dp),
+            ) { open ->
+                if (open) {
+                    LiveCard(
+                        activity = shownLive,
+                        index = liveIndex % live.size,
+                        count = live.size,
+                        onSwitch = { liveIndex = it },
+                        onOpen = {
+                            liveOpen = false
+                            shownLive.contentIntent?.let { openNotificationIntent(context, it) }
+                        },
+                        onAction = { action -> openNotificationIntent(context, action.intent) },
+                    )
+                } else {
+                    LivePill(
+                        activity = shownLive,
+                        effect = shellSettings.live.activityEffect,
+                        animate = !batterySaver,
+                        light = false,
+                        extra = live.size - 1,
+                        onClick = { shownLive.contentIntent?.let { openNotificationIntent(context, it) } },
+                        // A long press opens it up; with that off, several at once: it shows the next.
+                        onLongPress = when {
+                            canOpenUp -> ({ liveOpen = true })
+                            live.size > 1 -> ({ liveIndex++ })
+                            else -> null
+                        },
+                    )
+                }
+            }
         }
 
         // Always compose AppDrawerScreen at fillMaxSize to keep it pre-composed, pre-measured, and pre-laid out.
@@ -432,6 +490,9 @@ fun LauncherShell(
  * Fires a notification's tap action like the notification shade would. Android 14+ no longer lends
  * the sender's right to open an activity; home is in front on the tap, so the grant is ours to give.
  */
+/** How long an opened-up live card stays without a touch. */
+private const val LIVE_CARD_IDLE_MS = 10_000L
+
 private fun openNotificationIntent(context: Context, intent: PendingIntent) {
     runCatching {
         val options = ActivityOptions.makeBasic()

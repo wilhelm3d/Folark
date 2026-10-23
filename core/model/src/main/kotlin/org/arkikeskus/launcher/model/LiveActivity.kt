@@ -32,11 +32,21 @@ data class LiveActivity(
     val category: String?,
     val postTime: Long,
     val contentIntent: PendingIntent?,
+    /** The app's name, its sub text (an account, "Downloading"), the long text, and up to three of
+     *  the notification's own buttons (no reply boxes) — shown when the pill is opened up. */
+    val appLabel: String = "",
+    val subText: String? = null,
+    val bigText: String? = null,
+    val actions: List<Action> = emptyList(),
 ) {
+    /** One of the notification's buttons: its label and what it does. */
+    class Action(val title: String, val intent: PendingIntent)
+
     // PendingIntent and Icon compare by identity and are unparcelled afresh on every snapshot.
     private val fingerprint: List<Any?>
         get() = listOf(key, packageName, userSerial, color, title, text, critical, chronometerBase, countDown,
-            progress, indeterminate, category, postTime, contentIntent != null, icon != null)
+            progress, indeterminate, category, postTime, contentIntent != null, icon != null,
+            appLabel, subText, bigText, actions.map { it.title })
 
     override fun equals(other: Any?): Boolean = other is LiveActivity && fingerprint == other.fingerprint
     override fun hashCode(): Int = fingerprint.hashCode()
@@ -56,6 +66,9 @@ data class LiveActivity(
     val ticks: Boolean get() = (critical.isNullOrBlank()) && chronometerBase > 0L
 
     companion object {
+        /** The opened-up card's Open button (Folark is English-only). */
+        const val OPEN_LABEL = "Open"
+
         fun formatClock(ms: Long): String {
             val total = ms / 1000
             val h = total / 3600

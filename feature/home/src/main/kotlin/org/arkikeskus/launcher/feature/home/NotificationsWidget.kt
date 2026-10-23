@@ -110,7 +110,7 @@ class NotificationsWidgetViewModel @Inject constructor(
 
     val countStyle: StateFlow<String> = _screenType.flatMapLatest { screenType ->
         settingsRepository.settings(screenType)
-            .map { it.notificationWidgetCountStyle }
+            .map { it.widgets.notificationCountStyle }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.COUNT_NUMBER)
 
     /** One launcher entry per package+profile; see [NotificationWidgetLayout.representative]. */

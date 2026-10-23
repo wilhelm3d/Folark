@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher
 
+import org.arkikeskus.launcher.ui.unlockReveal
+import org.arkikeskus.launcher.xposed.SystemUnlock
 import android.appwidget.AppWidgetHost
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -103,6 +105,12 @@ class LauncherActivity : ComponentActivity() {
         // new shared flow (and a new coroutine in lifecycleScope) on every recomposition.
         val foldStates = foldStateMonitor.foldStateFlow(this, lifecycleScope)
         registerLockReceiver()
+        // The lock screen's exit, reported by SystemUI (Vector module), and the switch for using it.
+        lifecycleScope.launch { SystemUnlock.exits.collect { onSystemUnlock(it) } }
+        lifecycleScope.launch {
+            settingsRepository.settings(org.arkikeskus.launcher.model.ScreenType.INNER)
+                .collect { unlockSync = it.motion.unlockSystemHook }
+        }
         setContent {
             val foldState by foldStates.collectAsStateWithLifecycle()
             val screenType = foldState.screenType
@@ -111,7 +119,7 @@ class LauncherActivity : ComponentActivity() {
             val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
             // Folark's battery saver: on, off, or together with the system's own.
             val systemPowerSave = rememberSystemPowerSave()
-            val batterySaver = when (settings.batterySaverMode) {
+            val batterySaver = when (settings.motion.batterySaverMode) {
                 LauncherSettings.BATTERY_SAVER_ON -> true
                 LauncherSettings.BATTERY_SAVER_OFF -> false
                 else -> systemPowerSave
@@ -129,7 +137,7 @@ class LauncherActivity : ComponentActivity() {
             // home is started and that transition is chosen for the inner display.
             val innerSettingsFlow = remember { settingsRepository.settings(ScreenType.INNER) }
             val innerSettings by innerSettingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
-            val liveHinge = innerSettings.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available
+            val liveHinge = innerSettings.fold.transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available
             LifecycleStartEffect(liveHinge) {
                 if (liveHinge) hinge.start()
                 onStopOrDispose { hinge.stop() }
@@ -138,6 +146,9 @@ class LauncherActivity : ComponentActivity() {
             var previousFoldState by remember { mutableStateOf(foldState) }
             // Plays the fold transition of the display that was just switched TO.
             val foldTransition = remember { Animatable(1f) }
+            // The unlock styles' own progress (UnlockReveal), and the style that is playing.
+            val unlockReveal = remember { Animatable(1f) }
+            var unlockStyle by remember { mutableStateOf(LauncherSettings.UNLOCK_STYLE_DISPLAY) }
             LaunchedEffect(foldState) {
                 val previous = previousFoldState
                 previousFoldState = foldState
@@ -146,13 +157,13 @@ class LauncherActivity : ComponentActivity() {
                 // above may still hold the profile of the display that was just left.
                 val target = settingsRepository.settings(foldState.screenType).first()
                 if (foldState.screenType == ScreenType.INNER) {
-                    when (target.unfoldAction) {
+                    when (target.fold.unfoldAction) {
                         LauncherSettings.ACTION_SEARCH, LauncherSettings.ACTION_DRAWER ->
-                            shellCommands.tryEmit(target.unfoldAction)
+                            shellCommands.tryEmit(target.fold.unfoldAction)
                         else -> Unit
                     }
                 } else {
-                    when (target.foldAction) {
+                    when (target.fold.foldAction) {
                         // "Already on home" semantics: close the drawer and snap to the home page.
                         LauncherSettings.ACTION_PAGE_0 -> homeSignals.tryEmit(true)
                         LauncherSettings.ACTION_LOCK -> runCatching { LockAccessibilityService.lock() }
@@ -173,7 +184,7 @@ class LauncherActivity : ComponentActivity() {
                 foldTransition.snapTo(0f)
                 // The display just switched to: its transition and how fast it plays.
                 val target = settingsRepository.settings(screenType).first()
-                val speed = target.foldTransitionSpeed
+                val speed = target.fold.transitionSpeed
                 if (screenType == ScreenType.INNER && liveHinge) {
                     // Follows the hinge while it moves, never faster than the display's speed, then
                     // plays what is left at that speed (fully open, or resting half open).
@@ -181,13 +192,13 @@ class LauncherActivity : ComponentActivity() {
                     followHinge(
                         hinge,
                         foldTransition,
-                        innerSettings.liveHingeEndAngle.toFloat(),
-                        innerSettings.liveHingeSmoothingMs,
+                        innerSettings.fold.liveHingeEndAngle.toFloat(),
+                        innerSettings.fold.liveHingeSmoothingMs,
                         maxPerMs = 1f / effectMs,
                     )
                     val restMs = ((1f - foldTransition.value) * effectMs).toInt().coerceAtLeast(MIN_FINISH_MS)
                     foldTransition.animateTo(1f, tween(durationMillis = restMs, easing = LinearOutSlowInEasing))
-                } else if (screenType == ScreenType.OUTER && target.foldTransitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
+                } else if (screenType == ScreenType.OUTER && target.fold.transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
                     // Closed: the outer display plays its hinge effect on a timer (the hinge has stopped).
                     foldTransition.animateTo(1f, tween(liveHingeTimedMs(speed), easing = FastOutSlowInEasing))
                 } else {
@@ -203,17 +214,36 @@ class LauncherActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 unlockSignals.collect { signal ->
                     val target = settingsRepository.settings(currentScreen).first()
-                    val style = target.foldTransitionStyle
-                    if (!target.unlockTransition || signal == UNLOCK_SHOW) {
+                    val style = target.fold.transitionStyle
+                    // An unlock style of its own (Zoom, Bloom...) instead of the display's transition.
+                    val ownStyle = target.motion.unlockStyle.takeIf { it != LauncherSettings.UNLOCK_STYLE_DISPLAY }
+                    if (!target.motion.unlockTransition || signal == UNLOCK_SHOW) {
                         foldTransition.snapTo(1f)
+                        unlockReveal.snapTo(1f)
                         return@collect
                     }
                     if (signal == UNLOCK_HIDE) {
-                        foldTransition.snapTo(0f)
+                        if (ownStyle != null) {
+                            unlockStyle = ownStyle
+                            foldTransition.snapTo(1f)
+                            unlockReveal.snapTo(0f)
+                        } else {
+                            unlockReveal.snapTo(1f)
+                            foldTransition.snapTo(0f)
+                        }
                         return@collect
                     }
+                    val speed = target.fold.transitionSpeed
+                    if (ownStyle != null) {
+                        unlockStyle = ownStyle
+                        foldTransition.snapTo(1f)
+                        unlockReveal.snapTo(0f)
+                        val ms = (UNLOCK_STYLE_MS / speed.coerceAtLeast(0.1f)).toInt().coerceIn(160, 2_400)
+                        unlockReveal.animateTo(1f, tween(durationMillis = ms, easing = FastOutSlowInEasing))
+                        return@collect
+                    }
+                    unlockReveal.snapTo(1f)
                     foldTransition.snapTo(0f)
-                    val speed = target.foldTransitionSpeed
                     if (style == LauncherSettings.TRANSITION_LIVE_HINGE) {
                         // The hinge isn't moving: the live effect plays on a timer, as on the cover screen.
                         foldTransition.animateTo(1f, tween(liveHingeTimedMs(speed), easing = FastOutSlowInEasing))
@@ -224,8 +254,8 @@ class LauncherActivity : ComponentActivity() {
                 }
             }
 
-            LaunchedEffect(settings.allowLandscape) {
-                requestedOrientation = if (settings.allowLandscape) {
+            LaunchedEffect(settings.home.allowLandscape) {
+                requestedOrientation = if (settings.home.allowLandscape) {
                     ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 } else {
                     ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -233,12 +263,12 @@ class LauncherActivity : ComponentActivity() {
             }
 
             LauncherTheme(
-                amoledDark = settings.amoledDark,
-                fontFamily = settings.appFontFamily
+                amoledDark = settings.appearance.amoledDark,
+                fontFamily = settings.appearance.fontFamily
                     .takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT }
                     ?.let { LauncherFontFamily.resolve(it) },
-                boldText = settings.appFontBold,
-                fontScale = settings.appFontSizeScale,
+                boldText = settings.appearance.fontBold,
+                fontScale = settings.appearance.fontSizeScale,
             ) {
                 val iconEpochs by hiltViewModel<LauncherShellViewModel>().iconEpochs.collectAsStateWithLifecycle()
                 val customIcons by hiltViewModel<LauncherShellViewModel>().customIcons.collectAsStateWithLifecycle()
@@ -248,16 +278,16 @@ class LauncherActivity : ComponentActivity() {
                     LocalOrphanWidgetConfigResult provides orphanConfigResult,
                     LocalIconEpochs provides iconEpochs,
                     LocalCustomIcons provides customIcons,
-                    LocalPopupTheme provides settings.popupTheme,
-                    org.arkikeskus.launcher.ui.component.LocalGlassLevel provides settings.liquidGlassLevel,
-                    LocalBadgeStyle provides BadgeStyle(settings.dotShape, settings.dotColor, settings.dotPosition),
+                    LocalPopupTheme provides settings.appearance.popupTheme,
+                    org.arkikeskus.launcher.ui.component.LocalGlassLevel provides settings.appearance.liquidGlassLevel,
+                    LocalBadgeStyle provides BadgeStyle(settings.dots.shape, settings.dots.color, settings.dots.position),
                     LocalBatterySaver provides batterySaver,
                     LocalScreenType provides foldState.screenType,
                     LocalFoldState provides foldState,
-                    LocalAquamorphicTouch provides settings.aquamorphicTouchEnabled,
-                    LocalAppLaunchZoom provides settings.appLaunchZoomEnabled,
+                    LocalAquamorphicTouch provides settings.motion.aquamorphicTouchEnabled,
+                    LocalAppLaunchZoom provides settings.motion.appLaunchZoomEnabled,
                 ) {
-                    val transitionStyle = settings.foldTransitionStyle
+                    val transitionStyle = settings.fold.transitionStyle
                     val liveBook = liveHinge && screenType == ScreenType.INNER &&
                         transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE
                     // The outer display's hinge effect, on a timer after closing (no sensor needed).
@@ -271,16 +301,16 @@ class LauncherActivity : ComponentActivity() {
                             if (liveBook) {
                                 Modifier.liveHingeEffect(
                                     progress = { foldTransition.value },
-                                    style = innerSettings.liveHingeStyle,
-                                    blurDp = innerSettings.liveHingeBlurDp.toFloat(),
-                                    frost = innerSettings.liveHingeFrost,
+                                    style = innerSettings.fold.liveHingeStyle,
+                                    blurDp = innerSettings.fold.liveHingeBlurDp.toFloat(),
+                                    frost = innerSettings.fold.liveHingeFrost,
                                 )
                             } else if (outerEffect) {
                                 Modifier.liveHingeEffect(
                                     progress = { foldTransition.value },
-                                    style = innerSettings.liveHingeOuterStyle,
-                                    blurDp = innerSettings.liveHingeBlurDp.toFloat(),
-                                    frost = innerSettings.liveHingeFrost,
+                                    style = innerSettings.fold.liveHingeOuterStyle,
+                                    blurDp = innerSettings.fold.liveHingeBlurDp.toFloat(),
+                                    frost = innerSettings.fold.liveHingeFrost,
                                 )
                             } else {
                                 Modifier
@@ -311,7 +341,7 @@ class LauncherActivity : ComponentActivity() {
                                     scaleY = 0.95f + 0.05f * t
                                 }
                             }
-                        },
+                        }.unlockReveal(unlockStyle) { unlockReveal.value },
                     )
                 }
             }
@@ -320,6 +350,9 @@ class LauncherActivity : ComponentActivity() {
 
     /** The classic transitions' length at speed 1 (ms), and the shortest finish of a live one. */
     private val CLASSIC_TRANSITION_MS = 420f
+
+    /** The unlock styles' length at speed 1 (ms). */
+    private val UNLOCK_STYLE_MS = 520f
     private val MIN_FINISH_MS = 60
 
     /** The hinge angle, for the live-hinge fold transition (read only while it is chosen). */
@@ -504,16 +537,35 @@ class LauncherActivity : ComponentActivity() {
     private var hiddenForLock = false
     private var screenOnAt = 0L
 
+    /** Home was in front when the screen went off (so an unlock reveals it). */
+    private var frontAtLock = false
+
+    /** Settings ▸ Also when unlocking ▸ Sync with the lock screen (kept up to date in onCreate). */
+    @Volatile private var unlockSync = true
+
+    /** USER_PRESENT while SystemUI is expected to report the exit: the old timing, if it doesn't. */
+    private val unlockFallback = Runnable { revealAfterLock() }
+
     private val lockReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             when (intent?.action) {
                 // Locked: home is hidden behind the lock screen, ready to be revealed.
                 Intent.ACTION_SCREEN_OFF -> {
+                    frontAtLock = hasWindowFocus()
                     hiddenForLock = true
                     unlockSignals.tryEmit(UNLOCK_HIDE)
                 }
                 Intent.ACTION_SCREEN_ON -> screenOnAt = android.os.SystemClock.elapsedRealtime()
-                Intent.ACTION_USER_PRESENT -> if (hasWindowFocus()) revealAfterLock()
+                Intent.ACTION_USER_PRESENT -> if (hasWindowFocus()) {
+                    if (unlockSync && SystemUnlock.live) {
+                        // SystemUI reports the lock screen's exit itself (onSystemUnlock); this is
+                        // only the safety net in case that report never comes.
+                        window.decorView.removeCallbacks(unlockFallback)
+                        window.decorView.postDelayed(unlockFallback, UNLOCK_FALLBACK_MS)
+                    } else {
+                        revealAfterLock()
+                    }
+                }
             }
         }
     }
@@ -531,6 +583,19 @@ class LauncherActivity : ComponentActivity() {
         unlockSignals.tryEmit(if (sinceScreenOn < UNLOCK_WINDOW_MS) UNLOCK_PLAY else UNLOCK_SHOW)
     }
 
+    /**
+     * The lock screen started to leave (told by SystemUI through Folark's Vector module): play the
+     * reveal now when it is uncovering Folark, or just show home when it is uncovering another app.
+     * No timing guess: SystemUI knows.
+     */
+    private fun onSystemUnlock(exit: SystemUnlock.Exit) {
+        if (!unlockSync || !hiddenForLock) return
+        window.decorView.removeCallbacks(unlockFallback)
+        hiddenForLock = false
+        val revealsHome = exit.topPackage?.let { it == packageName } ?: frontAtLock
+        unlockSignals.tryEmit(if (revealsHome) UNLOCK_PLAY else UNLOCK_SHOW)
+    }
+
     private fun registerLockReceiver() {
         val filter = android.content.IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -542,6 +607,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(lockReceiver) }
+        window.decorView.removeCallbacks(unlockFallback)
         super.onDestroy()
     }
 
@@ -560,8 +626,12 @@ class LauncherActivity : ComponentActivity() {
         const val UNLOCK_PLAY = 1
         const val UNLOCK_SHOW = 2
 
-        /** Unlocked this soon after the screen came on: the unlock just happened, so it plays. */
+        /** Unlocked this soon after the screen came on: the unlock just happened, so it plays.
+         *  (Only used without the SystemUI report, see [onSystemUnlock].) */
         const val UNLOCK_WINDOW_MS = 20_000L
+
+        /** How long to wait for SystemUI's report after USER_PRESENT before using the old timing. */
+        const val UNLOCK_FALLBACK_MS = 700L
 
         /** Request code for the system-routed widget configuration activity. */
         const val WIDGET_CONFIG_REQUEST = 0x4357

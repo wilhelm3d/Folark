@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.settings
 
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,6 +43,10 @@ private val THEMES = listOf(
     LauncherSettings.RECENTS_THEME_DECK to R.string.settings_recents_theme_deck,
     LauncherSettings.RECENTS_THEME_COMPACT to R.string.settings_recents_theme_compact,
     LauncherSettings.RECENTS_THEME_SWITCHER to R.string.settings_recents_theme_switcher,
+    LauncherSettings.RECENTS_THEME_STACK to R.string.settings_recents_theme_stack,
+    LauncherSettings.RECENTS_THEME_ARC to R.string.settings_recents_theme_arc,
+    LauncherSettings.RECENTS_THEME_BENTO to R.string.settings_recents_theme_bento,
+    LauncherSettings.RECENTS_THEME_FILMSTRIP to R.string.settings_recents_theme_filmstrip,
 )
 
 /**
@@ -58,7 +63,7 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         THEMES.forEach { (key, label) ->
-            val chosen = s.recentsTheme == key
+            val chosen = s.recents.theme == key
             Column(
                 Modifier
                     .width(112.dp)
@@ -76,7 +81,7 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
                         .height(70.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFF0B1214)),
-                ) { sketch(key, s.recentsGlass, accent) }
+                ) { sketch(key, s.recents.glass, accent) }
                 Text(stringResource(label), color = palette.text, fontSize = 12.sp)
             }
         }
@@ -86,25 +91,25 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_recents_glass),
         subtitle = stringResource(R.string.settings_recents_glass_desc),
-        checked = s.recentsGlass,
+        checked = s.recents.glass,
         onCheckedChange = viewModel::setRecentsGlass,
     )
-    if (s.recentsGlass) {
+    if (s.recents.glass) {
         ExpressiveRowDivider()
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_recents_glass_blur),
-            value = s.recentsGlassBlur.toFloat(),
+            value = s.recents.glassBlur.toFloat(),
             onValueChange = { viewModel.setRecentsGlassBlur(it.roundToInt()) },
             valueRange = 0f..LauncherSettings.MAX_RECENTS_GLASS_BLUR.toFloat(),
-            valueDisplay = "${s.recentsGlassBlur} dp",
+            valueDisplay = "${s.recents.glassBlur} dp",
         )
         ExpressiveRowDivider()
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_recents_glass_tint),
-            value = s.recentsGlassTint,
+            value = s.recents.glassTint,
             onValueChange = viewModel::setRecentsGlassTint,
             valueRange = LauncherSettings.MIN_RECENTS_GLASS_TINT..LauncherSettings.MAX_RECENTS_GLASS_TINT,
-            valueDisplay = "${(s.recentsGlassTint * 100).roundToInt()} %",
+            valueDisplay = "${(s.recents.glassTint * 100).roundToInt()} %",
         )
     }
     ExpressiveRowDivider()
@@ -112,10 +117,10 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_recents_drag),
         subtitle = stringResource(R.string.settings_recents_drag_desc),
-        checked = s.recentsDragDrop,
+        checked = s.recents.dragDrop,
         onCheckedChange = viewModel::setRecentsDragDrop,
     )
-    if (s.recentsDragDrop) {
+    if (s.recents.dragDrop) {
         ExpressiveRowDivider()
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_recents_attached_side),
@@ -123,17 +128,17 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
                 LauncherSettings.RECENTS_ATTACHED_LEFT to stringResource(R.string.settings_recents_attached_left),
                 LauncherSettings.RECENTS_ATTACHED_RIGHT to stringResource(R.string.settings_recents_attached_right),
             ),
-            selected = s.recentsAttachedSide,
+            selected = s.recents.attachedSide,
             onSelect = viewModel::setRecentsAttachedSide,
         )
         ExpressiveRowDivider()
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_recents_attached_peek),
             subtitle = stringResource(R.string.settings_recents_attached_peek_desc),
-            value = s.recentsAttachedPeek,
+            value = s.recents.attachedPeek,
             onValueChange = viewModel::setRecentsAttachedPeek,
             valueRange = LauncherSettings.MIN_RECENTS_ATTACHED_PEEK..LauncherSettings.MAX_RECENTS_ATTACHED_PEEK,
-            valueDisplay = "${(s.recentsAttachedPeek * 100).roundToInt()} %",
+            valueDisplay = "${(s.recents.attachedPeek * 100).roundToInt()} %",
         )
     }
 }
@@ -178,6 +183,37 @@ private fun DrawScope.sketch(theme: String, glass: Boolean, accent: Color) {
                 card(w * 0.06f, y, w * 0.88f, h * 0.18f, 4f)
                 dot(w * 0.14f, y + h * 0.09f, 3.5f)
             }
+        }
+        LauncherSettings.RECENTS_THEME_STACK -> {
+            // A deck: the newest at the bottom, older ones smaller further up.
+            for (i in 3 downTo 0) {
+                val k = 1f - 0.12f * i
+                val cw = w * 0.78f * k
+                card((w - cw) / 2f, h * (0.5f - 0.13f * i), cw, h * 0.42f * k, 7f, front = i == 0)
+            }
+        }
+        LauncherSettings.RECENTS_THEME_ARC -> {
+            for (i in -1..1) {
+                rotate(i * 12f, Offset(w / 2f, h * 1.6f)) {
+                    card(w * 0.35f, h * 0.16f + kotlin.math.abs(i) * h * 0.05f, w * 0.3f, h * 0.62f, 7f, front = i == 0)
+                }
+            }
+        }
+        LauncherSettings.RECENTS_THEME_BENTO -> {
+            card(w * 0.06f, h * 0.06f, w * 0.88f, h * 0.36f, 7f, front = true)
+            card(w * 0.06f, h * 0.46f, w * 0.42f, h * 0.22f, 5f)
+            card(w * 0.52f, h * 0.46f, w * 0.42f, h * 0.22f, 5f)
+            for (i in 0..3) {
+                card(w * 0.06f + i * w * 0.225f, h * 0.72f, w * 0.19f, h * 0.22f, 4f)
+                dot(w * 0.06f + i * w * 0.225f + w * 0.095f, h * 0.83f, 2.5f)
+            }
+        }
+        LauncherSettings.RECENTS_THEME_FILMSTRIP -> {
+            card(w * 0.16f, h * 0.06f, w * 0.68f, h * 0.6f, 8f, front = true)
+            for (i in 0..4) {
+                card(w * 0.07f + i * w * 0.18f, h * 0.74f, w * 0.14f, h * 0.18f, 3f)
+            }
+            drawRoundRect(accent, Offset(w * 0.07f + 2 * w * 0.18f + w * 0.02f, h * 0.95f), Size(w * 0.1f, 2.5f), CornerRadius(1.5f))
         }
         LauncherSettings.RECENTS_THEME_SWITCHER -> {
             card(w * 0.08f, h * 0.2f, w * 0.84f, h * 0.6f, 10f)

@@ -186,12 +186,12 @@ fun HomeScreen(
     // app re-hides it. A swipe from the top still transiently reveals it (Android safety behaviour).
     val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(settings.hideSystemStatusBar, lifecycleOwner, view) {
+    DisposableEffect(settings.statusBar.hideSystem, lifecycleOwner, view) {
         val window = generateSequence(view.context) { (it as? ContextWrapper)?.baseContext }
             .filterIsInstance<Activity>().firstOrNull()?.window
         fun apply() {
             val controller = window?.insetsController ?: return
-            if (settings.hideSystemStatusBar) {
+            if (settings.statusBar.hideSystem) {
                 controller.systemBarsBehavior =
                     android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 controller.hide(android.view.WindowInsets.Type.statusBars())
@@ -468,13 +468,13 @@ fun HomeScreen(
     // Shared drag state spanning the workspace, dock and drawer (Launcher3-style drag layer/controller).
     // Created by LauncherShell and passed in so the app drawer can drag onto home; falls back to a
     // local one when HomeScreen is used standalone (previews/tests).
-    LaunchedEffect(uiState.dockApps.size, settings.dockEnabled, settings.dockColumns) {
+    LaunchedEffect(uiState.dockApps.size, settings.dock.enabled, settings.dock.columns) {
         dragController.dockItemCount = uiState.dockApps.size
-        dragController.dockHasSpace = settings.dockEnabled && uiState.dockApps.size < settings.dockColumns
+        dragController.dockHasSpace = settings.dock.enabled && uiState.dockApps.size < settings.dock.columns
     }
     // The split drop target only exists while the setting is on (see HomeDragController.isOverSplit).
-    LaunchedEffect(settings.splitLaunchEnabled) {
-        dragController.splitEnabled = settings.splitLaunchEnabled
+    LaunchedEffect(settings.launch.splitEnabled) {
+        dragController.splitEnabled = settings.launch.splitEnabled
     }
     // A drag that starts moving dismisses the menu (so the menu and drop bar never coexist).
     LaunchedEffect(dragController.moving) {
@@ -501,10 +501,10 @@ fun HomeScreen(
     // The counts are their own state and are only read where a badge is drawn (see BadgeCounts),
     // so a notification does not recompose the home screen from the top.
     val badgeState = viewModel.badges.collectAsStateWithLifecycle()
-    val showNotificationDots = rememberUpdatedState(settings.showNotificationDots)
+    val showNotificationDots = rememberUpdatedState(settings.dots.enabled)
     val badges = remember(badgeState) { BadgeCounts(badgeState) { showNotificationDots.value } }
-    val badgeShowCount = settings.notificationDotCount
-    val badgeScale = settings.notificationDotScale
+    val badgeShowCount = settings.dots.showCount
+    val badgeScale = settings.dots.scale
 
     fun executeAction(action: String) {
         when (action) {
@@ -517,7 +517,7 @@ fun HomeScreen(
                 }
             }
             LauncherSettings.GESTURE_RECENTS -> {
-                if (!settings.recentsEnabled || !FolarkRecents.open(context)) LockAccessibilityService.openRecents()
+                if (!settings.recents.enabled || !FolarkRecents.open(context)) LockAccessibilityService.openRecents()
             }
             LauncherSettings.GESTURE_NONE -> {}
             // Motorola gestures (MotoLinks): a note, Secure Vault, Ready For, Game Center, ...
@@ -526,15 +526,15 @@ fun HomeScreen(
     }
 
     // Half folded (and the setting on): where the hinge is decides the layout, see HalfFold.kt.
-    val halfFoldHinge = if (settings.halfOpenedModeEnabled) rememberHalfFoldHinge() else null
+    val halfFoldHinge = if (settings.fold.halfOpenedModeEnabled) rememberHalfFoldHinge() else null
     val tabletopHinge = halfFoldHinge?.takeIf { it.acrossScreen }
     val bookFold = halfFoldHinge != null && !halfFoldHinge.acrossScreen
 
     val systemDensity = LocalDensity.current
-    val dpiDensity = remember(systemDensity, settings.dpiWorkspace) {
+    val dpiDensity = remember(systemDensity, settings.appearance.dpiWorkspace) {
         Density(
-            density = systemDensity.density * settings.dpiWorkspace,
-            fontScale = systemDensity.fontScale * settings.dpiWorkspace,
+            density = systemDensity.density * settings.appearance.dpiWorkspace,
+            fontScale = systemDensity.fontScale * settings.appearance.dpiWorkspace,
         )
     }
 
@@ -543,28 +543,28 @@ fun HomeScreen(
     // user's app-label text-size multiplier.
     CompositionLocalProvider(
         LocalDensity provides dpiDensity,
-        LocalTonalWidgets provides settings.widgetTonalBackground,
-        LocalWidgetBackgroundAlpha provides settings.widgetBackgroundOpacity,
-        LocalThemedIcons provides settings.useThemedIcons,
-        LocalIconPack provides settings.iconPackPackage,
-        LocalIconShape provides settings.iconShape,
-        LocalMotoWeatherTap provides settings.motoWeatherTap,
-        LocalAppLabelScale provides settings.appLabelTextScale,
-        LocalAppLabelLines provides if (settings.twoLineHomeLabels) 2 else 1,
-        LocalIconSizeScale provides settings.iconSizeScale,
+        LocalTonalWidgets provides settings.widgets.tonalBackground,
+        LocalWidgetBackgroundAlpha provides settings.widgets.backgroundOpacity,
+        LocalThemedIcons provides settings.icons.useThemedIcons,
+        LocalIconPack provides settings.icons.iconPack,
+        LocalIconShape provides settings.icons.shape,
+        LocalMotoWeatherTap provides settings.widgets.motoWeatherTap,
+        LocalAppLabelScale provides settings.icons.labelTextScale,
+        LocalAppLabelLines provides if (settings.home.twoLineLabels) 2 else 1,
+        LocalIconSizeScale provides settings.icons.sizeScale,
         LocalWidgetLooks provides widgetLooks,
         LocalStackStyle provides StackStyle(
-            cornerRadius = settings.stackCornerRadius,
-            indicator = settings.stackIndicator,
-            showPill = settings.stackShowPill,
-            autoRotateSeconds = settings.stackAutoRotateSeconds,
+            cornerRadius = settings.widgets.stackCornerRadius,
+            indicator = settings.widgets.stackIndicator,
+            showPill = settings.widgets.stackShowPill,
+            autoRotateSeconds = settings.widgets.stackAutoRotateSeconds,
         ),
         LocalFolderStyle provides FolderStyle(
-            shape = settings.folderShape,
-            theme = settings.folderTheme,
-            preview = settings.folderPreview,
-            openColumns = settings.folderOpenColumns,
-            openSize = settings.folderOpenSize,
+            shape = settings.folders.shape,
+            theme = settings.folders.theme,
+            preview = settings.folders.preview,
+            openColumns = settings.folders.openColumns,
+            openSize = settings.folders.openSize,
         ),
         // Force the workspace left-to-right even in RTL locales (ar/he/fa/ur). The grid renders with
         // RTL-aware Modifier.offset {} but the drag/drop, drop-ring and popup-anchor math is all
@@ -576,9 +576,9 @@ fun HomeScreen(
         // behind every other app, and used to keep the sensor awake there. Its on/off lives in its
         // own small composable, so a resume, a pause or the drawer covering home recomposes only that.
         val parallaxOffset = remember { mutableStateOf<State<Offset>?>(null) }
-        HomeParallax(enabledSetting = settings.parallaxWallpaper, out = parallaxOffset)
+        HomeParallax(enabledSetting = settings.home.parallaxWallpaper, out = parallaxOffset)
         // Half folded: home leans with the hinge (HingeTilt.kt), read in the layer below.
-        val hingeFold = rememberHingeFold(enabled = settings.hingeTilt && halfFoldHinge != null && !LocalBatterySaver.current)
+        val hingeFold = rememberHingeFold(enabled = settings.fold.hingeTilt && halfFoldHinge != null && !LocalBatterySaver.current)
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -608,28 +608,28 @@ fun HomeScreen(
                 // All home gestures pause while the first-run intro covers the screen — this
                 // detector runs in the Initial pass on the ROOT, so it would otherwise catch a
                 // vertical swipe before the intro overlay could swallow it.
-                swipeUpAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.swipeUpAction,
-                swipeDownAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.swipeDownAction,
+                swipeUpAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.home.swipeUpAction,
+                swipeDownAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.home.swipeDownAction,
                 dragController = dragController,
                 onDrawerDrag = onDrawerDrag,
                 onDrawerSettle = onDrawerSettle,
                 onAction = ::executeAction,
                 // Left-edge action: a right-drag on the leftmost page launches the configured app.
-                leftEdgeEnabled = settings.leftSwipeAppKey.isNotBlank() && !showOnboarding,
+                leftEdgeEnabled = settings.home.leftSwipeAppKey.isNotBlank() && !showOnboarding,
                 atLeftEdge = { dragController.currentPage == 0 },
                 onLeftEdgeAction = viewModel::onLeftSwipe,
                 // Right-edge action: a left-drag on the rightmost page launches the configured app.
-                rightEdgeEnabled = settings.rightSwipeAppKey.isNotBlank() && !showOnboarding,
+                rightEdgeEnabled = settings.home.rightSwipeAppKey.isNotBlank() && !showOnboarding,
                 // Book layout: the pager rests on the left page of the last pair.
                 atRightEdge = {
                     dragController.currentPage + (if (dragController.isDualPage) 1 else 0) >= (uiState.pageCount - 1).coerceAtLeast(0)
                 },
                 onRightEdgeAction = viewModel::onRightSwipe,
                 // Swipe up on an app icon (Settings ▸ Gestures): instead of opening the drawer.
-                iconSwipeEnabled = settings.iconSwipeUpAction != LauncherSettings.ICON_SWIPE_NONE &&
-                    !settings.desktopLocked && !showOnboarding,
+                iconSwipeEnabled = settings.home.iconSwipeUpAction != LauncherSettings.ICON_SWIPE_NONE &&
+                    !settings.home.desktopLocked && !showOnboarding,
                 onIconSwipe = { app, at ->
-                    when (settings.iconSwipeUpAction) {
+                    when (settings.home.iconSwipeUpAction) {
                         LauncherSettings.ICON_SWIPE_MENU -> {
                             menuTarget = AppMenuTarget(
                                 app, IntOffset(at.x.roundToInt(), at.y.roundToInt()), DragSource.Home,
@@ -646,7 +646,7 @@ fun HomeScreen(
             ),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (settings.showStatusBar) {
+            if (settings.statusBar.enabled) {
                 val density = LocalDensity.current
                 // The status-bar zone height: use the display-cutout band (≈ system status bar height,
                 // and non-zero even when the system bar is hidden), with a sane fallback for no-cutout
@@ -668,15 +668,15 @@ fun HomeScreen(
                 //    content; WindowManager deliberately withholds that reveal from WindowInsets to keep the
                 //    layout stable (verified against AOSP), so it can't be seen via insets — we detect it
                 //    from our own NotificationListener instead and blank the bar for the heads-up window.
-                val hideSystemBar = settings.hideSystemStatusBar
+                val hideSystemBar = settings.statusBar.hideSystem
                 val systemBarShown = systemBarInset > 0.dp
                 StatusBar(
                     // Only align to the camera cutout when we own the top zone (system bar hidden).
-                    alignToCutout = settings.hideSystemStatusBar,
-                    scrimAlpha = settings.statusBarScrimOpacity,
+                    alignToCutout = settings.statusBar.hideSystem,
+                    scrimAlpha = settings.statusBar.scrimOpacity,
                     // When hidden we own the whole top zone (no inset, self-aligns to the cutout);
                     // otherwise reserve the system bar's height so the scrim fills it and glyphs clear it.
-                    topInset = if (settings.hideSystemStatusBar) 0.dp else systemBarInset,
+                    topInset = if (settings.statusBar.hideSystem) 0.dp else systemBarInset,
                     modifier = Modifier
                         .fillMaxWidth()
                         // Blank with alpha, NOT by leaving composition: the bar is the Column sibling
@@ -691,33 +691,33 @@ fun HomeScreen(
                         // Otherwise the scrim + topInset (inside StatusBar) handle the system-bar band, so
                         // no external statusBarsPadding here — that padding is what left the scrim gap.
                         .then(
-                            if (settings.hideSystemStatusBar) Modifier.heightIn(min = statusZone)
+                            if (settings.statusBar.hideSystem) Modifier.heightIn(min = statusZone)
                             else Modifier,
                         ),
                 )
             }
             // Book half-fold: one page per half, nothing on the crease.
-            val isDualPage = screenType == ScreenType.INNER && (settings.innerDualPageWorkspace || bookFold)
+            val isDualPage = screenType == ScreenType.INNER && (settings.home.innerDualPage || bookFold)
             Workspace(
                 pageCount = uiState.pageCount,
-                columns = settings.homeColumns,
-                rows = settings.homeRows,
+                columns = settings.home.columns,
+                rows = settings.home.rows,
                 entries = uiState.entries,
                 badges = badges,
                 badgeShowCount = badgeShowCount,
                 badgeScale = badgeScale,
-                showLabels = settings.showHomeLabels,
-                labelColor = Color(settings.appLabelColor),
-                glassBlurRadius = settings.glassBlurRadius,
-                glassDarkTint = settings.glassDarkTint,
-                showPageIndicator = settings.showPageIndicator,
-                locked = settings.desktopLocked,
+                showLabels = settings.home.showLabels,
+                labelColor = Color(settings.icons.labelColor),
+                glassBlurRadius = settings.drawer.glassBlurRadius,
+                glassDarkTint = settings.drawer.glassDarkTint,
+                showPageIndicator = settings.home.showPageIndicator,
+                locked = settings.home.desktopLocked,
                 isDualPage = isDualPage,
-                pageBounceEnabled = settings.pageBounceEnabled,
-                minusOneScreen = settings.minusOneScreen,
-                pageScrollEffect = settings.pageScrollEffect,
-                allowNewPage = settings.newPageOnDrag,
-                animationSpeed = settings.animationSpeed,
+                pageBounceEnabled = settings.home.pageBounceEnabled,
+                minusOneScreen = settings.home.minusOneScreen,
+                pageScrollEffect = settings.home.pageScrollEffect,
+                allowNewPage = settings.home.newPageOnDrag,
+                animationSpeed = settings.motion.animationSpeed,
                 onWidgetLookChange = { rowId, look -> viewModel.setWidgetLook(rowId, look) },
                 homeSignals = homeSignals,
                 homePage = if (uiState.loaded) uiState.homePage else null,
@@ -734,7 +734,7 @@ fun HomeScreen(
                 onOpenFolder = { openFolderId = it.id },
                 onFolderTap = { folder ->
                     val first = folder.apps.firstOrNull()
-                    if (settings.folderTapFirstApp && first != null) {
+                    if (settings.folders.tapFirstApp && first != null) {
                         viewModel.launch(first)
                     } else {
                         openFolderId = folder.id
@@ -760,7 +760,7 @@ fun HomeScreen(
                 },
                 onEmptyAreaMenu = { anchor, above -> homeOptions = anchor to above },
                 onEmptyAreaDoubleTap = {
-                    val action = settings.doubleTapAction
+                    val action = settings.home.doubleTapAction
                     if (action != LauncherSettings.GESTURE_NONE) {
                         executeAction(action)
                     }
@@ -800,7 +800,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     // Status-bar inset is consumed by the StatusBar above when it's shown; otherwise the
                     // workspace takes it itself.
-                    .then(if (settings.showStatusBar) Modifier else Modifier.statusBarsPadding())
+                    .then(if (settings.statusBar.enabled) Modifier else Modifier.statusBarsPadding())
                     // No horizontal padding: the grid spans the full width so a "full width" widget
                     // (spanX = columns at cellX 0) reaches both screen edges with no side gap. Icons
                     // shift outward by a negligible ~8dp.
@@ -809,12 +809,12 @@ fun HomeScreen(
 
             // Show the dock whenever it's enabled — even with no favorites yet — so a fresh install
             // can be populated by dragging apps onto it (there is no "add to dock" menu item).
-            val dockContent: @Composable ColumnScope.() -> Unit = { if (settings.dockEnabled) {
+            val dockContent: @Composable ColumnScope.() -> Unit = { if (settings.dock.enabled) {
                 // The narrower, alignable dock is for wide inner screens only; a flip phone's inner
                 // display is phone-wide and keeps the full-width dock.
                 val wideScreen = LocalConfiguration.current.screenWidthDp >= 600
                 val dockAlignModifier = if (screenType == ScreenType.INNER && wideScreen) {
-                    when (settings.innerDockAlignment) {
+                    when (settings.dock.innerAlignment) {
                         LauncherSettings.DOCK_ALIGNMENT_LEFT -> Modifier.fillMaxWidth(0.6f).align(Alignment.Start)
                         LauncherSettings.DOCK_ALIGNMENT_RIGHT -> Modifier.fillMaxWidth(0.6f).align(Alignment.End)
                         LauncherSettings.DOCK_ALIGNMENT_FLOATING -> Modifier.fillMaxWidth(0.75f).align(Alignment.CenterHorizontally).padding(bottom = 8.dp)
@@ -829,10 +829,10 @@ fun HomeScreen(
                     badges = badges,
                     badgeShowCount = badgeShowCount,
                     badgeScale = badgeScale,
-                    showLabels = settings.showDockLabels,
-                    labelColor = Color(settings.appLabelColor),
-                    backgroundAlpha = settings.dockBackgroundOpacity,
-                    locked = settings.desktopLocked,
+                    showLabels = settings.dock.showLabels,
+                    labelColor = Color(settings.icons.labelColor),
+                    backgroundAlpha = settings.dock.backgroundOpacity,
+                    locked = settings.home.desktopLocked,
                     dragController = dragController,
                     onAppClick = viewModel::launch,
                     onReorder = viewModel::reorderDock,
@@ -871,14 +871,14 @@ fun HomeScreen(
         val showRemoveTarget = (dragController.moving &&
             (dragController.source == DragSource.Home || dragController.source == DragSource.Dock)) ||
             dragController.localDragging
-        val showSplitTarget = dragController.moving && settings.splitLaunchEnabled
+        val showSplitTarget = dragController.moving && settings.launch.splitEnabled
         if (showRemoveTarget || showSplitTarget) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
                     // Clear the themed status bar (when shown) so the pills don't overlap it.
-                    .padding(top = if (settings.showStatusBar) 44.dp else 16.dp),
+                    .padding(top = if (settings.statusBar.enabled) 44.dp else 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1020,21 +1020,21 @@ fun HomeScreen(
                 PopupAction(stringResource(R.string.change_icon), LauncherIcons.SwapVert) {
                     dragController.iconPickRequest = menu.app
                 },
-                if (settings.floatingLaunchEnabled) {
+                if (settings.launch.floatingEnabled) {
                     PopupAction(stringResource(R.string.open_floating), LauncherIcons.OpenInNew) {
                         viewModel.launchFloating(menu.app)
                     }
                 } else {
                     null
                 },
-                if (settings.floatingLaunchEnabled) {
+                if (settings.launch.floatingEnabled) {
                     PopupAction(stringResource(R.string.add_floating_shortcut), LauncherIcons.Add) {
                         viewModel.addFloatingShortcut(menu.app)
                     }
                 } else {
                     null
                 },
-                if (settings.splitLaunchEnabled) {
+                if (settings.launch.splitEnabled) {
                     PopupAction(stringResource(R.string.open_split), LauncherIcons.SwapHoriz) {
                         dragController.splitRequest = menu.app
                     }
@@ -1061,7 +1061,7 @@ fun HomeScreen(
             anchor = anchor,
             preferAbove = above,
             items = buildList {
-                if (!settings.desktopLocked) {
+                if (!settings.home.desktopLocked) {
                     add(IconMenuItem(R.drawable.ic_widgets, stringResource(R.string.home_options_widgets)) {
                         stackToAddTo = null
                         showWidgetPicker = true
@@ -1085,7 +1085,7 @@ fun HomeScreen(
                         viewModel.setHomePage(page)
                     })
                 }
-                if (!settings.desktopLocked && uiState.pageCount > 1 && viewModel.isPageEmpty(page)) {
+                if (!settings.home.desktopLocked && uiState.pageCount > 1 && viewModel.isPageEmpty(page)) {
                     add(IconMenuItem(LauncherIcons.Delete, stringResource(R.string.home_options_page_remove)) {
                         widgetScope.launch {
                             when (val target = viewModel.removeEmptyPage(page)) {
@@ -1106,11 +1106,11 @@ fun HomeScreen(
         enter = fadeIn(animationSpec = tween(220)) + scaleIn(animationSpec = tween(220), initialScale = 0.94f),
         exit = fadeOut(animationSpec = tween(180)) + scaleOut(animationSpec = tween(180), targetScale = 0.94f),
     ) {
-        CompositionLocalProvider(LocalTonalWidgets provides settings.widgetTonalBackground) {
+        CompositionLocalProvider(LocalTonalWidgets provides settings.widgets.tonalBackground) {
             WidgetPickerScreen(
                 dragController = widgetDrag,
-                columns = settings.homeColumns,
-                rows = settings.homeRows,
+                columns = settings.home.columns,
+                rows = settings.home.rows,
                 screenType = screenType,
                 settings = settings,
                 onPick = { choice, sx, sy ->
@@ -1157,10 +1157,10 @@ fun HomeScreen(
             badges = badges,
             badgeShowCount = badgeShowCount,
             badgeScale = badgeScale,
-            glassBlurRadius = settings.glassBlurRadius,
-            glassDarkTint = settings.glassDarkTint,
-            openAnimation = settings.folderOpenAnimation,
-            animationSpeed = settings.animationSpeed,
+            glassBlurRadius = settings.drawer.glassBlurRadius,
+            glassDarkTint = settings.drawer.glassDarkTint,
+            openAnimation = settings.folders.openAnimation,
+            animationSpeed = settings.motion.animationSpeed,
             onRename = { viewModel.renameFolder(openFolder.id, it) },
             onAppClick = { viewModel.launch(it) },
             onRemoveFromFolder = { viewModel.removeFromFolder(it, openFolder.id) },

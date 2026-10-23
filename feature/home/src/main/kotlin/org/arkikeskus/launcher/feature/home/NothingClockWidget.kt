@@ -158,8 +158,8 @@ fun NothingClockWidget(
     val context = LocalContext.current
     val status by viewModel.status.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val darkText = settings.clockWidgetDarkText
-    val look = remember(settings.clockWidgetStyle) { clockLook(settings.clockWidgetStyle) }
+    val darkText = settings.widgets.clockDarkText
+    val look = remember(settings.widgets.clockStyle) { clockLook(settings.widgets.clockStyle) }
     val noIndication = remember { MutableInteractionSource() }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -182,7 +182,7 @@ fun NothingClockWidget(
     val timeString = texts[0]
 
     val ink = if (darkText) Color(0xFF16181C) else Color.White
-    val useGlassCard = settings.clockWidgetGlassEffect || look.isGlassPill || look.isNeumorphic
+    val useGlassCard = settings.widgets.clockGlassEffect || look.isGlassPill || look.isNeumorphic
     // Enhanced glass text halo shadow for glass depth
     val halo = Shadow(
         color = (if (darkText) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.5f)),
@@ -191,7 +191,7 @@ fun NothingClockWidget(
     )
     // Settings ▸ Folark widgets ▸ Clock minutes: a fixed shade from white to black, or what the
     // style uses; and how opaque they are.
-    val minuteBase = when (settings.clockMinuteColor) {
+    val minuteBase = when (settings.widgets.clockMinuteColor) {
         LauncherSettings.CLOCK_MINUTE_WHITE -> Color.White
         LauncherSettings.CLOCK_MINUTE_LIGHT_GREY -> Color(0xFFC4C7CC)
         LauncherSettings.CLOCK_MINUTE_GREY -> Color(0xFF8A8E95)
@@ -199,7 +199,7 @@ fun NothingClockWidget(
         LauncherSettings.CLOCK_MINUTE_BLACK -> Color(0xFF0E0F11)
         else -> if (look.accentMinutes) MaterialTheme.colorScheme.primary else ink
     }
-    val minuteColor = minuteBase.copy(alpha = minuteBase.alpha * settings.clockMinuteOpacity.coerceIn(0.1f, 1f))
+    val minuteColor = minuteBase.copy(alpha = minuteBase.alpha * settings.widgets.clockMinuteOpacity.coerceIn(0.1f, 1f))
     val density = LocalDensity.current
     val timeText = buildAnnotatedString {
         val parts = timeString.split(':')

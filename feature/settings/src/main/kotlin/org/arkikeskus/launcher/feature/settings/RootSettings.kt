@@ -38,8 +38,8 @@ internal fun RootSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         refresh++
         onPauseOrDispose { }
     }
-    LaunchedEffect(rootCheck, s.rootEnabled) {
-        if (!s.rootEnabled) return@LaunchedEffect
+    LaunchedEffect(rootCheck, s.root.enabled) {
+        if (!s.root.enabled) return@LaunchedEffect
         root = withContext(Dispatchers.IO) { RootShell.available(recheck = rootCheck > 0) }
     }
     fun grant(vararg which: String) {
@@ -62,10 +62,10 @@ internal fun RootSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_root_enabled),
             subtitle = stringResource(R.string.settings_root_enabled_desc),
-            checked = s.rootEnabled,
+            checked = s.root.enabled,
             onCheckedChange = viewModel::setRootEnabled,
         )
-        if (!s.rootEnabled) return@ExpressiveCategoryContainer
+        if (!s.root.enabled) return@ExpressiveCategoryContainer
         ExpressiveRowDivider()
         ExpressiveActionItem(
             title = stringResource(
@@ -81,35 +81,35 @@ internal fun RootSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveRowDivider()
 
         // ---------------------------------------------------------------- instead of the accessibility service
-        RootModeRow(R.string.settings_root_lock, R.string.settings_root_lock_desc, s.rootLockMode, viewModel::setRootLockMode)
+        RootModeRow(R.string.settings_root_lock, R.string.settings_root_lock_desc, s.root.lockMode, viewModel::setRootLockMode)
         ExpressiveRowDivider()
-        RootModeRow(R.string.settings_root_recents, R.string.settings_root_recents_desc, s.rootRecentsMode, viewModel::setRootRecentsMode)
+        RootModeRow(R.string.settings_root_recents, R.string.settings_root_recents_desc, s.root.recentsMode, viewModel::setRootRecentsMode)
         ExpressiveRowDivider()
-        RootModeRow(R.string.settings_root_shade, R.string.settings_root_shade_desc, s.rootShadeMode, viewModel::setRootShadeMode)
+        RootModeRow(R.string.settings_root_shade, R.string.settings_root_shade_desc, s.root.shadeMode, viewModel::setRootShadeMode)
         ExpressiveRowDivider()
 
         // ---------------------------------------------------------------- instead of ADB and settings pages
-        KeepRow(R.string.settings_root_keep_dump, R.string.settings_root_keep_dump_desc, s.rootKeepDump, granted[RootGrants.DUMP]) {
+        KeepRow(R.string.settings_root_keep_dump, R.string.settings_root_keep_dump_desc, s.root.keepDump, granted[RootGrants.DUMP]) {
             viewModel.setRootKeepDump(it); if (it) grant(RootGrants.DUMP)
         }
         ExpressiveRowDivider()
-        KeepRow(R.string.settings_root_keep_usage, R.string.settings_root_keep_usage_desc, s.rootKeepUsage, granted[RootGrants.USAGE]) {
+        KeepRow(R.string.settings_root_keep_usage, R.string.settings_root_keep_usage_desc, s.root.keepUsage, granted[RootGrants.USAGE]) {
             viewModel.setRootKeepUsage(it); if (it) grant(RootGrants.USAGE)
         }
         ExpressiveRowDivider()
-        KeepRow(R.string.settings_root_keep_secure, R.string.settings_root_keep_secure_desc, s.rootKeepSecureSettings, granted[RootGrants.SECURE_SETTINGS]) {
+        KeepRow(R.string.settings_root_keep_secure, R.string.settings_root_keep_secure_desc, s.root.keepSecureSettings, granted[RootGrants.SECURE_SETTINGS]) {
             viewModel.setRootKeepSecureSettings(it); if (it) grant(RootGrants.SECURE_SETTINGS)
         }
         ExpressiveRowDivider()
-        KeepRow(R.string.settings_root_keep_notifications, R.string.settings_root_keep_notifications_desc, s.rootKeepNotifications, granted[RootGrants.NOTIFICATIONS]) {
+        KeepRow(R.string.settings_root_keep_notifications, R.string.settings_root_keep_notifications_desc, s.root.keepNotifications, granted[RootGrants.NOTIFICATIONS]) {
             viewModel.setRootKeepNotifications(it); if (it) grant(RootGrants.NOTIFICATIONS)
         }
         ExpressiveRowDivider()
-        KeepRow(R.string.settings_root_keep_accessibility, R.string.settings_root_keep_accessibility_desc, s.rootKeepAccessibility, granted[RootGrants.ACCESSIBILITY]) {
+        KeepRow(R.string.settings_root_keep_accessibility, R.string.settings_root_keep_accessibility_desc, s.root.keepAccessibility, granted[RootGrants.ACCESSIBILITY]) {
             viewModel.setRootKeepAccessibility(it); if (it) grant(RootGrants.ACCESSIBILITY)
         }
         ExpressiveRowDivider()
-        KeepRow(R.string.settings_root_keep_widgets, R.string.settings_root_keep_widgets_desc, s.rootKeepWidgets, granted[RootGrants.WIDGETS]) {
+        KeepRow(R.string.settings_root_keep_widgets, R.string.settings_root_keep_widgets_desc, s.root.keepWidgets, granted[RootGrants.WIDGETS]) {
             viewModel.setRootKeepWidgets(it); if (it) grant(RootGrants.WIDGETS)
         }
         ExpressiveRowDivider()

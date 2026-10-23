@@ -221,7 +221,7 @@ class HomeViewModel @Inject constructor(
                         val settings = settingsRepository.settings(ScreenType.INNER).first()
                         homeLayoutRepository.addBuiltin(
                             HomeItemEntity.BUILTIN_SMARTSPACE,
-                            settings.homeColumns, SMARTSPACE_DEFAULT_SPAN_Y, settings.homeColumns, settings.homeRows, ScreenType.INNER
+                            settings.home.columns, SMARTSPACE_DEFAULT_SPAN_Y, settings.home.columns, settings.home.rows, ScreenType.INNER
                         )
                         val apps = appRepository.apps.firstOrNull { it.isNotEmpty() } ?: emptyList()
                         val dockKeys = resolveDefaultDockKeys(context, apps)
@@ -272,13 +272,13 @@ class HomeViewModel @Inject constructor(
                             // Full width so the centered clock sits in the middle of the screen.
                             homeLayoutRepository.addBuiltin(
                                 HomeItemEntity.BUILTIN_SMARTSPACE,
-                                settings.homeColumns, SMARTSPACE_DEFAULT_SPAN_Y, settings.homeColumns, settings.homeRows, type
+                                settings.home.columns, SMARTSPACE_DEFAULT_SPAN_Y, settings.home.columns, settings.home.rows, type
                             )
                         }
                         if (dockKeys.isNotEmpty() && settingsRepository.dockFavorites(type).first().isEmpty()) {
                             settingsRepository.seedDock(dockKeys, type)
                             // The seed is 5 apps but the dock defaults to 4 columns — widen to fit.
-                            if (dockKeys.size > settings.dockColumns) {
+                            if (dockKeys.size > settings.dock.columns) {
                                 settingsRepository.setDockColumns(dockKeys.size, type)
                             }
                         }
@@ -369,7 +369,7 @@ class HomeViewModel @Inject constructor(
         ) { settings, favoriteKeys, apps, homeItemsAndPairs ->
             val (homeItems, appPairs) = homeItemsAndPairs
             val byKey = apps.associateBy { it.key }
-            val dockApps = favoriteKeys.mapNotNull { byKey[it] }.take(settings.dockColumns)
+            val dockApps = favoriteKeys.mapNotNull { byKey[it] }.take(settings.dock.columns)
             // Children grouped by their folder id, kept in stored order.
             val childrenByFolder = homeItems
                 .filter { it.containerId != HomeItemEntity.HOME }
@@ -544,13 +544,13 @@ class HomeViewModel @Inject constructor(
             val occupied = homeItems.filter { it.containerId == HomeItemEntity.HOME }.map { it.page }.toSet()
             // A new trailing page is offered transiently by the workspace while dragging, and becomes
             // permanent once an icon lands.
-            val pageCount = permanentPageCount(occupied, settings.homePageCount)
+            val pageCount = permanentPageCount(occupied, settings.home.pageCount)
             HomeUiState(
                 settings = settings,
                 dockApps = dockApps,
                 entries = entries,
                 pageCount = pageCount,
-                homePage = settings.homePage.coerceIn(0, pageCount - 1),
+                homePage = settings.home.page.coerceIn(0, pageCount - 1),
                 occupiedPages = occupied,
                 loaded = true,
             )
@@ -572,7 +572,7 @@ class HomeViewModel @Inject constructor(
      * none is configured (blank key) or the app no longer resolves (e.g. uninstalled).
      */
     fun onLeftSwipe() = viewModelScope.launch {
-        val key = settingsRepository.settings(_screenType.value).first().leftSwipeAppKey
+        val key = settingsRepository.settings(_screenType.value).first().home.leftSwipeAppKey
         if (key.isBlank()) return@launch
         appRepository.apps.first().firstOrNull { it.key == key }?.let { launch(it) }
     }
@@ -582,7 +582,7 @@ class HomeViewModel @Inject constructor(
      * none is configured (blank key) or the app no longer resolves (e.g. uninstalled).
      */
     fun onRightSwipe() = viewModelScope.launch {
-        val key = settingsRepository.settings(_screenType.value).first().rightSwipeAppKey
+        val key = settingsRepository.settings(_screenType.value).first().home.rightSwipeAppKey
         if (key.isBlank()) return@launch
         appRepository.apps.first().firstOrNull { it.key == key }?.let { launch(it) }
     }
@@ -598,7 +598,7 @@ class HomeViewModel @Inject constructor(
             }
             floatingApp == null ->
                 AppShortcuts.startById(context, shortcut.packageName, shortcut.shortcutId, shortcut.userSerial)
-            uiState.value.settings.floatingLaunchEnabled -> launchFloating(floatingApp)
+            uiState.value.settings.launch.floatingEnabled -> launchFloating(floatingApp)
             else -> launch(floatingApp)
         }
     }
@@ -715,7 +715,7 @@ class HomeViewModel @Inject constructor(
      *  Context). Idempotent — the repository skips one already present. */
     fun addPinnedShortcut(packageName: String, shortcutId: String, userSerial: Long) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.homeColumns, s.homeRows, _screenType.value)
+        homeLayoutRepository.addShortcut(packageName, shortcutId, userSerial, s.home.columns, s.home.rows, _screenType.value)
     }
 
     /** Removes a pinned shortcut from home and re-pins the remaining set for its package in the system. */
@@ -736,7 +736,7 @@ class HomeViewModel @Inject constructor(
     /** Places a freshly-bound widget on the home grid (spans are the picker's default). */
     fun addWidget(appWidgetId: Int, provider: String, spanX: Int, spanY: Int) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.addWidget(appWidgetId, provider, spanX, spanY, s.homeColumns, s.homeRows, _screenType.value)
+        homeLayoutRepository.addWidget(appWidgetId, provider, spanX, spanY, s.home.columns, s.home.rows, _screenType.value)
     }
 
     suspend fun addWidgetAt(
@@ -745,7 +745,7 @@ class HomeViewModel @Inject constructor(
     ): Boolean {
         val s = settingsRepository.settings(_screenType.value).first()
         return homeLayoutRepository.addWidgetAt(
-            appWidgetId, provider, builtinType, placement, s.homeColumns, s.homeRows, _screenType.value
+            appWidgetId, provider, builtinType, placement, s.home.columns, s.home.rows, _screenType.value
         )
     }
 
@@ -800,7 +800,7 @@ class HomeViewModel @Inject constructor(
         val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(
             HomeItemEntity.BUILTIN_SMARTSPACE,
-            s.homeColumns, SMARTSPACE_DEFAULT_SPAN_Y, s.homeColumns, s.homeRows, _screenType.value
+            s.home.columns, SMARTSPACE_DEFAULT_SPAN_Y, s.home.columns, s.home.rows, _screenType.value
         )
     }
 
@@ -811,7 +811,7 @@ class HomeViewModel @Inject constructor(
         val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(
             HomeItemEntity.BUILTIN_NOTIFICATIONS,
-            s.homeColumns, NOTIFICATIONS_DEFAULT_SPAN_Y, s.homeColumns, s.homeRows, _screenType.value
+            s.home.columns, NOTIFICATIONS_DEFAULT_SPAN_Y, s.home.columns, s.home.rows, _screenType.value
         )
     }
 
@@ -820,7 +820,7 @@ class HomeViewModel @Inject constructor(
         val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(
             HomeItemEntity.BUILTIN_NOTIFICATION_WIDGET,
-            s.homeColumns, 2, s.homeColumns, s.homeRows, _screenType.value
+            s.home.columns, 2, s.home.columns, s.home.rows, _screenType.value
         )
     }
 
@@ -829,7 +829,7 @@ class HomeViewModel @Inject constructor(
         val s = settingsRepository.settings(_screenType.value).first()
         homeLayoutRepository.addBuiltin(
             HomeItemEntity.BUILTIN_BATTERY,
-            BATTERY_SPAN, BATTERY_SPAN, s.homeColumns, s.homeRows, _screenType.value
+            BATTERY_SPAN, BATTERY_SPAN, s.home.columns, s.home.rows, _screenType.value
         )
     }
 
@@ -881,7 +881,7 @@ class HomeViewModel @Inject constructor(
 
     fun addToHome(appItem: AppItem) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.addToHome(appItem, s.homeColumns, s.homeRows, _screenType.value)
+        homeLayoutRepository.addToHome(appItem, s.home.columns, s.home.rows, _screenType.value)
     }
 
     /** Moves/swaps a home shortcut; returns whether the repository accepted it (see [Workspace]). */
@@ -896,14 +896,14 @@ class HomeViewModel @Inject constructor(
      *  (the Workspace clears its optimistic override on false). */
     suspend fun setWidgetBounds(rowId: Long, page: Int, cellX: Int, cellY: Int, spanX: Int, spanY: Int): Boolean {
         val s = settingsRepository.settings(_screenType.value).first()
-        return homeLayoutRepository.setWidgetBounds(rowId, page, cellX, cellY, spanX, spanY, s.homeColumns, s.homeRows, _screenType.value)
+        return homeLayoutRepository.setWidgetBounds(rowId, page, cellX, cellY, spanX, spanY, s.home.columns, s.home.rows, _screenType.value)
     }
 
     /** Cross-surface: an icon dragged from the dock onto a home cell — place it and leave the dock. */
     fun moveToHome(appItem: AppItem, page: Int, cellX: Int, cellY: Int) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
         withContext(NonCancellable) {
-            if (homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.homeColumns, s.homeRows, _screenType.value)) {
+            if (homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.home.columns, s.home.rows, _screenType.value)) {
                 settingsRepository.removeFromDock(appItem.key, _screenType.value)
             }
         }
@@ -930,7 +930,7 @@ class HomeViewModel @Inject constructor(
     /** Take an app out of a folder back onto the home screen (dissolves the folder if one is left). */
     fun removeFromFolder(appItem: AppItem, folderId: Long) = viewModelScope.launch {
         val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.removeFromFolder(appItem, folderId, s.homeColumns, s.homeRows, _screenType.value)
+        homeLayoutRepository.removeFromFolder(appItem, folderId, s.home.columns, s.home.rows, _screenType.value)
     }
 
     fun renameFolder(folderId: Long, name: String) =
@@ -962,7 +962,7 @@ class HomeViewModel @Inject constructor(
                     skipNext = false
                     return@collect
                 }
-                if (!state.settings.autoRemoveEmptyPages || before == null || before.first != type) return@collect
+                if (!state.settings.home.autoRemoveEmptyPages || before == null || before.first != type) return@collect
                 val emptied = (before.second - shown).filter { it in 0 until state.pageCount }.maxOrNull()
                 if (emptied != null && state.pageCount > 1) {
                     val removed = runCatching { removeEmptyPage(emptied) }.getOrNull()

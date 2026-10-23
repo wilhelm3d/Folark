@@ -26,7 +26,7 @@ class ShortcutSearchProvider @Inject constructor(
 ) : SearchProvider {
 
     override suspend fun isEnabled(): Boolean =
-        settingsRepository.settings(ScreenType.OUTER).first().searchShortcuts
+        settingsRepository.settings(ScreenType.OUTER).first().search.shortcuts
 
     override suspend fun query(query: String): List<SearchResult> = withContext(Dispatchers.IO) {
         val q = query.trim().lowercase()

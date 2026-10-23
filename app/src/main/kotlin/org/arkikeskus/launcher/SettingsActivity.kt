@@ -40,7 +40,7 @@ class SettingsActivity : ComponentActivity() {
             val settingsFlow = remember(screenType) { settingsRepository.settings(screenType) }
             val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
             // The Studio look is always dark: dark theme and light system-bar icons with it.
-            val studio = settings.settingsStyle == LauncherSettings.SETTINGS_STYLE_STUDIO
+            val studio = settings.appearance.settingsStyle == LauncherSettings.SETTINGS_STYLE_STUDIO
             LaunchedEffect(studio) {
                 if (studio) {
                     enableEdgeToEdge(
@@ -53,12 +53,12 @@ class SettingsActivity : ComponentActivity() {
             }
             LauncherTheme(
                 darkTheme = studio || isSystemInDarkTheme(),
-                amoledDark = settings.amoledDark,
-                fontFamily = settings.appFontFamily
+                amoledDark = settings.appearance.amoledDark,
+                fontFamily = settings.appearance.fontFamily
                     .takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT }
                     ?.let { LauncherFontFamily.resolve(it) },
-                boldText = settings.appFontBold,
-                fontScale = settings.appFontSizeScale,
+                boldText = settings.appearance.fontBold,
+                fontScale = settings.appearance.fontSizeScale,
             ) {
                 CompositionLocalProvider(
                     LocalScreenType provides screenType,
