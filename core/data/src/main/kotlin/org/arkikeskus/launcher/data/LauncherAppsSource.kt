@@ -239,7 +239,7 @@ class LauncherAppsSource @Inject constructor(
             val list = runCatching {
                 launcherApps.getActivityList(null, user)
             }.getOrElse { emptyList() }
-            list.map { info ->
+            val userApps = list.map { info ->
                 AppItem(
                     packageName = info.componentName.packageName,
                     className = info.componentName.className,
@@ -249,7 +249,25 @@ class LauncherAppsSource @Inject constructor(
                     privateProfile = isPrivate,
                     isArchived = if (Build.VERSION.SDK_INT >= 35) info.applicationInfo.isArchived else false,
                 )
+            }.toMutableList()
+            if (!isPrivate && user == Process.myUserHandle()) {
+                runCatching {
+                    val pInfo = context.packageManager.getPackageInfo("com.motorola.smartmode", 0)
+                    if (pInfo.applicationInfo?.enabled == true) {
+                        userApps.add(
+                            AppItem(
+                                packageName = "com.motorola.smartmode",
+                                className = "com.motorola.smartmode.ui.activities.HomePageActivity",
+                                user = user,
+                                userSerial = serial,
+                                label = "Smart Rules",
+                                privateProfile = false,
+                            ),
+                        )
+                    }
+                }
             }
+            userApps
         }.sortedBy { it.label.lowercase() }
         _privateSpace.value = privateSpace
         return apps
@@ -272,7 +290,14 @@ class LauncherAppsSource @Inject constructor(
         } else {
             openOptions(animation, speed)
         }
-        launcherApps.startMainActivity(appItem.componentName, appItem.user, origin?.second, options)
+        runCatching {
+            launcherApps.startMainActivity(appItem.componentName, appItem.user, origin?.second, options)
+        }.getOrElse {
+            val intent = context.packageManager.getLaunchIntentForPackage(appItem.packageName)
+                ?: Intent("com.motorola.smartmode.LAUNCH_SMART_ZONE").setComponent(appItem.componentName)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent, options)
+        }
     }
 
     /** The app's window grows out of the icon at [bounds] (on screen), measured from [view]; with
