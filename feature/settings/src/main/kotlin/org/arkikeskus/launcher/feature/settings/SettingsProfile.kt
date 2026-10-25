@@ -35,7 +35,7 @@ import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 
 /**
- * Picks which display's profile the settings below edit. The cover screen and the inner screen keep
+ * Picks which display's profile the settings below edit. The outer screen and the inner screen keep
  * fully separate profiles; this switcher makes that explicit and lets either one be edited from
  * whichever display the settings are open on. [active] is the display currently in use.
  */

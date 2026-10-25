@@ -150,15 +150,19 @@ internal class RecentsEnv(
     /** "Peek view" on one app: pick the app that peeks in; on a split card: that split as peek view. */
     val onPeekPick: (RecentsCard) -> Unit = {},
     val onPeekSplit: (RecentsCard) -> Unit = {},
+    /** Closes every app (the Close all button), for the "Close all" gesture. */
+    val onCloseAll: () -> Unit = {},
 ) {
     val speed: Float get() = settings.recents.animationSpeed
 
-    /** On the cover screen (the narrow one), where Recents may have gestures of its own. */
+    /** On the outer screen (the narrow one), where Recents may have gestures of its own. */
     var coverScreen: Boolean = false
 
     /** The card gestures for the screen Recents is on (Settings ▸ Recents ▸ Gestures on a card). */
     val swipeUpAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeUpAction else it.swipeUpAction }
     val swipeDownAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeDownAction else it.swipeDownAction }
+    val swipeLeftAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeLeftAction else it.swipeLeftAction }
+    val swipeRightAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeRightAction else it.swipeRightAction }
     val longPressAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerLongPressAction else it.longPressAction }
     val doubleTapAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerDoubleTapAction else it.doubleTapAction }
     /** Borderless cards (Settings ▸ Recents ▸ Card layout). */
@@ -192,7 +196,7 @@ internal fun RecentsScreen(
     val accent = MaterialTheme.colorScheme.primary
     val onAccent = MaterialTheme.colorScheme.onPrimary
     val wide = LocalConfiguration.current.smallestScreenWidthDp >= 600
-    // On the cover screen, its own look when it has one (Settings ▸ Recents ▸ Own look on the cover screen).
+    // On the outer screen, its own look when it has one (Settings ▸ Recents ▸ Own look on the outer screen).
     @Suppress("NAME_SHADOWING")
     val settings = if (!wide && settings.recents.outerLookEnabled) settings.copy(recents = settings.recents.outerLook ?: settings.recents) else settings
     val glass = settings.recents.glass
@@ -254,6 +258,7 @@ internal fun RecentsScreen(
         onSplitThree = { card -> selecting = true; peekPick = false; picked.clear(); picked.add(card); openAt = 3 },
         onPeekPick = { card -> selecting = true; peekPick = true; picked.clear(); picked.add(card); openAt = 2 },
         onPeekSplit = onPeekSplit,
+        onCloseAll = onCloseAll,
     )
     env.coverScreen = !wide
 

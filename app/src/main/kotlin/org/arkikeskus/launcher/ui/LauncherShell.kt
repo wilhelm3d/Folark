@@ -78,7 +78,8 @@ import org.arkikeskus.launcher.ui.component.LocalBadgeAvatars
 import org.arkikeskus.launcher.ui.component.LivePill
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.padding
 import android.os.Build
 import android.content.Context
@@ -342,6 +343,11 @@ fun LauncherShell(
         }
 
         // What is going on right now (a timer, navigation, a download): a live pill on top of home.
+        // While Android's status bar shows, what it already has a chip for (calls, Live updates)
+        // isn't shown a second time.
+        val chipsShown = shellSettings.live.skipSystemChips && !shellSettings.statusBar.hideSystem
+        val live = if (chipsShown) live.filterNot { it.systemChip } else live
+        val cameraClear = rememberCameraClearance()
         if (shellSettings.live.activities && live.isNotEmpty() && !homeCovered) {
             var liveIndex by remember { mutableIntStateOf(0) }
             var liveOpen by remember { mutableStateOf(false) }
@@ -374,8 +380,9 @@ fun LauncherShell(
                 label = "live",
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 4.dp, start = 16.dp, end = 16.dp),
+                    // Below the status bar, and always below the front camera (with the status
+                    // bar hidden there is no bar to keep clear, but the camera hole is still there).
+                    .padding(top = cameraClear + 4.dp, start = 16.dp, end = 16.dp),
             ) { open ->
                 if (open) {
                     LiveCard(
@@ -502,4 +509,26 @@ private fun openNotificationIntent(context: Context, intent: PendingIntent) {
         }
         intent.send(context, 0, null, null, null, null, options.toBundle())
     }
+}
+
+/**
+ * How far down from the top of the screen the live pill must start: below the status bar when it
+ * shows, and below the front camera's hole (the outer screen's camera sits in the middle of the
+ * top edge) whether the status bar shows or not.
+ */
+@Composable
+private fun rememberCameraClearance(): androidx.compose.ui.unit.Dp {
+    val density = LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    // Both read in composition, so a screen switch or the status bar coming and going updates it.
+    val barTop = WindowInsets.statusBars.getTop(density)
+    val cutoutTop = WindowInsets.displayCutout.getTop(density)
+    val holeBottom = remember(cutoutTop, barTop, config.screenWidthDp, config.screenHeightDp, config.orientation) {
+        // The camera hole itself (Android's safe inset can be a little shorter than the hole).
+        val rects = runCatching { view.rootWindowInsets?.displayCutout?.boundingRects }.getOrNull().orEmpty()
+        val limit = view.rootView.height.takeIf { it > 0 }?.div(4) ?: Int.MAX_VALUE
+        rects.filter { it.top < limit && it.bottom < limit }.maxOfOrNull { it.bottom } ?: 0
+    }
+    return with(density) { maxOf(barTop, cutoutTop, holeBottom).toDp() }
 }

@@ -35,13 +35,21 @@ class RecentsHook : IXposedHookLoadPackage {
         val loader = lpparam.classLoader
         // SystemUI: only the unlock sync lives there (UnlockHook); the Recents hooks are launcher-only.
         if (lpparam.packageName == SYSTEMUI) {
+            // Only SystemUI's own main process, where the lock screen and WM Shell live. Other
+            // apps (the system launcher among them) also load SystemUI's code into their process
+            // now and then; there's nothing to hook there (and no split screen to find).
+            if (!lpparam.isFirstApplication || lpparam.processName != SYSTEMUI) return
             UnlockHook.install(loader, ::log)
             SplitThreeHook.install(loader, ::log)
             return
         }
         val helper = find("com.android.quickstep.OverviewCommandHelper", loader)
         if (helper == null) {
-            log("no OverviewCommandHelper in ${lpparam.packageName}; not a Quickstep launcher")
+            // Only worth a line for something that looks like a launcher (the scope also holds
+            // system packages, which load in many processes).
+            if (lpparam.packageName.contains("launcher", ignoreCase = true)) {
+                log("no OverviewCommandHelper in ${lpparam.packageName}; not a Quickstep launcher")
+            }
             return
         }
         log("hooking Recents in ${lpparam.packageName}")

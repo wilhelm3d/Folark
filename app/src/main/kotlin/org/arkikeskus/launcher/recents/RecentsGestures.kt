@@ -39,17 +39,26 @@ import kotlin.math.abs
  * What every card does, in every theme: comes in with the chosen animation, answers a pick, and
  * answers the gestures set in Settings ▸ Recents ▸ Gestures:
  * - a tap opens it (or picks it for split view),
- * - a swipe up / down (sideways in the Compact list) does what is set for it (close by default),
+ * - a swipe up / down / left / right does what is set for it (close by default): up / down where
+ *   the cards close along [closeAxis] = vertical, left / right where [sideSwipes] (the looks that
+ *   scroll up and down, so a sideways swipe is free); a Close flings the card off that way,
  * - a double tap and a long press (held still, then let go) do what is set for them,
  * - held and moved, it can be dropped on another card (split or attached view).
  *
  * One gesture reader for all of it, so a long press or a swipe never also counts as a tap.
  */
 @Composable
-internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int, closeAxis: Orientation = Orientation.Vertical): Modifier {
+internal fun RecentsEnv.cardModifier(
+    card: RecentsCard,
+    index: Int,
+    columns: Int,
+    closeAxis: Orientation = Orientation.Vertical,
+    sideSwipes: Boolean = closeAxis == Orientation.Horizontal,
+): Modifier {
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val offset = remember(card.key) { Animatable(0f) }
+    val offsetX = remember(card.key) { Animatable(0f) }
     val dismissPx = with(LocalDensity.current) { 120.dp.toPx() }
     val slot = picked.indexOf(card)
     val dragging = drag.card?.key == card.key
@@ -72,22 +81,27 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
     val dim by animateFloatAsState(if (dimForMenu) 1f else 0f, tween((160 / speed.coerceIn(0.25f, 4f)).toInt()), label = "dim")
     var origin by remember { mutableStateOf(Offset.Zero) }
     val s = settings
-    // The gestures of the screen Recents is on (the cover screen may have its own).
+    // The gestures of the screen Recents is on (the outer screen may have its own).
     val swipeUp = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeUpAction, card)
     val swipeDown = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeDownAction, card)
+    // Up / down only where cards don't scroll up and down; left / right only where they don't scroll sideways.
+    val vertical = closeAxis == Orientation.Vertical
+    val swipeLeft = if (selecting || !sideSwipes) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeLeftAction, card)
+    val swipeRight = if (selecting || !sideSwipes) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeRightAction, card)
     val longPress = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(longPressAction, card)
     val doubleTap = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(doubleTapAction, card)
     val canDrag = s.recents.dragDrop && !selecting && !card.isSplit
     val env = rememberUpdatedState(this)
 
-    /** A finished swipe: flies away for Close, springs back for anything else. */
-    fun finishSwipe(action: String, towardStart: Boolean) {
+    /** A finished swipe: flies away (off the screen, that way) for Close, springs back for anything else. */
+    fun finishSwipe(action: String, towardStart: Boolean, sideways: Boolean) {
+        val moving = if (sideways) offsetX else offset
         scope.launch {
             if (action == LauncherSettings.RECENTS_ACTION_CLOSE) {
-                offset.animateTo(if (towardStart) -dismissPx * 4 else dismissPx * 4)
+                moving.animateTo(if (towardStart) -dismissPx * 8 else dismissPx * 8, tween(220))
                 env.value.perform(action, card)
             } else {
-                offset.animateTo(0f)
+                moving.animateTo(0f)
                 env.value.perform(action, card)
             }
         }
@@ -102,16 +116,18 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
         .recentsEnter(s.recents.enterAnimation, index, columns.coerceIn(1, 6), speed, Unit)
         .recentsSelect(s.recents.selectAnimation, slot >= 0, slot, picked.size, accent, corner, speed)
         .graphicsLayer {
-            if (closeAxis == Orientation.Vertical) translationY = offset.value else translationX = offset.value
+            translationX = offsetX.value
+            translationY = offset.value
             // Held for a drag: lifted out of its place (faint, a little smaller) until it lands.
             val faint = (1f - 0.6f * heldOut) * (1f - 0.55f * dim)
-            alpha = faint * (1f - (abs(offset.value) / (dismissPx * 2f)).coerceIn(0f, 0.8f))
+            val away = maxOf(abs(offset.value), abs(offsetX.value))
+            alpha = faint * (1f - (away / (dismissPx * 2f)).coerceIn(0f, 0.8f))
             val k = 1f + 0.04f * lift - 0.08f * heldOut
             scaleX = k; scaleY = k
             shadowElevation = 28f * lift
         }
         .semantics { onClick { env.value.onTap(card); true } }
-        .pointerInput(card.key, swipeUp, swipeDown, longPress, doubleTap, canDrag, closeAxis) {
+        .pointerInput(card.key, swipeUp, swipeDown, swipeLeft, swipeRight, longPress, doubleTap, canDrag, closeAxis) {
             val slop = viewConfiguration.touchSlop
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
@@ -123,7 +139,9 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: run { left = true; return@withTimeoutOrNull true }
-                        if (!change.pressed) { released = true; return@withTimeoutOrNull true }
+                        // The card takes the tap: the screen behind (a tap on empty space cancels
+                        // picking, or goes home) must not see it too.
+                        if (!change.pressed) { change.consume(); released = true; return@withTimeoutOrNull true }
                         if (change.isConsumed) { left = true; return@withTimeoutOrNull true }
                         moved += change.positionChange()
                         if (moved.getDistance() > slop) return@withTimeoutOrNull true
@@ -142,7 +160,7 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) break
+                        if (!change.pressed) { change.consume(); break }
                         val d = change.positionChange()
                         travelled += d.getDistance()
                         if (canDrag && !dragging && travelled > slop) {
@@ -191,45 +209,56 @@ internal fun RecentsEnv.cardModifier(card: RecentsCard, index: Int, columns: Int
                 }
 
                 // -------------------------------------------------------- a swipe (or someone else's scroll)
-                val along = if (closeAxis == Orientation.Vertical) moved.y else moved.x
-                val across = if (closeAxis == Orientation.Vertical) moved.x else moved.y
-                if (abs(along) <= abs(across) || (swipeUp == LauncherSettings.RECENTS_ACTION_NONE && swipeDown == LauncherSettings.RECENTS_ACTION_NONE)) {
+                // Which way: up / down, or left / right (whichever the finger went more).
+                val sideways = abs(moved.x) > abs(moved.y)
+                val toStart = if (sideways) swipeLeft else swipeUp
+                val toEnd = if (sideways) swipeRight else swipeDown
+                val allowed = if (sideways) sideSwipes else vertical
+                if (!allowed || (toStart == LauncherSettings.RECENTS_ACTION_NONE && toEnd == LauncherSettings.RECENTS_ACTION_NONE)) {
                     return@awaitEachGesture // the list's scroll takes it
                 }
+                val moving = if (sideways) offsetX else offset
                 val tracker = VelocityTracker()
-                var total = along
-                scope.launch { offset.snapTo(total) }
+                var total = if (sideways) moved.x else moved.y
+                scope.launch { moving.snapTo(total) }
                 while (true) {
                     val event = awaitPointerEvent()
                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
                     tracker.addPosition(change.uptimeMillis, change.position)
-                    if (!change.pressed) break
+                    if (!change.pressed) { change.consume(); break }
                     val d = change.positionChange()
                     change.consume()
-                    total += if (closeAxis == Orientation.Vertical) d.y else d.x
+                    total += if (sideways) d.x else d.y
                     // Only the directions that do something move freely; the others resist.
-                    val dirAction = if (total < 0) swipeUp else swipeDown
+                    val dirAction = if (total < 0) toStart else toEnd
                     val shown = if (dirAction == LauncherSettings.RECENTS_ACTION_NONE) total * 0.25f else total
-                    scope.launch { offset.snapTo(shown) }
+                    scope.launch { moving.snapTo(shown) }
                 }
                 val v = tracker.calculateVelocity()
-                val speed = if (closeAxis == Orientation.Vertical) v.y else v.x
-                val finalAction = if (total < 0) swipeUp else swipeDown
+                val speed = if (sideways) v.x else v.y
+                val finalAction = if (total < 0) toStart else toEnd
                 if (finalAction != LauncherSettings.RECENTS_ACTION_NONE && (abs(total) > dismissPx || abs(speed) > 2200f && speed * total > 0)) {
-                    finishSwipe(finalAction, towardStart = total < 0)
+                    finishSwipe(finalAction, towardStart = total < 0, sideways = sideways)
                 } else {
-                    scope.launch { offset.animateTo(0f) }
+                    scope.launch { moving.animateTo(0f) }
                 }
             }
         }
 }
 
-/** [action] if it can be done on [card] now (Close needs root; Full screen a split card). */
+/**
+ * [action] if it can be done on [card] now (Close and Close the others need root; Full screen a
+ * split card; Split 3 apps the three-app split switch).
+ */
 private fun RecentsEnv.usable(action: String, card: RecentsCard): String = when (action) {
     LauncherSettings.RECENTS_ACTION_CLOSE -> if (canClose && !card.pinned) action else LauncherSettings.RECENTS_ACTION_NONE
     LauncherSettings.RECENTS_ACTION_UNSPLIT -> if (card.isSplit) action else LauncherSettings.RECENTS_ACTION_NONE
     LauncherSettings.RECENTS_ACTION_SPLIT, LauncherSettings.RECENTS_ACTION_POPUP ->
         if (card.isSplit) LauncherSettings.RECENTS_ACTION_NONE else action
+    LauncherSettings.RECENTS_ACTION_SPLIT3 ->
+        if (card.isSplit || !settings.launch.threeAppSplit) LauncherSettings.RECENTS_ACTION_NONE else action
+    LauncherSettings.RECENTS_ACTION_CLOSE_OTHERS ->
+        if (canClose && drag.cards.any { it.key != card.key && !it.pinned }) action else LauncherSettings.RECENTS_ACTION_NONE
     else -> action
 }
 
@@ -244,6 +273,11 @@ internal fun RecentsEnv.perform(action: String, card: RecentsCard) {
         LauncherSettings.RECENTS_ACTION_PIN -> onTogglePin(card)
         LauncherSettings.RECENTS_ACTION_MENU -> menu.open(card, drag.bounds[card.key]?.center ?: Offset.Zero)
         LauncherSettings.RECENTS_ACTION_OPEN -> onTap(card)
+        LauncherSettings.RECENTS_ACTION_PEEK -> if (card.isSplit) onPeekSplit(card) else onPeekPick(card)
+        LauncherSettings.RECENTS_ACTION_SPLIT3 -> onSplitThree(card)
+        LauncherSettings.RECENTS_ACTION_CLOSE_OTHERS ->
+            if (canClose) drag.cards.filter { it.key != card.key && !it.pinned }.forEach(onClose)
+        LauncherSettings.RECENTS_ACTION_CLOSE_ALL -> onCloseAll()
         else -> {}
     }
 }

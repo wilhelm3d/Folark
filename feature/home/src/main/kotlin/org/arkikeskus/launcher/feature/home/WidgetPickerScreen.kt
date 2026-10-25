@@ -83,7 +83,7 @@ private data class WidgetPreviewData(val remote: RemoteViews? = null, val bitmap
 /**
  * Searchable widget gallery. On the INNER SCREEN, renders a macOS Sonoma / iPadOS style 2-pane gallery
  * panel that automatically inherits the inner app drawer's size, positioning, theme colors, glass blur,
- * and animations. On the OUTER SCREEN, renders a compact 1-pane picker suited for narrow cover screens.
+ * and animations. On the OUTER SCREEN, renders a compact 1-pane picker suited for narrow outer screens.
  */
 @Composable
 fun WidgetPickerScreen(

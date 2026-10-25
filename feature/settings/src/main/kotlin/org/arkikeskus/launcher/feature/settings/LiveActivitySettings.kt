@@ -55,6 +55,14 @@ internal fun LiveActivityRows(s: LauncherSettings, viewModel: SettingsViewModel)
         shared = true,
     )
     ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_live_skip_chips),
+        subtitle = stringResource(R.string.settings_live_skip_chips_desc),
+        checked = s.live.skipSystemChips,
+        onCheckedChange = viewModel::setLiveSkipSystemChips,
+        shared = true,
+    )
+    ExpressiveRowDivider()
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_live_effect),
         options = LIVE_EFFECT_LABELS.map { (key, label) -> key to stringResource(label) },

@@ -200,7 +200,7 @@ internal fun BentoTheme(cards: List<RecentsCard>, env: RecentsEnv) {
                 key = { _, c -> c.key },
                 span = { i, _ -> GridItemSpan(if (i == 0) maxLineSpan else if (i <= 2) maxLineSpan / 2 else 1) },
             ) { index, card ->
-                val mod = env.cardModifier(card, index, columns)
+                val mod = env.cardModifier(card, index, columns, sideSwipes = true)
                 when {
                     index == 0 -> OverlayCard(card, env, mod, hero)
                     index <= 2 -> OverlayCard(card, env, mod, medium, showLabel = false)

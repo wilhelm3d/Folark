@@ -245,7 +245,7 @@ class LauncherActivity : ComponentActivity() {
                     unlockReveal.snapTo(1f)
                     foldTransition.snapTo(0f)
                     if (style == LauncherSettings.TRANSITION_LIVE_HINGE) {
-                        // The hinge isn't moving: the live effect plays on a timer, as on the cover screen.
+                        // The hinge isn't moving: the live effect plays on a timer, as on the outer screen.
                         foldTransition.animateTo(1f, tween(liveHingeTimedMs(speed), easing = FastOutSlowInEasing))
                     } else {
                         val ms = (CLASSIC_TRANSITION_MS / speed.coerceAtLeast(0.1f)).toInt().coerceIn(120, 4_200)

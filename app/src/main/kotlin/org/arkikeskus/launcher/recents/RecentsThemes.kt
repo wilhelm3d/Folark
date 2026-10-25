@@ -89,12 +89,12 @@ internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int
     ) {
         itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
             if (overlay) {
-                OverlayCard(card, env, env.cardModifier(card, index, columns), env.settings.recents.cardHeight.dp)
+                OverlayCard(card, env, env.cardModifier(card, index, columns, sideSwipes = true), env.settings.recents.cardHeight.dp)
             } else {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .then(env.cardModifier(card, index, columns))
+                        .then(env.cardModifier(card, index, columns, sideSwipes = true))
                         .envSurface(env, RoundedCornerShape(corner), card in env.picked)
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -320,7 +320,7 @@ internal fun SwitcherTheme(cards: List<RecentsCard>, env: RecentsEnv) {
                 Column(
                     Modifier
                         .width(icon + 36.dp)
-                        .then(env.cardModifier(card, index, 6))
+                        .then(env.cardModifier(card, index, 6, sideSwipes = true))
                         .envSurface(env, RoundedCornerShape(22.dp), card in env.picked)
                         .padding(vertical = 12.dp, horizontal = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,

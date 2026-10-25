@@ -184,6 +184,7 @@ class SettingsViewModel @Inject constructor(
     fun setLiveActivities(value: Boolean) = update { repository.setLiveActivities(value) }
     fun setLiveActivitiesTaskbar(value: Boolean) = update { repository.setLiveActivitiesTaskbar(value) }
     fun setLiveExpand(value: Boolean) = update { repository.setLiveExpand(value) }
+    fun setLiveSkipSystemChips(value: Boolean) = update { repository.setLiveSkipSystemChips(value) }
     fun setLiveActivityEffect(value: String) = update { repository.setLiveActivityEffect(value) }
     fun setSearchActions(value: Boolean) = update { repository.setSearchActions(value) }
     fun setRecentsEnabled(value: Boolean) = update { repository.setRecentsEnabled(value) }
@@ -225,11 +226,13 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsBtnCloseAll(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnCloseAll(value, cover = cover) } }
     fun setRecentsSwipeUpAction(value: String) = update { repository.setRecentsSwipeUpAction(value) }
     fun setRecentsSwipeDownAction(value: String) = update { repository.setRecentsSwipeDownAction(value) }
+    fun setRecentsSwipeLeftAction(value: String) = update { repository.setRecentsSwipeLeftAction(value) }
+    fun setRecentsSwipeRightAction(value: String) = update { repository.setRecentsSwipeRightAction(value) }
     fun setRecentsLongPressAction(value: String) = update { repository.setRecentsLongPressAction(value) }
     fun setRecentsDoubleTapAction(value: String) = update { repository.setRecentsDoubleTapAction(value) }
     fun setRecentsOuterGestures(value: Boolean) = update { repository.setRecentsOuterGestures(value) }
 
-    /** Settings ▸ Recents: the look being edited is the cover screen's (with its own look on). */
+    /** Settings ▸ Recents: the look being edited is the outer screen's (with its own look on). */
     var editRecentsCover by mutableStateOf(false)
     fun setRecentsOuterLook(value: Boolean) {
         if (!value) editRecentsCover = false
@@ -237,6 +240,8 @@ class SettingsViewModel @Inject constructor(
     }
     fun setRecentsOuterSwipeUpAction(value: String) = update { repository.setRecentsOuterSwipeUpAction(value) }
     fun setRecentsOuterSwipeDownAction(value: String) = update { repository.setRecentsOuterSwipeDownAction(value) }
+    fun setRecentsOuterSwipeLeftAction(value: String) = update { repository.setRecentsOuterSwipeLeftAction(value) }
+    fun setRecentsOuterSwipeRightAction(value: String) = update { repository.setRecentsOuterSwipeRightAction(value) }
     fun setRecentsOuterLongPressAction(value: String) = update { repository.setRecentsOuterLongPressAction(value) }
     fun setRecentsOuterDoubleTapAction(value: String) = update { repository.setRecentsOuterDoubleTapAction(value) }
     fun setRecentsBtnPin(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnPin(value, cover = cover) } }

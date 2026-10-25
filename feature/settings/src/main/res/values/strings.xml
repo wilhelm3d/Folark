@@ -180,7 +180,7 @@
     <string name="settings_profile_outer">Outer display</string>
     <string name="settings_profile_inner">Inner display</string>
     <string name="settings_profile_in_use">in use now</string>
-    <string name="settings_profile_outer_hint">These settings apply only to the outer (cover) display.</string>
+    <string name="settings_profile_outer_hint">These settings apply only to the outer display.</string>
     <string name="settings_profile_inner_hint">These settings apply only to the inner (unfolded) display.</string>
     <string name="settings_scope_both">Both displays</string>
     <string name="settings_foldable_shared">Foldable</string>
@@ -420,7 +420,7 @@
     <string name="settings_clock_minutes_opacity">Clock minutes opacity</string>
     <!-- Taskbar -->
     <string name="settings_taskbar_category">Taskbar</string>
-    <string name="settings_category_taskbar_desc">Folark\'s taskbar on the unfolded screen: apps, recent apps, look and size</string>
+    <string name="settings_category_taskbar_desc">Folark\'s taskbar on the inner screen: apps, recent apps, look and size</string>
     <string name="settings_taskbar_on_home">Show on the home screen</string>
     <string name="settings_taskbar_on_home_desc">Always visible on the home screen and in the app drawer, where Android hides its own taskbar</string>
     <string name="settings_taskbar_keep_open">Keep open over apps</string>
@@ -628,7 +628,7 @@
     <string name="settings_recents_taskbar_button">Taskbar Recents button opens it</string>
     <string name="settings_recents_taskbar_button_desc">Otherwise Android\'s Recents. A home gesture can open it too (Gestures)</string>
     <string name="settings_recents_columns_inner">Columns on the inner screen</string>
-    <string name="settings_recents_columns_outer">Columns on the cover screen</string>
+    <string name="settings_recents_columns_outer">Columns on the outer screen</string>
     <string name="settings_recents_max_apps">Most apps shown</string>
     <string name="settings_recents_card_height">Card height</string>
     <string name="settings_recents_corners">Card corners</string>
@@ -739,9 +739,11 @@
     <string name="settings_recents_btn_split_view">Split view (at the top)</string>
     <string name="settings_recents_btn_close_all">Close all (at the top)</string>
     <string name="settings_recents_gestures">Gestures on a card</string>
-    <string name="settings_recents_gestures_desc">Do it with a gesture instead of a button. In the Compact list the swipes go sideways (left = up, right = down). Hold and move still drags an app onto another</string>
+    <string name="settings_recents_gestures_desc">Do it with a gesture instead of a button. Swipe left / right flings a card off the side of the screen in Folark, Compact, Stack, Bento and Switcher (the other looks scroll sideways). Swipe up / down works in every look except Compact and Stack (they scroll up and down). Hold and move still drags an app onto another</string>
     <string name="settings_recents_gesture_swipe_up">Swipe up</string>
     <string name="settings_recents_gesture_swipe_down">Swipe down</string>
+    <string name="settings_recents_gesture_swipe_left">Swipe left</string>
+    <string name="settings_recents_gesture_swipe_right">Swipe right</string>
     <string name="settings_recents_gesture_long_press">Long press</string>
     <string name="settings_recents_gesture_double_tap">Double tap</string>
     <string name="settings_recents_action_none">Nothing</string>
@@ -772,6 +774,10 @@
     <string name="settings_recents_check_desc">Runs each step of getting the apps\' screenshots and shows what failed. Open a few apps first</string>
     <string name="settings_recents_check_copy">Copy</string>
     <string name="settings_recents_action_menu">Menu</string>
+    <string name="settings_recents_action_peek">Peek view</string>
+    <string name="settings_recents_action_split3">Split 3 apps</string>
+    <string name="settings_recents_action_close_others">Close the others</string>
+    <string name="settings_recents_action_close_all">Close all</string>
     <string name="settings_recents_press">Pressing a button</string>
     <string name="settings_recents_press_shrink">Shrink</string>
     <string name="settings_recents_press_bounce">Bounce</string>
@@ -819,6 +825,8 @@
     <string name="settings_app_pair_pin_taskbar">Pin to taskbar</string>
     <string name="settings_app_pair_unpin_taskbar">Unpin from taskbar</string>
     <string name="settings_live_expand">Long press opens it up</string>
+    <string name="settings_live_skip_chips">Not twice with Android\'s chips</string>
+    <string name="settings_live_skip_chips_desc">Calls and Live updates already show as a chip next to Android\'s clock, so the pill leaves them out while the status bar is showing. With the status bar hidden on home, the pill still shows them</string>
     <string name="settings_live_expand_desc">See the whole timer, trip or download with its buttons, without opening the app. Several at once: swipe between them. Off: a long press shows the next one</string>
     <string name="settings_status_icons">Android\'s status bar icons</string>
     <string name="settings_status_icons_desc">Hide icons you don\'t need to see, like the VPN key or NFC</string>
@@ -846,11 +854,11 @@
     <string name="settings_app_pair_peek_short">peek view</string>
     <string name="settings_drawer_tabs_exclusive">Apps in a tab leave All</string>
     <string name="settings_drawer_tabs_exclusive_desc">An app you put in a tab is shown only there, not in All too (search still finds it)</string>
-    <string name="settings_recents_outer_gestures">Own gestures on the cover screen</string>
-    <string name="settings_recents_outer_gestures_desc">The small screen gets its own set, made for one hand: pull a card down to open it, double tap for a pop-up window</string>
-    <string name="settings_recents_gestures_inner">Unfolded screen</string>
-    <string name="settings_recents_gestures_outer">Cover screen</string>
-    <string name="settings_recents_outer_look">Own look on the cover screen</string>
-    <string name="settings_recents_outer_look_desc">Theme, cards, glass, buttons and animations of their own on the small screen. Until you change one there, it is the same as on the unfolded screen</string>
+    <string name="settings_recents_outer_gestures">Own gestures on the outer screen</string>
+    <string name="settings_recents_outer_gestures_desc">The outer screen gets its own set, made for one hand: pull a card down to open it, double tap for a pop-up window</string>
+    <string name="settings_recents_gestures_inner">Inner screen</string>
+    <string name="settings_recents_gestures_outer">Outer screen</string>
+    <string name="settings_recents_outer_look">Own look on the outer screen</string>
+    <string name="settings_recents_outer_look_desc">Theme, cards, glass, buttons and animations of their own on the outer screen. Until you change one there, it is the same as on the inner screen</string>
     <string name="settings_recents_look_editing">Settings below are for</string>
 </resources>

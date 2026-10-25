@@ -159,7 +159,7 @@ class FoldStateMonitorTest {
 
     @Test
     @Config(qualifiers = "w360dp-h840dp-xxhdpi")
-    fun `isInnerDisplay returns false on outer cover screen 1080x2520`() {
+    fun `isInnerDisplay returns false on outer outer screen 1080x2520`() {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
 
@@ -185,7 +185,7 @@ class FoldStateMonitorTest {
 
     @Test
     @Config(qualifiers = "w360dp-h840dp-xxhdpi")
-    fun `computeFoldState returns CLOSED on outer cover display even if previousFoldState was OPENED`() {
+    fun `computeFoldState returns CLOSED on outer outer display even if previousFoldState was OPENED`() {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
 
@@ -269,7 +269,7 @@ class FoldStateMonitorTest {
     @Test
     @Config(qualifiers = "w360dp-h880dp-xxhdpi")
     fun `a folding feature marks a phone-sized window as the inner display (clamshell)`() {
-        // A flip phone's inner panel is 1080 px wide like a book foldable's cover screen, so only
+        // A flip phone's inner panel is 1080 px wide like a book foldable's outer screen, so only
         // the hinge can tell them apart.
         val activity = Robolectric.buildActivity(Activity::class.java).get()
         val monitor = FoldStateMonitor()

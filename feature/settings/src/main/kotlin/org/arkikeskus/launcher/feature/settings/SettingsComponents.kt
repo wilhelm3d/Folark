@@ -178,7 +178,7 @@ fun ExpressiveSwitchRow(
         modifier = modifier
             .searchFocus(title)
             .fillMaxWidth()
-            // The whole row toggles, not just the small switch — easier to hit on a cover screen.
+            // The whole row toggles, not just the small switch — easier to hit on a outer screen.
             .clip(RoundedCornerShape(14.dp))
             .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(vertical = 4.dp),
@@ -535,7 +535,7 @@ fun <T> ExpressiveSegmentedControl(
         }
 
         // Up to three options sit in one row; more wrap into rows of two, because four labels in a
-        // single row do not fit a narrow cover screen (they wrapped mid-word).
+        // single row do not fit a narrow outer screen (they wrapped mid-word).
         val rows = if (options.size <= 3) listOf(options) else options.chunked(2)
         Surface(
             color = palette.bg,

@@ -94,7 +94,7 @@ object RootShell {
     /** One open `su` shell: its input, and everything it prints collected by a reader thread. */
     private class Session(private val process: Process) {
         private val input: OutputStream = process.outputStream
-        private val buffer = ByteArrayOutputStream()
+        private val buffer = Output()
         private val signal = Object()
         @Volatile var alive = true
             private set
@@ -143,16 +143,19 @@ object RootShell {
             val deadline = System.currentTimeMillis() + timeoutMs
             synchronized(signal) {
                 while (true) {
-                    val bytes = buffer.toByteArray()
-                    val at = lastIndexOf(bytes, needle)
+                    // Looks only at the end of what has come in (no copy of a big output per chunk).
+                    val bytes = buffer.raw()
+                    val size = buffer.size()
+                    val at = lastIndexOf(bytes, size, needle)
                     if (at >= 0) {
                         var end = at + needle.size
-                        while (end < bytes.size && bytes[end] != NEWLINE) end++
-                        if (end < bytes.size) {
+                        while (end < size && bytes[end] != NEWLINE) end++
+                        if (end < size) {
                             val code = String(bytes, at + needle.size, end - at - needle.size).trim().toIntOrNull()
-                            buffer.reset()
                             // The output, without the blank line echoed before the marker.
-                            return if (code == 0) bytes.copyOfRange(0, at) else null
+                            val out = if (code == 0) bytes.copyOfRange(0, at) else null
+                            buffer.reset()
+                            return out
                         }
                     }
                     if (!alive) return null
@@ -177,10 +180,10 @@ object RootShell {
                 Session(ProcessBuilder("su").redirectErrorStream(false).start())
             }.getOrNull()
 
-            private fun lastIndexOf(bytes: ByteArray, needle: ByteArray): Int {
+            private fun lastIndexOf(bytes: ByteArray, size: Int, needle: ByteArray): Int {
                 // The marker is at the very end: look back from there only.
-                val from = bytes.size - needle.size
-                val stop = maxOf(0, bytes.size - needle.size - MARKER_TAIL)
+                val from = size - needle.size
+                val stop = maxOf(0, size - needle.size - MARKER_TAIL)
                 var i = from
                 while (i >= stop) {
                     var match = true
@@ -194,6 +197,11 @@ object RootShell {
             private const val MARKER_TAIL = 32
             private const val NEWLINE = '\n'.code.toByte()
         }
+    }
+
+    /** The shell's output so far; [raw] is the live array (valid up to [size]), not a copy. */
+    private class Output : ByteArrayOutputStream(64 * 1024) {
+        fun raw(): ByteArray = buf
     }
 
     private object NullOutput : OutputStream() {

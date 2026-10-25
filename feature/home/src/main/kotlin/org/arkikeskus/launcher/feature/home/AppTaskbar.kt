@@ -128,6 +128,8 @@ private data class TaskbarSetup(
     val liveEnabled: Boolean,
     val liveEffect: String,
     val liveExpand: Boolean,
+    /** Leave out what Android shows as a status-bar chip (calls, Live updates). */
+    val liveSkipChips: Boolean,
     val nudgeEnabled: Boolean,
     val nudgeEffect: String,
     val nudgeSoftness: Float,
@@ -222,6 +224,12 @@ internal class AppTaskbar(private val context: Context) {
 
     /** What is going on now (timers, navigation, downloads), and the pill showing it. */
     private var live: List<LiveActivity> = emptyList()
+    /** All of them, before leaving out the ones Android shows as status-bar chips. */
+    private var liveAll: List<LiveActivity> = emptyList()
+
+    /** The bar sits over apps, where Android's status bar (and its chips) shows. */
+    private fun liveShown(all: List<LiveActivity>): List<LiveActivity> =
+        if (setup?.liveSkipChips == true) all.filterNot { it.systemChip } else all
     private var livePill: TaskbarLivePill? = null
     private var liveIndex = 0
     private val SPACE_GAP_DP = 6
@@ -322,6 +330,7 @@ internal class AppTaskbar(private val context: Context) {
                     liveEnabled = s.live.activities && s.live.activitiesTaskbar,
                     liveEffect = s.live.activityEffect,
                     liveExpand = s.live.expandOnLongPress,
+                    liveSkipChips = s.live.skipSystemChips,
                     nudgeEnabled = s.icons.nudge && s.icons.nudgeTaskbar,
                     nudgeEffect = s.icons.nudgeEffect,
                     nudgeSoftness = s.icons.nudgeSoftness,
@@ -337,6 +346,7 @@ internal class AppTaskbar(private val context: Context) {
                     iconCache.clear()
                 }
                 setup = next
+                if (previous?.liveSkipChips != next.liveSkipChips) live = liveShown(liveAll)
                 // Per-app rules need to know which app is in front: only then is the service told.
                 // ...and so does handing Android's Recents over to Folark Recents.
                 LockAccessibilityService.replaceSystemRecents = next.replaceRecents
@@ -363,7 +373,9 @@ internal class AppTaskbar(private val context: Context) {
         }
         // Live activities: the pill follows them; it appears or goes with a rebuild of the bar.
         scope.launch {
-            entry.notificationBadgeRepository().live.collect { next ->
+            entry.notificationBadgeRepository().live.collect { all ->
+                liveAll = all
+                val next = liveShown(all)
                 val had = live.isNotEmpty()
                 live = next
                 val pill = livePill

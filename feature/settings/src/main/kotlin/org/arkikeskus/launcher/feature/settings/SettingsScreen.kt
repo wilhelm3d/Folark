@@ -226,7 +226,7 @@ fun SettingsScreen(
 ) {
     // The display profile being edited. It follows the display the settings are open on (and snaps
     // back to it when the phone is folded/unfolded), but either profile can be picked by hand, so
-    // the inner screen can be set up from the cover screen and vice versa. `screenType` stays the
+    // the inner screen can be set up from the outer screen and vice versa. `screenType` stays the
     // PHYSICAL display: it alone decides the layout (two-pane vs. phone) and the settings UI scale.
     var editingProfile by rememberSaveable { mutableStateOf<ScreenType?>(null) }
     LaunchedEffect(screenType) { editingProfile = null }
@@ -494,7 +494,7 @@ fun SettingsScreen(
                         }
                     }
                 } else {
-                    // Single-column layout for narrow windows: cover screens and flip-phone inner screens
+                    // Single-column layout for narrow windows: outer screens and flip-phone inner screens
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -2244,7 +2244,7 @@ private fun DockAndTaskbarSection(
         ExpressiveRowDivider()
 
         DockPreview(opacity = s.dock.backgroundOpacity, icon = previewIcon)
-        // Dock alignment only exists on the wide inner screen; the cover screen's dock is full width.
+        // Dock alignment only exists on the wide inner screen; the outer screen's dock is full width.
         if (screenType == ScreenType.INNER) {
             ExpressiveRowDivider()
             ExpressiveSegmentedControl(

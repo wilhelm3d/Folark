@@ -92,6 +92,7 @@ internal object SplitThreeHook {
             log("three-app split: can't listen: $it")
             return
         }
+        log("three-app split: ready (split screen found)")
         // Tell Folark the three-app split can be asked for (shown in its settings).
         Thread {
             runCatching {

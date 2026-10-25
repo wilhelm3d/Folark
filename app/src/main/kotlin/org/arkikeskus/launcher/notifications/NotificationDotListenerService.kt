@@ -764,6 +764,8 @@ class NotificationDotListenerService : NotificationListenerService() {
             subText = extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.takeIf { it.isNotBlank() },
             bigText = extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.takeIf { it.isNotBlank() },
             actions = liveActions(n),
+            // Android draws its own chip for these: a promoted Live update, or an ongoing call.
+            systemChip = promoted || (category == Notification.CATEGORY_CALL && ongoing),
         )
     }
 

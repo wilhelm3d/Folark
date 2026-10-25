@@ -95,9 +95,9 @@ class FoldStateMonitor @Inject constructor() {
      * Computes the [FoldState] from the [foldingFeature] and the window metrics of [activity].
      *
      * A reported [FoldingFeature] is the authoritative signal for the inner display: only the
-     * folding panel has a hinge, the cover screen never reports one. That is what makes clamshell
+     * folding panel has a hinge, the outer screen never reports one. That is what makes clamshell
      * devices work — their inner panel is an ordinary tall phone screen (e.g. 1080 px wide) that no
-     * size threshold can tell apart from a book foldable's cover screen. The size check stays as the
+     * size threshold can tell apart from a book foldable's outer screen. The size check stays as the
      * fallback for the first frame (before the first layout info arrives) and for devices that
      * report no folding feature at all.
      */
@@ -126,7 +126,7 @@ class FoldStateMonitor @Inject constructor() {
             return FoldState.CLOSED
         }
 
-        // 3. Fallback for static displays (tablets vs phone cover screens) when no folding feature exists
+        // 3. Fallback for static displays (tablets vs phone outer screens) when no folding feature exists
         val isInner = if (activity != null) isInnerDisplay(activity) else false
         val result = if (isInner) FoldState.OPENED else FoldState.CLOSED
 

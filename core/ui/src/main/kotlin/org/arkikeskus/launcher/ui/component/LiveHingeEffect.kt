@@ -41,7 +41,7 @@ fun Modifier.liveHingeEffect(progress: () -> Float, style: String, blurDp: Float
         val e = 1f - t
         when (style) {
             LauncherSettings.LIVE_HINGE_STYLE_DROP -> {
-                // Falls in from above, as if dropping from the cover screen onto the inner one.
+                // Falls in from above, as if dropping from the outer screen onto the inner one.
                 cameraDistance = 16f * density
                 translationY = -e * e * size.height * 0.6f
                 rotationX = e * 16f

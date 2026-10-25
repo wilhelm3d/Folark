@@ -310,6 +310,7 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_live_activities, R.string.settings_live_activities_desc, SettingsCategory.NOTIFICATIONS),
     SettingsSearchEntry(R.string.settings_live_activities_taskbar, 0, SettingsCategory.NOTIFICATIONS),
     SettingsSearchEntry(R.string.settings_live_expand, R.string.settings_live_expand_desc, SettingsCategory.NOTIFICATIONS),
+    SettingsSearchEntry(R.string.settings_live_skip_chips, R.string.settings_live_skip_chips_desc, SettingsCategory.NOTIFICATIONS),
     SettingsSearchEntry(R.string.settings_live_effect, 0, SettingsCategory.NOTIFICATIONS),
     SettingsSearchEntry(R.string.settings_scope_both, 0, SettingsCategory.NOTIFICATIONS),
     SettingsSearchEntry(R.string.settings_icon_nudge_preview, 0, SettingsCategory.NOTIFICATIONS),

@@ -57,7 +57,7 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         if (!s.recents.enabled) return@ExpressiveCategoryContainer
         ExpressiveRowDivider()
 
-        // A look of its own on the cover screen: the rows below then edit the screen picked here.
+        // A look of its own on the outer screen: the rows below then edit the screen picked here.
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_outer_look),
             subtitle = stringResource(R.string.settings_recents_outer_look_desc),

@@ -22,6 +22,10 @@ private val ACTIONS = listOf(
     LauncherSettings.RECENTS_ACTION_PIN to R.string.settings_recents_action_pin,
     LauncherSettings.RECENTS_ACTION_INFO to R.string.settings_recents_action_info,
     LauncherSettings.RECENTS_ACTION_OPEN to R.string.settings_recents_action_open,
+    LauncherSettings.RECENTS_ACTION_PEEK to R.string.settings_recents_action_peek,
+    LauncherSettings.RECENTS_ACTION_SPLIT3 to R.string.settings_recents_action_split3,
+    LauncherSettings.RECENTS_ACTION_CLOSE_OTHERS to R.string.settings_recents_action_close_others,
+    LauncherSettings.RECENTS_ACTION_CLOSE_ALL to R.string.settings_recents_action_close_all,
 )
 
 /**
@@ -59,11 +63,15 @@ internal fun RecentsButtonRows(s: LauncherSettings, viewModel: SettingsViewModel
         onCheckedChange = viewModel::setRecentsOuterGestures,
     )
     ExpressiveRowDivider()
-    // With the cover screen's own set, this first set is the unfolded screen's.
+    // With the outer screen's own set, this first set is the unfolded screen's.
     if (s.recents.outerGestures) ScreenHeading(R.string.settings_recents_gestures_inner)
     GesturePicker(R.string.settings_recents_gesture_swipe_up, s.recents.swipeUpAction, viewModel::setRecentsSwipeUpAction)
     ExpressiveRowDivider()
     GesturePicker(R.string.settings_recents_gesture_swipe_down, s.recents.swipeDownAction, viewModel::setRecentsSwipeDownAction)
+    ExpressiveRowDivider()
+    GesturePicker(R.string.settings_recents_gesture_swipe_left, s.recents.swipeLeftAction, viewModel::setRecentsSwipeLeftAction)
+    ExpressiveRowDivider()
+    GesturePicker(R.string.settings_recents_gesture_swipe_right, s.recents.swipeRightAction, viewModel::setRecentsSwipeRightAction)
     ExpressiveRowDivider()
     GesturePicker(R.string.settings_recents_gesture_long_press, s.recents.longPressAction, viewModel::setRecentsLongPressAction)
     ExpressiveRowDivider()
@@ -75,13 +83,17 @@ internal fun RecentsButtonRows(s: LauncherSettings, viewModel: SettingsViewModel
         ExpressiveRowDivider()
         GesturePicker(R.string.settings_recents_gesture_swipe_down, s.recents.outerSwipeDownAction, viewModel::setRecentsOuterSwipeDownAction)
         ExpressiveRowDivider()
+        GesturePicker(R.string.settings_recents_gesture_swipe_left, s.recents.outerSwipeLeftAction, viewModel::setRecentsOuterSwipeLeftAction)
+        ExpressiveRowDivider()
+        GesturePicker(R.string.settings_recents_gesture_swipe_right, s.recents.outerSwipeRightAction, viewModel::setRecentsOuterSwipeRightAction)
+        ExpressiveRowDivider()
         GesturePicker(R.string.settings_recents_gesture_long_press, s.recents.outerLongPressAction, viewModel::setRecentsOuterLongPressAction)
         ExpressiveRowDivider()
         GesturePicker(R.string.settings_recents_gesture_double_tap, s.recents.outerDoubleTapAction, viewModel::setRecentsOuterDoubleTapAction)
     }
 }
 
-/** "Unfolded screen" / "Cover screen" above a set of gestures. */
+/** "Unfolded screen" / "Outer screen" above a set of gestures. */
 @Composable
 private fun ScreenHeading(label: Int) {
     Text(

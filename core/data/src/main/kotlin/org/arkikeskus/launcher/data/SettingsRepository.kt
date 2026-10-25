@@ -413,6 +413,7 @@ class SettingsRepository @Inject constructor(
                 activities = p[Keys.LIVE_ACTIVITIES] ?: true,
                 activitiesTaskbar = p[Keys.LIVE_ACTIVITIES_TASKBAR] ?: true,
                 expandOnLongPress = p[Keys.LIVE_EXPAND] ?: true,
+                skipSystemChips = p[Keys.LIVE_SKIP_SYSTEM_CHIPS] ?: true,
                 activityEffect = (p[Keys.LIVE_ACTIVITY_EFFECT] ?: LauncherSettings.LIVE_EFFECT_GLOW)
                     .let { if (it in LauncherSettings.LIVE_EFFECTS) it else LauncherSettings.LIVE_EFFECT_GLOW },
             ),
@@ -608,6 +609,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setLiveActivities(value: Boolean) = edit { it[Keys.LIVE_ACTIVITIES] = value }
     suspend fun setLiveActivitiesTaskbar(value: Boolean) = edit { it[Keys.LIVE_ACTIVITIES_TASKBAR] = value }
     suspend fun setLiveExpand(value: Boolean) = edit { it[Keys.LIVE_EXPAND] = value }
+    suspend fun setLiveSkipSystemChips(value: Boolean) = edit { it[Keys.LIVE_SKIP_SYSTEM_CHIPS] = value }
     suspend fun setLiveActivityEffect(value: String) = edit { it[Keys.LIVE_ACTIVITY_EFFECT] = value }
     suspend fun setSearchActions(value: Boolean) = edit { it[Keys.SEARCH_ACTIONS] = value }
     suspend fun setRecentsEnabled(value: Boolean) = edit { it[Keys.RECENTS_ENABLED] = value }
@@ -661,11 +663,15 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsBtnCloseAll(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_CLOSE_ALL else Keys.RECENTS_BTN_CLOSE_ALL] = value }
     suspend fun setRecentsSwipeUpAction(value: String) = edit { it[Keys.RECENTS_SWIPE_UP] = value }
     suspend fun setRecentsSwipeDownAction(value: String) = edit { it[Keys.RECENTS_SWIPE_DOWN] = value }
+    suspend fun setRecentsSwipeLeftAction(value: String) = edit { it[Keys.RECENTS_SWIPE_LEFT] = value }
+    suspend fun setRecentsSwipeRightAction(value: String) = edit { it[Keys.RECENTS_SWIPE_RIGHT] = value }
     suspend fun setRecentsLongPressAction(value: String) = edit { it[Keys.RECENTS_LONG_PRESS] = value }
     suspend fun setRecentsDoubleTapAction(value: String) = edit { it[Keys.RECENTS_DOUBLE_TAP] = value }
     suspend fun setRecentsOuterGestures(value: Boolean) = edit { it[Keys.RECENTS_OUTER_GESTURES] = value }
     suspend fun setRecentsOuterSwipeUpAction(value: String) = edit { it[Keys.RECENTS_OUTER_SWIPE_UP] = value }
     suspend fun setRecentsOuterSwipeDownAction(value: String) = edit { it[Keys.RECENTS_OUTER_SWIPE_DOWN] = value }
+    suspend fun setRecentsOuterSwipeLeftAction(value: String) = edit { it[Keys.RECENTS_OUTER_SWIPE_LEFT] = value }
+    suspend fun setRecentsOuterSwipeRightAction(value: String) = edit { it[Keys.RECENTS_OUTER_SWIPE_RIGHT] = value }
     suspend fun setRecentsOuterLongPressAction(value: String) = edit { it[Keys.RECENTS_OUTER_LONG_PRESS] = value }
     suspend fun setRecentsOuterDoubleTapAction(value: String) = edit { it[Keys.RECENTS_OUTER_DOUBLE_TAP] = value }
 
@@ -732,11 +738,15 @@ class SettingsRepository @Inject constructor(
         btnCloseAll = p[Keys.RECENTS_BTN_CLOSE_ALL] ?: true,
         swipeUpAction = recentsAction(p[Keys.RECENTS_SWIPE_UP], LauncherSettings.RECENTS_ACTION_CLOSE),
         swipeDownAction = recentsAction(p[Keys.RECENTS_SWIPE_DOWN], LauncherSettings.RECENTS_ACTION_NONE),
+        swipeLeftAction = recentsAction(p[Keys.RECENTS_SWIPE_LEFT], LauncherSettings.RECENTS_ACTION_CLOSE),
+        swipeRightAction = recentsAction(p[Keys.RECENTS_SWIPE_RIGHT], LauncherSettings.RECENTS_ACTION_CLOSE),
         longPressAction = recentsAction(p[Keys.RECENTS_LONG_PRESS], LauncherSettings.RECENTS_ACTION_MENU),
         doubleTapAction = recentsAction(p[Keys.RECENTS_DOUBLE_TAP], LauncherSettings.RECENTS_ACTION_SPLIT),
         outerGestures = p[Keys.RECENTS_OUTER_GESTURES] ?: true,
         outerSwipeUpAction = recentsAction(p[Keys.RECENTS_OUTER_SWIPE_UP], LauncherSettings.RECENTS_ACTION_CLOSE),
         outerSwipeDownAction = recentsAction(p[Keys.RECENTS_OUTER_SWIPE_DOWN], LauncherSettings.RECENTS_ACTION_OPEN),
+        outerSwipeLeftAction = recentsAction(p[Keys.RECENTS_OUTER_SWIPE_LEFT], LauncherSettings.RECENTS_ACTION_CLOSE),
+        outerSwipeRightAction = recentsAction(p[Keys.RECENTS_OUTER_SWIPE_RIGHT], LauncherSettings.RECENTS_ACTION_CLOSE),
         outerLongPressAction = recentsAction(p[Keys.RECENTS_OUTER_LONG_PRESS], LauncherSettings.RECENTS_ACTION_MENU),
         outerDoubleTapAction = recentsAction(p[Keys.RECENTS_OUTER_DOUBLE_TAP], LauncherSettings.RECENTS_ACTION_POPUP),
         pinned = lines(p[Keys.RECENTS_PINNED]),
@@ -748,7 +758,7 @@ class SettingsRepository @Inject constructor(
             .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
     )
 
-    /** [p] with every Recents look setting the cover screen has its own value for replaced by it. */
+    /** [p] with every Recents look setting the outer screen has its own value for replaced by it. */
     @Suppress("UNCHECKED_CAST")
     private fun coverLook(p: Preferences): Preferences = p.toMutablePreferences().apply {
         Keys.RECENTS_LOOK_KEYS.forEach { (unfolded, cover) ->
@@ -1481,6 +1491,7 @@ class SettingsRepository @Inject constructor(
         val LIVE_ACTIVITIES = booleanPreferencesKey("live_activities")
         val LIVE_ACTIVITIES_TASKBAR = booleanPreferencesKey("live_activities_taskbar")
         val LIVE_EXPAND = booleanPreferencesKey("live_expand")
+        val LIVE_SKIP_SYSTEM_CHIPS = booleanPreferencesKey("live_skip_system_chips")
         val LIVE_ACTIVITY_EFFECT = stringPreferencesKey("live_activity_effect")
         val SEARCH_ACTIONS = booleanPreferencesKey("search_actions")
         val RECENTS_ENABLED = booleanPreferencesKey("recents_enabled")
@@ -1543,13 +1554,17 @@ class SettingsRepository @Inject constructor(
         val RECENTS_BTN_CLOSE_ALL = booleanPreferencesKey("recents_btn_close_all")
         val RECENTS_OUTER_BTN_CLOSE_ALL = booleanPreferencesKey("recents_outer_btn_close_all")
         val RECENTS_SWIPE_UP = stringPreferencesKey("recents_swipe_up")
+        val RECENTS_SWIPE_LEFT = stringPreferencesKey("recents_swipe_left")
+        val RECENTS_SWIPE_RIGHT = stringPreferencesKey("recents_swipe_right")
+        val RECENTS_OUTER_SWIPE_LEFT = stringPreferencesKey("recents_outer_swipe_left")
+        val RECENTS_OUTER_SWIPE_RIGHT = stringPreferencesKey("recents_outer_swipe_right")
         val RECENTS_SWIPE_DOWN = stringPreferencesKey("recents_swipe_down")
         val RECENTS_LONG_PRESS = stringPreferencesKey("recents_long_press")
         val RECENTS_DOUBLE_TAP = stringPreferencesKey("recents_double_tap")
         val RECENTS_OUTER_GESTURES = booleanPreferencesKey("recents_outer_gestures")
         val RECENTS_OUTER_LOOK = booleanPreferencesKey("recents_outer_look")
 
-        /** Each Recents look setting with its cover-screen key (Settings ▸ Recents ▸ Own look on the cover screen). */
+        /** Each Recents look setting with its cover-screen key (Settings ▸ Recents ▸ Own look on the outer screen). */
         val RECENTS_LOOK_KEYS: List<Pair<Preferences.Key<*>, Preferences.Key<*>>> by lazy {
             listOf(
                 RECENTS_THEME to RECENTS_OUTER_THEME,

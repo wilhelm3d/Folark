@@ -38,6 +38,9 @@ data class LiveActivity(
     val subText: String? = null,
     val bigText: String? = null,
     val actions: List<Action> = emptyList(),
+    /** Android itself shows this as a chip in the status bar, next to the clock: an Android 16+
+     *  Live update (promoted ongoing) or an ongoing call. */
+    val systemChip: Boolean = false,
 ) {
     /** One of the notification's buttons: its label and what it does. */
     class Action(val title: String, val intent: PendingIntent)
@@ -46,7 +49,7 @@ data class LiveActivity(
     private val fingerprint: List<Any?>
         get() = listOf(key, packageName, userSerial, color, title, text, critical, chronometerBase, countDown,
             progress, indeterminate, category, postTime, contentIntent != null, icon != null,
-            appLabel, subText, bigText, actions.map { it.title })
+            appLabel, subText, bigText, actions.map { it.title }, systemChip)
 
     override fun equals(other: Any?): Boolean = other is LiveActivity && fingerprint == other.fingerprint
     override fun hashCode(): Int = fingerprint.hashCode()

@@ -15,7 +15,7 @@ object MotoLinks {
     const val WEATHER = "com.motorola.commandcenter.action.START_WEATHER_APPLICATION"
     /** Moto Styles: colours, fonts, icon shape and grid for the whole phone. */
     const val STYLES = "com.motorola.personalize.action.STYLES"
-    /** Wallpaper picker for the second display (a flip's or fold's cover screen). */
+    /** Wallpaper picker for the second display (a flip's or fold's outer screen). */
     const val SECOND_SCREEN_WALLPAPER = "com.motorola.intent.action.SET_SECONDARY_WALLPAPER"
     /** Clock faces for the second display. */
     const val SECOND_SCREEN_CLOCK = "com.motorola.intent.action.SECONDARY_CLOCKFACE_PICKER"

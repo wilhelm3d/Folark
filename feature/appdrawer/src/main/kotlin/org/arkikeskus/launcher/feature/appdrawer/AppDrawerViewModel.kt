@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -157,7 +156,8 @@ class AppDrawerViewModel @Inject constructor(
         query.debounce { if (it.isBlank()) 0L else 200L }, // contacts hit ContentResolver; avoid per-keystroke
         appRepository.apps,                                 // install/uninstall/rename re-runs a live query
     ) { q, _ -> q }
-        .mapLatest { it to searchAggregator.search(it) }    // mapLatest cancels the previous run
+        // flatMapLatest cancels the previous run; results arrive as each provider answers.
+        .flatMapLatest { q -> searchAggregator.results(q).map { q to it } }
 
     val uiState: StateFlow<AppDrawerUiState> = _screenType.flatMapLatest { screenType -> combine(
         appRepository.apps,

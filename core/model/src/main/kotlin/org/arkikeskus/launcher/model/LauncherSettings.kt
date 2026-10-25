@@ -464,6 +464,9 @@ data class LauncherSettings(
         val activityEffect: String = LIVE_EFFECT_GLOW,
         /** A long press opens the pill up (full progress, its buttons); off: it shows the next one. */
         val expandOnLongPress: Boolean = true,
+        /** Leaves out what Android already shows as a chip in its status bar (calls, Live
+         *  updates) while that status bar is showing, so it isn't there twice. */
+        val skipSystemChips: Boolean = true,
         /** An app's long-press menu lists its current notifications (both displays). */
         val popupNotifications: Boolean = true,
     )
@@ -480,7 +483,7 @@ data class LauncherSettings(
         /** Vector module in the system launcher: a long press on the gesture handle opens Folark's
          *  search instead of Android's assistant / Circle to Search. */
         val navHandleOpensSearch: Boolean = false,
-        /** Cards per row on the inner screen and on the cover screen. */
+        /** Cards per row on the inner screen and on the outer screen. */
         val columnsInner: Int = 4,
         val columnsOuter: Int = 1,
         /** The most cards shown. */
@@ -534,23 +537,29 @@ data class LauncherSettings(
         val btnUnsplit: Boolean = true,
         val btnSplitView: Boolean = true,
         val btnCloseAll: Boolean = true,
-        /** What a gesture on a Recents card does: one of RECENTS_ACTION_*. Swipes are sideways in the
-         *  Compact list (left = up, right = down). */
+        /** What a gesture on a Recents card does: one of RECENTS_ACTION_*. Swipes left / right
+         *  (fling the card off the side of the screen) in the looks that scroll up and down
+         *  (Folark, Compact, Stack, Bento, Switcher); swipes up / down in every look but Compact
+         *  and Stack (where up and down scroll). */
         val swipeUpAction: String = RECENTS_ACTION_CLOSE,
         val swipeDownAction: String = RECENTS_ACTION_NONE,
+        val swipeLeftAction: String = RECENTS_ACTION_CLOSE,
+        val swipeRightAction: String = RECENTS_ACTION_CLOSE,
         val longPressAction: String = RECENTS_ACTION_MENU,
         val doubleTapAction: String = RECENTS_ACTION_SPLIT,
-        /** The cover screen has its own gestures (below); off: the ones above work on both screens.
+        /** The outer screen has its own gestures (below); off: the ones above work on both screens.
          *  Made for one hand on the small screen: pull a card down to open it, double tap for a
          *  pop-up window (split screen rarely fits there). */
         val outerGestures: Boolean = true,
         val outerSwipeUpAction: String = RECENTS_ACTION_CLOSE,
         val outerSwipeDownAction: String = RECENTS_ACTION_OPEN,
+        val outerSwipeLeftAction: String = RECENTS_ACTION_CLOSE,
+        val outerSwipeRightAction: String = RECENTS_ACTION_CLOSE,
         val outerLongPressAction: String = RECENTS_ACTION_MENU,
         val outerDoubleTapAction: String = RECENTS_ACTION_POPUP,
-        /** The cover screen has a Recents look of its own: [outerLook] is these settings with the
-         *  cover screen's theme, cards, glass, buttons and animations (each one the unfolded
-         *  screen's until changed for the cover screen). */
+        /** The outer screen has a Recents look of its own: [outerLook] is these settings with the
+         *  outer screen's theme, cards, glass, buttons and animations (each one the unfolded
+         *  screen's until changed for the outer screen). */
         val outerLookEnabled: Boolean = false,
         val outerLook: Recents? = null,
         /** Pinned apps ("package/user"): first in Recents, never closed by Close all; with root and
@@ -805,9 +814,18 @@ data class LauncherSettings(
         const val RECENTS_ACTION_PIN = "pin"
         /** A menu on the card: split screen, freeform, lock, close. */
         const val RECENTS_ACTION_MENU = "menu"
+        /** Peek view: one app big, another peeking in from the edge (on a split card: that split). */
+        const val RECENTS_ACTION_PEEK = "peek"
+        /** Split 3 apps: pick two more (needs the three-app split switch and the SystemUI hook). */
+        const val RECENTS_ACTION_SPLIT3 = "split3"
+        /** Closes every other unpinned app (needs root, like Close). */
+        const val RECENTS_ACTION_CLOSE_OTHERS = "close_others"
+        /** Same as the Close all button. */
+        const val RECENTS_ACTION_CLOSE_ALL = "close_all"
         val RECENTS_ACTIONS = listOf(
             RECENTS_ACTION_NONE, RECENTS_ACTION_MENU, RECENTS_ACTION_CLOSE, RECENTS_ACTION_SPLIT, RECENTS_ACTION_POPUP,
             RECENTS_ACTION_UNSPLIT, RECENTS_ACTION_PIN, RECENTS_ACTION_INFO, RECENTS_ACTION_OPEN,
+            RECENTS_ACTION_PEEK, RECENTS_ACTION_SPLIT3, RECENTS_ACTION_CLOSE_OTHERS, RECENTS_ACTION_CLOSE_ALL,
         )
         const val RECENTS_ATTACHED_LEFT = "left"
         const val RECENTS_ATTACHED_RIGHT = "right"
@@ -1058,7 +1076,7 @@ data class LauncherSettings(
         const val LIVE_HINGE_STYLE_INK = "ink"
         /** Out of black. */
         const val LIVE_HINGE_STYLE_FADE = "fade"
-        /** Falling in from above, as if dropping off the cover screen. */
+        /** Falling in from above, as if dropping off the outer screen. */
         const val LIVE_HINGE_STYLE_DROP = "drop"
         /** Two halves sliding in to meet at the hinge. */
         const val LIVE_HINGE_STYLE_DOORS = "doors"

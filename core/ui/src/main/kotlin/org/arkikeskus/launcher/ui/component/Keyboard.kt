@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.LocalView
 
 /**
  * Whether the keyboard is really on screen, as Android tells the window. Compose's own keyboard
- * inset can stay behind after the keyboard is closed (seen on the cover screen: the search bar
+ * inset can stay behind after the keyboard is closed (seen on the outer screen: the search bar
  * stayed up with an empty gap below), so this asks the window itself, again on every layout.
  */
 @Composable
