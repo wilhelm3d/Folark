@@ -121,7 +121,9 @@ private val EDGE_TO_EDGE_THEMES = setOf(
     LauncherSettings.RECENTS_THEME_CAROUSEL,
     LauncherSettings.RECENTS_THEME_DECK,
     LauncherSettings.RECENTS_THEME_ARC,
-    LauncherSettings.RECENTS_THEME_FILMSTRIP,
+    LauncherSettings.RECENTS_THEME_PORTRAIT,
+    LauncherSettings.RECENTS_THEME_SPOTLIGHT,
+    LauncherSettings.RECENTS_THEME_GALLERY,
 )
 
 /** Everything a Recents theme needs to draw its cards and answer touches. */
@@ -169,6 +171,10 @@ internal class RecentsEnv(
     val doubleTapAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerDoubleTapAction else it.doubleTapAction }
     /** Borderless cards (Settings ▸ Recents ▸ Card layout). */
     val overlay: Boolean get() = settings.recents.cardLayout == LauncherSettings.RECENTS_CARD_OVERLAY
+    /** The app icon on each card, a card shadow, and the label size (Settings ▸ Recents). */
+    val cardIcons: Boolean get() = settings.recents.cardIcons
+    val cardShadow: Boolean get() = settings.recents.cardShadow
+    val labelScale: Float get() = settings.recents.labelScale
     fun thumb(taskId: Int): ImageBitmap? = if (settings.recents.thumbnails) thumbnails[taskId] else null
     fun slotLabel(card: RecentsCard): Int? {
         val slot = picked.indexOf(card)
@@ -378,8 +384,9 @@ internal fun RecentsScreen(
                             LauncherSettings.RECENTS_THEME_SWITCHER -> SwitcherTheme(state.cards, env)
                             LauncherSettings.RECENTS_THEME_STACK -> StackTheme(state.cards, env)
                             LauncherSettings.RECENTS_THEME_ARC -> ArcTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_BENTO -> BentoTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_FILMSTRIP -> FilmstripTheme(state.cards, env)
+                            LauncherSettings.RECENTS_THEME_PORTRAIT -> PortraitTheme(state.cards, env)
+                            LauncherSettings.RECENTS_THEME_SPOTLIGHT -> SpotlightTheme(state.cards, env)
+                            LauncherSettings.RECENTS_THEME_GALLERY -> GalleryTheme(state.cards, env)
                             else -> FolarkTheme(state.cards, env, if (wide) settings.recents.columnsInner else settings.recents.columnsOuter)
                         }
                     }

@@ -214,7 +214,27 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 onCheckedChange = viewModel::setRecentsOverlayLabels,
             )
             ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_recents_card_icons),
+                checked = s.recents.cardIcons,
+                onCheckedChange = viewModel::setRecentsCardIcons,
+            )
+            ExpressiveRowDivider()
         }
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_card_shadow),
+            checked = s.recents.cardShadow,
+            onCheckedChange = viewModel::setRecentsCardShadow,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSliderRow(
+            title = stringResource(R.string.settings_recents_label_size),
+            value = s.recents.labelScale,
+            onValueChange = viewModel::setRecentsLabelScale,
+            valueRange = LauncherSettings.MIN_RECENTS_LABEL_SCALE..LauncherSettings.MAX_RECENTS_LABEL_SCALE,
+            valueDisplay = "${(s.recents.labelScale * 100).roundToInt()} %",
+        )
+        ExpressiveRowDivider()
 
         // ---------------------------------------------------------------- buttons and gestures
         RecentsButtonRows(s, viewModel)

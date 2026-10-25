@@ -241,6 +241,12 @@ internal object Keys {
     val RECENTS_DRAG_DROP = booleanPreferencesKey("recents_drag_drop")
     val RECENTS_OVERLAY_LABELS = booleanPreferencesKey("recents_overlay_labels")
     val RECENTS_OUTER_OVERLAY_LABELS = booleanPreferencesKey("recents_outer_overlay_labels")
+    val RECENTS_CARD_ICONS = booleanPreferencesKey("recents_card_icons")
+    val RECENTS_OUTER_CARD_ICONS = booleanPreferencesKey("recents_outer_card_icons")
+    val RECENTS_CARD_SHADOW = booleanPreferencesKey("recents_card_shadow")
+    val RECENTS_OUTER_CARD_SHADOW = booleanPreferencesKey("recents_outer_card_shadow")
+    val RECENTS_LABEL_SCALE = floatPreferencesKey("recents_label_scale")
+    val RECENTS_OUTER_LABEL_SCALE = floatPreferencesKey("recents_outer_label_scale")
     val RECENTS_MENU_MOTION = booleanPreferencesKey("recents_menu_motion")
     val RECENTS_OUTER_MENU_MOTION = booleanPreferencesKey("recents_outer_menu_motion")
     val RECENTS_BTN_CLOSE = booleanPreferencesKey("recents_btn_close")
@@ -272,6 +278,9 @@ internal object Keys {
             RECENTS_THEME to RECENTS_OUTER_THEME,
             RECENTS_CARD_LAYOUT to RECENTS_OUTER_CARD_LAYOUT,
             RECENTS_OVERLAY_LABELS to RECENTS_OUTER_OVERLAY_LABELS,
+            RECENTS_CARD_ICONS to RECENTS_OUTER_CARD_ICONS,
+            RECENTS_CARD_SHADOW to RECENTS_OUTER_CARD_SHADOW,
+            RECENTS_LABEL_SCALE to RECENTS_OUTER_LABEL_SCALE,
             RECENTS_CARD_HEIGHT to RECENTS_OUTER_CARD_HEIGHT,
             RECENTS_CORNER to RECENTS_OUTER_CORNER,
             RECENTS_BACKDROP to RECENTS_OUTER_BACKDROP,

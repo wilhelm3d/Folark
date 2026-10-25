@@ -383,25 +383,27 @@ internal fun OverlayCard(
                 .graphicsLayer {
                     val k = 1f - 0.05f * pick
                     scaleX = k; scaleY = k
-                    shadowElevation = 14f
+                    shadowElevation = if (env.cardShadow) 14f else 0f
                     this.shape = shape
                     clip = true
                 },
         ) {
             CardPicture(card, env, Modifier.matchParentSize(), env.corner, iconSize = 56.dp)
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .size(124.dp, 76.dp)
-                    .background(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent))),
-            )
-            Row(
-                Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy((-10).dp),
-            ) {
-                card.apps.forEach { app ->
-                    Box(Modifier.graphicsLayer { shadowElevation = 12f; this.shape = CircleShape; clip = false }) {
-                        AppBadge(app, 38.dp)
+            if (env.cardIcons) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .size(124.dp, 76.dp)
+                        .background(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent))),
+                )
+                Row(
+                    Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy((-10).dp),
+                ) {
+                    card.apps.forEach { app ->
+                        Box(Modifier.graphicsLayer { shadowElevation = 12f; this.shape = CircleShape; clip = false }) {
+                            AppBadge(app, 38.dp)
+                        }
                     }
                 }
             }
@@ -436,7 +438,7 @@ internal fun OverlayCard(
             Text(
                 card.label,
                 color = Ink,
-                fontSize = 12.sp,
+                fontSize = 12.sp * env.labelScale,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

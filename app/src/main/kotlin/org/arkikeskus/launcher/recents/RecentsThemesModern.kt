@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,11 +61,12 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /*
- * Four Recents designs made around gestures, all with borderless cards:
+ * Recents designs with borderless cards:
  *  - Stack: a vertical deck, newest at the bottom under your thumb; swipe a card sideways to close.
  *  - Arc: cards on a curve you spin with a flick; flick one up to close.
- *  - Bento: how recently you used an app is its size — a big tile, two medium, then icon tiles.
- *  - Filmstrip: one big picture you swipe through, with a strip of all apps below to scrub.
+ *  - Portrait: tall rounded cards you snap sideways, the icon and name above each.
+ *  - Spotlight: the middle card large and centred, its icon and name above it.
+ *  - Gallery: a row of larger cards, two or three in view, made for the unfolded screen.
  * Every card keeps every gesture from Settings ▸ Recents ▸ Gestures (cardModifier).
  */
 
@@ -171,154 +173,127 @@ internal fun ArcTheme(cards: List<RecentsCard>, env: RecentsEnv) {
     }
 }
 
-// ---------------------------------------------------------------------------- Bento
 
+// ---------------------------------------------------------------------------- Portrait / Spotlight / Gallery
+
+/**
+ * A card with the app's icon and name above it, then its picture (OverlayCard without a label).
+ * Shared by all three card looks. [centered] puts the icon and name in the middle (Spotlight)
+ * rather than at the start (Portrait / Gallery). Honours the icon, shadow and label-size settings.
+ */
 @Composable
-internal fun BentoTheme(cards: List<RecentsCard>, env: RecentsEnv) {
-    val aspect = screenAspect()
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth > 600.dp
-        val columns = if (wide) 6 else 4
-        val gap = 12.dp
-        val tile = (maxWidth - gap * (columns - 1)) / columns
-        val hero = (maxWidth / aspect * 0.5f).coerceIn(160.dp, maxHeight * 0.42f) * env.sizeScale().coerceIn(0.7f, 1.4f)
-        val medium = hero * 0.62f
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
-            horizontalArrangement = Arrangement.spacedBy(gap),
-            verticalArrangement = Arrangement.spacedBy(gap),
-            contentPadding = PaddingValues(bottom = 96.dp),
-        ) {
-            itemsIndexed(
-                cards,
-                key = { _, c -> c.key },
-                span = { i, _ -> GridItemSpan(if (i == 0) maxLineSpan else if (i <= 2) maxLineSpan / 2 else 1) },
-            ) { index, card ->
-                val mod = env.cardModifier(card, index, columns, sideSwipes = true)
-                when {
-                    index == 0 -> OverlayCard(card, env, mod, hero)
-                    index <= 2 -> OverlayCard(card, env, mod, medium, showLabel = false)
-                    else -> BentoTile(card, env, mod, tile * 1.25f)
-                }
-            }
-        }
-    }
-}
-
-/** A small Bento tile: the app's icon big on a dimmed corner of its picture, its name below. */
-@Composable
-private fun BentoTile(card: RecentsCard, env: RecentsEnv, cardModifier: Modifier, height: Dp) {
-    val picked = card in env.picked
-    val pick by animateFloatAsState(if (picked) 1f else 0f, spring(dampingRatio = 0.7f), label = "pick")
-    val shape = RoundedCornerShape(env.corner * 0.8f)
-    Column(cardModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(height)
-                .drawBehind {
-                    if (pick > 0.01f) {
-                        val g = 3.dp.toPx()
-                        drawRoundRect(
-                            env.accent.copy(alpha = pick), Offset(-g, -g), Size(size.width + 2 * g, size.height + 2 * g),
-                            CornerRadius((env.corner * 0.8f).toPx() + g), style = Stroke(2.dp.toPx()),
-                        )
-                    }
-                }
-                .graphicsLayer { val k = 1f - 0.06f * pick; scaleX = k; scaleY = k; this.shape = shape; clip = true; shadowElevation = 10f },
-            contentAlignment = Alignment.Center,
-        ) {
-            CardPicture(card, env, Modifier.fillMaxSize(), env.corner * 0.8f, iconSize = 34.dp)
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.45f)))))
-            Box(Modifier.graphicsLayer { shadowElevation = 12f; this.shape = androidx.compose.foundation.shape.CircleShape; clip = false }) {
-                AppBadge(card.apps.firstOrNull(), 40.dp)
-            }
-        }
-        Text(
-            card.label, color = Ink, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp),
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------- Filmstrip
-
-@Composable
-internal fun FilmstripTheme(cards: List<RecentsCard>, env: RecentsEnv) {
-    if (cards.isEmpty()) return
-    val aspect = screenAspect()
-    val pager = rememberPagerState(pageCount = { cards.size })
-    val strip = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    // The strip follows the big picture: the current app stays in view below.
-    LaunchedEffect(pager.currentPage) { strip.animateScrollToItem((pager.currentPage - 2).coerceAtLeast(0)) }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth > 600.dp
-        val stripHeight = 92.dp
-        val cardWidth = (maxWidth * (if (wide) 0.56f else 0.84f)).coerceAtLeast(180.dp)
-        val bigHeight = (cardWidth / aspect).coerceAtMost(maxHeight - stripHeight - 64.dp).coerceAtLeast(160.dp)
-        val side = (maxWidth - cardWidth) / 2
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            HorizontalPager(
-                state = pager,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = side),
-                pageSpacing = 16.dp,
-                key = { cards[it].key },
-            ) { page ->
-                val card = cards[page]
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Box(
-                        Modifier
-                            .width(cardWidth)
-                            .graphicsLayer {
-                                val off = abs((pager.currentPage - page) + pager.currentPageOffsetFraction).coerceAtMost(1f)
-                                val k = 1f - 0.08f * off
-                                scaleX = k; scaleY = k
-                                alpha = 1f - 0.35f * off
-                            },
-                    ) {
-                        OverlayCard(card, env, env.cardModifier(card, page, 1), bigHeight)
-                    }
-                }
-            }
-            LazyRow(
-                Modifier.fillMaxWidth().height(stripHeight),
-                state = strip,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+private fun SwitcherCard(
+    card: RecentsCard,
+    env: RecentsEnv,
+    index: Int,
+    count: Int,
+    width: Dp,
+    pictureHeight: Dp,
+    iconSize: Dp,
+    centered: Boolean,
+) {
+    val showName = env.settings.recents.overlayLabels
+    Column(
+        Modifier.width(width),
+        horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
+    ) {
+        if (env.cardIcons || showName) {
+            Row(
                 verticalAlignment = Alignment.CenterVertically,
-                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 8.dp, start = 4.dp, end = 4.dp),
             ) {
-                itemsIndexed(cards, key = { _, c -> c.key }) { i, card ->
-                    val current = pager.currentPage == i
-                    val lift by animateFloatAsState(if (current) 1f else 0f, spring(dampingRatio = 0.7f), label = "strip")
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            Modifier
-                                .size(width = 54.dp, height = 70.dp)
-                                .graphicsLayer {
-                                    val k = 0.92f + 0.12f * lift
-                                    scaleX = k; scaleY = k
-                                    alpha = 0.6f + 0.4f * lift
-                                    shape = RoundedCornerShape(12.dp); clip = true
-                                }
-                                .clickable(remember { MutableInteractionSource() }, null) {
-                                    scope.launch { pager.animateScrollToPage(i) }
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CardPicture(card, env, Modifier.fillMaxSize(), 12.dp, iconSize = 26.dp)
-                        }
-                        Box(
-                            Modifier
-                                .padding(top = 6.dp)
-                                .size(width = 18.dp * lift, height = 3.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(env.accent),
-                        )
-                    }
+                if (env.cardIcons) card.apps.forEach { AppBadge(it, iconSize) }
+                if (showName) {
+                    Text(
+                        card.label,
+                        color = Ink,
+                        fontSize = 13.sp * env.labelScale,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
+            }
+        }
+        OverlayCard(card, env, env.cardModifier(card, index, count), pictureHeight, showLabel = false)
+    }
+}
+
+/** Tall rounded cards, snapped sideways, the icon and name above each one. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun PortraitTheme(cards: List<RecentsCard>, env: RecentsEnv) {
+    val aspect = screenAspect()
+    val list = rememberLazyListState()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth > 600.dp
+        val cardWidth = (maxWidth * (if (wide) 0.5f else 0.8f) * env.sizeScale()).coerceIn(200.dp, maxWidth * 0.92f)
+        val pictureHeight = (cardWidth / aspect).coerceAtMost(maxHeight * 0.74f)
+        LazyRow(
+            Modifier.fillMaxSize(),
+            state = list,
+            flingBehavior = rememberSnapFlingBehavior(list),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            contentPadding = PaddingValues(horizontal = (maxWidth - cardWidth) / 2),
+        ) {
+            itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
+                SwitcherCard(card, env, index, cards.size, cardWidth, pictureHeight, 26.dp, centered = false)
             }
         }
     }
 }
+
+/** The middle card large and centred, its icon and name above it; neighbours peek in. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun SpotlightTheme(cards: List<RecentsCard>, env: RecentsEnv) {
+    val aspect = screenAspect()
+    val list = rememberLazyListState()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth > 600.dp
+        val cardWidth = (maxWidth * (if (wide) 0.46f else 0.74f) * env.sizeScale()).coerceIn(190.dp, maxWidth * 0.9f)
+        val pictureHeight = (cardWidth / aspect).coerceAtMost(maxHeight * 0.7f)
+        LazyRow(
+            Modifier.fillMaxSize(),
+            state = list,
+            flingBehavior = rememberSnapFlingBehavior(list),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            contentPadding = PaddingValues(horizontal = (maxWidth - cardWidth) / 2),
+        ) {
+            itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
+                SwitcherCard(card, env, index, cards.size, cardWidth, pictureHeight, 30.dp, centered = true)
+            }
+        }
+    }
+}
+
+/** A row of larger cards, two or three in view, for the unfolded screen. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun GalleryTheme(cards: List<RecentsCard>, env: RecentsEnv) {
+    val aspect = screenAspect()
+    val list = rememberLazyListState()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth > 600.dp
+        val cardWidth = (maxWidth * (if (wide) 0.44f else 0.82f) * env.sizeScale()).coerceIn(220.dp, maxWidth * 0.92f)
+        val pictureHeight = (cardWidth / aspect).coerceAtMost(maxHeight * 0.8f)
+        LazyRow(
+            Modifier.fillMaxSize(),
+            state = list,
+            flingBehavior = rememberSnapFlingBehavior(list),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            contentPadding = PaddingValues(horizontal = edgeMarginWide(wide)),
+        ) {
+            itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
+                SwitcherCard(card, env, index, cards.size, cardWidth, pictureHeight, 28.dp, centered = false)
+            }
+        }
+    }
+}
+
+/** The side margin for the tablet row (a touch wider on the big screen). */
+private fun edgeMarginWide(wide: Boolean): Dp = if (wide) 28.dp else 16.dp

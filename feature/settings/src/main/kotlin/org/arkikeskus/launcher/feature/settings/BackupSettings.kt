@@ -150,6 +150,9 @@ internal fun BackupSection(viewModel: BackupSettingsViewModel = hiltViewModel())
             description = stringResource(R.string.settings_restore_desc),
             onClick = { runCatching { pickBackup.launch(arrayOf(BackupRepository.MIME_TYPE, "application/octet-stream", "*/*")) } },
         )
+        ExpressiveRowDivider()
+
+        SystemUpdatesRow()
 
         message?.let { current ->
             Text(

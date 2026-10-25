@@ -390,6 +390,10 @@
     <!-- Backup & restore -->
     <string name="settings_backup">Backup &amp; restore</string>
     <string name="settings_category_backup_desc">Save everything to a file on your phone, and put it back after a reinstall</string>
+    <string name="settings_system_updates">System updates</string>
+    <string name="settings_system_updates_on_desc">On. Turn off to block Motorola\'s updates with root and hold the kernel your root method needs — you stay on an older security patch until you turn it back on</string>
+    <string name="settings_system_updates_off_desc">Blocked: Motorola can\'t download or install system updates. Turn on to allow them again — an update may remove root. Needs root</string>
+    <string name="settings_system_updates_need_root">Couldn\'t change it — root is needed</string>
     <string name="settings_backup_now">Back up now</string>
     <string name="settings_backup_now_desc">Home screens, dock, folders, widgets and all settings of both displays, in one file you choose where to keep</string>
     <string name="settings_backup_auto">Automatic backup</string>
@@ -818,6 +822,9 @@
     <string name="settings_unlock_sync_active">Active: System UI tells Folark when the lock screen leaves</string>
     <string name="settings_unlock_sync_missing">Not seen yet: add System UI to Folark\'s scope in Vector, then restart System UI or the phone. Until then the old timing is used</string>
     <string name="settings_recents_overlay_labels">App names under the cards</string>
+    <string name="settings_recents_card_icons">App icons on the cards</string>
+    <string name="settings_recents_card_shadow">Card shadow</string>
+    <string name="settings_recents_label_size">Label size</string>
     <string name="settings_recents_menu_motion">Animate the long-press menu</string>
     <string name="settings_recents_menu_motion_desc">It grows from your finger and its rows slide in one by one</string>
     <string name="settings_three_app_split">Real three-app split</string>
@@ -848,8 +855,9 @@
     <string name="settings_unlock_style_focus">Focus</string>
     <string name="settings_recents_theme_stack">Stack</string>
     <string name="settings_recents_theme_arc">Arc</string>
-    <string name="settings_recents_theme_bento">Bento</string>
-    <string name="settings_recents_theme_filmstrip">Filmstrip</string>
+    <string name="settings_recents_theme_portrait">Portrait</string>
+    <string name="settings_recents_theme_spotlight">Spotlight</string>
+    <string name="settings_recents_theme_gallery">Gallery</string>
     <string name="settings_search_found">Settings</string>
     <string name="settings_app_pair_peek">Open as peek view</string>
     <string name="settings_app_pair_peek_desc">The second app peeks in from the edge; tap its strip to swap (needs Folark\'s Vector module in System UI)</string>

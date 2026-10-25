@@ -121,6 +121,9 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_recents_show_time, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_card_layout, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_overlay_labels, 0, SettingsCategory.RECENTS),
+    SettingsSearchEntry(R.string.settings_recents_card_icons, 0, SettingsCategory.RECENTS),
+    SettingsSearchEntry(R.string.settings_recents_card_shadow, 0, SettingsCategory.RECENTS),
+    SettingsSearchEntry(R.string.settings_recents_label_size, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_confirm_close_all, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_third_in_split, R.string.settings_recents_third_in_split_desc, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_three_app_split, 0, SettingsCategory.RECENTS),
@@ -334,5 +337,6 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_restore_confirm_title, 0, SettingsCategory.BACKUP),
     SettingsSearchEntry(R.string.settings_restore_confirm_text, 0, SettingsCategory.BACKUP),
     SettingsSearchEntry(R.string.settings_restore_confirm, 0, SettingsCategory.BACKUP),
+    SettingsSearchEntry(R.string.settings_system_updates, 0, SettingsCategory.BACKUP),
     SettingsSearchEntry(R.string.settings_scope_both, 0, SettingsCategory.BACKUP),
 )

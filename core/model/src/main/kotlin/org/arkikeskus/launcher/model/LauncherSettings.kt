@@ -505,6 +505,12 @@ data class LauncherSettings(
         val cardLayout: String = RECENTS_CARD_OVERLAY,
         /** Borderless cards: the app's name under each card. */
         val overlayLabels: Boolean = true,
+        /** The app's icon floating on each card (overlay card looks). */
+        val cardIcons: Boolean = true,
+        /** A soft drop shadow under each card. */
+        val cardShadow: Boolean = true,
+        /** Scales the app-name labels on the cards, [MIN_RECENTS_LABEL_SCALE]..[MAX_RECENTS_LABEL_SCALE]. */
+        val labelScale: Float = 1f,
         /** The long-press menu grows from the finger and its rows come in one by one (off: it just appears). */
         val menuMotion: Boolean = true,
         /** "Close all" asks once more before closing everything. */
@@ -785,6 +791,8 @@ data class LauncherSettings(
         const val MIN_RECENTS_CARD_HEIGHT = 160
         const val MAX_RECENTS_CARD_HEIGHT = 440
         const val MAX_RECENTS_CORNER_DP = 40
+        const val MIN_RECENTS_LABEL_SCALE = 0.7f
+        const val MAX_RECENTS_LABEL_SCALE = 1.5f
         const val MIN_RECENTS_ANIM_SPEED = 0.25f
         /** Recents themes: Folark's card grid, iPad (big windows in a row), Carousel (one big card
          *  in the middle), Deck (overlapping cards), Compact (a list), Switcher (big icons). */
@@ -796,12 +804,17 @@ data class LauncherSettings(
         const val RECENTS_THEME_SWITCHER = "switcher"
         const val RECENTS_THEME_STACK = "stack"
         const val RECENTS_THEME_ARC = "arc"
-        const val RECENTS_THEME_BENTO = "bento"
-        const val RECENTS_THEME_FILMSTRIP = "filmstrip"
+        /** Tall rounded cards you snap sideways, the app's icon and name above each. */
+        const val RECENTS_THEME_PORTRAIT = "portrait"
+        /** The middle card large and centred, its icon and name above it; neighbours peek in. */
+        const val RECENTS_THEME_SPOTLIGHT = "spotlight"
+        /** A row of larger cards, two or three in view, for the unfolded screen. */
+        const val RECENTS_THEME_GALLERY = "gallery"
         val RECENTS_THEMES = listOf(
             RECENTS_THEME_FOLARK, RECENTS_THEME_IPAD, RECENTS_THEME_CAROUSEL,
             RECENTS_THEME_DECK, RECENTS_THEME_COMPACT, RECENTS_THEME_SWITCHER,
-            RECENTS_THEME_STACK, RECENTS_THEME_ARC, RECENTS_THEME_BENTO, RECENTS_THEME_FILMSTRIP,
+            RECENTS_THEME_STACK, RECENTS_THEME_ARC,
+            RECENTS_THEME_PORTRAIT, RECENTS_THEME_SPOTLIGHT, RECENTS_THEME_GALLERY,
         )
         const val MAX_RECENTS_GLASS_BLUR = 80
         const val MIN_RECENTS_GLASS_TINT = 0.04f

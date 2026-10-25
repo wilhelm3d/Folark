@@ -655,6 +655,9 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setRecentsDragDrop(value: Boolean) = edit { it[Keys.RECENTS_DRAG_DROP] = value }
     suspend fun setRecentsOverlayLabels(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_OVERLAY_LABELS else Keys.RECENTS_OVERLAY_LABELS] = value }
+    suspend fun setRecentsCardIcons(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_CARD_ICONS else Keys.RECENTS_CARD_ICONS] = value }
+    suspend fun setRecentsCardShadow(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_CARD_SHADOW else Keys.RECENTS_CARD_SHADOW] = value }
+    suspend fun setRecentsLabelScale(value: Float, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_LABEL_SCALE else Keys.RECENTS_LABEL_SCALE] = value.coerceIn(LauncherSettings.MIN_RECENTS_LABEL_SCALE, LauncherSettings.MAX_RECENTS_LABEL_SCALE) }
     suspend fun setRecentsMenuMotion(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_MENU_MOTION else Keys.RECENTS_MENU_MOTION] = value }
     suspend fun setRecentsBtnClose(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_CLOSE else Keys.RECENTS_BTN_CLOSE] = value }
     suspend fun setRecentsBtnSplit(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BTN_SPLIT else Keys.RECENTS_BTN_SPLIT] = value }
@@ -730,6 +733,10 @@ class SettingsRepository @Inject constructor(
             .coerceIn(LauncherSettings.MIN_RECENTS_GLASS_TINT, LauncherSettings.MAX_RECENTS_GLASS_TINT),
         dragDrop = p[Keys.RECENTS_DRAG_DROP] ?: true,
         overlayLabels = p[Keys.RECENTS_OVERLAY_LABELS] ?: true,
+        cardIcons = p[Keys.RECENTS_CARD_ICONS] ?: true,
+        cardShadow = p[Keys.RECENTS_CARD_SHADOW] ?: true,
+        labelScale = (p[Keys.RECENTS_LABEL_SCALE] ?: 1f)
+            .coerceIn(LauncherSettings.MIN_RECENTS_LABEL_SCALE, LauncherSettings.MAX_RECENTS_LABEL_SCALE),
         menuMotion = p[Keys.RECENTS_MENU_MOTION] ?: true,
         btnClose = p[Keys.RECENTS_BTN_CLOSE] ?: true,
         btnSplit = p[Keys.RECENTS_BTN_SPLIT] ?: true,

@@ -45,8 +45,9 @@ private val THEMES = listOf(
     LauncherSettings.RECENTS_THEME_SWITCHER to R.string.settings_recents_theme_switcher,
     LauncherSettings.RECENTS_THEME_STACK to R.string.settings_recents_theme_stack,
     LauncherSettings.RECENTS_THEME_ARC to R.string.settings_recents_theme_arc,
-    LauncherSettings.RECENTS_THEME_BENTO to R.string.settings_recents_theme_bento,
-    LauncherSettings.RECENTS_THEME_FILMSTRIP to R.string.settings_recents_theme_filmstrip,
+    LauncherSettings.RECENTS_THEME_PORTRAIT to R.string.settings_recents_theme_portrait,
+    LauncherSettings.RECENTS_THEME_SPOTLIGHT to R.string.settings_recents_theme_spotlight,
+    LauncherSettings.RECENTS_THEME_GALLERY to R.string.settings_recents_theme_gallery,
 )
 
 /**
@@ -199,21 +200,26 @@ private fun DrawScope.sketch(theme: String, glass: Boolean, accent: Color) {
                 }
             }
         }
-        LauncherSettings.RECENTS_THEME_BENTO -> {
-            card(w * 0.06f, h * 0.06f, w * 0.88f, h * 0.36f, 7f, front = true)
-            card(w * 0.06f, h * 0.46f, w * 0.42f, h * 0.22f, 5f)
-            card(w * 0.52f, h * 0.46f, w * 0.42f, h * 0.22f, 5f)
-            for (i in 0..3) {
-                card(w * 0.06f + i * w * 0.225f, h * 0.72f, w * 0.19f, h * 0.22f, 4f)
-                dot(w * 0.06f + i * w * 0.225f + w * 0.095f, h * 0.83f, 2.5f)
-            }
+        LauncherSettings.RECENTS_THEME_PORTRAIT -> {
+            // A tall very-rounded card in front, neighbours peeking, icon above.
+            card(-w * 0.16f, h * 0.22f, w * 0.28f, h * 0.62f, 9f)
+            card(w * 0.88f, h * 0.22f, w * 0.28f, h * 0.62f, 9f)
+            dot(w * 0.3f, h * 0.1f, 3f)
+            card(w * 0.26f, h * 0.18f, w * 0.48f, h * 0.72f, 11f, front = true)
         }
-        LauncherSettings.RECENTS_THEME_FILMSTRIP -> {
-            card(w * 0.16f, h * 0.06f, w * 0.68f, h * 0.6f, 8f, front = true)
-            for (i in 0..4) {
-                card(w * 0.07f + i * w * 0.18f, h * 0.74f, w * 0.14f, h * 0.18f, 3f)
-            }
-            drawRoundRect(accent, Offset(w * 0.07f + 2 * w * 0.18f + w * 0.02f, h * 0.95f), Size(w * 0.1f, 2.5f), CornerRadius(1.5f))
+        LauncherSettings.RECENTS_THEME_SPOTLIGHT -> {
+            // The middle card centred, its icon centred above.
+            card(-w * 0.12f, h * 0.26f, w * 0.26f, h * 0.54f, 7f)
+            card(w * 0.86f, h * 0.26f, w * 0.26f, h * 0.54f, 7f)
+            dot(w * 0.5f, h * 0.1f, 3f)
+            card(w * 0.28f, h * 0.2f, w * 0.44f, h * 0.68f, 8f, front = true)
+        }
+        LauncherSettings.RECENTS_THEME_GALLERY -> {
+            // Two larger cards side by side, each with its icon above.
+            dot(w * 0.28f, h * 0.14f, 2.5f)
+            card(w * 0.08f, h * 0.22f, w * 0.4f, h * 0.66f, 7f, front = true)
+            dot(w * 0.72f, h * 0.14f, 2.5f)
+            card(w * 0.52f, h * 0.22f, w * 0.4f, h * 0.66f, 7f, front = true)
         }
         LauncherSettings.RECENTS_THEME_SWITCHER -> {
             card(w * 0.08f, h * 0.2f, w * 0.84f, h * 0.6f, 10f)
