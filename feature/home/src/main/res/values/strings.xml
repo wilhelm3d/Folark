@@ -213,6 +213,8 @@
     <string name="taskbar_desktop_recents_missing">Ready For recents isn\'t available here: showing Motorola\'s recents</string>
     <string name="taskbar_no_shortcuts">No shortcuts for this app</string>
     <string name="taskbar_hint_choose">← Floating · Split screen →</string>
+    <string name="taskbar_drop_float">Floating window</string>
+    <string name="taskbar_drop_split">Split screen</string>
     <string name="taskbar_split_setup_needed">Split screen needs a one-time setup: see Settings ▸ Taskbar ▸ Split screen setup</string>
     <string name="taskbar_media">Now playing</string>
     <string name="taskbar_media_previous">Previous</string>

@@ -47,6 +47,18 @@ internal fun TaskbarPerAppRows(s: LauncherSettings, viewModel: SettingsViewModel
         description = countLabel(s.taskbar.alwaysApps.size, R.string.settings_taskbar_always_apps_desc),
         onClick = { picking = ALWAYS },
     )
+    ExpressiveRowDivider()
+    ExpressiveActionItem(
+        title = stringResource(R.string.settings_taskbar_autohide_apps),
+        description = countLabel(s.taskbar.autoHideApps.size, R.string.settings_taskbar_autohide_apps_desc),
+        onClick = { picking = AUTOHIDE },
+    )
+    ExpressiveRowDivider()
+    ExpressiveActionItem(
+        title = stringResource(R.string.settings_taskbar_mini_apps),
+        description = countLabel(s.taskbar.miniApps.size, R.string.settings_taskbar_mini_apps_desc),
+        onClick = { picking = MINI },
+    )
     when (picking) {
         HIDE -> PackagePicker(
             title = stringResource(R.string.settings_taskbar_hidden_apps),
@@ -62,11 +74,27 @@ internal fun TaskbarPerAppRows(s: LauncherSettings, viewModel: SettingsViewModel
             onDone = { viewModel.setTaskbarAlwaysApps(it); picking = null },
             onDismiss = { picking = null },
         )
+        AUTOHIDE -> PackagePicker(
+            title = stringResource(R.string.settings_taskbar_autohide_apps),
+            apps = apps,
+            initial = s.taskbar.autoHideApps,
+            onDone = { viewModel.setTaskbarAutoHideApps(it); picking = null },
+            onDismiss = { picking = null },
+        )
+        MINI -> PackagePicker(
+            title = stringResource(R.string.settings_taskbar_mini_apps),
+            apps = apps,
+            initial = s.taskbar.miniApps,
+            onDone = { viewModel.setTaskbarMiniApps(it); picking = null },
+            onDismiss = { picking = null },
+        )
     }
 }
 
 private const val HIDE = "hide"
 private const val ALWAYS = "always"
+private const val AUTOHIDE = "autohide"
+private const val MINI = "mini"
 
 @Composable
 private fun countLabel(count: Int, desc: Int): String =

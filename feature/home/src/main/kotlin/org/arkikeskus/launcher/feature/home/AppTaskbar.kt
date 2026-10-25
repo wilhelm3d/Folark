@@ -95,6 +95,7 @@ private data class TaskbarSetup(
     val iconSizeDp: Int,
     val spacingDp: Int,
     val bottomDp: Int,
+    val clearInset: Boolean,
     val theme: String,
     val opacity: Float,
     val handles: String,
@@ -125,6 +126,8 @@ private data class TaskbarSetup(
     val hiddenApps: Set<String>,
     val replaceRecents: Boolean,
     val alwaysApps: Set<String>,
+    val autoHideApps: Set<String>,
+    val miniApps: Set<String>,
     val liveEnabled: Boolean,
     val liveEffect: String,
     val liveExpand: Boolean,
@@ -293,6 +296,7 @@ internal class AppTaskbar(private val context: Context) {
                     iconSizeDp = s.taskbar.iconSize,
                     spacingDp = s.taskbar.iconSpacing,
                     bottomDp = s.taskbar.bottomOffset,
+                    clearInset = s.taskbar.clearSystemInset,
                     theme = s.taskbar.theme,
                     opacity = s.taskbar.opacity,
                     handles = s.taskbar.handles,
@@ -327,6 +331,8 @@ internal class AppTaskbar(private val context: Context) {
                     hiddenApps = s.taskbar.hiddenApps,
                     replaceRecents = s.recents.enabled && s.recents.replaceSystem,
                     alwaysApps = s.taskbar.alwaysApps,
+                    autoHideApps = s.taskbar.autoHideApps,
+                    miniApps = s.taskbar.miniApps,
                     liveEnabled = s.live.activities && s.live.activitiesTaskbar,
                     liveEffect = s.live.activityEffect,
                     liveExpand = s.live.expandOnLongPress,
@@ -350,7 +356,7 @@ internal class AppTaskbar(private val context: Context) {
                 // Per-app rules need to know which app is in front: only then is the service told.
                 // ...and so does handing Android's Recents over to Folark Recents.
                 LockAccessibilityService.replaceSystemRecents = next.replaceRecents
-                LockAccessibilityService.watchApps(next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty() || next.replaceRecents)
+                LockAccessibilityService.watchApps(next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty() || next.autoHideApps.isNotEmpty() || next.miniApps.isNotEmpty() || next.replaceRecents)
                 // The media session is only followed while the media icon is wanted.
                 if (next.enabled && next.mediaEnabled) media.start() else media.stop()
                 // Only Folark's own launch order moved (every launch): rebuild only if the recent apps changed.
@@ -415,7 +421,7 @@ internal class AppTaskbar(private val context: Context) {
     fun refresh(rebuild: Boolean = false) {
         val s = setup
         // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
-        ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty()) && screenOn && largeScreen())
+        ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty() || s.autoHideApps.isNotEmpty() || s.miniApps.isNotEmpty()) && screenOn && largeScreen())
         val active = s != null && s.enabled && screenOn && largeScreen() && keyguard?.isKeyguardLocked != true &&
             (s.pinned.isNotEmpty() || s.pairs.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
         if (!active || s == null) {
@@ -429,12 +435,16 @@ internal class AppTaskbar(private val context: Context) {
             homeVisible && TaskbarSpace.keyboardOnHome.value -> MODE_NONE
             homeVisible && s.onHome -> MODE_BAR_FIXED
             homeVisible -> MODE_NONE
-            // Settings ▸ Taskbar ▸ per app: never in these apps; always (but not over the keyboard) in those.
+            // Settings ▸ Taskbar ▸ per app: never in these; always (not over the keyboard) in those.
             foreground in s.hiddenApps -> MODE_NONE
             foreground in s.alwaysApps && !keyboardUp -> MODE_BAR_FIXED
+            // Just opened from a handle or the mini pill: the full bar (it collapses again by itself).
+            expanded -> MODE_BAR
+            // Per app: auto-hide (a corner swipe reveals it), or a small tap-to-open mini pill.
+            foreground in s.autoHideApps -> MODE_HANDLES
+            foreground in s.miniApps && !keyboardUp -> MODE_MINI
             // Full screen (a video, a game): no bar covering it; a corner swipe still opens it.
             s.keepOpen && !(s.hideFullScreen && fullScreen) && !keyboardUp -> MODE_BAR_FIXED
-            expanded -> MODE_BAR
             else -> MODE_HANDLES
         }
         // Only the bar that stays on home takes room there (home and the drawer step aside).
@@ -444,6 +454,7 @@ internal class AppTaskbar(private val context: Context) {
         when (mode) {
             MODE_BAR, MODE_BAR_FIXED -> showBar(s, fixed = mode == MODE_BAR_FIXED)
             MODE_HANDLES -> showHandles(s)
+            MODE_MINI -> showMini(s)
         }
         shownMode = mode
     }
@@ -488,7 +499,7 @@ internal class AppTaskbar(private val context: Context) {
         if (packageName == foreground) return
         val before = foreground
         foreground = packageName
-        fun ruled(p: String?) = p != null && (p in s.hiddenApps || p in s.alwaysApps)
+        fun ruled(p: String?) = p != null && (p in s.hiddenApps || p in s.alwaysApps || p in s.autoHideApps || p in s.miniApps)
         if (ruled(before) || ruled(packageName)) refresh()
     }
 
@@ -541,6 +552,22 @@ internal class AppTaskbar(private val context: Context) {
         if (runCatching { windowManager.addView(view, params) }.isSuccess) shown += view
     }
 
+    /**
+     * The space the system keeps at the bottom of the current display for its gesture handle (gesture
+     * navigation) or its navigation bar (3-button), in px. Read fresh from the display's own insets,
+     * not from Folark's tiny overlay windows, so it is right on either screen of the fold. 0 if unknown.
+     */
+    private fun systemBottomInset(): Int = runCatching {
+        val insets = windowManager.currentWindowMetrics.windowInsets
+        maxOf(
+            insets.getInsets(WindowInsets.Type.navigationBars()).bottom,
+            insets.getInsets(WindowInsets.Type.systemGestures()).bottom,
+        )
+    }.getOrDefault(0)
+
+    /** How far a bottom-anchored overlay is lifted to clear the system's bottom inset (0 when off). */
+    private fun TaskbarSetup.insetLift(): Int = if (clearInset) systemBottomInset() else 0
+
     // ------------------------------------------------------------------ the corner handles
 
     /**
@@ -586,8 +613,43 @@ internal class AppTaskbar(private val context: Context) {
                     bottomMargin = dp(10)
                 })
             }
-            add(zone, params(Gravity.BOTTOM or side, 0, 0))
+            add(zone, params(Gravity.BOTTOM or side, 0, s.insetLift()))
         }
+    }
+
+    /** A small visible pill at the bottom (per-app Mini pill): tap or swipe up to open the full bar. */
+    private fun showMini(s: TaskbarSetup) {
+        val slop = ViewConfiguration.get(context).scaledTouchSlop
+        val pill = FrameLayout(context).apply {
+            contentDescription = context.getString(R.string.taskbar_handle)
+            background = GradientDrawable().apply {
+                cornerRadius = dpf(16f)
+                setColor(Color.argb(210, 18, 22, 26))
+                setStroke(dp(1), Color.argb(55, 255, 255, 255))
+            }
+            elevation = dpf(6f)
+            setPadding(dp(18), dp(7), dp(18), dp(7))
+            addView(
+                View(context).apply {
+                    background = GradientDrawable().apply {
+                        cornerRadius = dpf(3f)
+                        setColor(Color.argb(190, 255, 255, 255))
+                    }
+                },
+                FrameLayout.LayoutParams(dp(26), dp(5), Gravity.CENTER),
+            )
+            var downY = 0f
+            var opened = false
+            setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { downY = event.rawY; opened = false }
+                    MotionEvent.ACTION_MOVE -> if (!opened && downY - event.rawY > slop * 2) { opened = true; open() }
+                    MotionEvent.ACTION_UP -> if (!opened) open()
+                }
+                true
+            }
+        }
+        add(pill, params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(8) + s.insetLift()))
     }
 
     private fun open() {
@@ -746,7 +808,7 @@ internal class AppTaskbar(private val context: Context) {
                 }
             }
         }
-        val barLayout = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(s.bottomDp), watchOutside = !fixed)
+        val barLayout = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(s.bottomDp) + s.insetLift(), watchOutside = !fixed)
         add(column, barLayout)
         barRow = row
         if (fixed && homeVisible) {
@@ -950,16 +1012,9 @@ internal class AppTaskbar(private val context: Context) {
                             action = next
                             val big = action != ACTION_NONE
                             ghostIcon?.animate()?.scaleX(if (big) 1.2f else 1f)?.scaleY(if (big) 1.2f else 1f)?.setDuration(110)?.start()
+                            // The left / right drop chips show where to drop; the armed one lights up.
+                            highlightDropChips(action)
                         }
-                        hint.visibility = View.VISIBLE
-                        hint.text = context.getString(
-                            when (action) {
-                                ACTION_SPLIT -> R.string.taskbar_hint_split
-                                ACTION_FLOAT -> R.string.taskbar_hint_floating
-                                else -> R.string.taskbar_hint_choose
-                            },
-                        )
-                        hint.alpha = if (action == ACTION_NONE) 0.7f else 1f
                     }
                 }
                 MotionEvent.ACTION_UP -> {
@@ -1789,6 +1844,7 @@ internal class AppTaskbar(private val context: Context) {
         (hint.parent as? android.view.ViewGroup)?.removeView(hint)
         hint.visibility = View.INVISIBLE
         root.addView(hint, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        addDropChips(root)
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -1824,6 +1880,67 @@ internal class AppTaskbar(private val context: Context) {
         ghostWindow?.let { runCatching { windowManager.removeView(it) } }
         ghostWindow = null
         ghostIcon = null
+        splitChip = null
+        floatChip = null
+    }
+
+    // ---------------------------------------------------------------- drag drop-zone chips
+
+    private var splitChip: TextView? = null
+    private var floatChip: TextView? = null
+
+    /**
+     * Two chips in the dragged-icon window while an app icon is dragged: "Floating window" on the
+     * left, "Split screen" on the right — the sides the drag arms. The one matching the current
+     * [action] lights up. They are only a guide (the window ignores touches); the gesture direction
+     * (and, over an app, Android's own drop zones) does the launching.
+     */
+    private fun addDropChips(root: FrameLayout) {
+        val top = (context.resources.displayMetrics.heightPixels * 0.56f).toInt()
+        floatChip = makeDropChip(context.getString(R.string.taskbar_drop_float))
+        splitChip = makeDropChip(context.getString(R.string.taskbar_drop_split))
+        root.addView(
+            floatChip,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.TOP or Gravity.START; leftMargin = dp(24); topMargin = top
+            },
+        )
+        root.addView(
+            splitChip,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.TOP or Gravity.END; rightMargin = dp(24); topMargin = top
+            },
+        )
+        highlightDropChips(ACTION_NONE)
+    }
+
+    private fun makeDropChip(label: String): TextView = TextView(context).apply {
+        text = label
+        textSize = 13f
+        gravity = Gravity.CENTER
+        setPadding(dp(16), dp(10), dp(16), dp(10))
+        elevation = dpf(6f)
+    }
+
+    /** Lights up the chip for [action] (ACTION_FLOAT = left, ACTION_SPLIT = right), dims the other. */
+    private fun highlightDropChips(action: Int) {
+        val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getColor(android.R.color.system_accent1_200)
+        } else Color.rgb(180, 200, 255)
+        fun style(chip: TextView?, armed: Boolean) {
+            chip ?: return
+            chip.background = GradientDrawable().apply {
+                cornerRadius = dpf(20f)
+                setColor(if (armed) accent else Color.argb(205, 20, 24, 30))
+                if (!armed) setStroke(dp(1), Color.argb(60, 255, 255, 255))
+            }
+            chip.setTextColor(if (armed) Color.BLACK else Color.WHITE)
+            chip.animate()
+                .scaleX(if (armed) 1.12f else 1f).scaleY(if (armed) 1.12f else 1f)
+                .alpha(if (armed) 1f else 0.82f).setDuration(110).start()
+        }
+        style(floatChip, action == ACTION_FLOAT)
+        style(splitChip, action == ACTION_SPLIT)
     }
 
     private fun loadIcon(app: AppItem, s: TaskbarSetup): Drawable? {
@@ -1995,6 +2112,7 @@ internal class AppTaskbar(private val context: Context) {
         private const val MODE_HANDLES = 1
         private const val MODE_BAR = 2
         private const val MODE_BAR_FIXED = 3
+        private const val MODE_MINI = 4
 
         private const val ACTION_NONE = 0
         private const val ACTION_OPEN = 1

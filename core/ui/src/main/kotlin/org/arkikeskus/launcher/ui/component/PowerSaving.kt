@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.PowerManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,4 +47,56 @@ fun rememberSystemPowerSave(): Boolean {
         onDispose { if (registered) runCatching { context.unregisterReceiver(receiver) } }
     }
     return on
+}
+
+/**
+ * True while the battery is at or below [thresholdPercent] and the phone is not charging — so the
+ * saver can switch itself on to stretch what's left. Reads the sticky battery broadcast.
+ */
+@Composable
+fun rememberBatteryLow(thresholdPercent: Int): Boolean {
+    val context = LocalContext.current
+    var low by remember { mutableStateOf(false) }
+    DisposableEffect(context, thresholdPercent) {
+        fun eval(intent: Intent?) {
+            if (intent == null) return
+            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+            val percent = if (level >= 0 && scale > 0) level * 100 / scale else 100
+            low = !plugged && percent <= thresholdPercent
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) = eval(intent)
+        }
+        // ACTION_BATTERY_CHANGED is sticky and a protected broadcast (no export flag needed).
+        val sticky = runCatching { context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }.getOrNull()
+        eval(sticky)
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+    return low
+}
+
+/**
+ * True while Android reports the phone is running hot (thermal throttling at MODERATE or worse), so
+ * the saver can ease off blur, animations and the high refresh rate to let it cool.
+ */
+@Composable
+fun rememberDeviceHot(): Boolean {
+    val context = LocalContext.current
+    val power = remember(context) { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
+    var hot by remember { mutableStateOf(false) }
+    DisposableEffect(power) {
+        if (power == null) {
+            hot = false
+            return@DisposableEffect onDispose { }
+        }
+        val listener = PowerManager.OnThermalStatusChangedListener { status ->
+            hot = status >= PowerManager.THERMAL_STATUS_MODERATE
+        }
+        val added = runCatching { power.addThermalStatusListener(listener); true }.getOrDefault(false)
+        hot = runCatching { power.currentThermalStatus >= PowerManager.THERMAL_STATUS_MODERATE }.getOrDefault(false)
+        onDispose { if (added) runCatching { power.removeThermalStatusListener(listener) } }
+    }
+    return hot
 }

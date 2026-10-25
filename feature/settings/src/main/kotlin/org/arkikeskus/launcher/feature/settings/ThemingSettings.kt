@@ -703,6 +703,22 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
         fontSize = 12.sp,
         lineHeight = 16.sp,
     )
+    if (s.motion.batterySaverMode == LauncherSettings.BATTERY_SAVER_AUTO) {
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_battery_saver_low),
+            subtitle = stringResource(R.string.settings_battery_saver_low_desc),
+            checked = s.motion.batterySaverLowBattery,
+            onCheckedChange = viewModel::setBatterySaverLowBattery,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_battery_saver_hot),
+            subtitle = stringResource(R.string.settings_battery_saver_hot_desc),
+            checked = s.motion.batterySaverWhenHot,
+            onCheckedChange = viewModel::setBatterySaverWhenHot,
+        )
+    }
     ExpressiveRowDivider()
     ExpressiveSliderRow(
         title = stringResource(R.string.settings_animation_speed),

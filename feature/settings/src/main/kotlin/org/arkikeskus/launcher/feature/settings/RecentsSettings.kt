@@ -108,14 +108,34 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         )
         ExpressiveRowDivider()
         if (s.recents.replaceSystem || s.recents.navHandleOpensSearch) {
-            // The Vector (LSPosed) module asks Folark each time it acts: seen lately = active.
-            val seenAt = remember(s.recents.replaceSystem) {
-                context.getSharedPreferences("folark_recents_hook", 0).getLong("seen_at", 0L)
+            // The Vector (LSPosed) module asks Folark each time it acts: seen lately = active. It also
+            // reports which launcher internals it could hook (compat), so a gesture the user turned on
+            // but this launcher build can't provide is shown as "limited" rather than a plain "active".
+            val prefs = remember { context.getSharedPreferences("folark_recents_hook", 0) }
+            val seenAt = remember(s.recents.replaceSystem, s.recents.navHandleOpensSearch) {
+                prefs.getLong("seen_at", 0L)
+            }
+            val compat = remember(s.recents.replaceSystem, s.recents.navHandleOpensSearch) {
+                prefs.getInt("compat", 0)
             }
             val active = seenAt > 0L && System.currentTimeMillis() - seenAt < 7L * 24 * 3600 * 1000
+            // compat == 0 means the module never reported (or predates this), so don't cry "limited".
+            val searchMissing = s.recents.navHandleOpensSearch && compat != 0 && (compat and 2) == 0
+            val swipeMissing = s.recents.replaceSystem && compat != 0 && (compat and 4) == 0
+            val partial = active && (searchMissing || swipeMissing)
+            val titleRes = when {
+                partial -> R.string.settings_recents_hook_partial
+                active -> R.string.settings_recents_hook_active
+                else -> R.string.settings_recents_hook_missing
+            }
+            val descRes = when {
+                partial -> R.string.settings_recents_hook_partial_desc
+                active -> R.string.settings_recents_hook_active_desc
+                else -> R.string.settings_recents_hook_missing_desc
+            }
             ExpressiveActionItem(
-                title = stringResource(if (active) R.string.settings_recents_hook_active else R.string.settings_recents_hook_missing),
-                description = stringResource(if (active) R.string.settings_recents_hook_active_desc else R.string.settings_recents_hook_missing_desc),
+                title = stringResource(titleRes),
+                description = stringResource(descRes),
                 onClick = { },
             )
             ExpressiveRowDivider()

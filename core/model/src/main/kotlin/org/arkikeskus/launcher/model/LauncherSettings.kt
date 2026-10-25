@@ -360,6 +360,10 @@ data class LauncherSettings(
         val appOpenAnimation: String = APP_OPEN_ICON,
         /** Folark's battery saver (both displays): off, on, or following the system's battery saver. */
         val batterySaverMode: String = BATTERY_SAVER_AUTO,
+        /** With "With system": also switch the saver on by itself when the battery is low (below
+         *  [BATTERY_SAVER_LOW_PERCENT] and not charging) or the phone is running hot. */
+        val batterySaverLowBattery: Boolean = true,
+        val batterySaverWhenHot: Boolean = true,
     )
 
     /** Theme, fonts, glass and per-surface density. */
@@ -400,6 +404,10 @@ data class LauncherSettings(
         val iconSpacing: Int = 8,
         /** Taskbar: distance from the bottom edge in dp. */
         val bottomOffset: Int = 12,
+        /** Taskbar: lift it (and the corner handles and Mini pill) clear of the space the system
+         *  keeps at the bottom for its gesture handle or navigation bar, so it never sits on top of
+         *  Android's home swipe area. Measured per display; off keeps it flush to the edge. */
+        val clearSystemInset: Boolean = true,
         /** Taskbar: its look, one of TASKBAR_THEME_*. */
         val theme: String = TASKBAR_THEME_CLEAR,
         /** Taskbar: how solid the backdrop of the non-clear themes is. */
@@ -443,9 +451,12 @@ data class LauncherSettings(
         val runningApps: Boolean = false,
         val runningDots: Boolean = true,
         /** Taskbar per app (package names): never shown in [hiddenApps]; always shown in
-         *  [alwaysApps], even full screen or when it isn't kept open. */
+         *  [alwaysApps], even full screen or when it isn't kept open; hidden but revealed by a
+         *  corner swipe in [autoHideApps]; a small tap-to-open pill in [miniApps]. */
         val hiddenApps: Set<String> = emptySet(),
         val alwaysApps: Set<String> = emptySet(),
+        val autoHideApps: Set<String> = emptySet(),
+        val miniApps: Set<String> = emptySet(),
         /** Taskbar: a small visible line at the corners where a swipe up opens it (when it isn't kept open). */
         val handleHint: Boolean = true,
         /** Which taskbar: Folark's own, or Android's (the system launcher's, with its gestures and
@@ -723,6 +734,8 @@ data class LauncherSettings(
         const val BATTERY_SAVER_OFF = "off"
         const val BATTERY_SAVER_AUTO = "auto"
         const val BATTERY_SAVER_ON = "on"
+        /** "With system" also kicks the saver in at or below this battery %, when not charging. */
+        const val BATTERY_SAVER_LOW_PERCENT = 20
         const val FONT_FAMILY_DEFAULT = "default"
         const val FONT_FAMILY_NDOT = "ndot"
         const val FONT_FAMILY_NTYPE = "ntype"

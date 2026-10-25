@@ -8,6 +8,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.Bundle
 import android.os.SystemClock
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
@@ -55,9 +56,8 @@ class RecentsHook : IXposedHookLoadPackage {
             return
         }
         log("hooking Recents in ${lpparam.packageName}")
-        // Tell Folark the module is live as soon as the launcher is ready (so it shows "active"
-        // without having to open Recents first). Retries until the launcher's context exists.
-        pingWhenReady(0)
+        // The main Recents command is always hooked here (we returned above if its class was gone).
+        compat = HOOK_MAIN
 
         XposedBridge.hookAllMethods(helper, "addCommand", object : XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
@@ -73,17 +73,25 @@ class RecentsHook : IXposedHookLoadPackage {
         })
 
         // A long press on the gesture handle: open Folark search instead of the assistant.
-        find("com.android.quickstep.inputconsumers.NavHandleLongPressHandler", loader)?.let { handler ->
-            XposedBridge.hookAllMethods(handler, "getLongPressRunnable", object : XC_MethodHook() {
+        // This class moves or disappears between launcher builds; when it is gone the search gesture
+        // can't be hooked, and Folark notes that (see [compat]) so Settings can say so.
+        val navHandle = find("com.android.quickstep.inputconsumers.NavHandleLongPressHandler", loader)
+        if (navHandle != null) {
+            compat = compat or HOOK_SEARCH
+            XposedBridge.hookAllMethods(navHandle, "getLongPressRunnable", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val context = appContext() ?: return
                     if (!searchOn(context)) return
                     param.result = Runnable { openFolarkSearch(context) }
                 }
             })
+        } else {
+            log("no NavHandleLongPressHandler in ${lpparam.packageName}; search gesture unavailable")
         }
 
-        find("com.android.quickstep.AbsSwipeUpHandler", loader)?.let { swipe ->
+        val swipe = find("com.android.quickstep.AbsSwipeUpHandler", loader)
+        if (swipe != null) {
+            compat = compat or HOOK_SWIPE
             XposedBridge.hookAllMethods(swipe, "calculateEndTarget", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val target = param.result as? Enum<*> ?: return
@@ -95,7 +103,14 @@ class RecentsHook : IXposedHookLoadPackage {
                     main.postDelayed({ openFolarkRecents(context, toggle = false) }, AFTER_HOME_MS)
                 }
             })
+        } else {
+            log("no AbsSwipeUpHandler in ${lpparam.packageName}; swipe-up to Folark Recents unavailable")
         }
+
+        // Tell Folark the module is live as soon as the launcher is ready (so it shows "active"
+        // without having to open Recents first), now that [compat] is known. Retries until the
+        // launcher's context exists.
+        pingWhenReady(0)
     }
 
     /**
@@ -128,6 +143,11 @@ class RecentsHook : IXposedHookLoadPackage {
     @Volatile private var fetching = false
     @Volatile private var observing = false
 
+    /** Which optional launcher internals this build could hook, OR of [HOOK_MAIN]/[HOOK_SEARCH]/
+     *  [HOOK_SWIPE]. Sent to Folark so Settings can tell "active" from "active, but a gesture isn't
+     *  available on this launcher version". 0 until the launcher is hooked. */
+    @Volatile private var compat = 0
+
     /**
      * Folark is asked on a thread of its own, never on the launcher's main thread: these hooks run
      * there (the Recents button, the end of a swipe), and a call into Folark can take long when
@@ -139,7 +159,10 @@ class RecentsHook : IXposedHookLoadPackage {
 
     private fun fetch(context: Context) {
         val bundle = runCatching {
-            context.contentResolver.call(Uri.parse("content://$STATE_AUTHORITY"), "state", null, null)
+            context.contentResolver.call(
+                Uri.parse("content://$STATE_AUTHORITY"), "state", null,
+                Bundle().apply { putInt(EXTRA_COMPAT, compat) },
+            )
         }.getOrNull() ?: return // Folark not answering: keep the last known answer
         cached = bundle.getBoolean("replace", false)
         cachedSearch = bundle.getBoolean("search", false)
@@ -232,6 +255,12 @@ class RecentsHook : IXposedHookLoadPackage {
         const val EXTRA_TOGGLE = "org.arkikeskus.launcher.extra.TOGGLE"
         const val SEARCH_EXTRA = "org.arkikeskus.launcher.extra.ACTION"
         const val SEARCH_ACTION = "open_search"
+
+        /** Compatibility bits reported to Folark (see [compat]). Carried on the "state" call. */
+        const val EXTRA_COMPAT = "compat"
+        const val HOOK_MAIN = 1   // the Recents command (the button / replace Android's Recents)
+        const val HOOK_SEARCH = 2 // the nav-handle long-press that opens Folark search
+        const val HOOK_SWIPE = 4  // the swipe-up end target that opens Folark Recents over home
 
         // OverviewCommandHelper's command types.
         private const val TYPE_SHOW = 1

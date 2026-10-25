@@ -57,6 +57,8 @@ import org.arkikeskus.launcher.ui.LauncherShellViewModel
 import org.arkikeskus.launcher.ui.LocalPopupTheme
 import org.arkikeskus.launcher.ui.component.BadgeStyle
 import org.arkikeskus.launcher.ui.component.rememberSystemPowerSave
+import org.arkikeskus.launcher.ui.component.rememberBatteryLow
+import org.arkikeskus.launcher.ui.component.rememberDeviceHot
 import org.arkikeskus.launcher.ui.component.LocalBatterySaver
 import org.arkikeskus.launcher.ui.component.LocalBadgeStyle
 import org.arkikeskus.launcher.ui.component.LocalAppLaunchZoom
@@ -119,10 +121,15 @@ class LauncherActivity : ComponentActivity() {
             val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
             // Folark's battery saver: on, off, or together with the system's own.
             val systemPowerSave = rememberSystemPowerSave()
+            val batteryLow = rememberBatteryLow(LauncherSettings.BATTERY_SAVER_LOW_PERCENT)
+            val deviceHot = rememberDeviceHot()
             val batterySaver = when (settings.motion.batterySaverMode) {
                 LauncherSettings.BATTERY_SAVER_ON -> true
                 LauncherSettings.BATTERY_SAVER_OFF -> false
-                else -> systemPowerSave
+                // "With system": the system's own saver, or (on its own) a low or hot battery.
+                else -> systemPowerSave ||
+                    (settings.motion.batterySaverLowBattery && batteryLow) ||
+                    (settings.motion.batterySaverWhenHot && deviceHot)
             }
             SideEffect {
                 if (batterySaverActive != batterySaver) {

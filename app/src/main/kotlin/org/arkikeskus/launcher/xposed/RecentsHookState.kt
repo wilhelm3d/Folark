@@ -47,7 +47,13 @@ class RecentsHookState : ContentProvider() {
         // Record that the module is alive first, so Folark shows it active even if reading the
         // settings below is briefly not ready (the launcher may call this very early).
         runCatching {
-            context.getSharedPreferences(PREFS, 0).edit().putLong(SEEN_AT, System.currentTimeMillis()).apply()
+            val edit = context.getSharedPreferences(PREFS, 0).edit()
+                .putLong(SEEN_AT, System.currentTimeMillis())
+            // Which gesture hooks this launcher build allowed (RecentsHook.HOOK_*); shown in Settings.
+            if (extras?.containsKey(RecentsHook.EXTRA_COMPAT) == true) {
+                edit.putInt(COMPAT, extras.getInt(RecentsHook.EXTRA_COMPAT))
+            }
+            edit.apply()
         }
         val settings = runCatching {
             runBlocking {
@@ -92,6 +98,7 @@ class RecentsHookState : ContentProvider() {
 
         const val PREFS = "folark_recents_hook"
         const val SEEN_AT = "seen_at"
+        const val COMPAT = "compat"
         const val UNLOCK_SEEN_AT = "unlock_seen_at"
     }
 }

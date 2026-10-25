@@ -145,6 +145,8 @@ class SettingsViewModel @Inject constructor(
     fun setPageScrollEffect(value: String) = update { repository.setPageScrollEffect(value) }
     fun setWidgetBackgroundOpacity(value: Float) = update { repository.setWidgetBackgroundOpacity(value) }
     fun setBatterySaverMode(value: String) = update { repository.setBatterySaverMode(value) }
+    fun setBatterySaverLowBattery(value: Boolean) = update { repository.setBatterySaverLowBattery(value) }
+    fun setBatterySaverWhenHot(value: Boolean) = update { repository.setBatterySaverWhenHot(value) }
     fun setClockWidgetStyle(value: String) = update { repository.setClockWidgetStyle(value) }
     fun setClockWidgetDarkText(value: Boolean) = update { repository.setClockWidgetDarkText(value) }
     fun setClockMinuteColor(value: String) = update { repository.setClockMinuteColor(value) }
@@ -251,6 +253,8 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsPinKeepAlive(value: Boolean) = update { repository.setRecentsPinKeepAlive(value) }
     fun setTaskbarHiddenApps(value: Set<String>) = update { repository.setTaskbarHiddenApps(value) }
     fun setTaskbarAlwaysApps(value: Set<String>) = update { repository.setTaskbarAlwaysApps(value) }
+    fun setTaskbarAutoHideApps(value: Set<String>) = update { repository.setTaskbarAutoHideApps(value) }
+    fun setTaskbarMiniApps(value: Set<String>) = update { repository.setTaskbarMiniApps(value) }
     fun setLiquidGlassEverywhere(value: Boolean) = update { repository.setLiquidGlassEverywhere(value) }
     fun setLiquidGlassLevel(value: Float) = update { repository.setLiquidGlassLevel(value) }
     fun setRecentsAttachedSide(value: String) = update { repository.setRecentsAttachedSide(value) }
@@ -314,6 +318,7 @@ class SettingsViewModel @Inject constructor(
     fun setHalfOpenedModeEnabled(value: Boolean) = update { repository.setHalfOpenedModeEnabled(value) }
     fun setHingeTilt(value: Boolean) = update { repository.setHingeTilt(value) }
     fun setTaskbarHideFullScreen(value: Boolean) = update { repository.setTaskbarHideFullScreen(value) }
+    fun setTaskbarClearSystemInset(value: Boolean) = update { repository.setTaskbarClearSystemInset(value) }
     fun setSplitLaunchEnabled(value: Boolean) = update { repository.setSplitLaunchEnabled(value) }
     fun setFloatingLaunchEnabled(value: Boolean) = update { repository.setFloatingLaunchEnabled(value) }
     fun setAmoledDark(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setAmoledDark(value, screenType) }

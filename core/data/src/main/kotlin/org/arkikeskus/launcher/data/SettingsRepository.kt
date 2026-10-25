@@ -355,6 +355,8 @@ class SettingsRepository @Inject constructor(
                     LauncherSettings.BATTERY_SAVER_ON -> LauncherSettings.BATTERY_SAVER_ON
                     else -> LauncherSettings.BATTERY_SAVER_AUTO
                 },
+                batterySaverLowBattery = p[Keys.BATTERY_SAVER_LOW_BATTERY] ?: true,
+                batterySaverWhenHot = p[Keys.BATTERY_SAVER_WHEN_HOT] ?: true,
             ),
             appearance = LauncherSettings.Appearance(
                 amoledDark = p[Keys.amoledDark(screenType)] ?: false,
@@ -378,6 +380,7 @@ class SettingsRepository @Inject constructor(
                 iconSize = (p[Keys.TASKBAR_ICON_SIZE] ?: 48).coerceIn(32, 72),
                 iconSpacing = (p[Keys.TASKBAR_SPACING] ?: 8).coerceIn(0, 24),
                 bottomOffset = (p[Keys.TASKBAR_BOTTOM] ?: 12).coerceIn(0, 64),
+                clearSystemInset = p[Keys.TASKBAR_CLEAR_SYSTEM_INSET] ?: true,
                 theme = (p[Keys.TASKBAR_THEME] ?: LauncherSettings.TASKBAR_THEME_CLEAR).let {
                     if (it in LauncherSettings.TASKBAR_THEMES) it else LauncherSettings.TASKBAR_THEME_CLEAR
                 },
@@ -403,6 +406,8 @@ class SettingsRepository @Inject constructor(
                 runningDots = p[Keys.TASKBAR_RUNNING_DOTS] ?: true,
                 hiddenApps = lines(p[Keys.TASKBAR_HIDDEN_APPS]),
                 alwaysApps = lines(p[Keys.TASKBAR_ALWAYS_APPS]),
+                autoHideApps = lines(p[Keys.TASKBAR_AUTOHIDE_APPS]),
+                miniApps = lines(p[Keys.TASKBAR_MINI_APPS]),
                 handleHint = p[Keys.TASKBAR_HANDLE_HINT] ?: true,
                 source = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
                     LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
@@ -564,6 +569,8 @@ class SettingsRepository @Inject constructor(
     val weatherLocation: Flow<String> = keyFlow(Keys.WEATHER_LOCATION) { it ?: "" }
     suspend fun setWeatherLocation(value: String) = edit { it[Keys.WEATHER_LOCATION] = value }
     suspend fun setBatterySaverMode(value: String) = edit { it[Keys.BATTERY_SAVER_MODE] = value }
+    suspend fun setBatterySaverLowBattery(value: Boolean) = edit { it[Keys.BATTERY_SAVER_LOW_BATTERY] = value }
+    suspend fun setBatterySaverWhenHot(value: Boolean) = edit { it[Keys.BATTERY_SAVER_WHEN_HOT] = value }
     suspend fun setClockWidgetStyle(value: String) = edit { it[Keys.CLOCK_WIDGET_STYLE] = value }
     suspend fun setClockWidgetDarkText(value: Boolean) = edit { it[Keys.CLOCK_WIDGET_DARK_TEXT] = value }
     suspend fun setClockWidgetGlassEffect(value: Boolean) = edit { it[Keys.CLOCK_WIDGET_GLASS_EFFECT] = value }
@@ -687,6 +694,8 @@ class SettingsRepository @Inject constructor(
     suspend fun setPinExemptions(value: Set<String>) = edit { it[Keys.RECENTS_PIN_EXEMPT] = value.joinToString("\n") }
     suspend fun setTaskbarHiddenApps(value: Set<String>) = edit { it[Keys.TASKBAR_HIDDEN_APPS] = value.joinToString("\n") }
     suspend fun setTaskbarAlwaysApps(value: Set<String>) = edit { it[Keys.TASKBAR_ALWAYS_APPS] = value.joinToString("\n") }
+    suspend fun setTaskbarAutoHideApps(value: Set<String>) = edit { it[Keys.TASKBAR_AUTOHIDE_APPS] = value.joinToString("\n") }
+    suspend fun setTaskbarMiniApps(value: Set<String>) = edit { it[Keys.TASKBAR_MINI_APPS] = value.joinToString("\n") }
     suspend fun setLiquidGlassEverywhere(value: Boolean) = edit { it[Keys.LIQUID_GLASS_EVERYWHERE] = value }
     suspend fun setLiquidGlassLevel(value: Float) = edit { it[Keys.LIQUID_GLASS_LEVEL] = value.coerceIn(0f, 1f) }
 
@@ -1103,6 +1112,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setHalfOpenedModeEnabled(value: Boolean) = edit { it[Keys.HALF_OPENED_ENABLED] = value }
     suspend fun setHingeTilt(value: Boolean) = edit { it[Keys.HINGE_TILT] = value }
     suspend fun setTaskbarHideFullScreen(value: Boolean) = edit { it[Keys.TASKBAR_HIDE_FULL_SCREEN] = value }
+    suspend fun setTaskbarClearSystemInset(value: Boolean) = edit { it[Keys.TASKBAR_CLEAR_SYSTEM_INSET] = value }
     suspend fun setSplitLaunchEnabled(value: Boolean) = edit { it[Keys.SPLIT_LAUNCH_ENABLED] = value }
     suspend fun setFloatingLaunchEnabled(value: Boolean) = edit { it[Keys.FLOATING_LAUNCH_ENABLED] = value }
     suspend fun setAmoledDark(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.amoledDark(screenType)] = value }

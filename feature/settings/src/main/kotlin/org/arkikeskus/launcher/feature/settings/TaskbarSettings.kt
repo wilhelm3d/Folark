@@ -350,6 +350,14 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         )
         ExpressiveRowDivider()
 
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_clear_inset),
+            subtitle = stringResource(R.string.settings_taskbar_clear_inset_desc),
+            checked = s.taskbar.clearSystemInset,
+            onCheckedChange = viewModel::setTaskbarClearSystemInset,
+        )
+        ExpressiveRowDivider()
+
         Text(
             text = stringResource(R.string.settings_taskbar_gestures_hint),
             color = LocalExpressivePalette.current.dim,
