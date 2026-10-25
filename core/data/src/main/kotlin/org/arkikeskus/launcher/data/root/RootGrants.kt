@@ -61,6 +61,56 @@ object RootGrants {
         return RootShell.available() && RootShell.run(command) != null
     }
 
+    /**
+     * The permissions Android normally asks for in a dialog (calendar, contacts, phone state,
+     * location, nearby devices…): every one Folark declares that isn't granted yet, given with
+     * root. True when all of them are in place afterwards.
+     */
+    fun grantRuntime(context: Context): Boolean {
+        val pkg = context.packageName
+        if (!SAFE.matches(pkg)) return false
+        val missing = runtimePermissions(context).filter { !has(context, it) }
+        if (missing.isEmpty()) return true
+        if (!RootShell.available()) return false
+        for (perm in missing) {
+            if (!SAFE.matches(perm)) continue
+            RootShell.run("pm grant $pkg $perm")
+        }
+        return runtimePermissions(context).all { has(context, it) }
+    }
+
+    /** Folark's own "dangerous" (asked-for) permissions, as declared in its manifest. */
+    private fun runtimePermissions(context: Context): List<String> = runCatching {
+        val pm = context.packageManager
+        val info = pm.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
+        info.requestedPermissions.orEmpty().filter { name ->
+            val p = runCatching { pm.getPermissionInfo(name, 0) }.getOrNull() ?: return@filter false
+            p.protection == android.content.pm.PermissionInfo.PROTECTION_DANGEROUS
+        }
+    }.getOrDefault(emptyList())
+
+    /** What [grantEverything] did: how many of the [total] steps worked, and which didn't. */
+    data class Outcome(val rootAnswered: Boolean, val done: Int, val total: Int, val failed: List<String>)
+
+    /**
+     * First start, "Use root": everything Folark can use, in one go — the asked-for permissions,
+     * every grant of Settings ▸ Root ([ALL]), and Folark as the default home app. Asks root once
+     * first (the root manager shows its prompt then).
+     */
+    fun grantEverything(context: Context): Outcome {
+        if (!RootShell.enabled || !RootShell.available(recheck = true)) return Outcome(false, 0, 0, emptyList())
+        val failed = ArrayList<String>()
+        if (!grantRuntime(context)) failed += "permissions"
+        for (g in ALL) {
+            val ok = grant(context, g) && granted(context, g) != false
+            if (!ok) failed += g
+            if (g == WIDGETS && ok) widgetsDone = true
+        }
+        if (!makeDefaultHome(context)) failed += "home"
+        val total = ALL.size + 2
+        return Outcome(true, total - failed.size, total, failed)
+    }
+
     /** Makes Folark the default home app. */
     fun makeDefaultHome(context: Context): Boolean {
         val pkg = context.packageName

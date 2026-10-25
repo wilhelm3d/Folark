@@ -64,6 +64,14 @@
     <string name="onboarding_grant_all">Grant all</string>
     <string name="onboarding_grant">Grant</string>
     <string name="onboarding_granted">Granted</string>
+    <string name="onboarding_root_title">Rooted phone? Grant everything at once</string>
+    <string name="onboarding_root_text">With root, Folark gives itself every permission below, plus what normally needs a computer or a trip to Android\'s settings: usage access, its accessibility service (lock gesture, taskbar), adding widgets, the open-apps list for Recents and secure settings. It also becomes your home app. Your root manager asks first. You can take any of it back in Android\'s settings</string>
+    <string name="onboarding_root_button">Use root</string>
+    <string name="onboarding_root_again">Try again</string>
+    <string name="onboarding_root_working">Asking root…</string>
+    <string name="onboarding_root_no_root">Root didn\'t answer: no root on this phone, or it was declined. Grant them one by one below instead</string>
+    <string name="onboarding_root_all_done">All granted with root</string>
+    <string name="onboarding_root_partly">%1$d of %2$d granted with root. Grant the rest below</string>
     <string name="home_remove">Remove from home</string>
     <string name="drag_remove">Remove</string>
     <string name="dock_remove">Remove from dock</string>

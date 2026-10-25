@@ -62,6 +62,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.arkikeskus.launcher.ui.DefaultLauncher
+import org.arkikeskus.launcher.data.root.RootGrants
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.ui.LauncherIcons
 
 /** The Arkikeskus brand colors the aurora blobs drift in (fixed — independent of the theme). */
@@ -352,7 +359,8 @@ private fun PermissionsPage(onContactsGranted: () -> Unit, onPhoneGranted: () ->
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp),
+        // Scrolls: with the root card it can be taller than the outer screen.
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
@@ -366,7 +374,13 @@ private fun PermissionsPage(onContactsGranted: () -> Unit, onPhoneGranted: () ->
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White.copy(alpha = 0.85f),
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
+        RootGrantCard(onDone = {
+            refresh()
+            if (contacts) onContactsGranted()
+            if (phone) onPhoneGranted()
+        })
+        Spacer(Modifier.height(12.dp))
         PermissionRow(
             title = stringResource(R.string.onboarding_perm_notif),
             description = stringResource(R.string.onboarding_perm_notif_desc),
@@ -413,6 +427,68 @@ private fun PermissionsPage(onContactsGranted: () -> Unit, onPhoneGranted: () ->
                 colors = ButtonDefaults.buttonColors(containerColor = AURORA_BLUE),
             ) {
                 Text(stringResource(R.string.onboarding_grant_all), color = Color.White)
+            }
+        }
+    }
+}
+
+/**
+ * For rooted phones: one button that gives Folark every permission on this page plus the extras
+ * only root (or a computer with ADB) can give — the same grants as Settings ▸ Root. The root
+ * manager asks first; nothing happens without that.
+ */
+@Composable
+private fun RootGrantCard(onDone: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // null = not tried yet; working while root is asked and the grants are given.
+    var working by remember { mutableStateOf(false) }
+    var outcome by remember { mutableStateOf<RootGrants.Outcome?>(null) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Text(stringResource(R.string.onboarding_root_title), color = Color.White, style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.onboarding_root_text),
+            color = Color.White.copy(alpha = 0.75f),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(10.dp))
+        val result = outcome
+        when {
+            working -> Text(stringResource(R.string.onboarding_root_working), color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.labelLarge)
+            result != null && !result.rootAnswered -> Text(
+                stringResource(R.string.onboarding_root_no_root), color = Color(0xFFFFB4A9), style = MaterialTheme.typography.labelLarge,
+            )
+            result != null && result.failed.isEmpty() -> Text(
+                stringResource(R.string.onboarding_root_all_done), color = AURORA_GREEN_LIGHT, style = MaterialTheme.typography.labelLarge,
+            )
+            result != null -> Text(
+                stringResource(R.string.onboarding_root_partly, result.done, result.total),
+                color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        if (!working && (result == null || result.failed.isNotEmpty())) {
+            Spacer(Modifier.height(6.dp))
+            Button(
+                onClick = {
+                    working = true
+                    scope.launch {
+                        outcome = withContext(Dispatchers.IO) { RootGrants.grantEverything(context.applicationContext) }
+                        working = false
+                        onDone()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AURORA_BLUE),
+            ) {
+                Text(
+                    stringResource(if (result == null) R.string.onboarding_root_button else R.string.onboarding_root_again),
+                    color = Color.White,
+                )
             }
         }
     }
