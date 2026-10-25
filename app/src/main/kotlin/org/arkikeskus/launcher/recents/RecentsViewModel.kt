@@ -246,6 +246,28 @@ class RecentsViewModel @Inject constructor(
     }
 
     /** Pins or unpins [card]'s apps; with root and the setting, keeps them in memory (or stops). */
+    /**
+     * Saves the apps of a split card as an app pair (Settings ▸ App pairs; then on home and the
+     * taskbar too). False when one of its apps isn't known (not installed for this user any more).
+     */
+    fun saveAsPair(card: RecentsCard): Boolean {
+        val apps = card.apps
+        if (apps.size !in 2..3 || apps.any { it == null }) return false
+        val (a, b) = apps.requireNoNulls()
+        val c = apps.getOrNull(2)
+        appRepository.saveAppPair(
+            org.arkikeskus.launcher.model.AppPair(
+                id = java.util.UUID.randomUUID().toString(),
+                name = apps.joinToString(" + ") { it!!.label },
+                app1Key = a.key, app1Package = a.packageName, app1ClassName = a.className, app1UserSerial = a.userSerial,
+                app2Key = b.key, app2Package = b.packageName, app2ClassName = b.className, app2UserSerial = b.userSerial,
+                app3Key = c?.key.orEmpty(), app3Package = c?.packageName.orEmpty(),
+                app3ClassName = c?.className.orEmpty(), app3UserSerial = c?.userSerial ?: 0L,
+            ),
+        )
+        return true
+    }
+
     fun togglePin(card: RecentsCard) {
         val pin = !card.pinned
         _state.value = _state.value.copy(
@@ -324,6 +346,22 @@ class RecentsViewModel @Inject constructor(
                 delay(SPLIT_STEP_MS)
                 popUp(picked[3])
             }
+        }
+    }
+
+    /**
+     * [third] dropped on the split card [pair]: the pair comes back to the front, then [third]
+     * joins it as a third pane (Folark's SystemUI module); without the module it floats on top.
+     */
+    fun addThird(pair: RecentsCard, third: RecentsCard) {
+        val task = third.tasks.first()
+        appScope.launch {
+            open(pair)
+            delay(SPLIT_STEP_MS)
+            val joined = withContext(Dispatchers.IO) {
+                SplitThree.ready(context) && SplitThree.addThird(context, taskId = task.taskId)
+            }
+            if (!joined) popUp(third)
         }
     }
 

@@ -111,6 +111,8 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
         add(MenuItem(R.string.recents_menu_peek, Glyph.PEEK) { if (card.isSplit) env.onPeekSplit(card) else env.onPeekPick(card) })
         if (!card.isSplit) add(MenuItem(R.string.recents_menu_freeform, Glyph.FREEFORM) { env.onPopUp(card) })
         if (card.isSplit) add(MenuItem(R.string.recents_menu_unsplit, Glyph.UNSPLIT) { env.onUnsplit(card) })
+        // Keep this split: saved as an app pair, opened together again from home or the taskbar.
+        if (card.isSplit && card.apps.none { it == null }) add(MenuItem(R.string.recents_menu_save_pair, Glyph.SAVE) { env.onSavePair(card) })
         add(MenuItem(if (card.pinned) R.string.recents_menu_unlock else R.string.recents_menu_lock, Glyph.LOCK) { env.onTogglePin(card) })
         add(MenuItem(R.string.recents_menu_info, Glyph.INFO) { env.onAppInfo(card) })
         if (env.canClose && !card.pinned) add(MenuItem(R.string.recents_menu_close, Glyph.CLOSE, danger = true) { env.onClose(card) })
@@ -204,7 +206,7 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
 
 private class MenuItem(val label: Int, val glyph: Glyph, val danger: Boolean = false, val action: () -> Unit)
 
-private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE }
+private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE, SAVE }
 
 /**
  * Places the menu just below [at], centred on it, always fully on screen (above it if no room
@@ -236,6 +238,13 @@ private fun DrawScope.drawGlyph(glyph: Glyph, color: Color, locked: Boolean) {
             drawLine(color, Offset(w * 0.4f, w * 0.6f), Offset(w * 0.68f, w * 0.32f), stroke.width, StrokeCap.Round)
             drawLine(color, Offset(w * 0.5f, w * 0.32f), Offset(w * 0.68f, w * 0.32f), stroke.width, StrokeCap.Round)
             drawLine(color, Offset(w * 0.68f, w * 0.32f), Offset(w * 0.68f, w * 0.5f), stroke.width, StrokeCap.Round)
+        }
+        Glyph.SAVE -> {
+            // Two panes with a plus: keep this pair.
+            drawRoundRect(color, Offset(w * 0.06f, w * 0.14f), Size(w * 0.3f, w * 0.72f), r, style = stroke)
+            drawRoundRect(color, Offset(w * 0.44f, w * 0.14f), Size(w * 0.3f, w * 0.72f), r, style = stroke)
+            drawLine(color, Offset(w * 0.86f, w * 0.38f), Offset(w * 0.86f, w * 0.62f), stroke.width, StrokeCap.Round)
+            drawLine(color, Offset(w * 0.74f, w * 0.5f), Offset(w * 0.98f, w * 0.5f), stroke.width, StrokeCap.Round)
         }
         Glyph.UNSPLIT -> {
             // One full box (back to full screen).

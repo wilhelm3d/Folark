@@ -40,6 +40,10 @@ class RecentsHookState : ContentProvider() {
         }
         if (method != "state") return null
         val context = context ?: return null
+        // Only the launchers in the module's scope ask this (anyone else could fake "module active").
+        val allowed = runCatching { context.resources.getStringArray(org.arkikeskus.launcher.R.array.xposed_scope).toSet() }
+            .getOrDefault(emptySet())
+        if (callingPackage !in allowed) return null
         // Record that the module is alive first, so Folark shows it active even if reading the
         // settings below is briefly not ready (the launcher may call this very early).
         runCatching {
@@ -82,6 +86,10 @@ class RecentsHookState : ContentProvider() {
     override fun update(uri: Uri, values: ContentValues?, s: String?, a: Array<out String>?): Int = 0
 
     companion object {
+        /** Watched by the module in the launcher: changes when Replace Android's Recents or the
+         *  gesture handle's search switch does, so it asks again (see LauncherApplication). */
+        val STATE_URI: Uri = Uri.parse("content://${RecentsHook.STATE_AUTHORITY}/state")
+
         const val PREFS = "folark_recents_hook"
         const val SEEN_AT = "seen_at"
         const val UNLOCK_SEEN_AT = "unlock_seen_at"

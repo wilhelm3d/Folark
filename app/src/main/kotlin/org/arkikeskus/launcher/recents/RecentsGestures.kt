@@ -135,6 +135,9 @@ internal fun RecentsEnv.cardModifier(
                 // Phase 1: a tap, the start of a swipe, or a long press (held still).
                 var released = false
                 var left = false
+                // The move that crossed the touch slop: taken (consumed) below if this card's swipe
+                // owns the stroke, so the list behind doesn't start scrolling on that same move.
+                var slopChange: androidx.compose.ui.input.pointer.PointerInputChange? = null
                 val decided = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -144,7 +147,7 @@ internal fun RecentsEnv.cardModifier(
                         if (!change.pressed) { change.consume(); released = true; return@withTimeoutOrNull true }
                         if (change.isConsumed) { left = true; return@withTimeoutOrNull true }
                         moved += change.positionChange()
-                        if (moved.getDistance() > slop) return@withTimeoutOrNull true
+                        if (moved.getDistance() > slop) { slopChange = change; return@withTimeoutOrNull true }
                     }
                 }
                 if (left) return@awaitEachGesture
@@ -209,14 +212,18 @@ internal fun RecentsEnv.cardModifier(
                 }
 
                 // -------------------------------------------------------- a swipe (or someone else's scroll)
-                // Which way: up / down, or left / right (whichever the finger went more).
-                val sideways = abs(moved.x) > abs(moved.y)
+                // Which way: up / down, or left / right — only when one clearly wins. A diagonal
+                // stroke (neither direction [AXIS_LEAD] times the other) is left to the list's scroll.
+                val axis = swipeAxis(moved.x, moved.y)
+                val sideways = axis == SwipeAxis.SIDEWAYS
+                val clear = axis != SwipeAxis.DIAGONAL
                 val toStart = if (sideways) swipeLeft else swipeUp
                 val toEnd = if (sideways) swipeRight else swipeDown
-                val allowed = if (sideways) sideSwipes else vertical
+                val allowed = clear && (if (sideways) sideSwipes else vertical)
                 if (!allowed || (toStart == LauncherSettings.RECENTS_ACTION_NONE && toEnd == LauncherSettings.RECENTS_ACTION_NONE)) {
                     return@awaitEachGesture // the list's scroll takes it
                 }
+                slopChange?.consume()
                 val moving = if (sideways) offsetX else offset
                 val tracker = VelocityTracker()
                 var total = if (sideways) moved.x else moved.y
@@ -279,5 +286,21 @@ internal fun RecentsEnv.perform(action: String, card: RecentsCard) {
             if (canClose) drag.cards.filter { it.key != card.key && !it.pinned }.forEach(onClose)
         LauncherSettings.RECENTS_ACTION_CLOSE_ALL -> onCloseAll()
         else -> {}
+    }
+}
+
+/** How much one direction must lead the other for a stroke to count as a card swipe (not a scroll). */
+private const val AXIS_LEAD = 1.25f
+
+internal enum class SwipeAxis { UP_DOWN, SIDEWAYS, DIAGONAL }
+
+/** Which way a stroke that moved by ([dx], [dy]) goes: one direction must lead by [AXIS_LEAD]. */
+internal fun swipeAxis(dx: Float, dy: Float): SwipeAxis {
+    val x = abs(dx)
+    val y = abs(dy)
+    return when {
+        x >= AXIS_LEAD * y && x > 0f -> SwipeAxis.SIDEWAYS
+        y >= AXIS_LEAD * x && y > 0f -> SwipeAxis.UP_DOWN
+        else -> SwipeAxis.DIAGONAL
     }
 }

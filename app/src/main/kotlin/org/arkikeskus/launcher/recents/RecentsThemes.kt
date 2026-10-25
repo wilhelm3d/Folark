@@ -63,7 +63,7 @@ import kotlin.math.abs
 
 /** The phone's own shape (width / height), so app pictures keep their proportions. */
 @Composable
-private fun screenAspect(): Float {
+internal fun screenAspect(): Float {
     val c = LocalConfiguration.current
     return (c.screenWidthDp.toFloat() / c.screenHeightDp.coerceAtLeast(1)).coerceIn(0.4f, 2f)
 }
@@ -73,7 +73,7 @@ private fun screenAspect(): Float {
 private fun edgeMargin(): Dp = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) 28.dp else 16.dp
 
 /** How much bigger than normal the cards are (Settings ▸ Recents ▸ Card height; 300 = normal). */
-private fun RecentsEnv.sizeScale(): Float = settings.recents.cardHeight / 300f
+internal fun RecentsEnv.sizeScale(): Float = settings.recents.cardHeight / 300f
 
 // ---------------------------------------------------------------------------- Folark: cards in a grid
 

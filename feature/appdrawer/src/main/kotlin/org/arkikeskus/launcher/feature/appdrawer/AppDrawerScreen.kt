@@ -6,33 +6,21 @@ import android.content.Intent
 import android.widget.Toast
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
-
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.WindowInsets
@@ -43,49 +31,31 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
@@ -95,40 +65,27 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.arkikeskus.launcher.ui.component.CommitWhenIdle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -136,7 +93,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 import kotlin.math.abs
 import org.arkikeskus.launcher.model.AppItem
@@ -144,16 +100,12 @@ import org.arkikeskus.launcher.model.SearchResult
 import org.arkikeskus.launcher.ui.AppActionPopup
 import org.arkikeskus.launcher.ui.AppActions
 import org.arkikeskus.launcher.ui.AppShortcuts
-import org.arkikeskus.launcher.ui.DragSource
 import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.LauncherIcons
 import org.arkikeskus.launcher.ui.PopupAction
 import org.arkikeskus.launcher.ui.RenameDialog
-import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
 import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
-import org.arkikeskus.launcher.ui.component.ContactAvatar
-import org.arkikeskus.launcher.ui.component.aquamorphicTouch
 import org.arkikeskus.launcher.ui.component.iconSizeForCell
 import org.arkikeskus.launcher.ui.component.liquidGlass
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
@@ -162,7 +114,6 @@ import org.arkikeskus.launcher.ui.component.LocalIconPack
 import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
-import org.arkikeskus.launcher.ui.component.NotificationBadge
 import org.arkikeskus.launcher.ui.drawer.DrawerColors
 import org.arkikeskus.launcher.ui.drawer.DrawerStyleSpec
 import org.arkikeskus.launcher.ui.drawer.drawerStyleSpec
@@ -170,7 +121,6 @@ import org.arkikeskus.launcher.ui.drawer.readableOn
 import org.arkikeskus.launcher.ui.drawer.rememberDrawerColors
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.ExpressiveActionRow
-import org.arkikeskus.launcher.ui.expressive.ExpressiveCard
 import org.arkikeskus.launcher.ui.expressive.ExpressiveSectionTitle
 import org.arkikeskus.launcher.ui.expressive.ExpressiveTheme
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -1165,890 +1115,6 @@ private fun DrawerPanelTheme(
             LocalContentColor provides colors.content,
         ) {
             ProvideTextStyle(LocalTextStyle.current.copy(fontFamily = style.fontFamily ?: LocalTextStyle.current.fontFamily), content)
-        }
-    }
-}
-
-/** The drawer search field, shared by the top and bottom positions. */
-@Composable
-private fun DrawerSearchField(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    colors: DrawerColors,
-    style: DrawerStyleSpec,
-) {
-    val container = if (style.searchOutlined) Color.Transparent else colors.field
-    TextField(
-        value = query,
-        onValueChange = onQueryChange,
-        singleLine = true,
-        placeholder = { Text(stringResource(R.string.app_drawer_search_hint)) },
-        leadingIcon = {
-            Icon(
-                painter = painterResource(LauncherIcons.Search),
-                contentDescription = null,
-                tint = colors.contentDim,
-            )
-        },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(
-                        painter = painterResource(LauncherIcons.Close),
-                        contentDescription = stringResource(R.string.search_clear),
-                        tint = colors.accent,
-                    )
-                }
-            }
-        },
-        shape = style.searchShape,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = container,
-            unfocusedContainerColor = container,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = colors.accent,
-            focusedTextColor = colors.content,
-            unfocusedTextColor = colors.content,
-            focusedPlaceholderColor = colors.contentDim,
-            unfocusedPlaceholderColor = colors.contentDim,
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .then(
-                if (style.searchOutlined) {
-                    Modifier.border(1.dp, colors.contentDim.copy(alpha = 0.6f), style.searchShape)
-                } else {
-                    Modifier
-                },
-            ),
-    )
-}
-
-/** The heading letter an app is filed under: its first letter, or '#' for digits and symbols. */
-private fun drawerLetterOf(app: AppItem): Char =
-    app.label.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#'
-
-/** One "A" / "B" / "C" heading between the apps of the full list. */
-@Composable
-private fun DrawerLetterHeader(letter: Char) {
-    Text(
-        text = letter.toString(),
-        color = LocalAccent.current,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 2.dp),
-    )
-}
-
-@Composable
-private fun DrawerIndexBar(
-    position: String,
-    onLetterSelected: (Char) -> Unit,
-    modifier: Modifier = Modifier,
-    /** Settings ▸ App drawer ▸ index bar size: scales the letters and the strip they sit in. */
-    scale: Float = 1f,
-    /** When set, the letter under the finger is reported here (null on release) and the bar draws
-     *  no bubble of its own: the drawer shows it large instead. */
-    onActiveLetter: ((Char?) -> Unit)? = null,
-) {
-    val alphabet = remember { listOf('#') + ('A'..'Z').toList() }
-    // The gesture blocks below live as long as the bar: always call the newest callback (it holds
-    // the current app list) and read the newest position.
-    val currentOnLetter by rememberUpdatedState(onLetterSelected)
-    val currentPosition by rememberUpdatedState(position)
-    val currentActiveLetter by rememberUpdatedState(onActiveLetter)
-    var selectedLetter by remember { mutableStateOf<Char?>(null) }
-    var barSize by remember { mutableStateOf(IntSize.Zero) }
-
-    fun updateSelection(offset: Offset) {
-        val count = alphabet.size
-        val isVertical = currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
-        val fraction = if (isVertical) {
-            if (barSize.height > 0) (offset.y / barSize.height).coerceIn(0f, 1f) else 0f
-        } else {
-            if (barSize.width > 0) (offset.x / barSize.width).coerceIn(0f, 1f) else 0f
-        }
-        val idx = (fraction * count).toInt().coerceIn(0, count - 1)
-        val char = alphabet[idx]
-        if (selectedLetter != char) {
-            selectedLetter = char
-            currentOnLetter(char)
-        }
-    }
-
-    Box(modifier = modifier) {
-        val isVertical = position == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || position == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
-        if (isVertical) {
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(vertical = 12.dp, horizontal = 4.dp * scale)
-                    .onSizeChanged { barSize = it }
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = { offset ->
-                                updateSelection(offset)
-                                tryAwaitRelease()
-                                selectedLetter = null
-                            },
-                        )
-                    }
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { offset -> updateSelection(offset) },
-                            onDragEnd = { selectedLetter = null },
-                            onDragCancel = { selectedLetter = null },
-                            onDrag = { change, _ -> updateSelection(change.position) },
-                        )
-                    },
-                verticalArrangement = Arrangement.SpaceEvenly,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                alphabet.forEach { char ->
-                    Text(
-                        text = char.toString(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp * scale,
-                            fontWeight = if (selectedLetter == char) FontWeight.ExtraBold else FontWeight.Medium,
-                        ),
-                        color = if (selectedLetter == char) LocalAccent.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    )
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp * scale)
-                    .onSizeChanged { barSize = it }
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = { offset ->
-                                updateSelection(offset)
-                                tryAwaitRelease()
-                                selectedLetter = null
-                            },
-                        )
-                    }
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { offset -> updateSelection(offset) },
-                            onDragEnd = { selectedLetter = null },
-                            onDragCancel = { selectedLetter = null },
-                            onDrag = { change, _ -> updateSelection(change.position) },
-                        )
-                    },
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                alphabet.forEach { char ->
-                    Text(
-                        text = char.toString(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp * scale,
-                            fontWeight = if (selectedLetter == char) FontWeight.ExtraBold else FontWeight.Medium,
-                        ),
-                        color = if (selectedLetter == char) LocalAccent.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    )
-                }
-            }
-        }
-
-        LaunchedEffect(selectedLetter) { currentActiveLetter?.invoke(selectedLetter) }
-        DisposableEffect(Unit) { onDispose { currentActiveLetter?.invoke(null) } }
-        if (onActiveLetter == null) selectedLetter?.let { letter ->
-            Surface(
-                shape = CircleShape,
-                color = LocalAccent.current,
-                contentColor = readableOn(LocalAccent.current),
-                shadowElevation = 6.dp,
-                modifier = Modifier
-                    .size(48.dp)
-                    .align(Alignment.Center),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = letter.toString(),
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppListRow(
-    app: AppItem,
-    badgeCount: Int,
-    badgeShowCount: Boolean,
-    badgeScale: Float,
-    showLabels: Boolean,
-    onAppClick: (AppItem) -> Unit,
-    onAppLongClick: (AppItem, Rect) -> Unit,
-    dragController: HomeDragController,
-    onDragOutStart: () -> Unit,
-    onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
-    onDropOnDock: (AppItem) -> Unit,
-    haptics: HapticFeedback,
-    locked: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    // Where the icon is, read when a long press or drag needs it (not on every scroll frame).
-    val placedAt = remember { arrayOfNulls<LayoutCoordinates>(1) }
-    val bounds = { placedAt[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero }
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .onPlaced { placedAt[0] = it }
-            .pointerInput(app.key, locked) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val slop = viewConfiguration.touchSlop
-                    var outcome = 0
-                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                        while (true) {
-                            val ev = awaitPointerEvent()
-                            val c = ev.changes.firstOrNull { it.id == down.id }
-                            if (c == null) {
-                                outcome = 2
-                                return@withTimeoutOrNull
-                            }
-                            if (!c.pressed) {
-                                outcome = 1
-                                return@withTimeoutOrNull
-                            }
-                            if (c.isConsumed || (c.position - down.position).getDistance() > slop) {
-                                outcome = 2
-                                return@withTimeoutOrNull
-                            }
-                        }
-                    }
-                    when (outcome) {
-                        1 -> {
-                            onAppClick(app)
-                            return@awaitEachGesture
-                        }
-                        2 -> return@awaitEachGesture
-                    }
-                    if (locked) return@awaitEachGesture
-                    dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position)
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    try {
-                        val completed = drag(down.id) { change ->
-                            change.consume()
-                            if (!dragController.moving && (change.position - down.position).getDistance() > slop) {
-                                dragController.beginMove()
-                                onDragOutStart()
-                            }
-                            if (dragController.moving) {
-                                dragController.update(bounds().topLeft + change.position)
-                            }
-                        }
-                        if (completed && dragController.moving) {
-                            val root = dragController.rootPosition
-                            when {
-                                // The "split" target on home: the partner picker opens.
-                                dragController.dropOnSplit(app, root) -> Unit
-                                dragController.isOverDock(root) && dragController.dockHasSpace ->
-                                    onDropOnDock(app)
-                                dragController.isOverGrid(root) -> {
-                                    val (page, cx, cy) = dragController.cellAt(root)
-                                    onDropOnHome(app, page, cx, cy)
-                                }
-                            }
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        } else if (completed) {
-                            onAppLongClick(app, bounds())
-                        }
-                    } finally {
-                        dragController.stop()
-                    }
-                }
-            }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppIcon(
-            appItem = app,
-            labelColor = Color.Transparent,
-            showLabel = false,
-            iconSize = 44.dp,
-            badgeCount = badgeCount,
-            badgeShowCount = badgeShowCount,
-            badgeScale = badgeScale,
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = app.label,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = LocalAppLabelLines.current,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = app.packageName,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/** Visual pull-down affordance: a small pill below the status bar. */
-@Composable
-private fun DragHandle(width: Dp = 36.dp, arrow: Boolean = false, progress: () -> Float = { 1f }) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (arrow) {
-            // A small white chevron: it points up while the drawer is on its way open, flattens as
-            // the drawer arrives, and points down once it is fully open ("pull down to close").
-            // The position is read while drawing, so the turn follows the finger without recomposing.
-            Canvas(Modifier.size(width = 26.dp, height = 12.dp)) {
-                val bend = (((1f - progress()) * 4f).coerceIn(0f, 1f) * 2f - 1f) * 3.dp.toPx()
-                val centre = Offset(size.width / 2f, size.height / 2f - bend)
-                val reach = 9.dp.toPx()
-                val stroke = 2.5.dp.toPx()
-                drawLine(Color.White, centre, Offset(centre.x - reach, size.height / 2f + bend), stroke, StrokeCap.Round)
-                drawLine(Color.White, centre, Offset(centre.x + reach, size.height / 2f + bend), stroke, StrokeCap.Round)
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(width = width, height = 4.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(2.dp),
-                    ),
-            )
-        }
-    }
-}
-
-/** A drawer folder tile: a rounded 2×2 preview of its first apps + label; tap (or long-press, which
- *  also ticks the haptic like an app long-press) opens the folder. */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun DrawerFolderTile(
-    folder: DrawerFolderUi,
-    showLabel: Boolean,
-    onClick: () -> Unit,
-    tileSize: Dp = 56.dp,
-    badgeCount: Int = 0,
-    badgeShowCount: Boolean = true,
-    badgeScale: Float = 1f,
-) {
-    val haptics = LocalHapticFeedback.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aquamorphicTouch()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onClick()
-                },
-            )
-            .padding(vertical = 10.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // EVERYTHING inside scales with the tile — padding and gaps included. A fixed padding/gap
-        // with linearly scaled icons inverted the margin below ~45dp tiles (6–7 drawer columns on a
-        // narrow screen), squeezing the 2×2 preview asymmetrically out of its card.
-        val scale = tileSize / 56.dp
-        Box(contentAlignment = Alignment.TopEnd) {
-            Box(
-                modifier = Modifier
-                    .size(tileSize)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
-                    .padding(7.dp * scale),
-                contentAlignment = Alignment.Center,
-            ) {
-                val mini = 18.dp * scale
-                val gap = 2.dp * scale
-                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                        FolderSlot(folder.apps.getOrNull(0), mini); FolderSlot(folder.apps.getOrNull(1), mini)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                        FolderSlot(folder.apps.getOrNull(2), mini); FolderSlot(folder.apps.getOrNull(3), mini)
-                    }
-                }
-            }
-            NotificationBadge(count = badgeCount, showCount = badgeShowCount, scale = badgeScale)
-        }
-        if (showLabel) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = folder.name,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 11.sp,
-                lineHeight = 13.sp,
-                maxLines = LocalAppLabelLines.current,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
-@Composable
-private fun FolderSlot(app: AppItem?, size: Dp) {
-    if (app == null) {
-        Spacer(Modifier.size(size))
-    } else {
-        AppIcon(appItem = app, labelColor = Color.Transparent, showLabel = false, iconSize = size)
-    }
-}
-
-/** The open-folder sheet: rename, member apps (tap launches, long-press removes), add apps, delete. */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-private fun DrawerFolderSheet(
-    folder: DrawerFolderUi,
-    candidateApps: List<AppItem>,
-    badges: Map<String, Int>,
-    badgeShowCount: Boolean,
-    badgeScale: Float,
-    onRename: (String) -> Unit,
-    onAppClick: (AppItem) -> Unit,
-    onRemoveApp: (AppItem) -> Unit,
-    onAddApps: (List<String>) -> Unit,
-    onDelete: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var showAdd by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
-        ) {
-            var name by remember(folder.id) { mutableStateOf(folder.name) }
-            CommitWhenIdle(folder.id, name, commit = onRename)
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                label = { Text(stringResource(R.string.folder_name_label)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (folder.apps.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.folder_remove_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 280.dp),
-                ) {
-                    items(items = folder.apps, key = { it.key }, contentType = { "app" }) { app ->
-                        AppIcon(
-                            appItem = app,
-                            labelColor = MaterialTheme.colorScheme.onSurface,
-                            showLabel = true,
-                            badgeCount = badges[app.badgeKey] ?: 0,
-                            badgeShowCount = badgeShowCount,
-                            badgeScale = badgeScale,
-                            modifier = Modifier
-                                .combinedClickable(
-                                    onClick = { onAppClick(app) },
-                                    onLongClick = { onRemoveApp(app) },
-                                )
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showAdd = true }) { Text(stringResource(R.string.folder_add_apps)) }
-                TextButton(onClick = onDelete) { Text(stringResource(R.string.folder_delete)) }
-            }
-        }
-    }
-    if (showAdd) {
-        AddAppsDialog(
-            apps = candidateApps,
-            onConfirm = {
-                onAddApps(it)
-                showAdd = false
-            },
-            onDismiss = { showAdd = false },
-        )
-    }
-}
-
-/** Multi-select picker of apps to add to a drawer folder. */
-@Composable
-private fun AddAppsDialog(apps: List<AppItem>, onConfirm: (List<String>) -> Unit, onDismiss: () -> Unit) {
-    val selected = remember { mutableStateListOf<String>() }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.folder_add_apps)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                apps.forEach { app ->
-                    val checked = app.key in selected
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { if (checked) selected.remove(app.key) else selected.add(app.key) }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = checked,
-                            onCheckedChange = { if (it) selected.add(app.key) else selected.remove(app.key) },
-                        )
-                        AppIcon(appItem = app, labelColor = MaterialTheme.colorScheme.onSurface, showLabel = false, iconSize = 32.dp)
-                        Text(
-                            text = app.label,
-                            modifier = Modifier.padding(start = 12.dp),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(selected.toList()) },
-                enabled = selected.isNotEmpty(),
-            ) { Text(stringResource(R.string.folder_add)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.folder_cancel)) } },
-    )
-}
-
-/** The "most used" apps in a rounded Version C card above the alphabetical grid. The same apps also
- *  stay in the A–Z list below; this card is just a distinct quick-access shortcut row. Icons span
- *  the drawer columns (left-aligned), so the row tracks the icon-count setting. */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun FrequentAppsCard(
-    apps: List<AppItem>,
-    columns: Int,
-    badges: Map<String, Int>,
-    badgeShowCount: Boolean,
-    badgeScale: Float,
-    showLabels: Boolean,
-    iconSize: Dp,
-    onAppClick: (AppItem) -> Unit,
-    onAppLongClick: (AppItem, Rect) -> Unit,
-) {
-    val p = LocalExpressivePalette.current
-    Surface(
-        color = p.surfaceHi,
-        shape = RoundedCornerShape(20.dp),
-        shadowElevation = p.shadow,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 10.dp),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
-            Text(
-                text = stringResource(R.string.drawer_frequent_apps),
-                color = p.dim,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
-            )
-            Row(modifier = Modifier.fillMaxWidth()) {
-                apps.forEach { app ->
-                    // Where the icon is, read when a long press or drag needs it (not on every scroll frame).
-                    val placedAt = remember(app.key) { arrayOfNulls<LayoutCoordinates>(1) }
-                    val bounds = { placedAt[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero }
-                    AppIcon(
-                        appItem = app,
-                        labelColor = MaterialTheme.colorScheme.onSurface,
-                        showLabel = showLabels,
-                        iconSize = iconSize,
-                        badgeCount = badges[app.badgeKey] ?: 0,
-                        badgeShowCount = badgeShowCount,
-                        badgeScale = badgeScale,
-                        modifier = Modifier
-                            .weight(1f)
-                            .onPlaced { placedAt[0] = it }
-                            .combinedClickable(
-                                onClick = { onAppClick(app) },
-                                onLongClick = { onAppLongClick(app, bounds()) },
-                            )
-                            .padding(vertical = 4.dp, horizontal = 2.dp),
-                    )
-                }
-                // Keep icons aligned to the leftmost columns when fewer than a full row are used.
-                if (apps.size < columns) {
-                    Spacer(Modifier.weight((columns - apps.size).toFloat()))
-                }
-            }
-        }
-    }
-}
-
-/** The drawer app-grid cell, shared by the idle and searching layouts. */
-private fun LazyGridScope.appCells(
-    apps: List<AppItem>,
-    badges: Map<String, Int>,
-    badgeShowCount: Boolean,
-    badgeScale: Float,
-    showLabels: Boolean,
-    iconSize: Dp,
-    onAppClick: (AppItem) -> Unit,
-    onAppLongClick: (AppItem, Rect) -> Unit,
-    dragController: HomeDragController,
-    onDragOutStart: () -> Unit,
-    onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
-    onDropOnDock: (AppItem) -> Unit,
-    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
-    locked: Boolean,
-) {
-    items(items = apps, key = { it.key }, contentType = { "app" }) { app ->
-        // Where the icon is, read when a long press or drag needs it (not on every scroll frame).
-        val placedAt = remember { arrayOfNulls<LayoutCoordinates>(1) }
-        val bounds = { placedAt[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero }
-        AppIcon(
-            appItem = app,
-            labelColor = MaterialTheme.colorScheme.onSurface,
-            showLabel = showLabels,
-            iconSize = iconSize,
-            badgeCount = badges[app.badgeKey] ?: 0,
-            badgeShowCount = badgeShowCount,
-            badgeScale = badgeScale,
-            modifier = Modifier
-                .onPlaced { placedAt[0] = it }
-                // One unified gesture (like Workspace/Dock) but non-consuming until the
-                // long-press fires, so a quick drag still scrolls the grid: quick tap
-                // launches; a still long-press lifts → drag out to home/dock, or with no
-                // movement opens the long-press menu.
-                .pointerInput(app.key, locked) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val slop = viewConfiguration.touchSlop
-                        // 0 = long-press (timed out still), 1 = tap, 2 = scroll/abandon.
-                        var outcome = 0
-                        withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                            while (true) {
-                                val ev = awaitPointerEvent()
-                                val c = ev.changes.firstOrNull { it.id == down.id }
-                                if (c == null) {
-                                    outcome = 2
-                                    return@withTimeoutOrNull
-                                }
-                                if (!c.pressed) {
-                                    outcome = 1
-                                    return@withTimeoutOrNull
-                                }
-                                // Don't consume: let the LazyGrid scroll a quick drag.
-                                if (c.isConsumed ||
-                                    (c.position - down.position).getDistance() > slop
-                                ) {
-                                    outcome = 2
-                                    return@withTimeoutOrNull
-                                }
-                            }
-                        }
-                        when (outcome) {
-                            1 -> {
-                                onAppClick(app)
-                                return@awaitEachGesture
-                            }
-                            2 -> return@awaitEachGesture
-                        }
-                        // Desktop locked: long-press does nothing (no menu, no drag-out); tap still launches.
-                        if (locked) return@awaitEachGesture
-                        // LONG PRESS → lift into the shared controller (drawer source).
-                        // The finger's root position is the icon's [bounds] top-left
-                        // (captured while the drawer is open) plus the pointer's local
-                        // position. The drawer is hidden with alpha (not translated) during
-                        // the drag, so its local coordinate space stays put and this stays
-                        // accurate.
-                        dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position)
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        try {
-                            val completed = drag(down.id) { change ->
-                                change.consume()
-                                // Only commit to a drag-out once the finger has moved past the
-                                // slop — otherwise a still long-press (with finger jitter) would
-                                // collapse the drawer instead of just showing the menu.
-                                if (!dragController.moving &&
-                                    (change.position - down.position).getDistance() > slop
-                                ) {
-                                    dragController.beginMove()
-                                    onDragOutStart()
-                                }
-                                if (dragController.moving) {
-                                    dragController.update(bounds().topLeft + change.position)
-                                }
-                            }
-                            if (completed && dragController.moving) {
-                                val root = dragController.rootPosition
-                                when {
-                                    // The "split" target on home: the partner picker opens.
-                                    dragController.dropOnSplit(app, root) -> Unit
-                                    dragController.isOverDock(root) && dragController.dockHasSpace ->
-                                        onDropOnDock(app)
-                                    dragController.isOverGrid(root) -> {
-                                        val (page, cx, cy) = dragController.cellAt(root)
-                                        onDropOnHome(app, page, cx, cy)
-                                    }
-                                }
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            } else if (completed) {
-                                // No movement → static long-press → show the menu by the icon.
-                                onAppLongClick(app, bounds())
-                            }
-                        } finally {
-                            // Reset even on cancellation (node disposed / pointerInput restarted),
-                            // mirroring Workspace's local-drag path, so a dead gesture can't leave
-                            // the shared controller lifted.
-                            dragController.stop()
-                        }
-                    }
-                }
-                .padding(vertical = 10.dp, horizontal = 4.dp),
-        )
-    }
-}
-
-/** The Gemini app, and Google's Gemini-powered "AI Mode" search page (which takes the query in its URL). */
-private const val GEMINI_PACKAGE = "com.google.android.apps.bard"
-private const val GEMINI_SEARCH_URL = "https://www.google.com/search?udm=50&q="
-
-/**
- * Hands [query] to the system's web search. A device without one gets Gemini instead: the query is
- * shared to the Gemini app when it is installed, otherwise the Gemini-powered search page opens.
- */
-private fun launchWebSearch(context: android.content.Context, query: String) {
-    if (query.isBlank()) return
-    val started = runCatching {
-        context.startActivity(
-            Intent(Intent.ACTION_WEB_SEARCH)
-                .putExtra(android.app.SearchManager.QUERY, query)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }.isSuccess
-    if (started) return
-    val sharedToGemini = runCatching {
-        context.startActivity(
-            Intent(Intent.ACTION_SEND)
-                .setType("text/plain")
-                .putExtra(Intent.EXTRA_TEXT, query)
-                .setPackage(GEMINI_PACKAGE)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }.isSuccess
-    if (!sharedToGemini) {
-        runCatching {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(GEMINI_SEARCH_URL + android.net.Uri.encode(query)))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        }
-    }
-}
-
-/** The drawer's folders as a row of tabs: "All" plus one per folder; the open one is filled. */
-@Composable
-private fun DrawerTabRow(tabs: List<Pair<Long, String>>, selected: Long?, onSelect: (Long?) -> Unit) {
-    val palette = LocalExpressivePalette.current
-    val accent = LocalAccent.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        val all: List<Pair<Long?, String>> =
-            listOf<Pair<Long?, String>>(null to stringResource(R.string.drawer_tab_all)) + tabs
-        all.forEach { (id, name) ->
-            val isSelected = id == selected
-            Text(
-                text = name,
-                color = if (isSelected) Color.White else palette.text,
-                fontSize = 14.sp,
-                maxLines = 1,
-                modifier = Modifier
-                    .background(if (isSelected) accent else palette.btn, RoundedCornerShape(50))
-                    .clickable { onSelect(id) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun CalcResultCard(calc: SearchResult.Calculation, onCopy: () -> Unit) {
-    val p = LocalExpressivePalette.current
-    ExpressiveCard(onClick = onCopy) {
-        Text("${calc.expression} = ", color = p.dim, fontSize = 18.sp)
-        Text(calc.result, color = LocalAccent.current, fontSize = 22.sp,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun ContactResultRow(contact: SearchResult.Contact, onOpened: () -> Unit) {
-    val context = LocalContext.current
-    val p = LocalExpressivePalette.current
-    val callDesc = stringResource(R.string.search_contact_call)
-    val messageDesc = stringResource(R.string.search_contact_message)
-    ExpressiveCard(onClick = {
-        runCatching {
-            context.startActivity(
-                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(contact.lookupUri))
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-            onOpened()
-        }
-    }) {
-        // Avatar is decorative here — the contact name provides the accessible label.
-        ContactAvatar(name = contact.name, photoUri = contact.photoUri)
-        Text(contact.name, color = p.text, fontSize = 16.sp,
-            modifier = Modifier.weight(1f).padding(start = 14.dp))
-        if (contact.number != null) {
-            IconButton(onClick = {
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(android.content.Intent.ACTION_DIAL,
-                            android.net.Uri.fromParts("tel", contact.number, null))
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                    onOpened()
-                }
-            }) { Icon(painter = painterResource(LauncherIcons.Call), contentDescription = callDesc, tint = LocalAccent.current) }
-            IconButton(onClick = {
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(android.content.Intent.ACTION_SENDTO,
-                            android.net.Uri.fromParts("smsto", contact.number, null))
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                    onOpened()
-                }
-            }) { Icon(painter = painterResource(LauncherIcons.Message), contentDescription = messageDesc, tint = LocalAccent.current) }
         }
     }
 }

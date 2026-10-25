@@ -46,3 +46,6 @@ Android launcherin teeman asetukset.zip
 *.txt
 *.apk
 
+
+# Editor / script backups
+*.bak

@@ -70,6 +70,9 @@ object RootShell {
         }
     }
 
+    /** The shell started for root. Tests on a PC set it to `sh` to run the same code without root. */
+    @Volatile internal var binary: String = "su"
+
     /** Closes the shell (it is opened again by the next command). */
     fun close() {
         synchronized(lock) {
@@ -177,7 +180,7 @@ object RootShell {
 
         companion object {
             fun start(): Session? = runCatching {
-                Session(ProcessBuilder("su").redirectErrorStream(false).start())
+                Session(ProcessBuilder(binary).redirectErrorStream(false).start())
             }.getOrNull()
 
             private fun lastIndexOf(bytes: ByteArray, size: Int, needle: ByteArray): Int {

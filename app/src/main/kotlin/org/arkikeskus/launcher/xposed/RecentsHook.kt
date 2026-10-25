@@ -4,7 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.database.ContentObserver
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.SystemClock
 import de.robv.android.xposed.IXposedHookLoadPackage
@@ -59,12 +61,13 @@ class RecentsHook : IXposedHookLoadPackage {
 
         XposedBridge.hookAllMethods(helper, "addCommand", object : XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
-                val type = param.args?.getOrNull(0) as? Int ?: return
-                if (type != TYPE_SHOW && type != TYPE_TOGGLE && type != TYPE_KEYBOARD_INPUT) return
+                val kind = commandKind(param.args?.getOrNull(0)) ?: return
+                if (kind != KIND_SHOW && kind != KIND_TOGGLE && kind != KIND_KEYBOARD) return
                 // Swipe-to-split also sends TOGGLE, but through its own method (not this one).
                 val context = appContext() ?: return
                 if (!replaceOn(context)) return
-                openFolarkRecents(context, toggle = type == TYPE_TOGGLE)
+                openFolarkRecents(context, toggle = kind == KIND_TOGGLE)
+                // addCommand returns nothing in older launchers, a CommandInfo (nullable) in newer.
                 param.result = null
             }
         })
@@ -95,6 +98,21 @@ class RecentsHook : IXposedHookLoadPackage {
         }
     }
 
+    /**
+     * The Recents command's kind: an Int constant in older Launcher3, an enum (CommandType: SHOW,
+     * KEYBOARD_INPUT, HIDE, TOGGLE, HOME) since Launcher3's OverviewCommandHelper went Kotlin.
+     */
+    private fun commandKind(arg: Any?): String? = when (arg) {
+        is Enum<*> -> arg.name
+        is Int -> when (arg) {
+            TYPE_SHOW -> KIND_SHOW
+            TYPE_KEYBOARD_INPUT -> KIND_KEYBOARD
+            TYPE_TOGGLE -> KIND_TOGGLE
+            else -> null
+        }
+        else -> null
+    }
+
     private fun find(name: String, loader: ClassLoader): Class<*>? =
         runCatching { XposedHelpers.findClass(name, loader) }.getOrNull()
 
@@ -106,19 +124,39 @@ class RecentsHook : IXposedHookLoadPackage {
 
     @Volatile private var cachedAt = 0L
     @Volatile private var cached = false
-
     @Volatile private var cachedSearch = false
+    @Volatile private var fetching = false
+    @Volatile private var observing = false
 
-    /** Folark's two switches, asked together and kept for a second. */
-    private fun state(context: Context): Int {
-        val now = SystemClock.uptimeMillis()
-        if (now - cachedAt < CACHE_MS) return packed()
+    /**
+     * Folark is asked on a thread of its own, never on the launcher's main thread: these hooks run
+     * there (the Recents button, the end of a swipe), and a call into Folark can take long when
+     * Folark has to be started first. The answer is kept and reused; it is asked again in the
+     * background when Folark says a switch changed (a ContentObserver), and otherwise when it is
+     * older than [CACHE_MS] — then the next press already sees the new answer.
+     */
+    private val worker by lazy { Handler(HandlerThread("folark-state").apply { start() }.looper) }
+
+    private fun fetch(context: Context) {
         val bundle = runCatching {
             context.contentResolver.call(Uri.parse("content://$STATE_AUTHORITY"), "state", null, null)
-        }.getOrNull()
-        cached = bundle?.getBoolean("replace", false) == true
-        cachedSearch = bundle?.getBoolean("search", false) == true
-        cachedAt = now
+        }.getOrNull() ?: return // Folark not answering: keep the last known answer
+        cached = bundle.getBoolean("replace", false)
+        cachedSearch = bundle.getBoolean("search", false)
+        cachedAt = SystemClock.uptimeMillis()
+    }
+
+    private fun refreshInBackground(context: Context) {
+        if (fetching) return
+        fetching = true
+        worker.post {
+            try { fetch(context) } finally { fetching = false }
+        }
+    }
+
+    /** Folark's two switches as last known; refreshed in the background when old. */
+    private fun state(context: Context): Int {
+        if (SystemClock.uptimeMillis() - cachedAt >= CACHE_MS) refreshInBackground(context)
         return packed()
     }
 
@@ -127,12 +165,29 @@ class RecentsHook : IXposedHookLoadPackage {
     private fun replaceOn(context: Context): Boolean = state(context) and 1 != 0
     private fun searchOn(context: Context): Boolean = state(context) and 2 != 0
 
-    /** Pings Folark's state provider once the launcher's app context is up (announces the module). */
+    /** Folark tells the launcher when one of its switches changes (see LauncherApplication). */
+    private fun observe(context: Context) {
+        if (observing) return
+        observing = runCatching {
+            context.contentResolver.registerContentObserver(
+                Uri.parse("content://$STATE_AUTHORITY/state"), false,
+                object : ContentObserver(worker) {
+                    override fun onChange(selfChange: Boolean) = fetch(context)
+                },
+            )
+            true
+        }.getOrElse {
+            log("can't watch Folark's switches ($it); asking from time to time instead")
+            false
+        }
+    }
+
+    /** Asks Folark once the launcher's app context is up (announces the module), then watches it. */
     private fun pingWhenReady(tries: Int) {
         val context = appContext()
         if (context != null) {
-            cachedAt = 0L
-            runCatching { state(context) }
+            worker.post { fetch(context) }
+            observe(context)
             return
         }
         if (tries < PING_MAX_TRIES) main.postDelayed({ pingWhenReady(tries + 1) }, PING_RETRY_MS)
@@ -185,7 +240,12 @@ class RecentsHook : IXposedHookLoadPackage {
 
         /** Lets the launcher's own swipe-home finish before Folark Recents opens over home. */
         private const val AFTER_HOME_MS = 260L
-        private const val CACHE_MS = 1_000L
+        /** How old Folark's answer may be before it is asked again (in the background). */
+        private const val CACHE_MS = 30_000L
+
+        private const val KIND_SHOW = "SHOW"
+        private const val KIND_TOGGLE = "TOGGLE"
+        private const val KIND_KEYBOARD = "KEYBOARD_INPUT"
         private const val PING_RETRY_MS = 1_500L
         private const val PING_MAX_TRIES = 12
     }

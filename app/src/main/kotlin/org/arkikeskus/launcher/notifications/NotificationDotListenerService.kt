@@ -141,6 +141,9 @@ class NotificationDotListenerService : NotificationListenerService() {
         const val MAX_SNAPSHOT_RETRIES = 2
         const val SNAPSHOT_RETRY_DELAY_MS = 500L
 
+        /** How long posts and removals are gathered into one rebuild (well under a frame's notice). */
+        const val COALESCE_MS = 40L
+
         /** Grace period for legacy snoozes to reappear before deleting stale bookkeeping. */
         const val RELEASE_SLACK_MS = 60_000L
     }
@@ -151,7 +154,27 @@ class NotificationDotListenerService : NotificationListenerService() {
     private fun refreshWithRetries() {
         snapshotRetriesLeft = MAX_SNAPSHOT_RETRIES
         handler.removeCallbacks(retryRefresh)
+        handler.removeCallbacks(coalescedRefresh)
+        refreshQueued = false
         refresh()
+    }
+
+    /**
+     * For posts and removals: one rebuild for a burst. A messaging app waking from Doze can post a
+     * dozen notifications within a few ms; each rebuild reads Android's whole list and redraws the
+     * dots, the people tiles and the notifications widget, so they are gathered for [COALESCE_MS]
+     * and done once. A steady stream still refreshes every [COALESCE_MS], never later.
+     */
+    private fun scheduleRefresh() {
+        if (refreshQueued) return
+        refreshQueued = true
+        handler.postDelayed(coalescedRefresh, COALESCE_MS)
+    }
+
+    private var refreshQueued = false
+    private val coalescedRefresh = Runnable {
+        refreshQueued = false
+        refreshWithRetries()
     }
 
     override fun onListenerConnected() {
@@ -212,6 +235,8 @@ class NotificationDotListenerService : NotificationListenerService() {
         connected = false
         handler.removeCallbacks(retryRefresh)
         handler.removeCallbacks(deliverBatch)
+        handler.removeCallbacks(coalescedRefresh)
+        refreshQueued = false
         stopPackageRefresh()
         settingsJob?.cancel()
         settingsJob = null
@@ -236,7 +261,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         if (sbn != null && isHeadsUpWorthy(sbn) && shouldAlert(sbn)) badgeRepository.notifyHeadsUp()
         if (sbn != null && settingsReady) holdForBatch(sbn)
         if (sbn != null) runCatching { maybeNudge(sbn) }
-        refreshWithRetries()
+        scheduleRefresh()
     }
 
     /** Notifications that already nudged their app's icon (a silent update must not nudge again). */
@@ -311,7 +336,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         // A user snoozing an already-held notification leaves its deadline intact. Only a real
         // removal (dismissed or cancelled by the app) forgets it.
         if (sbn != null && reason != REASON_SNOOZED && heldUntil.remove(sbn.key) != null) persistHeld()
-        refreshWithRetries()
+        scheduleRefresh()
     }
 
     /** A FLAG_ONLY_ALERT_ONCE notification heads-ups only on its FIRST post; a re-post (same key) must

@@ -10,6 +10,8 @@ import androidx.compose.ui.geometry.Rect
 /** Drop on the left half of a card: split view; on the right half: attached view. */
 internal const val COMBINE_SPLIT = "split"
 internal const val COMBINE_ATTACHED = "attached"
+/** Dropped on a split card: joins it as the third app (Settings ▸ Launch ▸ Real three-app split). */
+internal const val COMBINE_THIRD = "third"
 
 /**
  * Dragging one Recents card onto another (hold a card, then move it): which card is held, where
@@ -47,6 +49,9 @@ internal class RecentsDrag {
     val bounds = HashMap<Int, Rect>()
     var cards: List<RecentsCard> = emptyList()
 
+    /** Split cards (two apps) take a drop as their third app. */
+    var allowThird = false
+
     fun start(card: RecentsCard, at: Offset) {
         this.card = card
         origin = bounds[card.key]
@@ -65,9 +70,15 @@ internal class RecentsDrag {
 
     private fun update() {
         val held = card ?: return
-        val hit = cards.firstOrNull { it.key != held.key && !it.isSplit && bounds[it.key]?.contains(pointer) == true }
+        val hit = cards.firstOrNull {
+            it.key != held.key && (!it.isSplit || (allowThird && it.tasks.size == 2)) && bounds[it.key]?.contains(pointer) == true
+        }
         target = hit?.key
-        if (hit != null) mode = if (pointer.x < bounds.getValue(hit.key).center.x) COMBINE_SPLIT else COMBINE_ATTACHED
+        if (hit != null) mode = when {
+            hit.isSplit -> COMBINE_THIRD
+            pointer.x < bounds.getValue(hit.key).center.x -> COMBINE_SPLIT
+            else -> COMBINE_ATTACHED
+        }
     }
 
     /** Let go of the card: it will land on the card under the finger, or fly home. */

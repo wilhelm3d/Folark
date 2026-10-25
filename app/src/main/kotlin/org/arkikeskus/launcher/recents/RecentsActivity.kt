@@ -71,7 +71,9 @@ class RecentsActivity : ComponentActivity() {
                     },
                     onPeekSplit = { card -> viewModel.peekSplit(card, settings.recents.attachedSide); leave() },
                     onCombine = { dragged, target, how ->
-                        if (how == COMBINE_ATTACHED) {
+                        if (how == COMBINE_THIRD) {
+                            viewModel.addThird(target, dragged)
+                        } else if (how == COMBINE_ATTACHED) {
                             viewModel.openAttached(dragged, target, settings.recents.attachedSide, settings.recents.attachedPeek, windowManager.maximumWindowMetrics.bounds)
                         } else {
                             viewModel.openTogether(listOf(target, dragged), settings.recents.thirdInSplit, settings.launch.threeAppSplit)
@@ -80,6 +82,14 @@ class RecentsActivity : ComponentActivity() {
                     },
                     onAppInfo = { card -> viewModel.appInfo(card); leave() },
                     onTogglePin = viewModel::togglePin,
+                    onSavePair = { card ->
+                        val saved = viewModel.saveAsPair(card)
+                        android.widget.Toast.makeText(
+                            this,
+                            if (saved) org.arkikeskus.launcher.R.string.recents_pair_saved else org.arkikeskus.launcher.R.string.recents_pair_not_saved,
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    },
                     onDismiss = ::leave,
                 )
             }

@@ -68,23 +68,17 @@ import kotlin.math.abs
  * Every card keeps every gesture from Settings ▸ Recents ▸ Gestures (cardModifier).
  */
 
-@Composable
-private fun phoneAspect(): Float {
-    val c = LocalConfiguration.current
-    return (c.screenWidthDp.toFloat() / c.screenHeightDp.coerceAtLeast(1)).coerceIn(0.4f, 2f)
-}
-
-private fun RecentsEnv.scale(): Float = settings.recents.cardHeight / 300f
+// screenAspect() and sizeScale() are shared with the classic looks (RecentsThemes.kt).
 
 // ---------------------------------------------------------------------------- Stack
 
 @Composable
 internal fun StackTheme(cards: List<RecentsCard>, env: RecentsEnv) {
-    val aspect = phoneAspect()
+    val aspect = screenAspect()
     val list = rememberLazyListState()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > 600.dp
-        val cardWidth = (maxWidth * (if (wide) 0.5f else 0.9f) * env.scale()).coerceIn(180.dp, maxWidth * 0.95f)
+        val cardWidth = (maxWidth * (if (wide) 0.5f else 0.9f) * env.sizeScale()).coerceIn(180.dp, maxWidth * 0.95f)
         val pictureHeight = (cardWidth / aspect * 0.8f).coerceAtMost(maxHeight * 0.6f)
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -135,11 +129,11 @@ internal fun StackTheme(cards: List<RecentsCard>, env: RecentsEnv) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ArcTheme(cards: List<RecentsCard>, env: RecentsEnv) {
-    val aspect = phoneAspect()
+    val aspect = screenAspect()
     val list = rememberLazyListState()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > 600.dp
-        val cardWidth = (maxWidth * (if (wide) 0.4f else 0.68f) * env.scale()).coerceIn(150.dp, maxWidth * 0.9f)
+        val cardWidth = (maxWidth * (if (wide) 0.4f else 0.68f) * env.sizeScale()).coerceIn(150.dp, maxWidth * 0.9f)
         val pictureHeight = (cardWidth / aspect).coerceAtMost(maxHeight * 0.6f)
         LazyRow(
             Modifier.fillMaxSize(),
@@ -181,13 +175,13 @@ internal fun ArcTheme(cards: List<RecentsCard>, env: RecentsEnv) {
 
 @Composable
 internal fun BentoTheme(cards: List<RecentsCard>, env: RecentsEnv) {
-    val aspect = phoneAspect()
+    val aspect = screenAspect()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth > 600.dp
         val columns = if (wide) 6 else 4
         val gap = 12.dp
         val tile = (maxWidth - gap * (columns - 1)) / columns
-        val hero = (maxWidth / aspect * 0.5f).coerceIn(160.dp, maxHeight * 0.42f) * env.scale().coerceIn(0.7f, 1.4f)
+        val hero = (maxWidth / aspect * 0.5f).coerceIn(160.dp, maxHeight * 0.42f) * env.sizeScale().coerceIn(0.7f, 1.4f)
         val medium = hero * 0.62f
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
@@ -252,7 +246,7 @@ private fun BentoTile(card: RecentsCard, env: RecentsEnv, cardModifier: Modifier
 @Composable
 internal fun FilmstripTheme(cards: List<RecentsCard>, env: RecentsEnv) {
     if (cards.isEmpty()) return
-    val aspect = phoneAspect()
+    val aspect = screenAspect()
     val pager = rememberPagerState(pageCount = { cards.size })
     val strip = rememberLazyListState()
     val scope = rememberCoroutineScope()

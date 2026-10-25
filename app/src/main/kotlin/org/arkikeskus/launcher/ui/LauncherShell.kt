@@ -70,6 +70,8 @@ import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.feature.home.TaskbarSpace
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import org.arkikeskus.launcher.ui.component.LocalIconNudges
 import org.arkikeskus.launcher.ui.component.IconNudges
 import org.arkikeskus.launcher.ui.component.IconNudgeEvent
@@ -398,6 +400,18 @@ fun LauncherShell(
                     )
                 } else {
                     LivePill(
+                        // Several at once: a sideways swipe shows the next (or the one before).
+                        modifier = if (live.size < 2) Modifier else Modifier.pointerInput(live.size) {
+                            var dragged = 0f
+                            val step = 36.dp.toPx()
+                            detectHorizontalDragGestures(
+                                onDragStart = { dragged = 0f },
+                                onDragEnd = {
+                                    if (dragged <= -step) liveIndex++
+                                    else if (dragged >= step) liveIndex = (liveIndex - 1 + live.size) % live.size
+                                },
+                            ) { change, amount -> change.consume(); dragged += amount }
+                        },
                         activity = shownLive,
                         effect = shellSettings.live.activityEffect,
                         animate = !batterySaver,

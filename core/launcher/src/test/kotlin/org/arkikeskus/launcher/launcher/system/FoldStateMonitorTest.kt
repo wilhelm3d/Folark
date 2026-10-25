@@ -159,7 +159,7 @@ class FoldStateMonitorTest {
 
     @Test
     @Config(qualifiers = "w360dp-h840dp-xxhdpi")
-    fun `isInnerDisplay returns false on outer outer screen 1080x2520`() {
+    fun `isInnerDisplay returns false on outer screen 1080x2520`() {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
 
@@ -185,7 +185,7 @@ class FoldStateMonitorTest {
 
     @Test
     @Config(qualifiers = "w360dp-h840dp-xxhdpi")
-    fun `computeFoldState returns CLOSED on outer outer display even if previousFoldState was OPENED`() {
+    fun `computeFoldState returns CLOSED on outer display even if previousFoldState was OPENED`() {
         val controller = Robolectric.buildActivity(Activity::class.java)
         val activity = controller.get()
 

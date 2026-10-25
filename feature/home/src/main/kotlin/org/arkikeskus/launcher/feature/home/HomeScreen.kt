@@ -13,14 +13,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,22 +32,14 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -66,7 +50,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,15 +57,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -90,23 +67,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -117,14 +88,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.data.FolarkRecents
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.AppActionPopup
 import org.arkikeskus.launcher.ui.AppActions
-import org.arkikeskus.launcher.ui.AppShortcuts
 import org.arkikeskus.launcher.ui.DefaultLauncher
 import org.arkikeskus.launcher.ui.DragSource
 import org.arkikeskus.launcher.ui.HomeDragController
@@ -134,21 +103,16 @@ import org.arkikeskus.launcher.ui.LauncherIcons
 import org.arkikeskus.launcher.ui.PopupAction
 import org.arkikeskus.launcher.ui.RenameDialog
 import org.arkikeskus.launcher.ui.rememberHomeDragController
-import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
 import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
-import org.arkikeskus.launcher.ui.component.rememberParallaxOffset
 import org.arkikeskus.launcher.ui.component.LocalBatterySaver
-import org.arkikeskus.launcher.ui.component.LocalHomeCovered
-import org.arkikeskus.launcher.ui.component.LocalFoldState
 import org.arkikeskus.launcher.ui.component.LocalIconPack
 import org.arkikeskus.launcher.data.MotoLinks
 import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -1171,218 +1135,6 @@ fun HomeScreen(
     }
 }
 
-/**
- * Root-level home swipe-up/down detector — the Pixel-style fix for "the drawer swipe only catches on
- * empty space". Applied to HomeScreen's root Box and run in [PointerEventPass.Initial] (parent before
- * children), so it sees movement *before* the icons, folders, shortcuts, dock and the HorizontalPager.
- *
- * It does NOT consume the DOWN and only consumes once the gesture is clearly vertical past the touch
- * slop — so taps, long-presses and horizontal page swipes pass through untouched, while a flick up
- * from anywhere on the home surface reliably "catches" and drives the drawer (the root cause of the
- * old bug: the detector lived on the page background, so icons/dock won the gesture first).
- *
- * - Swipe up (with [swipeUpAction]) → finger-following drawer via [onDrawerDrag] / [onDrawerSettle].
- * - Swipe down (with [swipeDownAction]) → [onAction] (one-shot).
- * - A real long-press drag — an app/dock item ([HomeDragController.isDragging]) or a folder/shortcut
- *   ([HomeDragController.localGestureActive] / [HomeDragController.localDragging]) — is never stolen;
- *   the detector bails out so the drag owns the gesture.
- *
- * The velocity tracker is fed the UP position *before* `calculateVelocity()` so a fast flick reports
- * its true release speed (the old detector computed velocity without the final sample, which made fast
- * flicks under-settle and snap shut).
- */
-@Composable
-private fun Modifier.pixelHomeSwipe(
-    swipeUpAction: String,
-    swipeDownAction: String,
-    dragController: HomeDragController,
-    onDrawerDrag: (Float) -> Unit,
-    onDrawerSettle: (Float) -> Unit,
-    onAction: (String) -> Unit,
-    leftEdgeEnabled: Boolean = false,
-    atLeftEdge: () -> Boolean = { false },
-    onLeftEdgeAction: () -> Unit = {},
-    rightEdgeEnabled: Boolean = false,
-    atRightEdge: () -> Boolean = { false },
-    onRightEdgeAction: () -> Unit = {},
-    iconSwipeEnabled: Boolean = false,
-    onIconSwipe: (AppItem, Offset) -> Unit = { _, _ -> },
-): Modifier {
-    val latestSwipeUpAction by rememberUpdatedState(swipeUpAction)
-    val latestSwipeDownAction by rememberUpdatedState(swipeDownAction)
-    val latestOnDrawerDrag by rememberUpdatedState(onDrawerDrag)
-    val latestOnDrawerSettle by rememberUpdatedState(onDrawerSettle)
-    val latestOnAction by rememberUpdatedState(onAction)
-    val latestOnLeftEdgeAction by rememberUpdatedState(onLeftEdgeAction)
-    val latestOnRightEdgeAction by rememberUpdatedState(onRightEdgeAction)
-    val latestAtLeftEdge by rememberUpdatedState(atLeftEdge)
-    val latestAtRightEdge by rememberUpdatedState(atRightEdge)
-    val latestIconSwipeEnabled by rememberUpdatedState(iconSwipeEnabled)
-    val latestOnIconSwipe by rememberUpdatedState(onIconSwipe)
-
-    return pointerInput(swipeUpAction, swipeDownAction, leftEdgeEnabled, rightEdgeEnabled, dragController) {
-        val touchSlop = viewConfiguration.touchSlop
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            // A touch that starts inside a scrollable collection widget (e.g. WhatsApp's chat list)
-            // belongs to that widget's own list — bail without consuming so the scroll falls through to
-            // the embedded AppWidgetHostView instead of the swipe-up stealing the vertical drag.
-            if (dragController.isOverScrollableWidget(down.position)) return@awaitEachGesture
-            // A touch that starts on the dock belongs to the dock's own gestures (tap / long-press for
-            // the shortcut popup / drag to reorder or onto home). Bail so the dock owns it end-to-end —
-            // otherwise this Initial-pass detector steals a small upward drift during a dock long-press,
-            // cancelling the popup and half-opening the drawer (the "2/10 on Samsung" flakiness). Swipe
-            // up to open the drawer still works from anywhere above the dock.
-            if (dragController.isOverDock(down.position)) return@awaitEachGesture
-            val velocityTracker = VelocityTracker()
-            velocityTracker.addPosition(down.uptimeMillis, down.position)
-            // 0 = undecided, 1 = drawer up-drag, 2 = left-edge action, 3 = notification shade, 4 = right-edge action
-            // 5 = swipe up that started on an app icon (see [iconSwipeEnabled]).
-            var mode = 0
-            var swipedApp: AppItem? = null
-            var lastY = down.position.y
-
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                velocityTracker.addPosition(change.uptimeMillis, change.position)
-
-                // Never steal a real long-press drag (an app/dock item, or a folder/shortcut).
-                if (dragController.isDragging ||
-                    dragController.localGestureActive ||
-                    dragController.localDragging
-                ) {
-                    break
-                }
-
-                if (!change.pressed) {
-                    if (mode == 1) {
-                        val finalDy = change.position.y - lastY
-                        if (finalDy != 0f) latestOnDrawerDrag(finalDy)
-                        latestOnDrawerSettle(velocityTracker.calculateVelocity().y)
-                        mode = 0
-                    } else if (mode == 2) {
-                        if (change.position.x - down.position.x > size.width * 0.25f) latestOnLeftEdgeAction()
-                    } else if (mode == 4) {
-                        if (down.position.x - change.position.x > size.width * 0.25f) latestOnRightEdgeAction()
-                    } else if (mode == 5) {
-                        val app = swipedApp
-                        // A deliberate flick, not a twitch: the finger has to travel a little way up.
-                        if (app != null && down.position.y - change.position.y > 40.dp.toPx()) {
-                            latestOnIconSwipe(app, down.position)
-                        }
-                    }
-                    break
-                }
-
-                val dx = change.position.x - down.position.x
-                val dy = change.position.y - down.position.y
-
-                if (mode == 0) {
-                    when {
-                        abs(dy) > touchSlop && abs(dy) > abs(dx) -> when {
-                            dy < 0f -> {
-                                val action = latestSwipeUpAction
-                                val iconApp = if (latestIconSwipeEnabled) dragController.appAt?.invoke(down.position) else null
-                                if (iconApp != null) {
-                                    // The swipe started on an app icon that has its own swipe action.
-                                    swipedApp = iconApp
-                                    mode = 5
-                                    change.consume()
-                                } else if ((action == LauncherSettings.GESTURE_DRAWER || action == LauncherSettings.GESTURE_SEARCH) &&
-                                    down.position.y > size.height * 0.15f
-                                ) {
-                                    mode = 1
-                                    change.consume()
-                                    latestOnDrawerDrag(dy) // jump to the finger, including the slop moved
-                                    lastY = change.position.y
-                                } else {
-                                    break
-                                }
-                            }
-                            dy > 0f -> {
-                                val action = latestSwipeDownAction
-                                if (action != LauncherSettings.GESTURE_NONE) {
-                                    mode = 3
-                                    change.consume()
-                                    latestOnAction(action)
-                                } else {
-                                    break
-                                }
-                            }
-                            else -> {
-                                break
-                            }
-                        }
-                        // Horizontal gesture.
-                        abs(dx) > touchSlop && abs(dx) >= abs(dy) -> {
-                            if (leftEdgeEnabled && dx > 0f && latestAtLeftEdge()) {
-                                mode = 2
-                                change.consume()
-                            } else if (rightEdgeEnabled && dx < 0f && latestAtRightEdge()) {
-                                mode = 4
-                                change.consume()
-                            } else {
-                                break
-                            }
-                        }
-                    }
-                } else if (mode == 1) {
-                    change.consume()
-                    latestOnDrawerDrag(change.position.y - lastY)
-                    lastY = change.position.y
-                } else {
-                    // mode >= 2: keep consuming so pager never grabs the rest of the gesture.
-                    change.consume()
-                }
-            }
-            if (mode == 1) {
-                latestOnDrawerSettle(velocityTracker.calculateVelocity().y)
-            }
-        }
-    }
-}
-
-/** In-flight widget bind/configure state. [restoreRowId] non-null = re-binding a restored placeholder
- *  row (from a backup) rather than adding a new widget. */
-private data class PendingWidgetBind(
-    val appWidgetId: Int,
-    val provider: AppWidgetProviderInfo,
-    val restoreRowId: Long?,
-    val placement: WidgetPlacement? = null,
-    /** Non-null = the new widget goes into this widget stack rather than onto a grid [placement]. */
-    val stackId: Long? = null,
-)
-
-/** Bundles [PendingWidgetBind] into saved instance state so an in-flight bind survives process death
- *  while the system bind dialog or the widget's configuration activity is in the foreground. */
-private val PendingWidgetBindSaver = Saver<PendingWidgetBind?, android.os.Bundle>(
-    save = { p ->
-        p?.let {
-            android.os.Bundle().apply {
-                putInt("id", it.appWidgetId)
-                putParcelable("provider", it.provider)
-                putLong("row", it.restoreRowId ?: -1L)
-                putLong("stack", it.stackId ?: -1L)
-                it.placement?.let { p ->
-                    putIntArray("placement", intArrayOf(p.page, p.cellX, p.cellY, p.spanX, p.spanY))
-                }
-            }
-        }
-    },
-    restore = { b ->
-        @Suppress("DEPRECATION")
-        val provider = b.getParcelable<AppWidgetProviderInfo>("provider")
-        provider?.let {
-            PendingWidgetBind(b.getInt("id"), it, b.getLong("row").takeIf { row -> row >= 0 },
-                b.getIntArray("placement")?.takeIf { p -> p.size == 5 }?.let { p ->
-                    WidgetPlacement(p[0], p[1], p[2], p[3], p[4])
-                },
-                b.getLong("stack", -1L).takeIf { stack -> stack >= 0 })
-        }
-    },
-)
-
 /** The long-pressed app and where its menu should anchor (which surface it came from). */
 private data class AppMenuTarget(
     val app: AppItem,
@@ -1392,19 +1144,3 @@ private data class AppMenuTarget(
 )
 
 /** The long-press menu is the shared [org.arkikeskus.launcher.ui.AppActionPopup] (core/ui). */
-
-/**
- * Runs the parallax sensor while home is in front, not covered and not in battery saver, and hands
- * its offset (one [State] for the screen's lifetime) to [out] for the home layer to read.
- */
-@Composable
-private fun HomeParallax(enabledSetting: Boolean, out: MutableState<State<Offset>?>) {
-    var homeResumed by remember { mutableStateOf(false) }
-    LifecycleResumeEffect(Unit) {
-        homeResumed = true
-        onPauseOrDispose { homeResumed = false }
-    }
-    val active = enabledSetting && homeResumed && !LocalBatterySaver.current && !LocalHomeCovered.current
-    val offset = rememberParallaxOffset(enabled = active)
-    SideEffect { if (out.value !== offset) out.value = offset }
-}

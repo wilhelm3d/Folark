@@ -33,6 +33,7 @@
     <string name="recents_time_days">%1$d days ago</string>
     <string name="recents_drop_split">Split view</string>
     <string name="recents_drop_attached">Attached view</string>
+    <string name="recents_drop_third">Add as third app</string>
     <string name="recents_drag_hint">drop on an app</string>
     <string name="recents_close_others">Close others</string>
     <string name="recents_close_all_pins_too">Close all (pins too)</string>
@@ -47,6 +48,9 @@
     <string name="xposed_description">Opens Folark Recents instead of the system launcher\'s Recents (swipe up and hold, the taskbar\'s Recents, the Recents key). Turn it on in Folark: Settings ▸ Recents ▸ Replace Android\'s Recents. In System UI it only tells Folark when the lock screen starts to leave, so the unlock-to-home animation starts in step, and, when Folark asks, adds a third app to a split screen or switches it to Android\'s peek view.</string>
     <string name="recents_menu_split_three">Split 3 apps</string>
     <string name="recents_menu_peek">Peek view</string>
+    <string name="recents_menu_save_pair">Save as app pair</string>
+    <string name="recents_pair_saved">Saved. Add it to home or the taskbar in Settings ▸ App pairs</string>
+    <string name="recents_pair_not_saved">Can\'t save: one of these apps isn\'t installed any more</string>
     <string name="recents_mode_two">2 apps</string>
     <string name="recents_mode_three">3 apps</string>
     <string name="recents_mode_peek">Peek</string>

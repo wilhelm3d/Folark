@@ -152,6 +152,8 @@ internal class RecentsEnv(
     val onPeekSplit: (RecentsCard) -> Unit = {},
     /** Closes every app (the Close all button), for the "Close all" gesture. */
     val onCloseAll: () -> Unit = {},
+    /** A split card's apps saved as an app pair (to open them together again from home or the taskbar). */
+    val onSavePair: (RecentsCard) -> Unit = {},
 ) {
     val speed: Float get() = settings.recents.animationSpeed
 
@@ -192,6 +194,7 @@ internal fun RecentsScreen(
     onAppInfo: (RecentsCard) -> Unit,
     onTogglePin: (RecentsCard) -> Unit,
     onDismiss: () -> Unit,
+    onSavePair: (RecentsCard) -> Unit = {},
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val onAccent = MaterialTheme.colorScheme.onPrimary
@@ -229,6 +232,7 @@ internal fun RecentsScreen(
     val drag = remember { RecentsDrag() }
     val menu = remember { RecentsMenuState() }
     drag.cards = state.cards
+    drag.allowThird = settings.launch.threeAppSplit
     val backdrop = rememberRecentsBackdrop(settings.recents.enterAnimation, settings.recents.animationSpeed, Unit)
 
     val env = RecentsEnv(
@@ -259,13 +263,41 @@ internal fun RecentsScreen(
         onPeekPick = { card -> selecting = true; peekPick = true; picked.clear(); picked.add(card); openAt = 2 },
         onPeekSplit = onPeekSplit,
         onCloseAll = onCloseAll,
+        onSavePair = onSavePair,
     )
     env.coverScreen = !wide
+
+    // Back undoes what is under way first (the menu, a drag, picking apps); only then does it leave.
+    androidx.activity.compose.BackHandler(enabled = menu.isOpen || drag.card != null || selecting) {
+        when {
+            menu.isOpen -> menu.close()
+            drag.card != null -> drag.cancel()
+            else -> { selecting = false; openAt = 2; peekPick = false; picked.clear() }
+        }
+    }
+    // Leaving with Android's back gesture: the cards shrink back with the finger, then Recents
+    // closes (let go early and they come back).
+    val backShrink = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.activity.compose.PredictiveBackHandler(enabled = !menu.isOpen && drag.card == null && !selecting) { progress ->
+        try {
+            progress.collect { backShrink.snapTo(it.progress) }
+            onDismiss()
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            backShrink.animateTo(0f)
+            throw e
+        }
+    }
 
     CompositionLocalProvider(LocalPressStyle provides PressStyle(settings.recents.pressAnimation, accent, settings.recents.animationSpeed)) {
     Box(
         Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                val k = backShrink.value
+                val sc = 1f - 0.1f * k
+                scaleX = sc; scaleY = sc
+                alpha = 1f - 0.4f * k
+            }
             // The backdrop fades in with the cards (read while drawing: no recomposition per frame).
             .drawBehind { drawRect(Color(0xFF05090A).copy(alpha = settings.recents.backdropDim * backdrop())) }
             // A tap on empty space goes back home.
@@ -529,8 +561,13 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
                     .clip(RoundedCornerShape(env.corner))
                     .background(Color(0xD905090A)),
             ) {
-                DropHalf(R.string.recents_drop_split, 1f - attached, env.accent, attachedDiagram = false, env, Modifier.weight(1f))
-                DropHalf(R.string.recents_drop_attached, attached, env.accent, attachedDiagram = true, env, Modifier.weight(1f))
+                if (drag.mode == COMBINE_THIRD) {
+                    // A split card: the held app joins it as the third.
+                    DropHalf(R.string.recents_drop_third, 1f, env.accent, attachedDiagram = false, env, Modifier.weight(1f), panes = 3)
+                } else {
+                    DropHalf(R.string.recents_drop_split, 1f - attached, env.accent, attachedDiagram = false, env, Modifier.weight(1f))
+                    DropHalf(R.string.recents_drop_attached, attached, env.accent, attachedDiagram = true, env, Modifier.weight(1f))
+                }
             }
         }
 
@@ -562,7 +599,7 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
 
 /** One half of the drop target: a small drawing of the result and its name; lit by [active] 0..1. */
 @Composable
-private fun DropHalf(label: Int, active: Float, accent: Color, attachedDiagram: Boolean, env: RecentsEnv, modifier: Modifier) {
+private fun DropHalf(label: Int, active: Float, accent: Color, attachedDiagram: Boolean, env: RecentsEnv, modifier: Modifier, panes: Int = 2) {
     val attachedLeft = env.settings.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_LEFT
     Column(
         modifier
@@ -580,9 +617,15 @@ private fun DropHalf(label: Int, active: Float, accent: Color, attachedDiagram: 
             val r = CornerRadius(5.dp.toPx())
             val gap = 4.dp.toPx()
             if (!attachedDiagram) {
-                val half = (size.width - gap) / 2
-                drawRoundRect(ink, Offset.Zero, Size(half, size.height), r, style = stroke)
-                drawRoundRect(ink, Offset(half + gap, 0f), Size(half, size.height), r, style = stroke)
+                val pane = (size.width - gap * (panes - 1)) / panes
+                for (i in 0 until panes) {
+                    // In the three-app drawing the new (third) pane is the filled one.
+                    val fill = panes == 3 && i == 2
+                    drawRoundRect(
+                        if (fill) ink.copy(alpha = ink.alpha * 0.7f) else ink, Offset(i * (pane + gap), 0f), Size(pane, size.height), r,
+                        style = if (fill) androidx.compose.ui.graphics.drawscope.Fill else stroke,
+                    )
+                }
             } else {
                 // The main app, with the other one peeking in at the chosen side.
                 val peek = size.width * 0.26f

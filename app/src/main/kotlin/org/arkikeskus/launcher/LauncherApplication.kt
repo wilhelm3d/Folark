@@ -12,6 +12,9 @@ import org.arkikeskus.launcher.data.root.RootFeatures
 import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.SettingsRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.CoroutineScope
 
 @HiltAndroidApp
@@ -37,6 +40,17 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                 RootFeatures.update(s)
                 RootGrants.restoreIfNeeded(this@LauncherApplication)
             }
+        }
+        // The Vector module in the system launcher keeps Folark's answer for Replace Android's
+        // Recents and the gesture handle's search: tell it when either changes.
+        appScope.launch {
+            settingsRepository.settings(ScreenType.INNER)
+                .map { (it.recents.enabled && it.recents.replaceSystem) to it.recents.navHandleOpensSearch }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect {
+                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.RecentsHookState.STATE_URI, null) }
+                }
         }
     }
 }
