@@ -55,14 +55,17 @@ julkinen, joten jokaisen väitteen voi tarkistaa itse:
   tallennetaan laitteelle odotustilan säilyttämiseksi uudelleenkäynnistyksessä,
   mutta niitä ei sisällytetä varmuuskopioihin.
 - **Leikepöydän historia** — vain kun leikepöydän historia -widget on
-  aloitusnäytöllä, Folark säilyttää 30 viimeksi kopioimaasi tekstiä, jotta ne
-  voi näyttää ja kopioida uudelleen. Android antaa vain edessä olevan
+  aloitusnäytöllä tai Asetukset ▸ Sovelluslaatikko ▸ Leikepöytärivi on päällä,
+  Folark säilyttää 30 viimeksi kopioimaasi asiaa (tekstit sekä kuvat pienenä
+  kopiona), jotta ne voi näyttää ja kopioida, avata, soittaa, hakea tai jakaa
+  uudelleen; Folark päättelee puhelimessa, onko leike linkki, numero vai
+  sähköpostiosoite. Android antaa vain edessä olevan
   sovelluksen lukea leikepöytää, joten Folark katsoo sitä, kun aloitusnäyttö
   tulee näkyviin (Android voi silloin näyttää ilmoituksen leikepöydän
   lukemisesta). Tekstejä, jotka Android merkitsee arkaluonteisiksi, kuten
   salasanoja ja kertakoodeja, ei koskaan säilytetä. Lista tallennetaan
-  laitteen yksityiseen tiedostoon, se ei kuulu varmuuskopioihin eikä sitä
-  lähetetä minnekään; widgetin "Tyhjennä kaikki", leikkeen poisto tai
+  laitteen yksityiseen tiedostoon (kuvat yksityiseen kansioon), se ei kuulu
+  varmuuskopioihin eikä sitä lähetetä minnekään, ellet napauta Jaa tai Avaa; widgetin "Tyhjennä kaikki", leikkeen poisto tai
   sovelluksen poisto poistaa sen.
 - **Varmuuskopiot** — Asetukset ▸ Varmuuskopiointi ja palautus kirjoittaa
   varmuuskopiotiedoston valitsemaasi sijaintiin, ja jos otat automaattisen

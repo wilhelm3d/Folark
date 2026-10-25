@@ -154,6 +154,8 @@ data class LauncherSettings(
         val opensAtTop: Boolean = true,
         /** Show a "most used" row (top apps by decayed launch frequency) above the drawer's app list. */
         val showFrequentApps: Boolean = false,
+        /** The last things you copied as a row at the top of the drawer, with quick actions. */
+        val clipboardRow: Boolean = false,
         /** Show the drawer's folders as tabs above the app list instead of tiles inside it. */
         val folderTabs: Boolean = false,
         /** With folders as tabs: an app in a tab is shown only in that tab, not in "All" as well. */

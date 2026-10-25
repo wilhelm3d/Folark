@@ -202,7 +202,8 @@ private fun ClipRow(clip: ClipEntry, color: Color, shadow: Boolean, onCopy: () -
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                clip.text.replace('\n', ' '),
+                // A copied picture has no text: named as one (copy puts the picture back).
+                if (clip.image != null) stringResource(R.string.clipboard_picture) else clip.text.replace('\n', ' '),
                 style = if (shadow) shadowed(14.sp, FontWeight.Medium, color) else TextStyle(color = color, fontSize = 14.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

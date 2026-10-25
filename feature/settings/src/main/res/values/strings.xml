@@ -72,6 +72,8 @@
     <string name="settings_hide_status_bar">Hide system status bar (fullscreen)</string>
     <string name="settings_status_bar">Status bar (clock, battery, signal)</string>
     <string name="settings_status_bar_scrim">Status bar background darkness</string>
+    <string name="settings_drawer_clipboard">Clipboard row</string>
+    <string name="settings_drawer_clipboard_desc">What you copied last at the top of the drawer: links, text, phone numbers, emails and pictures, each with quick actions (copy to paste, open, call, share, search). Kept on this phone only; passwords and codes never</string>
     <string name="settings_frequent_apps">Most used at the top</string>
     <string name="settings_drawer_open_top">Always open at top</string>
     <string name="settings_double_tap_lock">Double-tap to lock the screen</string>

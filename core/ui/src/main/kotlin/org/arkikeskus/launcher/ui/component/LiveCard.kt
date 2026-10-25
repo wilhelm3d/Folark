@@ -85,8 +85,13 @@ fun LiveCard(
         }
     }
     val progress by animateFloatAsState(activity.progress ?: 0f, tween(500), label = "progress")
-    val busy = rememberInfiniteTransition(label = "busy")
-    val sweep by busy.animateFloat(0f, 1f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "sweep")
+    // The moving sweep of a busy bar: only animated when there is one (it draws every frame).
+    val sweep = if (activity.indeterminate) {
+        val busy = rememberInfiniteTransition(label = "busy")
+        busy.animateFloat(0f, 1f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "sweep").value
+    } else {
+        0f
+    }
     var dragged by remember { mutableFloatStateOf(0f) }
     val shape = RoundedCornerShape(28.dp)
     Column(

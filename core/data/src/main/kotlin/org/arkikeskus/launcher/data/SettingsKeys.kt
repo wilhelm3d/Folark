@@ -75,6 +75,7 @@ internal object Keys {
     fun drawerLayoutMode(type: ScreenType) = stringPreferencesKey(if (type == ScreenType.OUTER) "drawer_layout_mode" else "drawer_layout_mode_inner")
     fun showDrawerLabels(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "show_drawer_labels" else "show_drawer_labels_inner")
     fun showFrequentApps(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "show_frequent_apps" else "show_frequent_apps_inner")
+    fun drawerClipboard(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_clipboard" else "drawer_clipboard_inner")
     fun dpiWorkspace(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "dpi_workspace" else "dpi_workspace_inner")
     fun dpiAppDrawer(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "dpi_app_drawer" else "dpi_app_drawer_inner")
     fun dpiSettings(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "dpi_settings" else "dpi_settings_inner")

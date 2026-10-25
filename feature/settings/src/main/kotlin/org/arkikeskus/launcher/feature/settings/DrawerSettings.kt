@@ -350,6 +350,13 @@ internal fun AppDrawerSection(
             onCheckedChange = { viewModel.setShowFrequentApps(it, screenType) },
         )
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_clipboard),
+            subtitle = stringResource(R.string.settings_drawer_clipboard_desc),
+            checked = s.drawer.clipboardRow,
+            onCheckedChange = { viewModel.setDrawerClipboard(it, screenType) },
+        )
+        ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_show_labels),

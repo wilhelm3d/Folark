@@ -43,7 +43,14 @@ internal fun StatusBarIconsRow() {
     var open by remember { mutableStateOf(false) }
     var hidden by remember { mutableStateOf(StatusBarIcons.hidden(context)) }
     var canChange by remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(Unit) { canChange = withContext(Dispatchers.IO) { StatusBarIcons.canChange(context) } }
+    // Without asking root: only the grant, or root already known to answer. Asking `su` here would
+    // pop the root manager's question just because Settings was opened; it is asked on a tap.
+    LaunchedEffect(Unit) {
+        canChange = withContext(Dispatchers.IO) {
+            org.arkikeskus.launcher.data.SystemControls.canWrite(context) ||
+                org.arkikeskus.launcher.data.root.RootShell.lastKnown == true
+        }
+    }
     val offered = StatusBarIcons.SLOTS.map { it.first }
     val count = hidden.count { it in offered }
     ExpressiveActionItem(
@@ -53,7 +60,20 @@ internal fun StatusBarIconsRow() {
             count == 0 -> stringResource(R.string.settings_status_icons_desc)
             else -> pluralStringResource(R.plurals.settings_status_icons_hidden, count, count)
         },
-        onClick = { if (canChange == true) open = true },
+        onClick = {
+            if (canChange == true) {
+                open = true
+            } else {
+                // Root not known yet: ask it now (the root manager may show its question).
+                scope.launch {
+                    val ok = withContext(Dispatchers.IO) {
+                        org.arkikeskus.launcher.data.root.RootShell.available(recheck = true, prompt = true)
+                    }
+                    canChange = ok
+                    if (ok) open = true
+                }
+            }
+        },
     )
     if (!open) return
     fun change(block: () -> Unit) = scope.launch {

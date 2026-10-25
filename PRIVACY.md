@@ -49,12 +49,15 @@ public, so every claim here can be verified:
   sounds and pop-ups remain active. Notification keys and delivery times are
   saved locally to retain waiting state after a restart and excluded from backups.
 - **Clipboard history** — only while the clipboard history widget is on your
-  home screen, Folark keeps the last 30 texts you copied, to show them and copy
-  them again. Android lets only the app in front read the clipboard, so Folark
+  home screen or Settings ▸ App drawer ▸ Clipboard row is on, Folark keeps the
+  last 30 things you copied (texts, and pictures as a small copy), to show them
+  and copy, open, call, search or share them again; Folark only works out on the
+  phone whether a clip is a link, number or email. Android lets only the app in front read the clipboard, so Folark
   looks when the home screen comes into view (Android may show its "pasted from
   your clipboard" notice then). Texts Android marks as sensitive, such as
   passwords and one-time codes, are never kept. The list is stored in a private
-  file on the device, is not part of backups and is never transmitted; "Clear
+  file (pictures in a private folder) on the device, is not part of backups and
+  is never transmitted unless you tap Share or Open; "Clear
   all" in the widget, removing a clip, or uninstalling deletes it.
 - **Backups** — Settings ▸ Backup & restore writes a backup file to the
   location you choose, and, if you turn on automatic backup, keeps one

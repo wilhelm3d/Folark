@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the clipboard history's pictures are ever shared (see ClipboardHistoryRepository). -->
+<paths>
+    <files-path name="clips" path="clips/" />
+</paths>

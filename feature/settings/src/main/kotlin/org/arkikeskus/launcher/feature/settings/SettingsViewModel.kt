@@ -320,6 +320,7 @@ class SettingsViewModel @Inject constructor(
     fun setDrawerRows(value: Int, screenType: ScreenType = _screenType.value) = update { repository.setDrawerRows(value, screenType) }
     fun setShowDrawerSearch(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setShowDrawerSearch(value, screenType) }
     fun setShowFrequentApps(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setShowFrequentApps(value, screenType) }
+    fun setDrawerClipboard(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerClipboard(value, screenType) }
     fun setDrawerSearchPosition(value: String, screenType: ScreenType = _screenType.value) = update { repository.setDrawerSearchPosition(value, screenType) }
     fun setDrawerIndexBarEnabled(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerIndexBarEnabled(value, screenType) }
     fun setAzIndexScale(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setAzIndexScale(value, screenType) }

@@ -264,6 +264,7 @@ fun AppDrawerScreen(
     ) {
     ExpressiveTheme {
     CompositionLocalProvider(LocalDensity provides drawerDensity) {
+    FollowClipboard(uiState.clipboardRow)
     AppDrawerContent(
         colors = drawerColors,
         style = drawerStyle,
@@ -271,6 +272,7 @@ fun AppDrawerScreen(
         sidebar = sidebar,
         apps = uiState.apps,
         frequentApps = uiState.frequentApps,
+        clipboardRow = uiState.clipboardRow,
         folders = uiState.folders,
         query = uiState.query,
         columns = uiState.columns,
@@ -457,6 +459,8 @@ private fun AppDrawerContent(
     apps: List<AppItem>,
     frequentApps: List<AppItem>,
     folders: List<DrawerFolderUi>,
+    /** Settings ▸ App drawer ▸ Clipboard row (shown above the most used apps). */
+    clipboardRow: Boolean = false,
     query: String,
     columns: Int,
     badges: Map<String, Int>,
@@ -720,6 +724,9 @@ private fun AppDrawerContent(
                         modifier = Modifier.fillMaxSize().padding(indexStripPadding),
                     ) {
                         if (!searching) {
+                            if (clipboardRow) {
+                                item(key = "clipboard", contentType = "clipboard") { DrawerClipboardRow() }
+                            }
                             if (frequentApps.isNotEmpty()) {
                                 item(contentType = "frequent") {
                                     FrequentAppsCard(
@@ -883,6 +890,9 @@ private fun AppDrawerContent(
                             .onSizeChanged { gridWidthPx = it.width },
                     ) {
                         if (!searching) {
+                            if (clipboardRow) {
+                                item(key = "clipboard", span = { GridItemSpan(maxLineSpan) }, contentType = "clipboard") { DrawerClipboardRow() }
+                            }
                             if (frequentApps.isNotEmpty()) {
                                 item(span = { GridItemSpan(maxLineSpan) }, contentType = "frequent") {
                                     FrequentAppsCard(
@@ -1024,7 +1034,7 @@ private fun AppDrawerContent(
                         position = azIndexPosition,
                         scale = azIndexScale,
                         onLetterSelected = { char ->
-                            val headerOffset = (if (frequentApps.isNotEmpty()) 1 else 0) + folders.size
+                            val headerOffset = (if (clipboardRow) 1 else 0) + (if (frequentApps.isNotEmpty()) 1 else 0) + folders.size
                             val matchIdx = if (char == '#') {
                                 0
                             } else {

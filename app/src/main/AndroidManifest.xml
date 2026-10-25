@@ -133,6 +133,18 @@
         <meta-data android:name="xposedminversion" android:value="93" />
         <meta-data android:name="xposedscope" android:resource="@array/xposed_scope" />
 
+        <!-- Copied pictures in the clipboard history, handed back to the clipboard or shared
+             (read-only, only the files in the private clips folder). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.clips"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clip_paths" />
+        </provider>
+
         <!-- Tells that module whether Settings ▸ Recents ▸ Replace Android's Recents is on (a yes/no only). -->
         <provider
             android:name=".xposed.RecentsHookState"

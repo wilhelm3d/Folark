@@ -36,13 +36,19 @@ object RootShell {
     /** Whether the last "no root" answer is old enough to ask again (root may be back). */
     fun recheckDue(): Boolean = System.currentTimeMillis() - checkedAt >= RECHECK_MS
 
-    /** Whether root answers right now (the root manager may ask the first time). */
-    fun available(recheck: Boolean = false): Boolean {
+    /**
+     * Whether root answers right now (the root manager may ask the first time). [prompt]: a person
+     * just tapped something that needs root and the root manager's question may be on screen, so
+     * it is given [PROMPT_TIMEOUT_MS] to be answered (a timeout closes the shell, and with it the
+     * question: allowing root after that would do nothing).
+     */
+    fun available(recheck: Boolean = false, prompt: Boolean = false): Boolean {
         if (!enabled) return false
         val now = System.currentTimeMillis()
         val cached = known
-        if (!recheck && cached != null && now - checkedAt < RECHECK_MS) return cached
-        val ok = runCatching { run("id", CHECK_TIMEOUT_MS)?.contains("uid=0") == true }.getOrDefault(false)
+        if (!recheck && !prompt && cached != null && now - checkedAt < RECHECK_MS) return cached
+        val timeout = if (prompt) PROMPT_TIMEOUT_MS else CHECK_TIMEOUT_MS
+        val ok = runCatching { run("id", timeout)?.contains("uid=0") == true }.getOrDefault(false)
         known = ok
         checkedAt = now
         return ok
@@ -214,6 +220,7 @@ object RootShell {
 
     private const val RECHECK_MS = 60_000L
     private const val CHECK_TIMEOUT_MS = 8_000L
+    private const val PROMPT_TIMEOUT_MS = 60_000L
     private const val DEFAULT_TIMEOUT_MS = 5_000L
     private const val IDLE_CLOSE_MS = 30_000L
 }

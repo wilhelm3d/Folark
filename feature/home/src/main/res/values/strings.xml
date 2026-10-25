@@ -221,6 +221,7 @@
     <string name="taskbar_media_next">Next</string>
     <string name="gesture_moto_unavailable">This phone doesn\'t have that Motorola screen</string>
     <string name="clipboard_widget_name">Clipboard history</string>
+    <string name="clipboard_picture">Picture</string>
     <string name="clipboard_widget_title">Clipboard</string>
     <string name="clipboard_widget_empty">Copy something, then come back home: it shows up here</string>
     <string name="clipboard_copy">Copy again</string>

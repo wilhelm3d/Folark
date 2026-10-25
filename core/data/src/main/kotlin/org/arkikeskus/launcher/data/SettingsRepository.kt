@@ -154,6 +154,7 @@ class SettingsRepository @Inject constructor(
                 showSearch = p[Keys.showDrawerSearch(screenType)] ?: true,
                 showLabels = p[Keys.showDrawerLabels(screenType)] ?: true,
                 showFrequentApps = p[Keys.showFrequentApps(screenType)] ?: false,
+                clipboardRow = p[Keys.drawerClipboard(screenType)] ?: false,
                 searchPosition = (p[Keys.drawerSearchPosition(screenType)] ?: LauncherSettings.SEARCH_TOP)
                     .let { if (it == LauncherSettings.SEARCH_BOTTOM) it else LauncherSettings.SEARCH_TOP },
                 indexBarEnabled = p[Keys.drawerIndexBarEnabled(screenType)] ?: true,
@@ -1099,12 +1100,11 @@ class SettingsRepository @Inject constructor(
     suspend fun setFloatingLaunchEnabled(value: Boolean) = edit { it[Keys.FLOATING_LAUNCH_ENABLED] = value }
     suspend fun setAmoledDark(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.amoledDark(screenType)] = value }
     suspend fun setShowDrawerSearch(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showDrawerSearch(screenType)] = value }
-    suspend fun setSwipeUpForDrawer(value: Boolean) = edit { it[Keys.SWIPE_UP_DRAWER] = value }
-    suspend fun setSwipeDownForNotifications(value: Boolean) = edit { it[Keys.SWIPE_DOWN_NOTIF] = value }
     suspend fun setShowDockLabels(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showDockLabels(screenType)] = value }
     suspend fun setShowHomeLabels(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showHomeLabels(screenType)] = value }
     suspend fun setShowDrawerLabels(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showDrawerLabels(screenType)] = value }
     suspend fun setShowFrequentApps(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.showFrequentApps(screenType)] = value }
+    suspend fun setDrawerClipboard(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerClipboard(screenType)] = value }
     suspend fun setDrawerSearchPosition(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerSearchPosition(screenType)] = value }
     suspend fun setDrawerIndexBarEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerIndexBarEnabled(screenType)] = value }
     suspend fun setAzIndexScale(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit {

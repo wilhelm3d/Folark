@@ -75,6 +75,8 @@ data class AppDrawerUiState(
     val actionResults: List<SearchResult.Action> = emptyList(),
     val searchWeb: Boolean = true,
     val showFrequentApps: Boolean = false,
+    /** Settings ▸ App drawer ▸ Clipboard row. */
+    val clipboardRow: Boolean = false,
     val frequentApps: List<AppItem> = emptyList(),
     val appLabelTextScale: Float = 1f,
     /** Labels may wrap onto a second line (Settings ▸ App drawer ▸ Two-line labels). */
@@ -197,6 +199,7 @@ class AppDrawerViewModel @Inject constructor(
             tabsExclusive = settings.drawer.tabsExclusive,
             searchWeb = settings.search.web,
             showFrequentApps = settings.drawer.showFrequentApps,
+            clipboardRow = settings.drawer.clipboardRow,
             appLabelTextScale = settings.icons.labelTextScale,
             twoLineLabels = settings.drawer.twoLineLabels,
             drawerOpensAtTop = settings.drawer.opensAtTop,

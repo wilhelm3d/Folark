@@ -98,7 +98,7 @@ object RootGrants {
      * first (the root manager shows its prompt then).
      */
     fun grantEverything(context: Context): Outcome {
-        if (!RootShell.enabled || !RootShell.available(recheck = true)) return Outcome(false, 0, 0, emptyList())
+        if (!RootShell.enabled || !RootShell.available(recheck = true, prompt = true)) return Outcome(false, 0, 0, emptyList())
         val failed = ArrayList<String>()
         if (!grantRuntime(context)) failed += "permissions"
         for (g in ALL) {
