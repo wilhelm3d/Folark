@@ -602,6 +602,10 @@ data class LauncherSettings(
         val pinKeepAlive: Boolean = true,
         val attachedSide: String = RECENTS_ATTACHED_LEFT,
         val attachedPeek: Float = 0.12f,
+        /** Peek view via SystemUI's own snap (Folark's module). Off by default: Folark instead drags
+         *  the divider like a finger, which some ROMs handle far more reliably (the module's cold
+         *  snap can crash System UI on certain builds). On: the exact native peek strip, where it works. */
+        val attachedNative: Boolean = false,
     )
 
     /** Root features (all off unless root is enabled). */
@@ -635,6 +639,10 @@ data class LauncherSettings(
         /** With Folark's Vector module in SystemUI: a third app joins a split screen as a real third
          *  pane (Recents, saved app pairs) instead of floating over it. */
         val threeAppSplit: Boolean = true,
+        /** Actually tile that third pane through SystemUI's module. Off by default: the third app
+         *  floats instead, because asking SystemUI to start a task into a third pane can crash System
+         *  UI on some ROMs. On: the real tiled third pane, where the ROM supports it. */
+        val threeAppNative: Boolean = false,
     )
 
 

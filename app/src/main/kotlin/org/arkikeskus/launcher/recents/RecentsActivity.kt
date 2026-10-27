@@ -70,7 +70,7 @@ class RecentsActivity : ComponentActivity() {
                         viewModel.openAttached(main, peek, settings.recents.attachedSide, settings.recents.attachedPeek, windowManager.maximumWindowMetrics.bounds)
                         leave()
                     },
-                    onPeekSplit = { card -> viewModel.peekSplit(card, settings.recents.attachedSide); leave() },
+                    onPeekSplit = { card -> viewModel.peekSplit(card, settings.recents.attachedSide, windowManager.maximumWindowMetrics.bounds, settings.recents.attachedPeek); leave() },
                     onCombine = { dragged, target, how ->
                         if (how == COMBINE_THIRD) {
                             viewModel.addThird(target, dragged)

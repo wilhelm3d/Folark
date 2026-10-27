@@ -141,6 +141,13 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
             valueRange = LauncherSettings.MIN_RECENTS_ATTACHED_PEEK..LauncherSettings.MAX_RECENTS_ATTACHED_PEEK,
             valueDisplay = "${(s.recents.attachedPeek * 100).roundToInt()} %",
         )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_attached_native),
+            subtitle = stringResource(R.string.settings_recents_attached_native_desc),
+            checked = s.recents.attachedNative,
+            onCheckedChange = viewModel::setRecentsAttachedNative,
+        )
     }
 }
 

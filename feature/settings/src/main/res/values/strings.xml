@@ -743,6 +743,8 @@
     <string name="settings_recents_attached_right">Right</string>
     <string name="settings_recents_attached_peek">Attached view: how much it peeks in</string>
     <string name="settings_recents_attached_peek_desc">The phone snaps to its nearest size</string>
+    <string name="settings_recents_attached_native">Native peek (System UI)</string>
+    <string name="settings_recents_attached_native_desc">Use Android\'s own peek snap for the exact peek strip. Leave off if peek view crashes System UI — Folark then drags the divider itself, which is more reliable.</string>
     <string name="settings_taskbar_theme_glass">Liquid Glass</string>
     <string name="settings_taskbar_handle_hint">Show where to swipe</string>
     <string name="settings_taskbar_handle_hint_desc">A small line in the bottom corners of apps: swipe up there to open the taskbar. Or turn on Keep open</string>
@@ -850,6 +852,8 @@
     <string name="settings_three_app_split_desc">A third app joins split screen as a third pane instead of floating (Recents and app pairs). Needs Folark\'s Vector module with System UI in its scope</string>
     <string name="settings_three_app_split_active">Active: System UI takes a third pane</string>
     <string name="settings_three_app_split_missing">Not seen yet: add System UI to Folark\'s scope in Vector, then restart the phone. Until then a third app floats</string>
+    <string name="settings_three_app_native">Tile the third pane (System UI)</string>
+    <string name="settings_three_app_native_desc">Ask System UI to actually tile the third app. Leave off if picking a third app crashes System UI — the third app then floats instead, which is reliable on every ROM.</string>
     <string name="settings_app_pair_pin_taskbar">Pin to taskbar</string>
     <string name="settings_app_pair_unpin_taskbar">Unpin from taskbar</string>
     <string name="settings_live_expand">Long press opens it up</string>

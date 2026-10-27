@@ -99,6 +99,7 @@ class SettingsViewModel @Inject constructor(
     }
     fun launchAppPair(pair: AppPair) = appRepository.launchAppPair(pair)
     fun setThreeAppSplit(value: Boolean) = update { repository.setThreeAppSplit(value) }
+    fun setThreeAppNative(value: Boolean) = update { repository.setThreeAppNative(value) }
 
     /** Pins [pair] on Folark's taskbar, or takes it off again. */
     fun toggleTaskbarPair(pair: AppPair) = update {
@@ -263,6 +264,7 @@ class SettingsViewModel @Inject constructor(
     fun setLiquidGlassLevel(value: Float) = update { repository.setLiquidGlassLevel(value) }
     fun setRecentsAttachedSide(value: String) = update { repository.setRecentsAttachedSide(value) }
     fun setRecentsAttachedPeek(value: Float) = update { repository.setRecentsAttachedPeek(value) }
+    fun setRecentsAttachedNative(value: Boolean) = update { repository.setRecentsAttachedNative(value) }
     fun setTaskbarHandleHint(value: Boolean) = update { repository.setTaskbarHandleHint(value) }
     fun setTaskbarSource(value: String) = update { repository.setTaskbarSource(value) }
     fun setSystemTaskbarMode(value: Int) = update { repository.setSystemTaskbarMode(value) }

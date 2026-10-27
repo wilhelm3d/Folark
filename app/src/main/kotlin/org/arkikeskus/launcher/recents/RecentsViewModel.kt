@@ -335,7 +335,11 @@ class RecentsViewModel @Inject constructor(
             withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, tasks[1].taskId, right = true) }
             if (picked.size >= 3) {
                 delay(SPLIT_STEP_MS)
-                val joined = thirdInSplit && withContext(Dispatchers.IO) {
+                // Tiling the third pane means asking SystemUI's module to start a task into a third
+                // slot, which can crash System UI on some ROMs, so it is off by default: the third app
+                // floats instead (reliable everywhere). Only when the user opts in do we try to tile.
+                val tileThird = thirdInSplit && settings.value.launch.threeAppNative
+                val joined = tileThird && withContext(Dispatchers.IO) {
                     // A real third pane through Folark's module in SystemUI; else Android's own
                     // split command (some phones take a third there), else it floats (below).
                     (threeApp && SplitThree.ready(context) && SplitThree.addThird(context, taskId = tasks[2].taskId)) || run {
@@ -358,11 +362,13 @@ class RecentsViewModel @Inject constructor(
      * joins it as a third pane (Folark's SystemUI module); without the module it floats on top.
      */
     fun addThird(pair: RecentsCard, third: RecentsCard) {
-        val task = third.tasks.first()
+        val task = third.tasks.firstOrNull() ?: return
         appScope.launch {
             open(pair)
             delay(SPLIT_STEP_MS)
-            val joined = withContext(Dispatchers.IO) {
+            // Same trade-off as [openTogether]: tile the third pane only on opt-in (it can crash
+            // System UI on some ROMs); otherwise it floats.
+            val joined = settings.value.launch.threeAppNative && withContext(Dispatchers.IO) {
                 SplitThree.ready(context) && SplitThree.addThird(context, taskId = task.taskId)
             }
             if (!joined) popUp(third)
@@ -419,16 +425,18 @@ class RecentsViewModel @Inject constructor(
      * drag is a touch made by Folark's accessibility service (or root), as a finger would do it.
      */
     fun openAttached(main: RecentsCard, peek: RecentsCard, side: String, peekFraction: Float, screen: android.graphics.Rect) {
-        val mainTask = main.tasks.first()
+        val mainTask = main.tasks.firstOrNull() ?: return
         val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
         appScope.launch {
             open(peek)
             delay(SPLIT_STEP_MS)
             val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, mainTask.taskId, right = left) }
             if (!moved) return@launch
-            // Android's own peek view through Folark's module in SystemUI (the strip to tap
-            // included); without it, a touch on the divider drags it near the edge.
-            if (SplitThree.ready(context) &&
+            // Peek it. By default Folark drags the divider like a finger (Android's normal input path,
+            // which it handles safely); only when the user opts into native peek do we ask SystemUI's
+            // module to snap — that cold snap can crash System UI on some ROMs, so it is off by default.
+            if (settings.value.recents.attachedNative &&
+                SplitThree.ready(context) &&
                 SplitThree.snap(context, if (left) SplitThree.SNAP_PEEK_LEFT else SplitThree.SNAP_PEEK_RIGHT)
             ) return@launch
             delay(ATTACH_SETTLE_MS)
@@ -439,12 +447,46 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /** A split card's two apps as Android's peek view, the one at [side] peeking in. */
-    fun peekSplit(card: RecentsCard, side: String) {
+    /**
+     * A split card's two apps as peek view, the one at [side] peeking in. Same reliability trade-off
+     * as [openAttached]: the finger-style divider drag by default, SystemUI's native snap only on opt-in.
+     */
+    fun peekSplit(card: RecentsCard, side: String, screen: android.graphics.Rect, peekFraction: Float) {
+        val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
         appScope.launch {
             open(card)
-            val snap = if (side == LauncherSettings.RECENTS_ATTACHED_RIGHT) SplitThree.SNAP_PEEK_RIGHT else SplitThree.SNAP_PEEK_LEFT
-            SplitThree.snap(context, snap)
+            if (settings.value.recents.attachedNative &&
+                SplitThree.ready(context) &&
+                SplitThree.snap(context, if (left) SplitThree.SNAP_PEEK_LEFT else SplitThree.SNAP_PEEK_RIGHT)
+            ) return@launch
+            delay(ATTACH_SETTLE_MS)
+            val y = screen.exactCenterY()
+            val from = screen.exactCenterX()
+            val to = if (left) screen.left + screen.width() * peekFraction else screen.right - screen.width() * peekFraction
+            DividerDrag.drag(from, y, to, y)
+        }
+    }
+
+    /**
+     * Mute or unmute every app on [card], persistently. The muted set is stored so it survives a
+     * restart of Folark and of the app; on root it is enforced with appops PLAY_AUDIO (ignore to
+     * mute, allow to unmute), which the system keeps across app restarts and reboots. Whether a
+     * given ROM honours the PLAY_AUDIO op varies, so this is best-effort when it isn't honoured.
+     */
+    fun toggleMute(card: RecentsCard) {
+        val pkgs = card.tasks.map { it.packageName }.filter { it.isNotBlank() }.toSet()
+        if (pkgs.isEmpty()) return
+        appScope.launch {
+            val current = settingsRepository.mutedPackages()
+            // "Mute" when none of the card's apps are muted yet; otherwise this is an "Unmute".
+            val muting = pkgs.none { it in current }
+            settingsRepository.setMutedPackages(if (muting) current + pkgs else current - pkgs)
+            withContext(Dispatchers.IO) {
+                if (RootShell.available()) {
+                    val mode = if (muting) "ignore" else "allow"
+                    pkgs.forEach { p -> if (SAFE_PKG.matches(p)) RootShell.run("appops set $p PLAY_AUDIO $mode") }
+                }
+            }
         }
     }
 

@@ -84,8 +84,11 @@ internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns.coerceAtLeast(1)),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        // Sit the cards at the bottom (near the taskbar) rather than pinned to the top with a big
+        // empty area below; when there are enough to scroll, this has no effect.
+        verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.Bottom),
         contentPadding = PaddingValues(bottom = 96.dp),
+        modifier = Modifier.fillMaxSize(),
     ) {
         itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
             if (overlay) {

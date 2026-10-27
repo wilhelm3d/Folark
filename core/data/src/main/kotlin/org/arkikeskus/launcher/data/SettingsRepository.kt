@@ -447,6 +447,7 @@ class SettingsRepository @Inject constructor(
                 floatingWindowSize = (p[Keys.FLOATING_WINDOW_SIZE] ?: LauncherSettings.FLOATING_SIZE_MEDIUM)
                     .let { if (it in LauncherSettings.FLOATING_SIZES) it else LauncherSettings.FLOATING_SIZE_MEDIUM },
                 threeAppSplit = p[Keys.THREE_APP_SPLIT] ?: true,
+                threeAppNative = p[Keys.THREE_APP_NATIVE] ?: false,
             ),
         )
     }
@@ -558,6 +559,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setDrawerTabsExclusive(value: Boolean) = edit { it[Keys.DRAWER_TABS_EXCLUSIVE] = value }
     suspend fun setFloatingWindowSize(value: String) = edit { it[Keys.FLOATING_WINDOW_SIZE] = value }
     suspend fun setThreeAppSplit(value: Boolean) = edit { it[Keys.THREE_APP_SPLIT] = value }
+    suspend fun setThreeAppNative(value: Boolean) = edit { it[Keys.THREE_APP_NATIVE] = value }
     suspend fun setTaskbarPairs(ids: List<String>) = edit { it[Keys.TASKBAR_PAIRS] = ids.distinct().joinToString("\n") }
     suspend fun setSearchShortcuts(value: Boolean) = edit { it[Keys.SEARCH_SHORTCUTS] = value }
     suspend fun setSearchWeb(value: Boolean) = edit { it[Keys.SEARCH_WEB] = value }
@@ -785,6 +787,7 @@ class SettingsRepository @Inject constructor(
             LauncherSettings.RECENTS_ATTACHED_RIGHT else LauncherSettings.RECENTS_ATTACHED_LEFT,
         attachedPeek = (p[Keys.RECENTS_ATTACHED_PEEK] ?: 0.12f)
             .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
+        attachedNative = p[Keys.RECENTS_ATTACHED_NATIVE] ?: false,
     )
 
     /** [p] with every Recents look setting the outer screen has its own value for replaced by it. */
@@ -803,6 +806,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsAttachedPeek(value: Float) = edit {
         it[Keys.RECENTS_ATTACHED_PEEK] = value.coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK)
     }
+    suspend fun setRecentsAttachedNative(value: Boolean) = edit { it[Keys.RECENTS_ATTACHED_NATIVE] = value }
     suspend fun setTaskbarHandleHint(value: Boolean) = edit { it[Keys.TASKBAR_HANDLE_HINT] = value }
     suspend fun setTaskbarSource(value: String) = edit { it[Keys.TASKBAR_SOURCE] = value }
     suspend fun setSystemTaskbarMode(value: Int) = edit { it[Keys.SYSTEM_TASKBAR_MODE] = value }

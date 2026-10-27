@@ -300,6 +300,15 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             checked = s.launch.threeAppSplit,
             onCheckedChange = viewModel::setThreeAppSplit,
         )
+        if (s.launch.threeAppSplit) {
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_three_app_native),
+                subtitle = stringResource(R.string.settings_three_app_native_desc),
+                checked = s.launch.threeAppNative,
+                onCheckedChange = viewModel::setThreeAppNative,
+            )
+        }
         ExpressiveRowDivider()
 
         // ---------------------------------------------------------------- root
