@@ -171,6 +171,9 @@ internal class RecentsEnv(
     val onToggleAudio: (String) -> Unit = {},
     /** Place a long-press-dragged card at a screen edge (inner screen only), one of EDGE_*. */
     val onPlaceAtEdge: (RecentsCard, Int) -> Unit = { _, _ -> },
+    /** Persistent per-app mute (menu, beneath App info): whether this card is muted, and the toggle. */
+    val isMuted: (RecentsCard) -> Boolean = { false },
+    val onToggleMute: (RecentsCard) -> Unit = {},
 ) {
     val speed: Float get() = settings.recents.animationSpeed
 
@@ -218,6 +221,9 @@ internal fun RecentsScreen(
     onSavePair: (RecentsCard) -> Unit = {},
     /** Long-press-drag a card to a screen edge (inner screen): place the app there (EDGE_*). */
     onPlaceAtEdge: (RecentsCard, Int) -> Unit = { _, _ -> },
+    /** Persistent per-app mute (menu item beneath App info): is this card muted, and the toggle. */
+    isMuted: (RecentsCard) -> Boolean = { false },
+    onToggleMute: (RecentsCard) -> Unit = {},
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val onAccent = MaterialTheme.colorScheme.onPrimary
@@ -301,6 +307,8 @@ internal fun RecentsScreen(
         audioPlaying = { pkg -> audio.playing(pkg) },
         onToggleAudio = { pkg -> audio.toggle(pkg) },
         onPlaceAtEdge = onPlaceAtEdge,
+        isMuted = isMuted,
+        onToggleMute = onToggleMute,
     )
     env.coverScreen = !wide
 

@@ -58,6 +58,7 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.aquamorphicTouch
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
+import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
 import org.arkikeskus.launcher.ui.component.NotificationBadge
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -164,24 +165,40 @@ internal fun DrawerFolderSheet(
     var menuOpen by remember { mutableStateOf(false) }
     var showAdd by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        // A slim grab pill instead of the default handle, which leaves a big empty band up top.
+        dragHandle = {
+            Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(width = 32.dp, height = 4.dp)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
+                )
+            }
+        },
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
+                .padding(top = 2.dp, bottom = 16.dp)
+                .navigationBarsPadding()
+                // Clear Folark's own taskbar at the bottom so the last apps aren't hidden under it.
+                .padding(bottom = LocalTaskbarInset.current),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Centred folder name, with the settings cog pinned to the right.
+            Box(Modifier.fillMaxWidth()) {
                 Text(
                     text = folder.name,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 48.dp),
                 )
-                Box {
+                Box(Modifier.align(Alignment.CenterEnd)) {
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(
                             Icons.Rounded.Settings,

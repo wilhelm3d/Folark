@@ -18,6 +18,8 @@ import dagger.hilt.components.SingletonComponent
 import org.arkikeskus.launcher.data.AppIconFetcher
 import org.arkikeskus.launcher.data.AppIconKeyer
 import org.arkikeskus.launcher.data.LauncherAppsSource
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -61,7 +63,14 @@ object DataModule {
     @Singleton
     @ApplicationScope
     fun provideApplicationScope(): CoroutineScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        // Fire-and-forget work must never take down the HOME process: a SupervisorJob isolates
+        // siblings but does NOT swallow a throw, so without this handler an uncaught exception in
+        // any appScope.launch (split/peek/edge placement) would crash Folark to the lock screen.
+        CoroutineScope(
+            SupervisorJob() +
+                Dispatchers.Default +
+                CoroutineExceptionHandler { _, t -> Log.e("Folark", "appScope task failed", t) },
+        )
 
     @Provides
     @Singleton

@@ -38,6 +38,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -115,6 +116,11 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
         if (card.isSplit && card.apps.none { it == null }) add(MenuItem(R.string.recents_menu_save_pair, Glyph.SAVE) { env.onSavePair(card) })
         add(MenuItem(if (card.pinned) R.string.recents_menu_unlock else R.string.recents_menu_lock, Glyph.LOCK) { env.onTogglePin(card) })
         add(MenuItem(R.string.recents_menu_info, Glyph.INFO) { env.onAppInfo(card) })
+        // Persistent per-app mute: stays muted across restarts (appops PLAY_AUDIO on root).
+        run {
+            val muted = env.isMuted(card)
+            add(MenuItem(if (muted) R.string.recents_menu_unmute else R.string.recents_menu_mute, if (muted) Glyph.UNMUTE else Glyph.MUTE) { env.onToggleMute(card) })
+        }
         if (env.canClose && !card.pinned) add(MenuItem(R.string.recents_menu_close, Glyph.CLOSE, danger = true) { env.onClose(card) })
     }
     val motion = env.settings.recents.menuMotion
@@ -206,7 +212,7 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
 
 private class MenuItem(val label: Int, val glyph: Glyph, val danger: Boolean = false, val action: () -> Unit)
 
-private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE, SAVE }
+private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE, SAVE, MUTE, UNMUTE }
 
 /**
  * Places the menu just below [at], centred on it, always fully on screen (above it if no room
@@ -287,6 +293,26 @@ private fun DrawScope.drawGlyph(glyph: Glyph, color: Color, locked: Boolean) {
         Glyph.CLOSE -> {
             drawLine(color, Offset(w * 0.2f, w * 0.2f), Offset(w * 0.8f, w * 0.8f), stroke.width, StrokeCap.Round)
             drawLine(color, Offset(w * 0.8f, w * 0.2f), Offset(w * 0.2f, w * 0.8f), stroke.width, StrokeCap.Round)
+        }
+        Glyph.MUTE, Glyph.UNMUTE -> {
+            // A speaker, with a slash (muted) or sound waves (unmuted) to its right.
+            val speaker = Path().apply {
+                moveTo(w * 0.08f, w * 0.4f)
+                lineTo(w * 0.22f, w * 0.4f)
+                lineTo(w * 0.42f, w * 0.22f)
+                lineTo(w * 0.42f, w * 0.78f)
+                lineTo(w * 0.22f, w * 0.6f)
+                lineTo(w * 0.08f, w * 0.6f)
+                close()
+            }
+            drawPath(speaker, color, style = stroke)
+            if (glyph == Glyph.MUTE) {
+                drawLine(color, Offset(w * 0.58f, w * 0.38f), Offset(w * 0.9f, w * 0.62f), stroke.width, StrokeCap.Round)
+                drawLine(color, Offset(w * 0.9f, w * 0.38f), Offset(w * 0.58f, w * 0.62f), stroke.width, StrokeCap.Round)
+            } else {
+                drawArc(color, -50f, 100f, false, Offset(w * 0.4f, w * 0.3f), Size(w * 0.28f, w * 0.4f), style = stroke)
+                drawArc(color, -50f, 100f, false, Offset(w * 0.46f, w * 0.18f), Size(w * 0.44f, w * 0.64f), style = stroke)
+            }
         }
     }
 }

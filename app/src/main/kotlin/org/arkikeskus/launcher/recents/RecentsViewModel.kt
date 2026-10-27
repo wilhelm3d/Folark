@@ -77,6 +77,10 @@ class RecentsViewModel @Inject constructor(
     val settings: StateFlow<LauncherSettings> = settingsRepository.settings(ScreenType.INNER)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings())
 
+    /** Packages the user has muted from Recents (persistent; see [toggleMute]). */
+    val mutedApps: StateFlow<Set<String>> = settingsRepository.mutedApps
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     private val _state = MutableStateFlow(RecentsState())
     val state: StateFlow<RecentsState> = _state.asStateFlow()
 
@@ -444,6 +448,29 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Mute or unmute every app on [card], persistently. The muted set is stored so it survives a
+     * restart of Folark and of the app; on root it is enforced with appops PLAY_AUDIO (ignore to
+     * mute, allow to unmute), which the system keeps across app restarts and reboots. Whether a
+     * given ROM honours the PLAY_AUDIO op varies, so this is best-effort when it isn't honoured.
+     */
+    fun toggleMute(card: RecentsCard) {
+        val pkgs = card.tasks.map { it.packageName }.filter { it.isNotBlank() }.toSet()
+        if (pkgs.isEmpty()) return
+        appScope.launch {
+            val current = settingsRepository.mutedPackages()
+            // "Mute" when none of the card's apps are muted yet; otherwise this is an "Unmute".
+            val muting = pkgs.none { it in current }
+            settingsRepository.setMutedPackages(if (muting) current + pkgs else current - pkgs)
+            withContext(Dispatchers.IO) {
+                if (RootShell.available()) {
+                    val mode = if (muting) "ignore" else "allow"
+                    pkgs.forEach { p -> if (SAFE_PKG.matches(p)) RootShell.run("appops set $p PLAY_AUDIO $mode") }
+                }
+            }
+        }
+    }
+
     private companion object {
         /** Long side of a decoded screenshot, px (a card is rarely bigger). */
         const val THUMB_MAX_EDGE = 720
@@ -453,5 +480,8 @@ class RecentsViewModel @Inject constructor(
 
         const val SPLIT_STEP_MS = 450L
         const val ATTACH_SETTLE_MS = 900L
+
+        /** Package names allowed into a shell command (never anything that could inject). */
+        val SAFE_PKG = Regex("[A-Za-z0-9_.]+")
     }
 }

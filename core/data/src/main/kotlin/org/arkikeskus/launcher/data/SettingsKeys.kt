@@ -319,6 +319,8 @@ internal object Keys {
     val RECENTS_OUTER_BTN_PIN = booleanPreferencesKey("recents_outer_btn_pin")
     val RECENTS_PIN_KEEP_ALIVE = booleanPreferencesKey("recents_pin_keep_alive")
     val RECENTS_PIN_EXEMPT = stringPreferencesKey("recents_pin_exempt")
+    /** Packages the user muted from Recents (newline-joined); enforced via appops on root. */
+    val RECENTS_MUTED = stringPreferencesKey("recents_muted")
     val TASKBAR_HIDDEN_APPS = stringPreferencesKey("taskbar_hidden_apps")
     val TASKBAR_ALWAYS_APPS = stringPreferencesKey("taskbar_always_apps")
     val TASKBAR_AUTOHIDE_APPS = stringPreferencesKey("taskbar_autohide_apps")

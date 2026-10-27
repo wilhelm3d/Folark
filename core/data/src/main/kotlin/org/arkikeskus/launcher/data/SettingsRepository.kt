@@ -699,6 +699,10 @@ class SettingsRepository @Inject constructor(
     /** Packages whose battery-optimisation exemption Folark added for a pin (and may take back). */
     suspend fun pinExemptions(): Set<String> = lines(dataStore.data.first()[Keys.RECENTS_PIN_EXEMPT])
     suspend fun setPinExemptions(value: Set<String>) = edit { it[Keys.RECENTS_PIN_EXEMPT] = value.joinToString("\n") }
+    /** Packages the user muted from Recents; persistent, enforced via appops PLAY_AUDIO on root. */
+    val mutedApps: Flow<Set<String>> = keyFlow(Keys.RECENTS_MUTED) { lines(it) }
+    suspend fun mutedPackages(): Set<String> = lines(dataStore.data.first()[Keys.RECENTS_MUTED])
+    suspend fun setMutedPackages(value: Set<String>) = edit { it[Keys.RECENTS_MUTED] = value.joinToString("\n") }
     suspend fun setTaskbarHiddenApps(value: Set<String>) = edit { it[Keys.TASKBAR_HIDDEN_APPS] = value.joinToString("\n") }
     suspend fun setTaskbarAlwaysApps(value: Set<String>) = edit { it[Keys.TASKBAR_ALWAYS_APPS] = value.joinToString("\n") }
     suspend fun setTaskbarAutoHideApps(value: Set<String>) = edit { it[Keys.TASKBAR_AUTOHIDE_APPS] = value.joinToString("\n") }

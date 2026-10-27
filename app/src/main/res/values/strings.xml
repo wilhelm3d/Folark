@@ -46,6 +46,8 @@
     <string name="recents_menu_open">Open</string>
     <string name="recents_menu_unsplit">Full screen</string>
     <string name="recents_menu_info">App info</string>
+    <string name="recents_menu_mute">Mute</string>
+    <string name="recents_menu_unmute">Unmute</string>
     <string name="xposed_description">Opens Folark Recents instead of the system launcher\'s Recents (swipe up and hold, the taskbar\'s Recents, the Recents key). Turn it on in Folark: Settings ▸ Recents ▸ Replace Android\'s Recents. In System UI it only tells Folark when the lock screen starts to leave, so the unlock-to-home animation starts in step, and, when Folark asks, adds a third app to a split screen or switches it to Android\'s peek view.</string>
     <string name="recents_menu_split_three">Split 3 apps</string>
     <string name="recents_menu_peek">Peek view</string>

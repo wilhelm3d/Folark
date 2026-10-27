@@ -172,14 +172,20 @@ class LockAccessibilityService : AccessibilityService() {
          */
         fun swipe(x0: Float, y0: Float, x1: Float, y1: Float, durationMs: Long): Boolean {
             val service = instance ?: return false
-            val path = android.graphics.Path().apply {
-                moveTo(x0, y0)
-                lineTo(x1, y1)
-            }
-            val gesture = android.accessibilityservice.GestureDescription.Builder()
-                .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, durationMs))
-                .build()
-            return runCatching { service.dispatchGesture(gesture, null, null) }.getOrDefault(false)
+            // A zero-length path (start == end) makes StrokeDescription throw, so nudge the end a
+            // pixel when the two points coincide; the whole build+dispatch is guarded regardless so
+            // a bad gesture can never escape as an uncaught exception.
+            return runCatching {
+                val ex = if (x1 == x0 && y1 == y0) x1 + 1f else x1
+                val path = android.graphics.Path().apply {
+                    moveTo(x0, y0)
+                    lineTo(ex, y1)
+                }
+                val gesture = android.accessibilityservice.GestureDescription.Builder()
+                    .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, durationMs))
+                    .build()
+                service.dispatchGesture(gesture, null, null)
+            }.getOrDefault(false)
         }
 
         /** Hears which app comes to the front ([on]), or nothing at all (the default). */

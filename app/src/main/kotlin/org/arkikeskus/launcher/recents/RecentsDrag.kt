@@ -128,9 +128,11 @@ internal class RecentsDrag {
         } else if (allowEdge && screenW > 0f && screenH > 0f) {
             // Not over a card: which screen edge the finger is near (Aero-style placement).
             edge = when {
-                pointer.x < screenW * 0.14f -> EDGE_LEFT
-                pointer.x > screenW * 0.86f -> EDGE_RIGHT
-                pointer.y < screenH * 0.14f -> EDGE_TOP
+                // Generous zones (not just the corners): the top band is full screen, otherwise the
+                // left or right 40% snaps that half, with a dead zone in the middle for free movement.
+                pointer.y < screenH * 0.16f -> EDGE_TOP
+                pointer.x < screenW * 0.40f -> EDGE_LEFT
+                pointer.x > screenW * 0.60f -> EDGE_RIGHT
                 else -> EDGE_NONE
             }
         }

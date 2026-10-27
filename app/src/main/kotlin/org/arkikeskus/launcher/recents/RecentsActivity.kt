@@ -36,6 +36,7 @@ class RecentsActivity : ComponentActivity() {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val state by viewModel.state.collectAsStateWithLifecycle()
             val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
+            val mutedApps by viewModel.mutedApps.collectAsStateWithLifecycle()
             // Liquid Glass: Android blurs whatever is behind Recents (home, or the app).
             val blurPx = if (settings.recents.glass) (settings.recents.glassBlur * resources.displayMetrics.density).toInt() else 0
             LaunchedEffect(blurPx) {
@@ -85,6 +86,8 @@ class RecentsActivity : ComponentActivity() {
                     onAppInfo = { card -> viewModel.appInfo(card); leave() },
                     onTogglePin = viewModel::togglePin,
                     onPlaceAtEdge = { card, edge -> viewModel.placeAtEdge(card, edge); leave() },
+                    isMuted = { card -> card.tasks.any { it.packageName in mutedApps } },
+                    onToggleMute = { card -> viewModel.toggleMute(card) },
                     onSavePair = { card ->
                         val saved = viewModel.saveAsPair(card)
                         android.widget.Toast.makeText(
