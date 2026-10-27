@@ -495,9 +495,11 @@ fun LauncherShell(
     }
     }
 
-    PredictiveBackHandler(enabled = drawerOpen) { progress ->
+    PredictiveBackHandler(enabled = drawerOpen) { backEvents ->
         try {
-            progress.collect { _ -> }
+            // Scrub the drawer closed live as the system back gesture progresses (0 → 1), so it
+            // tracks the finger instead of only animating on release (progress: 1 open → 0 closed).
+            backEvents.collect { ev -> progress.snapTo(1f - ev.progress) }
             // Commit: the user completed the swipe.
             animateProgress(0f)
         } catch (e: CancellationException) {

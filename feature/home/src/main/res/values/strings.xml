@@ -215,6 +215,10 @@
     <string name="taskbar_hint_choose">← Floating · Split screen →</string>
     <string name="taskbar_drop_float">Floating window</string>
     <string name="taskbar_drop_split">Split screen</string>
+    <string name="taskbar_snap_left">Left half</string>
+    <string name="taskbar_snap_right">Right half</string>
+    <string name="taskbar_snap_top">Full screen</string>
+    <string name="taskbar_snap_float">Floating window</string>
     <string name="taskbar_split_setup_needed">Split screen needs a one-time setup: see Settings ▸ Taskbar ▸ Split screen setup</string>
     <string name="taskbar_media">Now playing</string>
     <string name="taskbar_media_previous">Previous</string>

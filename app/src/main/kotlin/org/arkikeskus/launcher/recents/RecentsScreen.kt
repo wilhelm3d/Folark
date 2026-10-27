@@ -7,8 +7,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.VectorConverter
@@ -31,7 +35,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -63,6 +69,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -156,6 +163,14 @@ internal class RecentsEnv(
     val onCloseAll: () -> Unit = {},
     /** A split card's apps saved as an app pair (to open them together again from home or the taskbar). */
     val onSavePair: (RecentsCard) -> Unit = {},
+    /** Speaker badge (Settings ▸ Recents): whether it shows, which packages have audio, whether one
+     *  is playing, and the tap that pauses/resumes just that app. */
+    val speakerBadge: Boolean = false,
+    val audioActive: (String) -> Boolean = { false },
+    val audioPlaying: (String) -> Boolean = { false },
+    val onToggleAudio: (String) -> Unit = {},
+    /** Place a long-press-dragged card at a screen edge (inner screen only), one of EDGE_*. */
+    val onPlaceAtEdge: (RecentsCard, Int) -> Unit = { _, _ -> },
 ) {
     val speed: Float get() = settings.recents.animationSpeed
 
@@ -201,6 +216,8 @@ internal fun RecentsScreen(
     onTogglePin: (RecentsCard) -> Unit,
     onDismiss: () -> Unit,
     onSavePair: (RecentsCard) -> Unit = {},
+    /** Long-press-drag a card to a screen edge (inner screen): place the app there (EDGE_*). */
+    onPlaceAtEdge: (RecentsCard, Int) -> Unit = { _, _ -> },
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val onAccent = MaterialTheme.colorScheme.onPrimary
@@ -239,8 +256,17 @@ internal fun RecentsScreen(
     val menu = remember { RecentsMenuState() }
     drag.cards = state.cards
     drag.allowThird = settings.launch.threeAppSplit
+    drag.allowReplace = settings.launch.threeAppSplit
+    // Aero edge placement: inner screen only, where there is room for side-by-side apps.
+    drag.allowEdge = wide
+    with(LocalDensity.current) {
+        drag.screenW = LocalConfiguration.current.screenWidthDp.dp.toPx()
+        drag.screenH = LocalConfiguration.current.screenHeightDp.dp.toPx()
+    }
     val backdrop = rememberRecentsBackdrop(settings.recents.enterAnimation, settings.recents.animationSpeed, Unit)
 
+    // Active media sessions, for the per-card speaker badge (no-op and empty when the badge is off).
+    val audio = rememberRecentsAudio(settings.recents.speakerBadge)
     val env = RecentsEnv(
         settings = settings,
         thumbnails = thumbnails,
@@ -270,6 +296,11 @@ internal fun RecentsScreen(
         onPeekSplit = onPeekSplit,
         onCloseAll = onCloseAll,
         onSavePair = onSavePair,
+        speakerBadge = settings.recents.speakerBadge,
+        audioActive = { pkg -> audio.active(pkg) },
+        audioPlaying = { pkg -> audio.playing(pkg) },
+        onToggleAudio = { pkg -> audio.toggle(pkg) },
+        onPlaceAtEdge = onPlaceAtEdge,
     )
     env.coverScreen = !wide
 
@@ -540,7 +571,15 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
         } finally {
             // Only this drag's landing (a new hold may have started meanwhile).
             if (drag.card?.key == held.key && drag.settling) {
-                drag.finish()?.let { (from, onto, how) -> env.onCombine(from, onto, how) }
+                val combine = drag.finish()
+                if (combine != null) {
+                    val (from, onto, how) = combine
+                    // Replace carries which pane was dropped on, encoded onto the mode string.
+                    if (how == COMBINE_REPLACE) env.onCombine(from, onto, "$COMBINE_REPLACE:${drag.droppedPane}")
+                    else env.onCombine(from, onto, how)
+                } else if (drag.droppedEdge != EDGE_NONE) {
+                    drag.edgeCard?.let { env.onPlaceAtEdge(it, drag.droppedEdge) }
+                }
             }
         }
     }
@@ -568,7 +607,13 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
                     .clip(RoundedCornerShape(env.corner))
                     .background(Color(0xD905090A)),
             ) {
-                if (drag.mode == COMBINE_THIRD) {
+                if (drag.mode == COMBINE_REPLACE) {
+                    // A three-app card: the pane under the finger lights up — the held app replaces it.
+                    val n = (drag.cards.firstOrNull { it.key == drag.target }?.tasks?.size ?: 3).coerceIn(2, 4)
+                    repeat(n) { i ->
+                        DropHalf(R.string.recents_drop_replace, if (i == drag.paneIndex) 1f else 0.18f, env.accent, attachedDiagram = false, env, Modifier.weight(1f), panes = n)
+                    }
+                } else if (drag.mode == COMBINE_THIRD) {
                     // A split card: the held app joins it as the third.
                     DropHalf(R.string.recents_drop_third, 1f, env.accent, attachedDiagram = false, env, Modifier.weight(1f), panes = 3)
                 } else {
@@ -576,6 +621,14 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
                     DropHalf(R.string.recents_drop_attached, attached, env.accent, attachedDiagram = true, env, Modifier.weight(1f))
                 }
             }
+        }
+
+        // Aero edge zones (inner screen): glass bars at the edges while a card is long-press-dragged;
+        // the one the finger is near lights up — drop there to place the app (left/right split, top full).
+        if (drag.allowEdge && drag.card != null && drag.target == null) {
+            EdgeZone(drag.edge == EDGE_LEFT, Alignment.CenterStart, vertical = true, env.accent)
+            EdgeZone(drag.edge == EDGE_RIGHT, Alignment.CenterEnd, vertical = true, env.accent)
+            EdgeZone(drag.edge == EDGE_TOP, Alignment.TopCenter, vertical = false, env.accent)
         }
 
         // The miniature of the held card.
@@ -605,6 +658,21 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
 }
 
 /** One half of the drop target: a small drawing of the result and its name; lit by [active] 0..1. */
+@Composable
+private fun BoxScope.EdgeZone(armed: Boolean, alignment: Alignment, vertical: Boolean, accent: Color) {
+    val grow by animateFloatAsState(if (armed) 1f else 0f, tween(120), label = "edgezone")
+    val thickness = 10.dp + 44.dp * grow
+    Box(
+        Modifier
+            .align(alignment)
+            .then(if (vertical) Modifier.fillMaxHeight(0.52f).width(thickness) else Modifier.fillMaxWidth(0.6f).height(thickness))
+            .padding(8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (armed) accent.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.14f))
+            .border(1.dp, Color.White.copy(alpha = if (armed) 0.85f else 0.3f), RoundedCornerShape(16.dp)),
+    )
+}
+
 @Composable
 private fun DropHalf(label: Int, active: Float, accent: Color, attachedDiagram: Boolean, env: RecentsEnv, modifier: Modifier, panes: Int = 2) {
     val attachedLeft = env.settings.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_LEFT
@@ -720,9 +788,76 @@ internal fun PinGlyph(color: Color) {
 /** The card's picture: Android's screenshot of each app (split halves side by side), or its icon. */
 @Composable
 internal fun CardPicture(card: RecentsCard, env: RecentsEnv, modifier: Modifier, corner: Dp, iconSize: Dp = 64.dp) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        card.tasks.forEachIndexed { i, task ->
-            Thumb(env.thumb(task.taskId), card.apps.getOrNull(i), Modifier.weight(1f).fillMaxSize(), RoundedCornerShape(corner), env.glass, iconSize)
+    Box(modifier) {
+        Row(Modifier.matchParentSize(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            card.tasks.forEachIndexed { i, task ->
+                Thumb(env.thumb(task.taskId), card.apps.getOrNull(i), Modifier.weight(1f).fillMaxSize(), RoundedCornerShape(corner), env.glass, iconSize)
+            }
+        }
+        // A speaker badge for the card's first app that is playing/paused audio (Settings ▸ Recents).
+        if (env.speakerBadge && !env.selecting) {
+            val pkg = card.tasks.firstOrNull { env.audioActive(it.packageName) }?.packageName
+            if (pkg != null) {
+                SpeakerBadge(
+                    playing = env.audioPlaying(pkg),
+                    onClick = { env.onToggleAudio(pkg) },
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                )
+            }
+        }
+    }
+}
+
+/** A round speaker button on a Recents card: pulses while the app is playing; a tap pauses/resumes it. */
+@Composable
+private fun SpeakerBadge(playing: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    val pulse = rememberInfiniteTransition(label = "speaker")
+    val scale by if (playing) {
+        pulse.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.16f,
+            animationSpec = infiniteRepeatable(tween(680), RepeatMode.Reverse),
+            label = "pulse",
+        )
+    } else {
+        remember { mutableStateOf(1f) }
+    }
+    Box(
+        modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.5f))
+            .pressClick(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        SpeakerGlyph(playing, Color.White)
+    }
+}
+
+/** A simple speaker drawn by hand (the app module has no icon pack): waves when playing, a slash when muted. */
+@Composable
+private fun SpeakerGlyph(playing: Boolean, color: Color) {
+    Canvas(Modifier.size(15.dp)) {
+        val w = size.width
+        val h = size.height
+        val sw = w * 0.13f
+        val body = Path().apply {
+            moveTo(w * 0.08f, h * 0.38f)
+            lineTo(w * 0.26f, h * 0.38f)
+            lineTo(w * 0.48f, h * 0.20f)
+            lineTo(w * 0.48f, h * 0.80f)
+            lineTo(w * 0.26f, h * 0.62f)
+            lineTo(w * 0.08f, h * 0.62f)
+            close()
+        }
+        drawPath(body, color)
+        if (playing) {
+            drawArc(color, -50f, 100f, false, topLeft = Offset(w * 0.40f, h * 0.28f), size = Size(w * 0.26f, h * 0.44f), style = Stroke(sw, cap = StrokeCap.Round))
+            drawArc(color, -50f, 100f, false, topLeft = Offset(w * 0.46f, h * 0.14f), size = Size(w * 0.42f, h * 0.72f), style = Stroke(sw, cap = StrokeCap.Round))
+        } else {
+            drawLine(color, Offset(w * 0.60f, h * 0.32f), Offset(w * 0.92f, h * 0.68f), strokeWidth = sw, cap = StrokeCap.Round)
+            drawLine(color, Offset(w * 0.92f, h * 0.32f), Offset(w * 0.60f, h * 0.68f), strokeWidth = sw, cap = StrokeCap.Round)
         }
     }
 }

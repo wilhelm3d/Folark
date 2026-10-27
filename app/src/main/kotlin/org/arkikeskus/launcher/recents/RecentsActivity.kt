@@ -73,6 +73,8 @@ class RecentsActivity : ComponentActivity() {
                     onCombine = { dragged, target, how ->
                         if (how == COMBINE_THIRD) {
                             viewModel.addThird(target, dragged)
+                        } else if (how.startsWith(COMBINE_REPLACE)) {
+                            viewModel.replacePane(target, how.substringAfter(':', "").toIntOrNull() ?: 0, dragged)
                         } else if (how == COMBINE_ATTACHED) {
                             viewModel.openAttached(dragged, target, settings.recents.attachedSide, settings.recents.attachedPeek, windowManager.maximumWindowMetrics.bounds)
                         } else {
@@ -82,6 +84,7 @@ class RecentsActivity : ComponentActivity() {
                     },
                     onAppInfo = { card -> viewModel.appInfo(card); leave() },
                     onTogglePin = viewModel::togglePin,
+                    onPlaceAtEdge = { card, edge -> viewModel.placeAtEdge(card, edge); leave() },
                     onSavePair = { card ->
                         val saved = viewModel.saveAsPair(card)
                         android.widget.Toast.makeText(

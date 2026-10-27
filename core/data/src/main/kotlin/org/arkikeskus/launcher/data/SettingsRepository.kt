@@ -385,6 +385,7 @@ class SettingsRepository @Inject constructor(
                     if (it in LauncherSettings.TASKBAR_THEMES) it else LauncherSettings.TASKBAR_THEME_CLEAR
                 },
                 opacity = (p[Keys.TASKBAR_OPACITY] ?: 0.8f).coerceIn(0.1f, 1f),
+                glassBlur = (p[Keys.TASKBAR_GLASS_BLUR] ?: 24).coerceIn(0, 80),
                 handles = p[Keys.TASKBAR_HANDLES] ?: LauncherSettings.TASKBAR_HANDLES_BOTH,
                 onHome = p[Keys.TASKBAR_ON_HOME] ?: true,
                 keepOpen = p[Keys.TASKBAR_KEEP_OPEN] ?: false,
@@ -396,6 +397,7 @@ class SettingsRepository @Inject constructor(
                 mediaShape = p[Keys.TASKBAR_MEDIA_SHAPE] ?: LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE,
                 mediaBadge = p[Keys.TASKBAR_MEDIA_BADGE] ?: true,
                 systemDrag = p[Keys.TASKBAR_SYSTEM_DRAG] ?: true,
+                edgeSnap = p[Keys.TASKBAR_EDGE_SNAP] ?: true,
                 recentsButton = p[Keys.TASKBAR_RECENTS_BUTTON] ?: LauncherSettings.TASKBAR_RECENTS_SYSTEM,
                 quickSwitch = p[Keys.TASKBAR_QUICK_SWITCH] ?: true,
                 splitControls = p[Keys.TASKBAR_SPLIT_CONTROLS] ?: true,
@@ -404,6 +406,7 @@ class SettingsRepository @Inject constructor(
                 hideFullScreen = p[Keys.TASKBAR_HIDE_FULL_SCREEN] ?: true,
                 runningApps = p[Keys.TASKBAR_RUNNING_APPS] ?: false,
                 runningDots = p[Keys.TASKBAR_RUNNING_DOTS] ?: true,
+                multiInstanceDots = p[Keys.TASKBAR_MULTI_DOTS] ?: true,
                 hiddenApps = lines(p[Keys.TASKBAR_HIDDEN_APPS]),
                 alwaysApps = lines(p[Keys.TASKBAR_ALWAYS_APPS]),
                 autoHideApps = lines(p[Keys.TASKBAR_AUTOHIDE_APPS]),
@@ -592,6 +595,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setTaskbarBottomOffset(value: Int) = edit { it[Keys.TASKBAR_BOTTOM] = value.coerceIn(0, 64) }
     suspend fun setTaskbarTheme(value: String) = edit { it[Keys.TASKBAR_THEME] = value }
     suspend fun setTaskbarOpacity(value: Float) = edit { it[Keys.TASKBAR_OPACITY] = value.coerceIn(0.1f, 1f) }
+    suspend fun setTaskbarGlassBlur(value: Int) = edit { it[Keys.TASKBAR_GLASS_BLUR] = value.coerceIn(0, 80) }
     suspend fun setTaskbarHandles(value: String) = edit { it[Keys.TASKBAR_HANDLES] = value }
     suspend fun setTaskbarOnHome(value: Boolean) = edit { it[Keys.TASKBAR_ON_HOME] = value }
     suspend fun setTaskbarKeepOpen(value: Boolean) = edit { it[Keys.TASKBAR_KEEP_OPEN] = value }
@@ -603,6 +607,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setTaskbarMediaShape(value: String) = edit { it[Keys.TASKBAR_MEDIA_SHAPE] = value }
     suspend fun setTaskbarMediaBadge(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA_BADGE] = value }
     suspend fun setTaskbarSystemDrag(value: Boolean) = edit { it[Keys.TASKBAR_SYSTEM_DRAG] = value }
+    suspend fun setTaskbarEdgeSnap(value: Boolean) = edit { it[Keys.TASKBAR_EDGE_SNAP] = value }
     suspend fun setTaskbarRecentsButton(value: String) = edit { it[Keys.TASKBAR_RECENTS_BUTTON] = value }
     suspend fun setTaskbarQuickSwitch(value: Boolean) = edit { it[Keys.TASKBAR_QUICK_SWITCH] = value }
     suspend fun setTaskbarSplitControls(value: Boolean) = edit { it[Keys.TASKBAR_SPLIT_CONTROLS] = value }
@@ -644,9 +649,11 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsConfirmCloseAll(value: Boolean) = edit { it[Keys.RECENTS_CONFIRM_CLOSE_ALL] = value }
     suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
     suspend fun setRecentsThumbnails(value: Boolean) = edit { it[Keys.RECENTS_THUMBNAILS] = value }
+    suspend fun setRecentsSpeakerBadge(value: Boolean) = edit { it[Keys.RECENTS_SPEAKER_BADGE] = value }
     suspend fun setRecentsRootClose(value: Boolean) = edit { it[Keys.RECENTS_ROOT_CLOSE] = value }
     suspend fun setTaskbarRunningApps(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_APPS] = value }
     suspend fun setTaskbarRunningDots(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_DOTS] = value }
+    suspend fun setTaskbarMultiDots(value: Boolean) = edit { it[Keys.TASKBAR_MULTI_DOTS] = value }
     suspend fun setRecentsEnterAnimation(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_ENTER else Keys.RECENTS_ENTER] = value }
     suspend fun setRecentsSelectAnimation(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SELECT else Keys.RECENTS_SELECT] = value }
     suspend fun setRecentsAnimationSpeed(value: Float, cover: Boolean = false) = edit {
@@ -725,6 +732,7 @@ class SettingsRepository @Inject constructor(
         confirmCloseAll = p[Keys.RECENTS_CONFIRM_CLOSE_ALL] ?: false,
         thirdInSplit = p[Keys.RECENTS_THIRD_IN_SPLIT] ?: true,
         thumbnails = p[Keys.RECENTS_THUMBNAILS] ?: true,
+        speakerBadge = p[Keys.RECENTS_SPEAKER_BADGE] ?: false,
         rootClose = p[Keys.RECENTS_ROOT_CLOSE] ?: true,
         enterAnimation = (p[Keys.RECENTS_ENTER] ?: LauncherSettings.RECENTS_ENTER_RISE)
             .let { if (it in LauncherSettings.RECENTS_ENTERS) it else LauncherSettings.RECENTS_ENTER_RISE },

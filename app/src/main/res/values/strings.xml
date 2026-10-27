@@ -34,6 +34,7 @@
     <string name="recents_drop_split">Split view</string>
     <string name="recents_drop_attached">Attached view</string>
     <string name="recents_drop_third">Add as third app</string>
+    <string name="recents_drop_replace">Replace</string>
     <string name="recents_drag_hint">drop on an app</string>
     <string name="recents_close_others">Close others</string>
     <string name="recents_close_all_pins_too">Close all (pins too)</string>

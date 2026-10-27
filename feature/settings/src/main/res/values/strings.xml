@@ -455,6 +455,7 @@
     <string name="settings_taskbar_theme_light">Light</string>
     <string name="settings_taskbar_theme_accent">Accent</string>
     <string name="settings_taskbar_opacity">Backdrop opacity</string>
+    <string name="settings_taskbar_glass_blur">Backdrop blur</string>
     <string name="settings_taskbar_icon_size">Icon size</string>
     <string name="settings_taskbar_spacing">Space between icons</string>
     <string name="settings_taskbar_bottom">Distance from the bottom</string>
@@ -664,8 +665,12 @@
     <string name="settings_recents_root_check">Tap to check again (e.g. after re-enabling root)</string>
     <string name="settings_taskbar_running_apps">Taskbar shows open apps</string>
     <string name="settings_taskbar_running_apps_desc">The apps open now instead of the recently used ones</string>
+    <string name="settings_taskbar_edge_snap">Snap to screen edges</string>
+    <string name="settings_taskbar_edge_snap_desc">Drag an app off the taskbar to a glass drop zone: left or right half (split), top (full screen, or a third app over a split), bottom (floating window). Off keeps the up-left / up-right drag</string>
     <string name="settings_taskbar_running_dots">Dot under open apps on the taskbar</string>
     <string name="settings_taskbar_running_dots_desc">Needs the same one-time ADB grant</string>
+    <string name="settings_taskbar_multi_dots">Pill for multiple windows</string>
+    <string name="settings_taskbar_multi_dots_desc">The dot widens into a pill when an app has two or more open windows, like split pairs or pop-ups</string>
     <string name="settings_recents_enter">Opening animation</string>
     <string name="settings_recents_enter_rise">Rise</string>
     <string name="settings_recents_enter_zoom">Zoom</string>
@@ -836,6 +841,8 @@
     <string name="settings_recents_overlay_labels">App names under the cards</string>
     <string name="settings_recents_card_icons">App icons on the cards</string>
     <string name="settings_recents_card_shadow">Card shadow</string>
+    <string name="settings_recents_speaker_badge">Speaker badge</string>
+    <string name="settings_recents_speaker_badge_desc">On a card playing audio, a pulsing speaker you can tap to pause or resume just that app (needs notification access)</string>
     <string name="settings_recents_label_size">Label size</string>
     <string name="settings_recents_menu_motion">Animate the long-press menu</string>
     <string name="settings_recents_menu_motion_desc">It grows from your finger and its rows slide in one by one</string>

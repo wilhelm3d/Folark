@@ -365,6 +365,42 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * [with] dropped on pane [paneIndex] of the multi-app card [target]: the split is rebuilt with
+     * that pane's app swapped for [with]. Android has no in-place pane swap, so the split is torn
+     * down and reopened from the new trio (a brief flash) — best effort, like [openTogether].
+     */
+    fun replacePane(target: RecentsCard, paneIndex: Int, with: RecentsCard) {
+        if (paneIndex !in target.tasks.indices || target.tasks.size < 2) return
+        if (with.tasks.first().taskId in target.tasks.map { it.taskId }) return
+        val panes = target.tasks.indices.map { i ->
+            if (i == paneIndex) with
+            else RecentsCard(
+                tasks = listOf(target.tasks[i]),
+                apps = listOf(target.apps.getOrNull(i)),
+                label = target.apps.getOrNull(i)?.label ?: target.tasks[i].packageName,
+                inactiveMs = target.tasks[i].inactiveMs,
+            )
+        }
+        openTogether(panes, thirdInSplit = true, threeApp = true)
+    }
+
+    /**
+     * [card] long-press-dragged to a screen edge (inner screen, Aero-style): top = full screen; left
+     * or right = the app into that split half beside whatever is behind Recents. A floating (pop-up)
+     * app dragged to a side is pulled into the split this way. Best effort, like the other split ops.
+     */
+    fun placeAtEdge(card: RecentsCard, edge: Int) {
+        when (edge) {
+            EDGE_TOP -> open(card)
+            EDGE_LEFT, EDGE_RIGHT -> appScope.launch {
+                open(card)
+                delay(SPLIT_STEP_MS)
+                withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, card.tasks.first().taskId, right = edge == EDGE_RIGHT) }
+            }
+        }
+    }
+
     /** Whether split view can work: Android's split command needs the one-time DUMP grant. */
     fun canSplit(): Boolean = ShellSplit.hasDump(context)
 

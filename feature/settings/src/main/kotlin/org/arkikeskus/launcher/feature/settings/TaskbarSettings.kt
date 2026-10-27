@@ -177,6 +177,14 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_edge_snap),
+            subtitle = stringResource(R.string.settings_taskbar_edge_snap_desc),
+            checked = s.taskbar.edgeSnap,
+            onCheckedChange = viewModel::setTaskbarEdgeSnap,
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_system_drag),
             subtitle = stringResource(R.string.settings_taskbar_system_drag_desc),
             checked = s.taskbar.systemDrag,
@@ -319,6 +327,16 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 onValueChange = viewModel::setTaskbarOpacity,
                 valueRange = 0.1f..1f,
                 valueDisplay = "${(s.taskbar.opacity * 100).roundToInt()}%",
+            )
+        }
+        if (s.taskbar.theme == LauncherSettings.TASKBAR_THEME_GLASS) {
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_taskbar_glass_blur),
+                value = s.taskbar.glassBlur.toFloat(),
+                onValueChange = { viewModel.setTaskbarGlassBlur(it.roundToInt()) },
+                valueRange = 0f..80f,
+                valueDisplay = "${s.taskbar.glassBlur} dp",
             )
         }
         ExpressiveRowDivider()

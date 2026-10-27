@@ -412,6 +412,9 @@ data class LauncherSettings(
         val theme: String = TASKBAR_THEME_CLEAR,
         /** Taskbar: how solid the backdrop of the non-clear themes is. */
         val opacity: Float = 0.8f,
+        /** Taskbar: with the Glass theme, how far the wallpaper/apps behind the bar are blurred (dp,
+         *  real backdrop blur; 0 = off). Needs Android 12+ and the system's cross-window blur. */
+        val glassBlur: Int = 24,
         /** Taskbar: which bottom corners open it over other apps, one of TASKBAR_HANDLES_*. */
         val handles: String = TASKBAR_HANDLES_BOTH,
         /** Taskbar: always shown on Folark's home screen and app drawer. */
@@ -434,6 +437,10 @@ data class LauncherSettings(
         val mediaBadge: Boolean = true,
         /** Taskbar over an app: a drag to the right (an icon or a shortcut) uses Android's own split drop zones. */
         val systemDrag: Boolean = true,
+        /** Taskbar: drag an icon to a screen edge to snap it there — left/right half (split), top
+         *  (full screen, or a third app over a split), bottom (floating window), with glass drop
+         *  zones, Windows-snap style. Off keeps the up-left-float / up-right-split drag. */
+        val edgeSnap: Boolean = true,
         /** Taskbar: the recents button, one of TASKBAR_RECENTS_*. */
         val recentsButton: String = TASKBAR_RECENTS_SYSTEM,
         /** Taskbar: holding the recents button goes back to the last app. */
@@ -450,6 +457,9 @@ data class LauncherSettings(
          *  icons of open apps (both need the one-time DUMP grant). */
         val runningApps: Boolean = false,
         val runningDots: Boolean = true,
+        /** Taskbar: the running dot widens into a pill for an app with two or more open windows
+         *  (split pairs, pop-ups), Windows-style. Needs [runningDots]. */
+        val multiInstanceDots: Boolean = true,
         /** Taskbar per app (package names): never shown in [hiddenApps]; always shown in
          *  [alwaysApps], even full screen or when it isn't kept open; hidden but revealed by a
          *  corner swipe in [autoHideApps]; a small tap-to-open pill in [miniApps]. */
@@ -532,6 +542,9 @@ data class LauncherSettings(
         /** With root: Android's saved screenshots of the apps, and closing a single app. */
         val thumbnails: Boolean = true,
         val rootClose: Boolean = true,
+        /** A speaker badge on a card whose app has a media session; a tap pauses/resumes just that
+         *  app (there is no public per-UID stream mute, so this is the per-app audio control). */
+        val speakerBadge: Boolean = false,
         /** Recents animations: how the cards come in (RECENTS_ENTER_*), how a card picked for split
          *  view answers (RECENTS_SELECT_*), and how fast both play (1 = normal, higher = faster). */
         val enterAnimation: String = RECENTS_ENTER_RISE,

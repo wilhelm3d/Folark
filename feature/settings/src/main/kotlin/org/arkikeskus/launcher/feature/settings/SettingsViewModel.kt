@@ -161,6 +161,7 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarBottomOffset(value: Int) = update { repository.setTaskbarBottomOffset(value) }
     fun setTaskbarTheme(value: String) = update { repository.setTaskbarTheme(value) }
     fun setTaskbarOpacity(value: Float) = update { repository.setTaskbarOpacity(value) }
+    fun setTaskbarGlassBlur(value: Int) = update { repository.setTaskbarGlassBlur(value) }
     fun setTaskbarHandles(value: String) = update { repository.setTaskbarHandles(value) }
     fun setTaskbarOnHome(value: Boolean) = update { repository.setTaskbarOnHome(value) }
     fun setTaskbarKeepOpen(value: Boolean) = update { repository.setTaskbarKeepOpen(value) }
@@ -172,6 +173,7 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarMediaShape(value: String) = update { repository.setTaskbarMediaShape(value) }
     fun setTaskbarMediaBadge(value: Boolean) = update { repository.setTaskbarMediaBadge(value) }
     fun setTaskbarSystemDrag(value: Boolean) = update { repository.setTaskbarSystemDrag(value) }
+    fun setTaskbarEdgeSnap(value: Boolean) = update { repository.setTaskbarEdgeSnap(value) }
     fun setTaskbarRecentsButton(value: String) = update { repository.setTaskbarRecentsButton(value) }
     fun setTaskbarQuickSwitch(value: Boolean) = update { repository.setTaskbarQuickSwitch(value) }
     fun setTaskbarSplitControls(value: Boolean) = update { repository.setTaskbarSplitControls(value) }
@@ -208,9 +210,11 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsConfirmCloseAll(value: Boolean) = update { repository.setRecentsConfirmCloseAll(value) }
     fun setRecentsThirdInSplit(value: Boolean) = update { repository.setRecentsThirdInSplit(value) }
     fun setRecentsThumbnails(value: Boolean) = update { repository.setRecentsThumbnails(value) }
+    fun setRecentsSpeakerBadge(value: Boolean) = update { repository.setRecentsSpeakerBadge(value) }
     fun setRecentsRootClose(value: Boolean) = update { repository.setRecentsRootClose(value) }
     fun setTaskbarRunningApps(value: Boolean) = update { repository.setTaskbarRunningApps(value) }
     fun setTaskbarRunningDots(value: Boolean) = update { repository.setTaskbarRunningDots(value) }
+    fun setTaskbarMultiDots(value: Boolean) = update { repository.setTaskbarMultiDots(value) }
     fun setRecentsEnterAnimation(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsEnterAnimation(value, cover = cover) } }
     fun setRecentsSelectAnimation(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsSelectAnimation(value, cover = cover) } }
     fun setRecentsAnimationSpeed(value: Float) = editRecentsCover.let { cover -> update { repository.setRecentsAnimationSpeed(value, cover = cover) } }

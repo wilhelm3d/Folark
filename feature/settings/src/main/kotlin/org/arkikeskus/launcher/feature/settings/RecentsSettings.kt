@@ -247,6 +247,13 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsCardShadow,
         )
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_speaker_badge),
+            subtitle = stringResource(R.string.settings_recents_speaker_badge_desc),
+            checked = s.recents.speakerBadge,
+            onCheckedChange = viewModel::setRecentsSpeakerBadge,
+        )
+        ExpressiveRowDivider()
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_recents_label_size),
             value = s.recents.labelScale,
@@ -346,6 +353,15 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             checked = s.taskbar.runningDots,
             onCheckedChange = viewModel::setTaskbarRunningDots,
         )
+        if (s.taskbar.runningDots) {
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_taskbar_multi_dots),
+                subtitle = stringResource(R.string.settings_taskbar_multi_dots_desc),
+                checked = s.taskbar.multiInstanceDots,
+                onCheckedChange = viewModel::setTaskbarMultiDots,
+            )
+        }
     }
 }
 
