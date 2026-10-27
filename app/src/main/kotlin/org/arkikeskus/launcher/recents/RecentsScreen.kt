@@ -623,12 +623,11 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
             }
         }
 
-        // Aero edge zones (inner screen): glass bars at the edges while a card is long-press-dragged;
-        // the one the finger is near lights up — drop there to place the app (left/right split, top full).
-        if (drag.allowEdge && drag.card != null && drag.target == null) {
-            EdgeZone(drag.edge == EDGE_LEFT, Alignment.CenterStart, vertical = true, env.accent)
-            EdgeZone(drag.edge == EDGE_RIGHT, Alignment.CenterEnd, vertical = true, env.accent)
-            EdgeZone(drag.edge == EDGE_TOP, Alignment.TopCenter, vertical = false, env.accent)
+        // Aero snap preview (inner screen): while a card is long-press-dragged to an edge, a rounded
+        // glass region shows where the app will land — left/right half, or full screen for the top,
+        // Windows-snap style. Only the targeted region is shown.
+        if (drag.allowEdge && drag.card != null && drag.target == null && drag.edge != EDGE_NONE) {
+            SnapPreview(drag.edge, env.accent)
         }
 
         // The miniature of the held card.
@@ -659,17 +658,25 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
 
 /** One half of the drop target: a small drawing of the result and its name; lit by [active] 0..1. */
 @Composable
-private fun BoxScope.EdgeZone(armed: Boolean, alignment: Alignment, vertical: Boolean, accent: Color) {
-    val grow by animateFloatAsState(if (armed) 1f else 0f, tween(120), label = "edgezone")
-    val thickness = 10.dp + 44.dp * grow
+private fun BoxScope.SnapPreview(edge: Int, accent: Color) {
+    // A rounded preview of the region the app will take: left/right half, or the whole screen for top.
+    val pop by animateFloatAsState(1f, tween(130), label = "snap")
+    val align = when (edge) {
+        EDGE_RIGHT -> Alignment.CenterEnd
+        EDGE_TOP -> Alignment.Center
+        else -> Alignment.CenterStart
+    }
+    val widthFraction = if (edge == EDGE_TOP) 1f else 0.5f
     Box(
         Modifier
-            .align(alignment)
-            .then(if (vertical) Modifier.fillMaxHeight(0.52f).width(thickness) else Modifier.fillMaxWidth(0.6f).height(thickness))
-            .padding(8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (armed) accent.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.14f))
-            .border(1.dp, Color.White.copy(alpha = if (armed) 0.85f else 0.3f), RoundedCornerShape(16.dp)),
+            .align(align)
+            .fillMaxWidth(widthFraction)
+            .fillMaxHeight()
+            .padding(12.dp)
+            .graphicsLayer { val s = 0.97f + 0.03f * pop; scaleX = s; scaleY = s }
+            .clip(RoundedCornerShape(26.dp))
+            .background(accent.copy(alpha = 0.20f))
+            .border(2.dp, accent.copy(alpha = 0.85f), RoundedCornerShape(26.dp)),
     )
 }
 

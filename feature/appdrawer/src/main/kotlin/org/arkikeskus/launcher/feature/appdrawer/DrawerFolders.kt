@@ -23,10 +23,15 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -40,7 +45,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.arkikeskus.launcher.ui.component.CommitWhenIdle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -137,7 +141,11 @@ private fun FolderSlot(app: AppItem?, size: Dp) {
     }
 }
 
-/** The open-folder sheet: rename, member apps (tap launches, long-press removes), add apps, delete. */
+/**
+ * The open-folder sheet: a clean view — the folder name and a small settings cog on top, then the
+ * apps (tap launches, long-press removes). The cog opens rename / add apps / delete folder, so none
+ * of those controls clutter the folder while it is just being browsed.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun DrawerFolderSheet(
@@ -153,7 +161,9 @@ internal fun DrawerFolderSheet(
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     var showAdd by remember { mutableStateOf(false) }
+    var showRename by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -162,27 +172,37 @@ internal fun DrawerFolderSheet(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp),
         ) {
-            var name by remember(folder.id) { mutableStateOf(folder.name) }
-            CommitWhenIdle(folder.id, name, commit = onRename)
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                label = { Text(stringResource(R.string.folder_name_label)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
+                )
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(
+                            Icons.Rounded.Settings,
+                            contentDescription = stringResource(R.string.folder_options),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.rename)) }, onClick = { menuOpen = false; showRename = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.folder_add_apps)) }, onClick = { menuOpen = false; showAdd = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.folder_delete)) }, onClick = { menuOpen = false; onDelete() })
+                    }
+                }
+            }
             if (folder.apps.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.folder_remove_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 280.dp),
+                        .heightIn(max = 320.dp),
                 ) {
                     items(items = folder.apps, key = { it.key }, contentType = { "app" }) { app ->
                         AppIcon(
@@ -202,11 +222,6 @@ internal fun DrawerFolderSheet(
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showAdd = true }) { Text(stringResource(R.string.folder_add_apps)) }
-                TextButton(onClick = onDelete) { Text(stringResource(R.string.folder_delete)) }
-            }
         }
     }
     if (showAdd) {
@@ -219,6 +234,38 @@ internal fun DrawerFolderSheet(
             onDismiss = { showAdd = false },
         )
     }
+    if (showRename) {
+        FolderRenameDialog(
+            initial = folder.name,
+            onConfirm = { onRename(it); showRename = false },
+            onDismiss = { showRename = false },
+        )
+    }
+}
+
+/** Rename dialog opened from the folder's settings cog. */
+@Composable
+private fun FolderRenameDialog(initial: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.rename)) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                label = { Text(stringResource(R.string.folder_name_label)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) {
+                Text(stringResource(R.string.folder_save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.folder_cancel)) } },
+    )
 }
 
 /** Multi-select picker of apps to add to a drawer folder. */

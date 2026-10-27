@@ -11,6 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -19,6 +20,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +30,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -35,6 +38,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -50,6 +55,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -144,15 +150,15 @@ fun OnboardingFlow(
                     }
                     Spacer(Modifier.width(10.dp))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
                     repeat(3) { i ->
+                        val active = i == page
+                        val w by animateDpAsState(if (active) 22.dp else 8.dp, label = "dot")
                         Box(
                             Modifier
-                                .size(8.dp)
-                                .background(
-                                    if (i == page) Color.White else Color.White.copy(alpha = 0.35f),
-                                    CircleShape,
-                                ),
+                                .height(8.dp)
+                                .width(w)
+                                .background(if (active) Color.White else Color.White.copy(alpha = 0.35f), CircleShape),
                         )
                     }
                 }
@@ -160,6 +166,8 @@ fun OnboardingFlow(
                 Button(
                     onClick = { if (page < 2) page++ else onFinish() },
                     colors = ButtonDefaults.buttonColors(containerColor = AURORA_BLUE),
+                    shape = RoundedCornerShape(50),
+                    contentPadding = PaddingValues(horizontal = 26.dp, vertical = 13.dp),
                 ) {
                     Text(
                         stringResource(if (page < 2) R.string.onboarding_next else R.string.onboarding_finish),
@@ -218,9 +226,18 @@ private fun WelcomePage(onRestored: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // A calm brand orb in the aurora colours, instead of a bare title.
+        Box(
+            Modifier
+                .size(76.dp)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(listOf(AURORA_BLUE, AURORA_GREEN)))
+                .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape),
+        )
+        Spacer(Modifier.height(24.dp))
         Text(
             text = stringResource(R.string.onboarding_title),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineLarge,
             color = Color.White,
             textAlign = TextAlign.Center,
         )
@@ -447,10 +464,11 @@ private fun RootGrantCard(onDone: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .background(AURORA_BLUE.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
+            .border(1.dp, AURORA_BLUE.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
     ) {
-        Text(stringResource(R.string.onboarding_root_title), color = Color.White, style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.onboarding_root_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(
             stringResource(R.string.onboarding_root_text),
@@ -500,7 +518,8 @@ private fun PermissionRow(title: String, description: String, granted: Boolean, 
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = if (granted) 0.05f else 0.08f), RoundedCornerShape(18.dp))
+            .then(if (granted) Modifier.border(1.dp, AURORA_GREEN_LIGHT.copy(alpha = 0.45f), RoundedCornerShape(18.dp)) else Modifier)
             .clickable(enabled = !granted, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -513,10 +532,15 @@ private fun PermissionRow(title: String, description: String, granted: Boolean, 
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        Text(
-            text = if (granted) stringResource(R.string.onboarding_granted) else stringResource(R.string.onboarding_grant),
-            color = if (granted) AURORA_GREEN_LIGHT else Color.White.copy(alpha = 0.9f),
-            style = MaterialTheme.typography.labelLarge,
-        )
+        Spacer(Modifier.width(12.dp))
+        if (granted) {
+            Icon(Icons.Rounded.CheckCircle, contentDescription = stringResource(R.string.onboarding_granted), tint = AURORA_GREEN_LIGHT, modifier = Modifier.size(24.dp))
+        } else {
+            Text(
+                text = stringResource(R.string.onboarding_grant),
+                color = Color.White.copy(alpha = 0.9f),
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
     }
 }
