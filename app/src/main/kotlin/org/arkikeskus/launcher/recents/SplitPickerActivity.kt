@@ -7,13 +7,14 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import org.arkikeskus.launcher.data.SplitPicker
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
 import org.arkikeskus.launcher.feature.appdrawer.SplitPickerDrawer
 
 /**
- * The second pane of a split-select: Folark opens the dragged app on one side and this picker on
- * the other (paired through the normal split mechanism). It shows [SplitPickerDrawer]; tapping an
- * app launches it, which replaces this picker in its pane with Android's own slide-in animation.
+ * The split-select picker: Folark's app drawer, shown full screen to choose the second app for a
+ * split. Once an app is tapped, [SplitPickerViewModel.formSplit] opens it beside the first (dragged)
+ * app — the first one on the side it was dropped — and this screen closes.
  */
 @AndroidEntryPoint
 class SplitPickerActivity : ComponentActivity() {
@@ -22,6 +23,8 @@ class SplitPickerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val firstPackage = intent.getStringExtra(SplitPicker.EXTRA_FIRST_PACKAGE).orEmpty()
+        val right = intent.getBooleanExtra(SplitPicker.EXTRA_RIGHT, false)
         setContent {
             val apps by viewModel.apps.collectAsStateWithLifecycle()
             val folders by viewModel.folders.collectAsStateWithLifecycle()
@@ -30,7 +33,7 @@ class SplitPickerActivity : ComponentActivity() {
                     apps = apps,
                     folders = folders,
                     onPick = { app ->
-                        viewModel.launch(app)
+                        viewModel.formSplit(firstPackage, right, app)
                         finish()
                     },
                 )

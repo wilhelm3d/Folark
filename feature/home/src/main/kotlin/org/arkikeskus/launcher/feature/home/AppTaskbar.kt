@@ -2277,21 +2277,8 @@ internal class AppTaskbar(private val context: Context) {
             launchApp(app)
             return
         }
-        scope.launch {
-            runCatching { context.startActivity(SplitPicker.intent(context)) }
-            delay(SPLIT_PARTNER_DELAY_MS)
-            launchApp(app)
-            delay(SPLIT_SETTLE_DELAY_MS)
-            var taskId: Int? = null
-            repeat(SPLIT_FIND_TRIES) {
-                if (taskId == null) {
-                    taskId = withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, app.packageName) }
-                    if (taskId == null) delay(SPLIT_RETRY_MS)
-                }
-            }
-            val id = taskId ?: return@launch
-            withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, id, right = right) }
-        }
+        // Show the picker to choose the partner; it builds the split from the two real apps.
+        runCatching { context.startActivity(SplitPicker.intent(context, app.packageName, right)) }
     }
 
     /** The screen edge the finger is over while dragging (edge-snap): the six Recents-style zones. */

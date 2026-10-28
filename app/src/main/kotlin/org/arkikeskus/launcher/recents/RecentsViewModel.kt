@@ -405,15 +405,11 @@ class RecentsViewModel @Inject constructor(
         when (edge) {
             EDGE_TOP -> open(card)
             EDGE_BOTTOM -> popUp(card)
-            EDGE_LEFT, EDGE_RIGHT -> appScope.launch {
-                val task = card.tasks.firstOrNull()?.taskId ?: return@launch
-                // Folark's own picker fills the other side: the picker (partner) first, then the
-                // dragged app, then move it to its side — the same order the taskbar split uses.
-                runCatching { context.startActivity(SplitPicker.intent(context)) }
-                delay(SPLIT_STEP_MS)
-                open(card)
-                delay(SPLIT_STEP_MS)
-                withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, task, right = edge == EDGE_RIGHT) }
+            EDGE_LEFT, EDGE_RIGHT -> {
+                // Show Folark's picker to choose the partner; it then builds the split from the two
+                // real apps (the dragged app on the side it was dropped).
+                val pkg = card.tasks.firstOrNull()?.packageName ?: return
+                runCatching { context.startActivity(SplitPicker.intent(context, pkg, right = edge == EDGE_RIGHT)) }
             }
         }
     }
