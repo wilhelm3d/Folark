@@ -612,6 +612,8 @@ data class LauncherSettings(
          *  the divider like a finger, which some ROMs handle far more reliably (the module's cold
          *  snap can crash System UI on certain builds). On: the exact native peek strip, where it works. */
         val attachedNative: Boolean = false,
+        /** Which execution flow to use when forming split screen from the picker. */
+        val splitEngine: Int = SPLIT_ENGINE_INTENT_ROUTING,
     )
 
     /** Root features (all off unless root is enabled). */
@@ -653,6 +655,11 @@ data class LauncherSettings(
 
 
     companion object {
+        const val SPLIT_ENGINE_INTENT_ROUTING = 1
+        const val SPLIT_ENGINE_CLASSIC = 2
+        const val SPLIT_ENGINE_LSPOSED = 3
+        const val SPLIT_ENGINE_ROOT = 4
+
         const val UNLOCK_STYLE_DISPLAY = "display"
         const val UNLOCK_STYLE_ZOOM = "zoom"
         const val UNLOCK_STYLE_RISE = "rise"

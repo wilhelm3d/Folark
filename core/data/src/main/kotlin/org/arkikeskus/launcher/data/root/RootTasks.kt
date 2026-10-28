@@ -142,6 +142,15 @@ object RootTasks {
     }
 
     /** Stops [packageName] completely (its tasks stay listed until Android tidies them up). */
+    /** Uses am start to launch two packages into split screen (ROOT). */
+    fun launchSplitPair(pkg1: String, pkg2: String): Boolean {
+        if (!PACKAGE.matches(pkg1) || !PACKAGE.matches(pkg2)) return false
+        // 3 = WINDOWING_MODE_SPLIT_SCREEN_PRIMARY
+        // 4 = WINDOWING_MODE_SPLIT_SCREEN_SECONDARY
+        val script = "am start -n $pkg1 --windowingMode 3; sleep 0.3; am start -n $pkg2 --windowingMode 4"
+        return RootShell.run(script) != null
+    }
+
     fun forceStop(packageName: String): Boolean {
         if (!PACKAGE.matches(packageName)) return false
         return RootShell.run("am force-stop $packageName") != null

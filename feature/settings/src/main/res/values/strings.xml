@@ -911,4 +911,10 @@
     <string name="settings_recents_outer_look">Own look on the outer screen</string>
     <string name="settings_recents_outer_look_desc">Theme, cards, glass, buttons and animations of their own on the outer screen. Until you change one there, it is the same as on the inner screen</string>
     <string name="settings_recents_look_editing">Settings below are for</string>
+    <string name="settings_split_engine">Split Screen Engine</string>
+    <string name="settings_split_engine_desc">How Folark forms a split screen (drag to edge, Recents).</string>
+    <string name="settings_split_engine_intent">Intent Routing (Default)</string>
+    <string name="settings_split_engine_classic">Classic Flow</string>
+    <string name="settings_split_engine_lsposed">Native (LSPosed)</string>
+    <string name="settings_split_engine_root">Root Override</string>
 </resources>

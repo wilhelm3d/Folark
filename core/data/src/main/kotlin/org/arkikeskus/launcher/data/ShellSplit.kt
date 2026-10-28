@@ -108,7 +108,7 @@ object ShellSplit {
                 stageIndent = -1
                 continue
             }
-            if (!line.contains("visible=true")) continue
+            if (!line.contains("visible=true") && !line.contains("visibleRequested=true")) continue
             val id = Regex("""Task\{\S+ #(\d+)""").find(line)?.groupValues?.get(1)?.toIntOrNull() ?: continue
             val pkg = Regex("""\bA=\d+:([\w.]+)""").find(line)?.groupValues?.get(1)
                 ?: Regex("""\bI=([\w.]+)/""").find(line)?.groupValues?.get(1)

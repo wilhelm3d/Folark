@@ -331,6 +331,7 @@ internal object Keys {
     val RECENTS_ATTACHED_SIDE = stringPreferencesKey("recents_attached_side")
     val RECENTS_ATTACHED_PEEK = floatPreferencesKey("recents_attached_peek")
     val RECENTS_ATTACHED_NATIVE = booleanPreferencesKey("recents_attached_native")
+    val RECENTS_SPLIT_ENGINE = intPreferencesKey("recents_split_engine")
     val TASKBAR_HANDLE_HINT = booleanPreferencesKey("taskbar_handle_hint")
     val TASKBAR_HANDLE_STYLE = stringPreferencesKey("taskbar_handle_style")
     val TASKBAR_HIDE_BUTTON = booleanPreferencesKey("taskbar_hide_button")

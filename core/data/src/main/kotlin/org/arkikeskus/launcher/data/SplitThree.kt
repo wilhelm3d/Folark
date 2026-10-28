@@ -31,6 +31,7 @@ object SplitThree {
     const val EXTRA_SNAP = "snap"
     /** Native split-select: 1 = two-app picker (startTaskWithSelectRequest), 2 = three-app select. */
     const val EXTRA_SELECT = "select"
+    const val EXTRA_SPLIT_TASKS = "split_tasks"
     /** The split index / position hint that goes with a select request. */
     const val EXTRA_POS = "pos"
 
@@ -127,6 +128,10 @@ object SplitThree {
      * Motorola's native three-app split-select (only while a split is showing): the system shows
      * its picker for the third app. [position] is the place hint (as Moto's gesture manager passes).
      */
+    suspend fun startSplitTasks(context: Context, taskId1: Int, taskId2: Int, snapPosition: Int): Boolean {
+        return send(context) { putExtra(EXTRA_SPLIT_TASKS, true); putExtra("taskId1", taskId1); putExtra("taskId2", taskId2); putExtra("snapPosition", snapPosition) }
+    }
+
     suspend fun selectThird(context: Context, position: Int): Boolean {
         if (Build.VERSION.SDK_INT < 34) return false
         return send(context) { putExtra(EXTRA_SELECT, 2); putExtra(EXTRA_POS, position) }

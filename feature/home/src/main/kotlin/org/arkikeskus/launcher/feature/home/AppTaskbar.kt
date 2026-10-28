@@ -2267,9 +2267,8 @@ internal class AppTaskbar(private val context: Context) {
     }
 
     /**
-     * Split-select: [app] opens on one side and Folark's picker drawer on the other. Reuses the same
-     * launch-then-moveToSide path as [openSplit] (which forms a split reliably here), with the picker
-     * as the partner; picking an app in the drawer replaces the picker in its pane.
+     * Split-select: [app] opens on one side and Folark's picker drawer on the other. 
+     * Uses the native FLAG_ACTIVITY_LAUNCH_ADJACENT so WM Shell properly docks both windows.
      */
     private fun openSplitPick(app: AppItem, right: Boolean) {
         if (!ShellSplit.available(context)) {
@@ -2277,8 +2276,21 @@ internal class AppTaskbar(private val context: Context) {
             launchApp(app)
             return
         }
-        // Show the picker to choose the partner; it builds the split from the two real apps.
-        runCatching { context.startActivity(SplitPicker.intent(context, app.packageName, right)) }
+        scope.launch {
+            if (right) {
+                // App goes right, Picker goes left.
+                runCatching { context.startActivity(SplitPicker.intent(context, app.packageName, right)) }
+                delay(300L)
+                repository?.launchBeside(app)
+            } else {
+                // App goes left, Picker goes right.
+                launchApp(app)
+                delay(300L)
+                val intent = SplitPicker.intent(context, app.packageName, right)
+                intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
+                runCatching { context.startActivity(intent) }
+            }
+        }
     }
 
     /** The screen edge the finger is over while dragging (edge-snap): the six Recents-style zones. */

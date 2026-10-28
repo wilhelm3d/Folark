@@ -124,6 +124,13 @@ internal object SplitThreeHook {
         }
         // Motorola's own split-select (its system app picker), mirroring SplitScreenGestureManager.
         val select = intent.getIntExtra(SplitThree.EXTRA_SELECT, 0)
+        if (intent.getBooleanExtra(SplitThree.EXTRA_SPLIT_TASKS, false)) {
+            val t1 = intent.getIntExtra("taskId1", -1)
+            val t2 = intent.getIntExtra("taskId2", -1)
+            val pos = intent.getIntExtra("snapPosition", 1)
+            executor.execute { startSplitTasksNative(context, c, request, t1, t2, pos) }
+            return
+        }
         if (select > 0) {
             val pos = intent.getIntExtra(SplitThree.EXTRA_POS, 0)
             val selTask = intent.getIntExtra(SplitThree.EXTRA_TASK, -1)
@@ -219,6 +226,20 @@ internal object SplitThreeHook {
      * `requestEnterThreeAppsSplitSelectByGesture(position)` on the controller's `mImpl`, only while a
      * split is showing. Everything is wrapped, so a signature that differs just answers "no".
      */
+    private fun startSplitTasksNative(context: Context, c: Any, request: String, task1: Int, task2: Int, pos: Int) {
+        val ok = runCatching {
+            val m = methods(c.javaClass).firstOrNull { it.name == "startTasks" && it.parameterTypes.size >= 6 }
+                ?: error("startTasks not found")
+            m.isAccessible = true
+            m.invoke(c, task1, Bundle(), task2, Bundle(), pos, 0.5f, null, null)
+            true
+        }.getOrElse {
+            log("startTasks failed: $it")
+            false
+        }
+        reply(context, request, ok)
+    }
+
     private fun selectNative(context: Context, c: Any, request: String, mode: Int, task: Int, pos: Int) {
         val ok = runCatching {
             if (mode == 2) {

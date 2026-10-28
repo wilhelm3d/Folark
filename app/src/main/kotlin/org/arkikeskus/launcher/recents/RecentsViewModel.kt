@@ -36,6 +36,7 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
+import android.content.Intent
 
 /** One card in Folark's Recents: an open app, or the apps sharing a split screen. */
 data class RecentsCard(
@@ -409,7 +410,29 @@ class RecentsViewModel @Inject constructor(
                 // Show Folark's picker to choose the partner; it then builds the split from the two
                 // real apps (the dragged app on the side it was dropped).
                 val pkg = card.tasks.firstOrNull()?.packageName ?: return
-                runCatching { context.startActivity(SplitPicker.intent(context, pkg, right = edge == EDGE_RIGHT)) }
+                val right = edge == EDGE_RIGHT
+                // We must launch the first app and the SplitPicker side-by-side natively.
+                val intent = context.packageManager.getLaunchIntentForPackage(pkg) ?: return
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                
+                if (right) {
+                    // First app on the right, picker on the left.
+                    // Start picker fullscreen, then launch first app adjacent to it (which naturally places it on the right).
+                    runCatching { context.startActivity(SplitPicker.intent(context, pkg, right)) }
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        val firstApp = card.apps.firstOrNull()
+                        if (firstApp != null) appRepository.launchBeside(firstApp)
+                    }, 300)
+                } else {
+                    // First app on the left, picker on the right.
+                    // Start first app fullscreen, then launch picker adjacent to it (which places the picker on the right).
+                    runCatching { appRepository.launch(card.apps.firstOrNull() ?: return@runCatching) }
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        val pickerIntent = SplitPicker.intent(context, pkg, right)
+                        pickerIntent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
+                        runCatching { context.startActivity(pickerIntent) }
+                    }, 300)
+                }
             }
         }
     }

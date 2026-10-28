@@ -4,6 +4,8 @@ import org.arkikeskus.launcher.data.SplitThree
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.HorizontalSplit
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,9 +47,24 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_recents),
         icon = Icons.Rounded.GridView,
-        subtitle = stringResource(R.string.settings_category_recents_desc),
         sharedByBothDisplays = true,
     ) {
+        ExpressiveSegmentedControl(
+
+            title = stringResource(R.string.settings_split_engine),
+
+            icon = Icons.Rounded.HorizontalSplit,
+            options = listOf(
+                LauncherSettings.SPLIT_ENGINE_INTENT_ROUTING to stringResource(R.string.settings_split_engine_intent),
+                LauncherSettings.SPLIT_ENGINE_CLASSIC to stringResource(R.string.settings_split_engine_classic),
+                LauncherSettings.SPLIT_ENGINE_LSPOSED to stringResource(R.string.settings_split_engine_lsposed),
+                LauncherSettings.SPLIT_ENGINE_ROOT to stringResource(R.string.settings_split_engine_root)
+            ),
+            selected = s.recents.splitEngine,
+            onSelect = { viewModel.setRecentsSplitEngine(it) }
+        )
+
+
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_enabled),
             subtitle = stringResource(R.string.settings_recents_enabled_desc),

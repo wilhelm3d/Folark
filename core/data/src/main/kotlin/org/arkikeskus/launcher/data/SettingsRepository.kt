@@ -791,6 +791,7 @@ class SettingsRepository @Inject constructor(
         attachedPeek = (p[Keys.RECENTS_ATTACHED_PEEK] ?: 0.12f)
             .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
         attachedNative = p[Keys.RECENTS_ATTACHED_NATIVE] ?: false,
+        splitEngine = p[Keys.RECENTS_SPLIT_ENGINE] ?: LauncherSettings.SPLIT_ENGINE_INTENT_ROUTING,
     )
 
     /** [p] with every Recents look setting the outer screen has its own value for replaced by it. */
@@ -810,6 +811,7 @@ class SettingsRepository @Inject constructor(
         it[Keys.RECENTS_ATTACHED_PEEK] = value.coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK)
     }
     suspend fun setRecentsAttachedNative(value: Boolean) = edit { it[Keys.RECENTS_ATTACHED_NATIVE] = value }
+    suspend fun setRecentsSplitEngine(value: Int) = edit { it[Keys.RECENTS_SPLIT_ENGINE] = value }
     suspend fun setTaskbarHandleHint(value: Boolean) = edit { it[Keys.TASKBAR_HANDLE_HINT] = value }
     suspend fun setTaskbarHandleStyle(value: String) = edit { it[Keys.TASKBAR_HANDLE_STYLE] = value }
     suspend fun setTaskbarHideButton(value: Boolean) = edit { it[Keys.TASKBAR_HIDE_BUTTON] = value }
