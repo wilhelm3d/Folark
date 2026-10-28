@@ -24,7 +24,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Outline
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
@@ -42,6 +44,8 @@ import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -101,6 +105,9 @@ private data class TaskbarSetup(
     val glassBlur: Int,
     val handles: String,
     val handleHint: Boolean,
+    val handleStyle: String,
+    val hideButton: Boolean,
+    val taskbarAnim: String,
     val onHome: Boolean,
     val keepOpen: Boolean,
     val themedIcons: Boolean,
@@ -189,6 +196,9 @@ internal class AppTaskbar(private val context: Context) {
     /** The keyboard is up in the app in front (as far as Android tells this window). */
     private var keyboardUp = false
     private var expanded = false
+
+    /** The hide button was tapped: stay as handles (even for a kept-open bar) until a handle reopens it. */
+    private var manuallyHidden = false
     private var recentsJob: Job? = null
     private val collapse = Runnable { expanded = false; mediaControlsOpen = false; refresh() }
 
@@ -308,6 +318,9 @@ internal class AppTaskbar(private val context: Context) {
                     glassBlur = s.taskbar.glassBlur,
                     handles = s.taskbar.handles,
                     handleHint = s.taskbar.handleHint,
+                    handleStyle = s.taskbar.taskbarHandleStyle,
+                    hideButton = s.taskbar.hideButton,
+                    taskbarAnim = s.taskbar.taskbarAnim,
                     onHome = s.taskbar.onHome,
                     keepOpen = s.taskbar.keepOpen,
                     themedIcons = s.icons.useThemedIcons,
@@ -442,6 +455,8 @@ internal class AppTaskbar(private val context: Context) {
         val mode = when {
             // Typing on home or in the drawer: the bar would cover the keyboard's bottom row.
             homeVisible && TaskbarSpace.keyboardOnHome.value -> MODE_NONE
+            // The hide button was tapped: show only the pull handles until a handle swipe reopens it.
+            manuallyHidden && !expanded -> MODE_HANDLES
             homeVisible && s.onHome -> MODE_BAR_FIXED
             homeVisible -> MODE_NONE
             // Settings ▸ Taskbar ▸ per app: never in these; always (not over the keyboard) in those.
@@ -461,7 +476,7 @@ internal class AppTaskbar(private val context: Context) {
         if (mode == shownMode && !rebuild) return
         remove()
         when (mode) {
-            MODE_BAR, MODE_BAR_FIXED -> showBar(s, fixed = mode == MODE_BAR_FIXED)
+            MODE_BAR, MODE_BAR_FIXED -> showBar(s, fixed = mode == MODE_BAR_FIXED, animateIn = shownMode != MODE_BAR && shownMode != MODE_BAR_FIXED)
             MODE_HANDLES -> showHandles(s)
             MODE_MINI -> showMini(s)
         }
@@ -588,6 +603,7 @@ internal class AppTaskbar(private val context: Context) {
         val sides = when (s.handles) {
             LauncherSettings.TASKBAR_HANDLES_LEFT -> listOf(Gravity.START)
             LauncherSettings.TASKBAR_HANDLES_RIGHT -> listOf(Gravity.END)
+            LauncherSettings.TASKBAR_HANDLES_CENTER -> listOf(Gravity.CENTER_HORIZONTAL)
             else -> listOf(Gravity.START, Gravity.END)
         }
         val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -610,19 +626,82 @@ internal class AppTaskbar(private val context: Context) {
                     true
                 }
             }
-            // A small line shows where the swipe starts (Settings ▸ Taskbar ▸ Show where to swipe).
+            // A pull hint shows where the swipe starts, in the chosen style (Settings ▸ Taskbar ▸ Pull style).
             if (s.handleHint) {
-                zone.addView(View(context).apply {
-                    background = GradientDrawable().apply {
-                        cornerRadius = dpf(3f)
-                        setColor(Color.argb(150, 255, 255, 255))
-                    }
-                    elevation = dpf(2f)
-                }, FrameLayout.LayoutParams(dp(28), dp(5), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-                    bottomMargin = dp(10)
-                })
+                val (hintView, lp) = handleHintView(s.handleStyle)
+                zone.addView(hintView, lp)
             }
             add(zone, params(Gravity.BOTTOM or side, 0, s.insetLift()))
+        }
+    }
+
+    /** The pull-hint view for [style] (a line, one/two arrows, dots or a text label), bottom-centred. */
+    private fun handleHintView(style: String): Pair<View, FrameLayout.LayoutParams> {
+        val white = Color.argb(185, 255, 255, 255)
+        fun lp(w: Int, h: Int) = FrameLayout.LayoutParams(w, h, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(2) }
+        return when (style) {
+            LauncherSettings.TASKBAR_HANDLE_ARROW ->
+                ChevronView(context, 1, white).also { it.elevation = dpf(2f) } to lp(dp(30), dp(13))
+            LauncherSettings.TASKBAR_HANDLE_DOUBLE ->
+                ChevronView(context, 2, white).also { it.elevation = dpf(2f) } to lp(dp(30), dp(20))
+            LauncherSettings.TASKBAR_HANDLE_DOTS -> {
+                val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; elevation = dpf(2f) }
+                repeat(3) { i ->
+                    row.addView(
+                        View(context).apply {
+                            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(white) }
+                        },
+                        LinearLayout.LayoutParams(dp(5), dp(5)).apply { if (i < 2) marginEnd = dp(5) },
+                    )
+                }
+                row to lp(FrameLayout.LayoutParams.WRAP_CONTENT, dp(5))
+            }
+            LauncherSettings.TASKBAR_HANDLE_TEXT -> {
+                val tv = TextView(context).apply {
+                    text = context.getString(R.string.taskbar_handle_text)
+                    setTextColor(white)
+                    textSize = 11f
+                    elevation = dpf(2f)
+                    background = GradientDrawable().apply {
+                        cornerRadius = dpf(11f)
+                        setColor(Color.argb(150, 18, 22, 26))
+                        setStroke(dp(1), Color.argb(45, 255, 255, 255))
+                    }
+                    setPadding(dp(13), dp(3), dp(13), dp(3))
+                }
+                tv to lp(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+            }
+            else -> { // TASKBAR_HANDLE_LINE
+                val v = View(context).apply {
+                    background = GradientDrawable().apply { cornerRadius = dpf(3f); setColor(white) }
+                    elevation = dpf(2f)
+                }
+                v to lp(dp(28), dp(5))
+            }
+        }
+    }
+
+    /** Draws [count] stacked up-chevrons — the "arrow" and "two arrows" pull hints. */
+    private class ChevronView(context: Context, private val count: Int, tint: Int) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = tint
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat()
+            val h = height.toFloat()
+            paint.strokeWidth = (h / count) * 0.18f
+            val armW = w * 0.42f
+            val cx = w / 2f
+            for (i in 0 until count) {
+                val slotTop = i * (h / count)
+                val top = slotTop + (h / count) * 0.28f
+                val bottom = slotTop + (h / count) * 0.72f
+                canvas.drawLine(cx - armW, bottom, cx, top, paint)
+                canvas.drawLine(cx, top, cx + armW, bottom, paint)
+            }
         }
     }
 
@@ -663,13 +742,54 @@ internal class AppTaskbar(private val context: Context) {
 
     private fun open() {
         expanded = true
+        manuallyHidden = false
         loadRecents(rebuild = true, force = false)
+    }
+
+    /** The hide button: animate the bar away, then leave only the pull handles. */
+    private fun hideToHandles() {
+        manuallyHidden = true
+        expanded = false
+        handler.removeCallbacks(collapse)
+        val view = barColumn
+        val anim = setup?.taskbarAnim
+        if (view != null && anim != null) animateBarOut(view, anim) { refresh() } else refresh()
+    }
+
+    /** Plays the chosen show animation on the bar [view] as it appears. */
+    private fun animateBarIn(view: View, anim: String) {
+        val dist = dpf(90f)
+        view.animate().cancel()
+        view.translationY = 0f; view.alpha = 1f; view.scaleX = 1f; view.scaleY = 1f
+        val a = view.animate()
+        when (anim) {
+            LauncherSettings.TASKBAR_ANIM_FADE -> { view.alpha = 0f; a.alpha(1f).setDuration(220L) }
+            LauncherSettings.TASKBAR_ANIM_SCALE -> { view.scaleX = 0.82f; view.scaleY = 0.82f; view.alpha = 0f; a.scaleX(1f).scaleY(1f).alpha(1f).setDuration(240L).interpolator = DecelerateInterpolator() }
+            LauncherSettings.TASKBAR_ANIM_RISE -> { view.translationY = dist; view.alpha = 0f; a.translationY(0f).alpha(1f).setDuration(260L).interpolator = DecelerateInterpolator() }
+            LauncherSettings.TASKBAR_ANIM_BOUNCE -> { view.translationY = dist; a.translationY(0f).setDuration(430L).interpolator = OvershootInterpolator(2.4f) }
+            else -> { view.translationY = dist; a.translationY(0f).setDuration(240L).interpolator = DecelerateInterpolator() } // SLIDE
+        }
+        a.start()
+    }
+
+    /** Plays the chosen hide animation on the bar [view], then runs [onEnd] (which removes it). */
+    private fun animateBarOut(view: View, anim: String, onEnd: () -> Unit) {
+        val dist = dpf(90f)
+        view.animate().cancel()
+        val a = view.animate().setDuration(190L)
+        when (anim) {
+            LauncherSettings.TASKBAR_ANIM_FADE -> a.alpha(0f)
+            LauncherSettings.TASKBAR_ANIM_SCALE -> a.scaleX(0.82f).scaleY(0.82f).alpha(0f)
+            LauncherSettings.TASKBAR_ANIM_RISE -> a.translationY(dist).alpha(0f)
+            else -> a.translationY(dist) // SLIDE, BOUNCE
+        }
+        a.withEndAction { onEnd() }.start()
     }
 
     // ------------------------------------------------------------------ the bar
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun showBar(s: TaskbarSetup, fixed: Boolean) {
+    private fun showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Boolean = false) {
         val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getColor(android.R.color.system_accent1_200)
         } else Color.rgb(180, 200, 255)
@@ -798,6 +918,15 @@ internal class AppTaskbar(private val context: Context) {
                         marginEnd = dp(s.spacingDp) / 2
                     })
             }
+            // A small hide button next to Recents: tucks the bar away, leaving just the pull handles.
+            if (s.hideButton) {
+                row.addView(barButton(R.drawable.ic_taskbar_hide, R.string.taskbar_hide, s, size, fixed,
+                    onTap = { hideToHandles() }, onHold = null),
+                    LinearLayout.LayoutParams(size, size).apply {
+                        marginStart = dp(s.spacingDp) / 2
+                        marginEnd = dp(s.spacingDp) / 2
+                    })
+            }
         }
 
         val column = LinearLayout(context).apply {
@@ -829,6 +958,8 @@ internal class AppTaskbar(private val context: Context) {
         }
         add(column, barLayout)
         barRow = row
+        barColumn = column
+        if (animateIn) animateBarIn(column, s.taskbarAnim)
         if (fixed && homeVisible) {
             // Tell home and the drawer where the bar's top edge is, whenever it is laid out again.
             row.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishSpace(v) }
@@ -1263,6 +1394,7 @@ internal class AppTaskbar(private val context: Context) {
     // ------------------------------------------------------------------ Android's drag and drop
 
     private var barRow: View? = null
+    private var barColumn: View? = null
     private var systemDragging = false
 
     /**

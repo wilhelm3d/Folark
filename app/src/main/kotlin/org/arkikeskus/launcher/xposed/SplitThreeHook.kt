@@ -122,6 +122,14 @@ internal object SplitThreeHook {
             executor.execute { snapTo(context, c, request, snap, 0) }
             return
         }
+        // Motorola's own split-select (its system app picker), mirroring SplitScreenGestureManager.
+        val select = intent.getIntExtra(SplitThree.EXTRA_SELECT, 0)
+        if (select > 0) {
+            val pos = intent.getIntExtra(SplitThree.EXTRA_POS, 0)
+            val selTask = intent.getIntExtra(SplitThree.EXTRA_TASK, -1)
+            executor.execute { selectNative(context, c, request, select, selTask, pos) }
+            return
+        }
         val task = intent.getIntExtra(SplitThree.EXTRA_TASK, -1)
         @Suppress("DEPRECATION")
         val launch = intent.getParcelableExtra<PendingIntent>(SplitThree.EXTRA_INTENT)
@@ -199,6 +207,37 @@ internal object SplitThreeHook {
             true
         }.getOrElse {
             log("split layout: can't snap to $snap: $it")
+            false
+        }
+        reply(context, request, ok)
+    }
+
+    /**
+     * On WM Shell's thread: hand off to Motorola's own split-select (its system app picker), exactly
+     * as `SplitScreenGestureManager` does. [mode] 1 = two-app: `startTaskWithSelectRequest(taskId,
+     * options, index, bounds, leftRight)` on the controller; 2 = three-app:
+     * `requestEnterThreeAppsSplitSelectByGesture(position)` on the controller's `mImpl`, only while a
+     * split is showing. Everything is wrapped, so a signature that differs just answers "no".
+     */
+    private fun selectNative(context: Context, c: Any, request: String, mode: Int, task: Int, pos: Int) {
+        val ok = runCatching {
+            if (mode == 2) {
+                val visible = runCatching { c.javaClass.getMethod("isSplitScreenVisible").invoke(c) as Boolean }.getOrDefault(false)
+                if (!visible) error("no split visible for three-app select")
+                val impl = field(c, "mImpl") ?: error("no mImpl")
+                val m = methods(impl.javaClass).first { it.name == "requestEnterThreeAppsSplitSelectByGesture" && it.parameterTypes.size == 1 }
+                m.isAccessible = true
+                m.invoke(impl, pos)
+            } else {
+                if (task <= 0) error("no task")
+                // startTaskWithSelectRequest(int taskId, Bundle options, int index, Rect bounds, boolean leftRight)
+                val m = methods(c.javaClass).first { it.name == "startTaskWithSelectRequest" && it.parameterTypes.size == 5 }
+                m.isAccessible = true
+                m.invoke(c, task, Bundle(), pos, null, true)
+            }
+            true
+        }.getOrElse {
+            log("split select ($mode) failed: $it")
             false
         }
         reply(context, request, ok)

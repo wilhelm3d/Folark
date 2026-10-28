@@ -174,6 +174,9 @@ internal class RecentsEnv(
     /** Persistent per-app mute (menu, beneath App info): whether this card is muted, and the toggle. */
     val isMuted: (RecentsCard) -> Boolean = { false },
     val onToggleMute: (RecentsCard) -> Unit = {},
+    /** Motorola's native split-select pickers (shown only when native three-app split is on). */
+    val onNativeSplit: (RecentsCard) -> Unit = {},
+    val onNativeThird: (RecentsCard) -> Unit = {},
 ) {
     val speed: Float get() = settings.recents.animationSpeed
 
@@ -224,6 +227,9 @@ internal fun RecentsScreen(
     /** Persistent per-app mute (menu item beneath App info): is this card muted, and the toggle. */
     isMuted: (RecentsCard) -> Boolean = { false },
     onToggleMute: (RecentsCard) -> Unit = {},
+    /** Motorola's native split-select pickers (shown only when native three-app split is on). */
+    onNativeSplit: (RecentsCard) -> Unit = {},
+    onNativeThird: (RecentsCard) -> Unit = {},
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val onAccent = MaterialTheme.colorScheme.onPrimary
@@ -309,6 +315,8 @@ internal fun RecentsScreen(
         onPlaceAtEdge = onPlaceAtEdge,
         isMuted = isMuted,
         onToggleMute = onToggleMute,
+        onNativeSplit = onNativeSplit,
+        onNativeThird = onNativeThird,
     )
     env.coverScreen = !wide
 
@@ -586,7 +594,15 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
                     if (how == COMBINE_REPLACE) env.onCombine(from, onto, "$COMBINE_REPLACE:${drag.droppedPane}")
                     else env.onCombine(from, onto, how)
                 } else if (drag.droppedEdge != EDGE_NONE) {
-                    drag.edgeCard?.let { env.onPlaceAtEdge(it, drag.droppedEdge) }
+                    drag.edgeCard?.let { c ->
+                        when (drag.droppedEdge) {
+                            // Peek and three-app open the app picker right here (seeded with this app)
+                            // so the next app(s) can be chosen; the directions place it straight away.
+                            EDGE_PEEK -> env.onPeekPick(c)
+                            EDGE_THREE -> env.onSplitThree(c)
+                            else -> env.onPlaceAtEdge(c, drag.droppedEdge)
+                        }
+                    }
                 }
             }
         }
@@ -667,25 +683,92 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
 /** One half of the drop target: a small drawing of the result and its name; lit by [active] 0..1. */
 @Composable
 private fun BoxScope.SnapPreview(edge: Int, accent: Color) {
-    // A rounded preview of the region the app will take: left/right half, or the whole screen for top.
+    // A rounded glass preview of where the app will land, with an icon and label — Windows-snap style.
+    // Left/right = that split half; top = full screen; bottom = a floating window; top-centre = peek
+    // view; bottom-centre = three-app split.
     val pop by animateFloatAsState(1f, tween(130), label = "snap")
     val align = when (edge) {
         EDGE_RIGHT -> Alignment.CenterEnd
-        EDGE_TOP -> Alignment.Center
-        else -> Alignment.CenterStart
+        EDGE_LEFT, EDGE_PEEK -> Alignment.CenterStart
+        EDGE_BOTTOM -> Alignment.BottomCenter
+        else -> Alignment.Center
     }
-    val widthFraction = if (edge == EDGE_TOP) 1f else 0.5f
+    val widthFraction = when (edge) {
+        EDGE_LEFT, EDGE_RIGHT -> 0.5f
+        EDGE_PEEK -> 0.88f
+        EDGE_BOTTOM -> 0.5f
+        else -> 1f
+    }
+    val heightFraction = if (edge == EDGE_BOTTOM) 0.42f else 1f
+    val label = stringResource(
+        when (edge) {
+            EDGE_LEFT -> R.string.recents_edge_left
+            EDGE_RIGHT -> R.string.recents_edge_right
+            EDGE_TOP -> R.string.recents_edge_top
+            EDGE_BOTTOM -> R.string.recents_edge_bottom
+            EDGE_PEEK -> R.string.recents_edge_peek
+            else -> R.string.recents_edge_three
+        },
+    )
     Box(
         Modifier
             .align(align)
             .fillMaxWidth(widthFraction)
-            .fillMaxHeight()
+            .fillMaxHeight(heightFraction)
             .padding(12.dp)
             .graphicsLayer { val s = 0.97f + 0.03f * pop; scaleX = s; scaleY = s }
             .clip(RoundedCornerShape(26.dp))
             .background(accent.copy(alpha = 0.20f))
             .border(2.dp, accent.copy(alpha = 0.85f), RoundedCornerShape(26.dp)),
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        // Three-app: hint the three panes behind the label.
+        if (edge == EDGE_THREE) {
+            Row(Modifier.matchParentSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(3) { Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(16.dp)).background(accent.copy(alpha = 0.14f))) }
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xCC05090A))
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Canvas(Modifier.size(22.dp)) { drawEdgeGlyph(edge, accent) }
+            Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+/** The little landing icon shown on a snap preview, matching the drop target. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEdgeGlyph(edge: Int, accent: Color) {
+    val w = size.width
+    val stroke = Stroke(width = w * 0.08f, cap = StrokeCap.Round)
+    val r = CornerRadius(w * 0.14f)
+    fun pane(x: Float, pw: Float, filled: Boolean) {
+        val top = w * 0.14f
+        val h = w * 0.72f
+        if (filled) drawRoundRect(accent, Offset(x, top), Size(pw, h), r)
+        else drawRoundRect(accent, Offset(x, top), Size(pw, h), r, style = stroke)
+    }
+    when (edge) {
+        EDGE_LEFT -> { pane(w * 0.08f, w * 0.38f, true); pane(w * 0.54f, w * 0.38f, false) }
+        EDGE_RIGHT -> { pane(w * 0.08f, w * 0.38f, false); pane(w * 0.54f, w * 0.38f, true) }
+        EDGE_TOP -> drawRoundRect(accent, Offset(w * 0.1f, w * 0.14f), Size(w * 0.8f, w * 0.72f), r, style = stroke)
+        EDGE_BOTTOM -> {
+            // A floating window: a small centred box with corner ticks.
+            drawRoundRect(accent, Offset(w * 0.24f, w * 0.3f), Size(w * 0.52f, w * 0.4f), r, style = stroke)
+            drawLine(accent, Offset(w * 0.12f, w * 0.2f), Offset(w * 0.24f, w * 0.2f), stroke.width, StrokeCap.Round)
+            drawLine(accent, Offset(w * 0.12f, w * 0.2f), Offset(w * 0.12f, w * 0.32f), stroke.width, StrokeCap.Round)
+        }
+        EDGE_PEEK -> { pane(w * 0.08f, w * 0.64f, false); drawRoundRect(accent, Offset(w * 0.8f, w * 0.26f), Size(w * 0.12f, w * 0.48f), CornerRadius(w * 0.06f)) }
+        else -> { // EDGE_THREE
+            val pw = w * 0.24f
+            for (i in 0..2) drawRoundRect(accent, Offset(w * 0.08f + i * (pw + w * 0.07f), w * 0.14f), Size(pw, w * 0.72f), r, style = stroke)
+        }
+    }
 }
 
 @Composable

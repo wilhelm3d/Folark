@@ -110,6 +110,12 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
         }
         // Android's peek view: one app big, the other peeking in from the edge (a strip to tap).
         add(MenuItem(R.string.recents_menu_peek, Glyph.PEEK) { if (card.isSplit) env.onPeekSplit(card) else env.onPeekPick(card) })
+        // Motorola's own split picker (only when native three-app split is on): pick the other app
+        // from the system's picker instead of Folark's. On a split, pick the third; else pick a second.
+        if (env.settings.launch.threeAppNative) {
+            if (card.isSplit) add(MenuItem(R.string.recents_menu_native_third, Glyph.SPLIT3) { env.onNativeThird(card) })
+            else add(MenuItem(R.string.recents_menu_native_split, Glyph.SPLIT) { env.onNativeSplit(card) })
+        }
         if (!card.isSplit) add(MenuItem(R.string.recents_menu_freeform, Glyph.FREEFORM) { env.onPopUp(card) })
         if (card.isSplit) add(MenuItem(R.string.recents_menu_unsplit, Glyph.UNSPLIT) { env.onUnsplit(card) })
         // Keep this split: saved as an app pair, opened together again from home or the taskbar.

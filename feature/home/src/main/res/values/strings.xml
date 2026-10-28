@@ -183,6 +183,8 @@
     <string name="widget_look_default">default</string>
     <string name="widget_look_reset">Reset</string>
     <string name="taskbar_handle">Open taskbar</string>
+    <string name="taskbar_handle_text">Apps</string>
+    <string name="taskbar_hide">Hide taskbar</string>
     <string name="taskbar_split_hint">Release to open in split screen</string>
     <string name="weather_day_widget_name">Weather day</string>
     <string name="weather_big_widget_name">Weather day (large)</string>

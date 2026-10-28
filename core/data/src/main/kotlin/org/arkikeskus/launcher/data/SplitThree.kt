@@ -29,6 +29,10 @@ object SplitThree {
     const val EXTRA_OK = "ok"
     /** A split layout to switch to, by WM Shell's snap position (see the SNAP_* values). */
     const val EXTRA_SNAP = "snap"
+    /** Native split-select: 1 = two-app picker (startTaskWithSelectRequest), 2 = three-app select. */
+    const val EXTRA_SELECT = "select"
+    /** The split index / position hint that goes with a select request. */
+    const val EXTRA_POS = "pos"
 
     /** Half and half. */
     const val SNAP_EVEN = 1
@@ -107,6 +111,25 @@ object SplitThree {
     suspend fun snap(context: Context, snap: Int): Boolean {
         if (Build.VERSION.SDK_INT < 34) return false
         return send(context) { putExtra(EXTRA_SNAP, snap) }
+    }
+
+    /**
+     * Motorola's native two-app split-select: put [taskId] in split and let the system's own app
+     * picker choose the other app. [index] is the side (0 left / 1 right). Returns false where the
+     * module or the method isn't there.
+     */
+    suspend fun splitSelect(context: Context, taskId: Int, index: Int): Boolean {
+        if (Build.VERSION.SDK_INT < 34) return false
+        return send(context) { putExtra(EXTRA_SELECT, 1); putExtra(EXTRA_TASK, taskId); putExtra(EXTRA_POS, index) }
+    }
+
+    /**
+     * Motorola's native three-app split-select (only while a split is showing): the system shows
+     * its picker for the third app. [position] is the place hint (as Moto's gesture manager passes).
+     */
+    suspend fun selectThird(context: Context, position: Int): Boolean {
+        if (Build.VERSION.SDK_INT < 34) return false
+        return send(context) { putExtra(EXTRA_SELECT, 2); putExtra(EXTRA_POS, position) }
     }
 
     /** Sends one request to SystemUI (Android shares Folark's identity with it) and waits for the answer. */

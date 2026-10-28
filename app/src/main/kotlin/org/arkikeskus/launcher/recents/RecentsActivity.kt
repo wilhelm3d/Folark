@@ -88,6 +88,8 @@ class RecentsActivity : ComponentActivity() {
                     onPlaceAtEdge = { card, edge -> viewModel.placeAtEdge(card, edge); leave() },
                     isMuted = { card -> card.tasks.any { it.packageName in mutedApps } },
                     onToggleMute = { card -> viewModel.toggleMute(card) },
+                    onNativeSplit = { card -> viewModel.nativeSplitSelect(card); leave() },
+                    onNativeThird = { card -> viewModel.nativeThreeAppSelect(card); leave() },
                     onSavePair = { card ->
                         val saved = viewModel.saveAsPair(card)
                         android.widget.Toast.makeText(

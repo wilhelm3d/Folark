@@ -133,6 +133,11 @@ object ShellSplit {
 
     /** Moves task [taskId] into the side half, [right] or left, beside the app behind it. */
     fun moveToSide(context: Context, taskId: Int, right: Boolean): Boolean {
+        // WM Shell's moveToStage throws IllegalArgumentException("taskId is in split<id>") when the
+        // task is ALREADY a split member — and it throws on WM Shell's own HandlerThread inside
+        // System UI, where Folark cannot catch it, so System UI is killed (drops to the lock screen).
+        // Never re-issue the command for a task that is already in the split: it is already placed.
+        if (splitTasks(context).any { it.taskId == taskId }) return true
         dump(
             context,
             arrayOf("service", "SystemUIService", "WMShell", "splitscreen", "moveToSideStage", taskId.toString(), if (right) "1" else "0"),

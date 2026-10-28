@@ -10,11 +10,35 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Process
 import android.provider.Settings
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -126,6 +150,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_HANDLES_BOTH to stringResource(R.string.settings_taskbar_handles_both),
                 LauncherSettings.TASKBAR_HANDLES_LEFT to stringResource(R.string.settings_taskbar_handles_left),
                 LauncherSettings.TASKBAR_HANDLES_RIGHT to stringResource(R.string.settings_taskbar_handles_right),
+                LauncherSettings.TASKBAR_HANDLES_CENTER to stringResource(R.string.settings_taskbar_handles_center),
             ),
             selected = s.taskbar.handles,
             onSelect = viewModel::setTaskbarHandles,
@@ -141,7 +166,48 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 onCheckedChange = viewModel::setTaskbarHandleHint,
             )
             ExpressiveRowDivider()
+            if (s.taskbar.handleHint) {
+                // Five looks for the pull hint: a line, one or two arrows, dots, or a text label.
+                ExpressiveSegmentedControl(
+                    title = stringResource(R.string.settings_taskbar_handle_style),
+                    options = listOf(
+                        LauncherSettings.TASKBAR_HANDLE_LINE to stringResource(R.string.settings_taskbar_handle_line),
+                        LauncherSettings.TASKBAR_HANDLE_ARROW to stringResource(R.string.settings_taskbar_handle_arrow),
+                        LauncherSettings.TASKBAR_HANDLE_DOUBLE to stringResource(R.string.settings_taskbar_handle_double),
+                        LauncherSettings.TASKBAR_HANDLE_DOTS to stringResource(R.string.settings_taskbar_handle_dots),
+                        LauncherSettings.TASKBAR_HANDLE_TEXT to stringResource(R.string.settings_taskbar_handle_text),
+                    ),
+                    selected = s.taskbar.taskbarHandleStyle,
+                    onSelect = viewModel::setTaskbarHandleStyle,
+                    icon = null,
+                )
+                ExpressiveRowDivider()
+            }
         }
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_hide_button),
+            subtitle = stringResource(R.string.settings_taskbar_hide_button_desc),
+            checked = s.taskbar.hideButton,
+            onCheckedChange = viewModel::setTaskbarHideButton,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_taskbar_anim),
+            options = listOf(
+                LauncherSettings.TASKBAR_ANIM_SLIDE to stringResource(R.string.settings_taskbar_anim_slide),
+                LauncherSettings.TASKBAR_ANIM_FADE to stringResource(R.string.settings_taskbar_anim_fade),
+                LauncherSettings.TASKBAR_ANIM_SCALE to stringResource(R.string.settings_taskbar_anim_scale),
+                LauncherSettings.TASKBAR_ANIM_RISE to stringResource(R.string.settings_taskbar_anim_rise),
+                LauncherSettings.TASKBAR_ANIM_BOUNCE to stringResource(R.string.settings_taskbar_anim_bounce),
+            ),
+            selected = s.taskbar.taskbarAnim,
+            onSelect = viewModel::setTaskbarAnim,
+            icon = null,
+        )
+        ExpressiveRowDivider()
+        TaskbarPreview(s.taskbar.taskbarHandleStyle, s.taskbar.handles, s.taskbar.taskbarAnim)
+        ExpressiveRowDivider()
 
         TaskbarPerAppRows(s, viewModel, apps)
         ExpressiveRowDivider()
@@ -462,4 +528,120 @@ private fun TaskbarPinnedPicker(
             TextButton(onClick = onUseDock) { Text(stringResource(R.string.settings_taskbar_use_dock)) }
         },
     )
+}
+
+// --------------------------------------------------------------------- live preview
+
+/** A looping demo of the taskbar: it shows, holds, hides to the chosen pull handle, and repeats. */
+@Composable
+private fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
+    val accent = MaterialTheme.colorScheme.primary
+    var shown by remember { mutableStateOf(true) }
+    LaunchedEffect(anim, handleStyle, handles) {
+        shown = true
+        while (true) {
+            kotlinx.coroutines.delay(1500)
+            shown = !shown
+        }
+    }
+    val spec: AnimationSpec<Float> =
+        if (anim == LauncherSettings.TASKBAR_ANIM_BOUNCE) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)
+        else tween(300)
+    val p by animateFloatAsState(if (shown) 1f else 0f, spec, label = "tbprev")
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            stringResource(R.string.settings_taskbar_preview),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF11161B), Color(0xFF05080A)))),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            val handleAligns = when (handles) {
+                LauncherSettings.TASKBAR_HANDLES_LEFT -> listOf(Alignment.BottomStart)
+                LauncherSettings.TASKBAR_HANDLES_RIGHT -> listOf(Alignment.BottomEnd)
+                LauncherSettings.TASKBAR_HANDLES_CENTER -> listOf(Alignment.BottomCenter)
+                else -> listOf(Alignment.BottomStart, Alignment.BottomEnd)
+            }
+            handleAligns.forEach { a ->
+                Box(
+                    Modifier.align(a).padding(horizontal = 22.dp, vertical = 4.dp).graphicsLayer { alpha = 1f - p },
+                ) { PreviewHandle(handleStyle, accent) }
+            }
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp)
+                    .graphicsLayer {
+                        val dist = size.height * 1.6f + 60f
+                        when (anim) {
+                            LauncherSettings.TASKBAR_ANIM_FADE -> alpha = p
+                            LauncherSettings.TASKBAR_ANIM_SCALE -> { scaleX = 0.82f + 0.18f * p; scaleY = 0.82f + 0.18f * p; alpha = p }
+                            LauncherSettings.TASKBAR_ANIM_RISE -> { translationY = (1f - p) * dist; alpha = p }
+                            else -> translationY = (1f - p) * dist // SLIDE, BOUNCE
+                        }
+                    },
+            ) { PreviewBar(accent) }
+        }
+    }
+}
+
+@Composable
+private fun PreviewBar(accent: Color) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xCC12171C))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(5) { i ->
+            Box(
+                Modifier.size(20.dp).clip(RoundedCornerShape(6.dp))
+                    .background(if (i == 4) accent.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.18f)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreviewHandle(style: String, accent: Color) {
+    val c = Color.White.copy(alpha = 0.82f)
+    when (style) {
+        LauncherSettings.TASKBAR_HANDLE_ARROW -> Canvas(Modifier.size(28.dp, 12.dp)) { previewChevrons(1, c) }
+        LauncherSettings.TASKBAR_HANDLE_DOUBLE -> Canvas(Modifier.size(28.dp, 18.dp)) { previewChevrons(2, c) }
+        LauncherSettings.TASKBAR_HANDLE_DOTS -> Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            repeat(3) { Box(Modifier.size(5.dp).clip(CircleShape).background(c)) }
+        }
+        LauncherSettings.TASKBAR_HANDLE_TEXT -> Text(
+            stringResource(R.string.settings_taskbar_preview_apps),
+            color = c,
+            fontSize = 11.sp,
+            modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0x9912171C)).padding(horizontal = 12.dp, vertical = 3.dp),
+        )
+        else -> Box(Modifier.size(28.dp, 5.dp).clip(RoundedCornerShape(3.dp)).background(c))
+    }
+}
+
+private fun DrawScope.previewChevrons(count: Int, color: Color) {
+    val w = size.width
+    val h = size.height
+    val sw = (h / count) * 0.18f
+    val armW = w * 0.42f
+    val cx = w / 2f
+    for (i in 0 until count) {
+        val slotTop = i * (h / count)
+        val top = slotTop + (h / count) * 0.28f
+        val bottom = slotTop + (h / count) * 0.72f
+        drawLine(color, Offset(cx - armW, bottom), Offset(cx, top), sw, StrokeCap.Round)
+        drawLine(color, Offset(cx, top), Offset(cx + armW, bottom), sw, StrokeCap.Round)
+    }
 }

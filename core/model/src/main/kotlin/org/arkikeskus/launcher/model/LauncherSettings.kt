@@ -469,6 +469,12 @@ data class LauncherSettings(
         val miniApps: Set<String> = emptySet(),
         /** Taskbar: a small visible line at the corners where a swipe up opens it (when it isn't kept open). */
         val handleHint: Boolean = true,
+        /** The look of that pull hint: one of TASKBAR_HANDLE_* — a line, one or two arrows, dots or text. */
+        val taskbarHandleStyle: String = TASKBAR_HANDLE_LINE,
+        /** A button on the bar (next to Recents) that hides the bar and leaves the pull handles. */
+        val hideButton: Boolean = true,
+        /** How the bar shows and hides: one of TASKBAR_ANIM_*. */
+        val taskbarAnim: String = TASKBAR_ANIM_SLIDE,
         /** Which taskbar: Folark's own, or Android's (the system launcher's, with its gestures and
          *  quick switch); for Android's, its mode (1 always, 2 by a swipe up, 4 off). */
         val source: String = TASKBAR_SOURCE_FOLARK,
@@ -946,6 +952,21 @@ data class LauncherSettings(
         const val TASKBAR_HANDLES_BOTH = "both"
         const val TASKBAR_HANDLES_LEFT = "left"
         const val TASKBAR_HANDLES_RIGHT = "right"
+        const val TASKBAR_HANDLES_CENTER = "center"
+
+        /** Pull-hint looks (Settings ▸ Taskbar ▸ Pull style). */
+        const val TASKBAR_HANDLE_LINE = "line"
+        const val TASKBAR_HANDLE_ARROW = "arrow"
+        const val TASKBAR_HANDLE_DOUBLE = "double"
+        const val TASKBAR_HANDLE_DOTS = "dots"
+        const val TASKBAR_HANDLE_TEXT = "text"
+
+        /** Show/hide animations (Settings ▸ Taskbar ▸ Animation). */
+        const val TASKBAR_ANIM_SLIDE = "slide"
+        const val TASKBAR_ANIM_FADE = "fade"
+        const val TASKBAR_ANIM_SCALE = "scale"
+        const val TASKBAR_ANIM_RISE = "rise"
+        const val TASKBAR_ANIM_BOUNCE = "bounce"
 
         /** Minutes as the clock style colours them (accent or like the hours). */
         const val CLOCK_MINUTE_STYLE = "style"

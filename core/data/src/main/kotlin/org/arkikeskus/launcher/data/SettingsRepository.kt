@@ -412,6 +412,9 @@ class SettingsRepository @Inject constructor(
                 autoHideApps = lines(p[Keys.TASKBAR_AUTOHIDE_APPS]),
                 miniApps = lines(p[Keys.TASKBAR_MINI_APPS]),
                 handleHint = p[Keys.TASKBAR_HANDLE_HINT] ?: true,
+                taskbarHandleStyle = p[Keys.TASKBAR_HANDLE_STYLE] ?: LauncherSettings.TASKBAR_HANDLE_LINE,
+                hideButton = p[Keys.TASKBAR_HIDE_BUTTON] ?: true,
+                taskbarAnim = p[Keys.TASKBAR_ANIM] ?: LauncherSettings.TASKBAR_ANIM_SLIDE,
                 source = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
                     LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
                 systemMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
@@ -808,6 +811,9 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setRecentsAttachedNative(value: Boolean) = edit { it[Keys.RECENTS_ATTACHED_NATIVE] = value }
     suspend fun setTaskbarHandleHint(value: Boolean) = edit { it[Keys.TASKBAR_HANDLE_HINT] = value }
+    suspend fun setTaskbarHandleStyle(value: String) = edit { it[Keys.TASKBAR_HANDLE_STYLE] = value }
+    suspend fun setTaskbarHideButton(value: Boolean) = edit { it[Keys.TASKBAR_HIDE_BUTTON] = value }
+    suspend fun setTaskbarAnim(value: String) = edit { it[Keys.TASKBAR_ANIM] = value }
     suspend fun setTaskbarSource(value: String) = edit { it[Keys.TASKBAR_SOURCE] = value }
     suspend fun setSystemTaskbarMode(value: Int) = edit { it[Keys.SYSTEM_TASKBAR_MODE] = value }
     suspend fun setRootLockMode(value: String) = edit { it[Keys.ROOT_LOCK_MODE] = rootMode(value) }

@@ -403,10 +403,17 @@ class RecentsViewModel @Inject constructor(
     fun placeAtEdge(card: RecentsCard, edge: Int) {
         when (edge) {
             EDGE_TOP -> open(card)
+            EDGE_BOTTOM -> popUp(card)
             EDGE_LEFT, EDGE_RIGHT -> appScope.launch {
+                val task = card.tasks.firstOrNull()?.taskId ?: return@launch
                 open(card)
                 delay(SPLIT_STEP_MS)
-                withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, card.tasks.first().taskId, right = edge == EDGE_RIGHT) }
+                // The dragged app takes this side; Android's own app picker fills the other
+                // (startTaskWithSelectRequest). If the module can't, fall back to pulling it into the
+                // split beside whatever is behind Recents.
+                val index = if (edge == EDGE_RIGHT) 1 else 0
+                val picked = SplitThree.splitSelect(context, task, index)
+                if (!picked) withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, task, right = edge == EDGE_RIGHT) }
             }
         }
     }
@@ -448,6 +455,32 @@ class RecentsViewModel @Inject constructor(
     }
 
     /**
+     * Motorola's native two-app split-select: [card] goes into split and the system's own app
+     * picker chooses the other app. Uses Moto's SplitScreenController.startTaskWithSelectRequest.
+     */
+    fun nativeSplitSelect(card: RecentsCard) {
+        val task = card.tasks.firstOrNull()?.taskId ?: return
+        val index = if (settings.value.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_RIGHT) 1 else 0
+        appScope.launch {
+            open(card)
+            delay(SPLIT_STEP_MS)
+            SplitThree.splitSelect(context, task, index)
+        }
+    }
+
+    /**
+     * Motorola's native three-app split-select: while [card]'s split is showing, the system shows
+     * its picker for the third app (requestEnterThreeAppsSplitSelectByGesture).
+     */
+    fun nativeThreeAppSelect(card: RecentsCard) {
+        appScope.launch {
+            open(card)
+            delay(SPLIT_STEP_MS)
+            SplitThree.selectThird(context, 3)
+        }
+    }
+
+    /**
      * A split card's two apps as peek view, the one at [side] peeking in. Same reliability trade-off
      * as [openAttached]: the finger-style divider drag by default, SystemUI's native snap only on opt-in.
      */
@@ -464,29 +497,6 @@ class RecentsViewModel @Inject constructor(
             val from = screen.exactCenterX()
             val to = if (left) screen.left + screen.width() * peekFraction else screen.right - screen.width() * peekFraction
             DividerDrag.drag(from, y, to, y)
-        }
-    }
-
-    /**
-     * Mute or unmute every app on [card], persistently. The muted set is stored so it survives a
-     * restart of Folark and of the app; on root it is enforced with appops PLAY_AUDIO (ignore to
-     * mute, allow to unmute), which the system keeps across app restarts and reboots. Whether a
-     * given ROM honours the PLAY_AUDIO op varies, so this is best-effort when it isn't honoured.
-     */
-    fun toggleMute(card: RecentsCard) {
-        val pkgs = card.tasks.map { it.packageName }.filter { it.isNotBlank() }.toSet()
-        if (pkgs.isEmpty()) return
-        appScope.launch {
-            val current = settingsRepository.mutedPackages()
-            // "Mute" when none of the card's apps are muted yet; otherwise this is an "Unmute".
-            val muting = pkgs.none { it in current }
-            settingsRepository.setMutedPackages(if (muting) current + pkgs else current - pkgs)
-            withContext(Dispatchers.IO) {
-                if (RootShell.available()) {
-                    val mode = if (muting) "ignore" else "allow"
-                    pkgs.forEach { p -> if (SAFE_PKG.matches(p)) RootShell.run("appops set $p PLAY_AUDIO $mode") }
-                }
-            }
         }
     }
 
