@@ -596,10 +596,11 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
                 } else if (drag.droppedEdge != EDGE_NONE) {
                     drag.edgeCard?.let { c ->
                         when (drag.droppedEdge) {
-                            // Peek and three-app open the app picker right here (seeded with this app)
-                            // so the next app(s) can be chosen; the directions place it straight away.
+                            // Peek and three-app use Folark's in-Recents picker (seeded with this app).
                             EDGE_PEEK -> env.onPeekPick(c)
                             EDGE_THREE -> env.onSplitThree(c)
+                            // Left/right open the app on that side with Folark's split picker on the
+                            // other; top = full screen; bottom = floating window (all via placeAtEdge).
                             else -> env.onPlaceAtEdge(c, drag.droppedEdge)
                         }
                     }

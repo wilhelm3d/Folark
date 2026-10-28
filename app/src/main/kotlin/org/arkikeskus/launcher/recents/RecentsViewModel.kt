@@ -28,6 +28,7 @@ import org.arkikeskus.launcher.data.OpenTask
 import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
+import org.arkikeskus.launcher.data.SplitPicker
 import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.data.root.RootTasks
@@ -406,14 +407,13 @@ class RecentsViewModel @Inject constructor(
             EDGE_BOTTOM -> popUp(card)
             EDGE_LEFT, EDGE_RIGHT -> appScope.launch {
                 val task = card.tasks.firstOrNull()?.taskId ?: return@launch
+                // Folark's own picker fills the other side: the picker (partner) first, then the
+                // dragged app, then move it to its side — the same order the taskbar split uses.
+                runCatching { context.startActivity(SplitPicker.intent(context)) }
+                delay(SPLIT_STEP_MS)
                 open(card)
                 delay(SPLIT_STEP_MS)
-                // The dragged app takes this side; Android's own app picker fills the other
-                // (startTaskWithSelectRequest). If the module can't, fall back to pulling it into the
-                // split beside whatever is behind Recents.
-                val index = if (edge == EDGE_RIGHT) 1 else 0
-                val picked = SplitThree.splitSelect(context, task, index)
-                if (!picked) withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, task, right = edge == EDGE_RIGHT) }
+                withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, task, right = edge == EDGE_RIGHT) }
             }
         }
     }

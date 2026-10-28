@@ -74,6 +74,7 @@ import org.arkikeskus.launcher.data.NotificationBadgeRepository
 import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
+import org.arkikeskus.launcher.data.SplitPicker
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.model.LauncherSettings
@@ -1179,10 +1180,15 @@ internal class AppTaskbar(private val context: Context) {
                             launchApp(app)
                         }
                         ACTION_SPLIT -> openSplit(app)
-                        ACTION_SPLIT_LEFT -> openSplit(app, right = false)
-                        ACTION_SPLIT_RIGHT -> openSplit(app, right = true)
+                        // Left/right: open the app on that side and Folark's picker on the other.
+                        ACTION_SPLIT_LEFT -> openSplitPick(app, right = false)
+                        ACTION_SPLIT_RIGHT -> openSplitPick(app, right = true)
                         ACTION_TOP -> if (splitOpen) addThird(app) else launchApp(app)
                         ACTION_FLOAT -> repository?.launchFloating(app)
+                        // Top-centre: peek view. Bottom-centre: three-app split (join an open split,
+                        // else start a two-app split as the base).
+                        ACTION_PEEK -> openSplit(app, peek = true)
+                        ACTION_THREE -> if (splitOpen) addThird(app) else openSplit(app)
                     }
                     if (chosen != ACTION_NONE) {
                         expanded = false
@@ -2041,6 +2047,8 @@ internal class AppTaskbar(private val context: Context) {
         rightZone = null
         topZone = null
         bottomZone = null
+        peekZone = null
+        threeZone = null
     }
 
     // ---------------------------------------------------------------- drag drop-zone chips
@@ -2108,6 +2116,8 @@ internal class AppTaskbar(private val context: Context) {
     private var rightZone: FrameLayout? = null
     private var topZone: FrameLayout? = null
     private var bottomZone: FrameLayout? = null
+    private var peekZone: FrameLayout? = null
+    private var threeZone: FrameLayout? = null
 
     /**
      * Four frosted-glass drop zones hugging the screen edges while an icon is dragged (edge-snap):
@@ -2116,20 +2126,31 @@ internal class AppTaskbar(private val context: Context) {
      * guide (the window ignores touches); [edgeAction] decides what the drop does.
      */
     private fun addEdgeZones(root: FrameLayout) {
+        // Full-region previews of where the app will land — the same Windows-snap look as Folark's
+        // Recents: a glass region fills the target half/area, and only the one under the finger shows.
         val m = context.resources.displayMetrics
-        val sideH = (m.heightPixels * 0.5f).toInt()
-        val barW = (m.widthPixels * 0.62f).toInt()
-        leftZone = makeEdgeZone(context.getString(R.string.taskbar_snap_left)).also {
-            root.addView(it, FrameLayout.LayoutParams(dp(16), sideH, Gravity.START or Gravity.CENTER_VERTICAL).apply { leftMargin = dp(10) })
+        val w = m.widthPixels
+        val h = m.heightPixels
+        val margin = dp(12)
+        val tall = h - dp(120) // clear of the bar at the bottom
+        fun region(label: Int) = makeEdgeZone(context.getString(label))
+        leftZone = region(R.string.taskbar_snap_left).also {
+            root.addView(it, FrameLayout.LayoutParams(w / 2 - margin, tall, Gravity.START or Gravity.CENTER_VERTICAL).apply { leftMargin = margin })
         }
-        rightZone = makeEdgeZone(context.getString(R.string.taskbar_snap_right)).also {
-            root.addView(it, FrameLayout.LayoutParams(dp(16), sideH, Gravity.END or Gravity.CENTER_VERTICAL).apply { rightMargin = dp(10) })
+        rightZone = region(R.string.taskbar_snap_right).also {
+            root.addView(it, FrameLayout.LayoutParams(w / 2 - margin, tall, Gravity.END or Gravity.CENTER_VERTICAL).apply { rightMargin = margin })
         }
-        topZone = makeEdgeZone(context.getString(R.string.taskbar_snap_top)).also {
-            root.addView(it, FrameLayout.LayoutParams(barW, dp(16), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(12) })
+        topZone = region(R.string.taskbar_snap_top).also {
+            root.addView(it, FrameLayout.LayoutParams(w - margin * 2, tall, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = margin })
         }
-        bottomZone = makeEdgeZone(context.getString(R.string.taskbar_snap_float)).also {
-            root.addView(it, FrameLayout.LayoutParams(barW, dp(16), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(90) })
+        bottomZone = region(R.string.taskbar_snap_float).also {
+            root.addView(it, FrameLayout.LayoutParams((w * 0.5f).toInt(), (h * 0.34f).toInt(), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(96) })
+        }
+        peekZone = region(R.string.taskbar_snap_peek).also {
+            root.addView(it, FrameLayout.LayoutParams((w * 0.84f).toInt(), tall, Gravity.START or Gravity.CENTER_VERTICAL).apply { leftMargin = margin })
+        }
+        threeZone = region(R.string.taskbar_snap_three).also {
+            root.addView(it, FrameLayout.LayoutParams(w - margin * 2, tall, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = margin })
         }
         highlightEdgeZones(ACTION_NONE)
     }
@@ -2154,29 +2175,36 @@ internal class AppTaskbar(private val context: Context) {
         val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getColor(android.R.color.system_accent1_200)
         } else Color.rgb(180, 200, 255)
+        // Only the region under the finger shows (the rest are hidden), exactly like Recents.
         fun style(zone: FrameLayout?, armed: Boolean) {
             zone ?: return
+            if (!armed) {
+                if (zone.visibility != View.GONE) zone.visibility = View.GONE
+                return
+            }
             zone.background = GradientDrawable().apply {
-                cornerRadius = dpf(10f)
-                setColor(if (armed) Color.argb(235, Color.red(accent), Color.green(accent), Color.blue(accent)) else Color.argb(70, 255, 255, 255))
-                setStroke(dp(1), Color.argb(if (armed) 220 else 90, 255, 255, 255))
+                cornerRadius = dpf(26f)
+                setColor(Color.argb(55, Color.red(accent), Color.green(accent), Color.blue(accent)))
+                setStroke(dp(2), Color.argb(225, Color.red(accent), Color.green(accent), Color.blue(accent)))
             }
             zone.findViewWithTag<TextView>("label")?.apply {
-                alpha = if (armed) 1f else 0f
-                setTextColor(if (armed) Color.BLACK else Color.WHITE)
+                alpha = 1f
+                setTextColor(Color.WHITE)
+                textSize = 15f
             }
-            val vertical = zone === leftZone || zone === rightZone
-            val grow = if (armed) 2.4f else 1f
-            zone.animate()
-                .scaleX(if (vertical) grow else 1f)
-                .scaleY(if (vertical) 1f else grow)
-                .alpha(if (armed) 1f else 0.9f)
-                .setDuration(110).start()
+            if (zone.visibility != View.VISIBLE) {
+                zone.visibility = View.VISIBLE
+                zone.alpha = 0f
+                zone.scaleX = 0.97f; zone.scaleY = 0.97f
+                zone.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(120).start()
+            }
         }
         style(leftZone, action == ACTION_SPLIT_LEFT)
         style(rightZone, action == ACTION_SPLIT_RIGHT)
         style(topZone, action == ACTION_TOP)
         style(bottomZone, action == ACTION_FLOAT)
+        style(peekZone, action == ACTION_PEEK)
+        style(threeZone, action == ACTION_THREE)
     }
 
     private fun loadIcon(app: AppItem, s: TaskbarSetup): Drawable? {
@@ -2200,7 +2228,7 @@ internal class AppTaskbar(private val context: Context) {
      * recent app is opened first. Without the one-time permission (see [ShellSplit]) the app just
      * opens, with a note on where to set split screen up.
      */
-    private fun openSplit(app: AppItem, right: Boolean = setup?.splitSide != LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT) {
+    private fun openSplit(app: AppItem, right: Boolean = setup?.splitSide != LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT, peek: Boolean = false) {
         if (!ShellSplit.available(context)) {
             Toast.makeText(context, R.string.taskbar_split_setup_needed, Toast.LENGTH_LONG).show()
             launchApp(app)
@@ -2230,20 +2258,56 @@ internal class AppTaskbar(private val context: Context) {
                 return@launch
             }
             withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, id, right = right) }
+            if (peek) {
+                // Narrow the split so the dragged app only peeks in (Android's own peek layout).
+                delay(SPLIT_SETTLE_DELAY_MS)
+                SplitThree.snap(context, if (right) SplitThree.SNAP_PEEK_RIGHT else SplitThree.SNAP_PEEK_LEFT)
+            }
         }
     }
 
-    /** The screen edge the finger is over while dragging (edge-snap): left/right half, top, bottom. */
+    /**
+     * Split-select: [app] opens on one side and Folark's picker drawer on the other. Reuses the same
+     * launch-then-moveToSide path as [openSplit] (which forms a split reliably here), with the picker
+     * as the partner; picking an app in the drawer replaces the picker in its pane.
+     */
+    private fun openSplitPick(app: AppItem, right: Boolean) {
+        if (!ShellSplit.available(context)) {
+            Toast.makeText(context, R.string.taskbar_split_setup_needed, Toast.LENGTH_LONG).show()
+            launchApp(app)
+            return
+        }
+        scope.launch {
+            runCatching { context.startActivity(SplitPicker.intent(context)) }
+            delay(SPLIT_PARTNER_DELAY_MS)
+            launchApp(app)
+            delay(SPLIT_SETTLE_DELAY_MS)
+            var taskId: Int? = null
+            repeat(SPLIT_FIND_TRIES) {
+                if (taskId == null) {
+                    taskId = withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, app.packageName) }
+                    if (taskId == null) delay(SPLIT_RETRY_MS)
+                }
+            }
+            val id = taskId ?: return@launch
+            withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, id, right = right) }
+        }
+    }
+
+    /** The screen edge the finger is over while dragging (edge-snap): the six Recents-style zones. */
     private fun edgeAction(rawX: Float, rawY: Float, up: Float): Int {
         if (up < dp(28)) return ACTION_NONE // lift the icon clear of the bar first
         val m = context.resources.displayMetrics
         val w = m.widthPixels.toFloat()
         val h = m.heightPixels.toFloat()
         return when {
-            rawX < w * 0.16f -> ACTION_SPLIT_LEFT
-            rawX > w * 0.84f -> ACTION_SPLIT_RIGHT
+            // Centre of the top/bottom edges: peek and three-app split (same zones as Recents).
+            rawY < h * 0.22f && rawX > w * 0.40f && rawX < w * 0.60f -> ACTION_PEEK
+            rawY > h * 0.78f && rawX > w * 0.40f && rawX < w * 0.60f -> ACTION_THREE
+            rawX < w * 0.32f -> ACTION_SPLIT_LEFT
+            rawX > w * 0.68f -> ACTION_SPLIT_RIGHT
             rawY < h * 0.16f -> ACTION_TOP
-            rawY > h * 0.82f -> ACTION_FLOAT
+            rawY > h * 0.84f -> ACTION_FLOAT
             else -> ACTION_NONE
         }
     }
@@ -2387,6 +2451,8 @@ internal class AppTaskbar(private val context: Context) {
         private const val ACTION_SPLIT_LEFT = 4
         private const val ACTION_SPLIT_RIGHT = 5
         private const val ACTION_TOP = 6
+        private const val ACTION_PEEK = 7
+        private const val ACTION_THREE = 8
 
         private const val MAX_PINNED = 10
         private const val MAX_SHORTCUTS = 5

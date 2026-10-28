@@ -126,6 +126,17 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
             android:theme="@style/Theme.ArkikeskusLauncher.Recents" />
 
+        <!-- Split-select picker: Folark's app drawer shown in the empty pane of a split. Resizeable
+             so it lives in a split stage; its own task so it can be paired beside the dragged app. -->
+        <activity
+            android:name=".recents.SplitPickerActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="org.arkikeskus.launcher.splitpicker"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
+            android:theme="@style/Theme.ArkikeskusLauncher" />
+
         <!-- Folark's module for Vector (LSPosed): hands the system launcher's Recents over to Folark
              Recents. Only active if you install Vector and enable Folark for the launcher there. -->
         <meta-data android:name="xposedmodule" android:value="true" />
