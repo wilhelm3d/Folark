@@ -11,13 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -30,18 +33,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.ui.component.AppIcon
 
-/**
- * The compact app picker shown in the empty pane during a split drop (approach B). A five-column
- * scrollable grid: the first row is the drawer's folders (tap one to pick from inside it), then
- * every app that is NOT already in a folder — so apps in folders aren't listed twice. Tapping an
- * app calls [onPick]; the host then launches it into the empty split pane.
- */
+data class SplitRecentItem(
+    val taskId: Int,
+    val app: AppItem,
+    val inactiveMs: Long? = null,
+    val thumbnail: ImageBitmap? = null,
+)
+
 @Composable
 fun SplitPickerDrawer(
     apps: List<AppItem>,
@@ -49,20 +54,56 @@ fun SplitPickerDrawer(
     onPick: (AppItem) -> Unit,
     modifier: Modifier = Modifier,
     columns: Int = 5,
+    recents: List<SplitRecentItem> = emptyList(),
+    firstPackageToHide: String = "",
 ) {
-    // Every app key that lives in a folder — those are kept out of the loose list below.
-    val inFolders = remember(folders) { folders.flatMap { f -> f.apps.map { it.key } }.toHashSet() }
-    val loose = remember(apps, inFolders) {
-        apps.filter { !it.isHidden && it.key !in inFolders }.sortedBy { it.label.lowercase() }
+    // Improvement #2: Filter out firstPackage and launcher package
+    val shownApps = remember(apps, firstPackageToHide) {
+        apps.filter { !it.isHidden && it.packageName != firstPackageToHide }.sortedBy { it.label.lowercase() }
     }
     val realFolders = remember(folders) { folders.filter { it.apps.isNotEmpty() } }
 
     var open by remember { mutableStateOf<Long?>(null) }
-    val current = realFolders.firstOrNull { it.id == open }
+    val current = realFolders.firstOrNull { f -> f.id == open }
 
     Column(modifier.fillMaxSize().background(Color(0xF20A0E12))) {
+        // Improvement #4: Centered Recent Apps Row at the top
+        if (recents.isNotEmpty() && open == null) {
+            Column(
+                Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "RECENT APPS",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                ) {
+                    items(recents, key = { "rec_${it.taskId}" }) { item ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onPick(item.app) }
+                                .padding(4.dp),
+                        ) {
+                            AppIcon(item.app, labelColor = Color.White, iconSize = 42.dp, showLabel = true, maxLabelLines = 1)
+                        }
+                    }
+                }
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    color = Color.White.copy(alpha = 0.10f),
+                )
+            }
+        }
+
         if (current != null) {
-            // Inside a folder: a back row, then its apps.
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -89,13 +130,11 @@ fun SplitPickerDrawer(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // First row(s): the folders only.
                 items(realFolders, key = { "f${it.id}" }) { folder -> FolderTile(folder) { open = folder.id } }
-                // Pad to the row boundary so the loose apps always start on a fresh row.
                 val pad = (columns - realFolders.size % columns) % columns
                 if (pad > 0) item(span = { GridItemSpan(pad) }) { Box(Modifier) }
-                // Every app that isn't in a folder.
-                items(loose, key = { it.key }) { app -> AppTile(app) { onPick(app) } }
+                // Improvement #4: All apps remain listed fully in the main grid below
+                items(shownApps, key = { it.key }) { app -> AppTile(app) { onPick(app) } }
             }
         }
     }
@@ -108,7 +147,6 @@ private fun AppTile(app: AppItem, onClick: () -> Unit) {
     }
 }
 
-/** A folder as a rounded tile with a 2×2 preview of its first apps and the folder's name below. */
 @Composable
 private fun FolderTile(folder: DrawerFolderUi, onClick: () -> Unit) {
     Column(

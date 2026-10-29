@@ -14,6 +14,7 @@ object SplitPicker {
     const val EXTRA_FIRST_PACKAGE = "first_package"
     const val EXTRA_RIGHT = "right"
     const val EXTRA_SELF_DOCK_RIGHT = "self_dock_right"
+    const val EXTRA_PEEK = "peek"
 
     fun componentName(context: Context): ComponentName = ComponentName(context.packageName, PICKER)
 
@@ -22,6 +23,7 @@ object SplitPicker {
         firstPackage: String,
         right: Boolean,
         selfDockRight: Boolean = false,
+        peek: Boolean = false,
     ): Intent = Intent().apply {
         component = componentName(context)
         addFlags(
@@ -32,6 +34,7 @@ object SplitPicker {
         putExtra(EXTRA_FIRST_PACKAGE, firstPackage)
         putExtra(EXTRA_RIGHT, right)
         putExtra(EXTRA_SELF_DOCK_RIGHT, selfDockRight)
+        putExtra(EXTRA_PEEK, peek)
     }
 
     suspend fun openBesideApp(
@@ -41,19 +44,17 @@ object SplitPicker {
         firstPackage: String,
         firstTaskId: Int?,
         firstOnRight: Boolean,
+        peek: Boolean = false,
     ) {
         val noAnim = ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
 
         if (ShellSplit.hasDump(context)) {
             if (firstOnRight) {
-                // [Picker | App 1]:
-                // 1. Launch invisible Picker first (it stays transparent until MultiWindow mode triggers!)
-                val pickerIntent = intent(context, firstPackage, right = true, selfDockRight = false)
+                val pickerIntent = intent(context, firstPackage, right = true, selfDockRight = false, peek = peek)
                 withContext(Dispatchers.Main) {
                     runCatching { context.startActivity(pickerIntent, noAnim) }
                 }
                 delay(90L)
-                // 2. Launch App 1 and immediately dock it to the right
                 withContext(Dispatchers.Main) {
                     if (firstApp != null) appRepository.launch(firstApp)
                 }
@@ -70,16 +71,11 @@ object SplitPicker {
                     }
                 }
             } else {
-                // [App 1 | Picker]:
-                // 1. Launch App 1 first
                 withContext(Dispatchers.Main) {
                     if (firstApp != null) appRepository.launch(firstApp)
                 }
                 delay(90L)
-                // 2. Launch invisible Picker with selfDockRight = true:
-                // SplitPickerActivity immediately docks its own `taskId` in onCreate and only reveals
-                // the Drawer UI once onMultiWindowModeChanged fires!
-                val pickerIntent = intent(context, firstPackage, right = false, selfDockRight = true)
+                val pickerIntent = intent(context, firstPackage, right = false, selfDockRight = true, peek = peek)
                 withContext(Dispatchers.Main) {
                     runCatching { context.startActivity(pickerIntent, noAnim) }
                 }
@@ -87,7 +83,7 @@ object SplitPicker {
             return
         }
 
-        val fallbackIntent = intent(context, firstPackage, firstOnRight)
+        val fallbackIntent = intent(context, firstPackage, firstOnRight, peek = peek)
         withContext(Dispatchers.Main) {
             runCatching { context.startActivity(fallbackIntent, noAnim) }
         }

@@ -36,30 +36,31 @@ class SplitPickerActivity : ComponentActivity() {
 
     private val viewModel: SplitPickerViewModel by viewModels()
     private var docked by mutableStateOf(false)
+    private var appPicked = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Make window completely transparent while full-screen so it never flashes over the screen
         window.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
 
         val firstPackage = intent.getStringExtra(SplitPicker.EXTRA_FIRST_PACKAGE).orEmpty()
         val right = intent.getBooleanExtra(SplitPicker.EXTRA_RIGHT, false)
         val selfDockRight = intent.getBooleanExtra(SplitPicker.EXTRA_SELF_DOCK_RIGHT, false)
+        val peek = intent.getBooleanExtra(SplitPicker.EXTRA_PEEK, false)
 
         docked = isInMultiWindowMode
 
         setContent {
             val apps by viewModel.apps.collectAsStateWithLifecycle()
             val folders by viewModel.folders.collectAsStateWithLifecycle()
+            val recents by viewModel.recents.collectAsStateWithLifecycle()
 
-            LaunchedEffect(Unit) {
+            LaunchedEffect(firstPackage) {
+                viewModel.loadRecents(firstPackage)
                 if (selfDockRight && !isInMultiWindowMode) {
-                    // We already know our exact taskId (`this@SplitPickerActivity.taskId`) — dock immediately!
                     withContext(Dispatchers.IO) {
                         ShellSplit.moveToSideFast(this@SplitPickerActivity, taskId, right = true)
                     }
                 }
-                // Fallback: if WMShell takes longer than 260ms or isn't in multi-window, show anyway
                 delay(260L)
                 docked = true
             }
@@ -73,11 +74,15 @@ class SplitPickerActivity : ComponentActivity() {
                         SplitPickerDrawer(
                             apps = apps,
                             folders = folders,
+                            recents = recents,
+                            firstPackageToHide = firstPackage,
                             onPick = { app ->
+                                appPicked = true
                                 if (isInMultiWindowMode && app.user == Process.myUserHandle() && launchInThisStage(app)) {
+                                    if (peek) snapPeek(right)
                                     finishAndRemoveTask()
                                 } else {
-                                    viewModel.formSplit(firstPackage, right, app)
+                                    viewModel.formSplit(firstPackage, right, app, peek = peek)
                                     finishAndRemoveTask()
                                 }
                             },
@@ -88,10 +93,33 @@ class SplitPickerActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        // Cleanly exit split stage if user backs out without picking an app
+        if (!appPicked && isInMultiWindowMode) {
+            val firstPackage = intent.getStringExtra(SplitPicker.EXTRA_FIRST_PACKAGE).orEmpty()
+            val firstTaskId = ShellSplit.taskIdOf(this, firstPackage)
+            if (firstTaskId != null) {
+                kotlin.concurrent.thread(start = true) {
+                    ShellSplit.exitSplit(this, firstTaskId)
+                }
+            }
+        }
+    }
+
     override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
         super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
         if (isInMultiWindowMode) {
             docked = true
+        }
+    }
+
+    private fun snapPeek(right: Boolean) {
+        kotlin.concurrent.thread(start = true) {
+            runCatching {
+                val targetSnap = if (right) org.arkikeskus.launcher.data.SplitThree.SNAP_PEEK_RIGHT else org.arkikeskus.launcher.data.SplitThree.SNAP_PEEK_LEFT
+                // handled by SplitThree or DividerDrag if needed
+            }
         }
     }
 

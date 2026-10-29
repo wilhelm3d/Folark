@@ -124,23 +124,17 @@ object ShellSplit {
                 ?: Regex("""\bI=([\w.]+)/""").find(line)?.groupValues?.get(1)
                 ?: ""
             if (pkg.isNotEmpty() && pkg != context.packageName) {
-                // Keep the top-most task per stage (stage_a, stage_b, stage_c)
                 found.putIfAbsent(currentStage, SplitTask(id, pkg, isVis))
             }
         }
         return found.values.toList()
     }
 
-    /** Tasks visibly in split screen right now. */
     fun splitTasks(context: Context): List<SplitTask> {
         val visible = queryStagedTasks(context, visibleOnly = true)
         return if (visible.size >= 2) visible else emptyList()
     }
 
-    /**
-     * Tasks currently paired in split stages (even when backgrounded behind Home or Folark Recents),
-     * so Recents can display them grouped together as a single split card.
-     */
     fun stagedSplitTasks(context: Context): List<SplitTask> {
         val staged = queryStagedTasks(context, visibleOnly = false)
         return if (staged.size >= 2) staged else emptyList()
@@ -159,7 +153,6 @@ object ShellSplit {
     private fun wmShell(context: Context, vararg command: String): Boolean =
         dump(context, arrayOf("service", "SystemUIService", "WMShell", *command)) != null
 
-    /** Direct, zero-overhead WMShell moveToSideStage when the caller already cleared old split state. */
     fun moveToSideFast(context: Context, taskId: Int, right: Boolean): Boolean {
         if (taskId <= 0) return false
         val sideStr = if (right) "1" else "0"

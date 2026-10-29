@@ -1,6 +1,8 @@
 package org.arkikeskus.launcher.data
 
 import android.os.UserHandle
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -24,6 +26,7 @@ import javax.inject.Singleton
 
 @Singleton
 open class AppRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val source: LauncherAppsSource,
     private val settingsRepository: SettingsRepository,
     private val appUsageRepository: AppUsageRepository,
@@ -116,6 +119,13 @@ open class AppRepository @Inject constructor(
         val result = source.launchAppPair(pair)
         if (result.isSuccess) {
             scope.launch {
+                withContext(Dispatchers.IO) {
+                    val staged = ShellSplit.allStagedTaskIds(context)
+                    if (staged.isNotEmpty()) {
+                        ShellSplit.exitSplit(context, -1)
+                        delay(120L)
+                    }
+                }
                 // Every app that opened is counted, in one write at the end.
                 val launched = mutableListOf(pair.app1Key)
                 delay(SPLIT_SECOND_APP_DELAY_MS)
