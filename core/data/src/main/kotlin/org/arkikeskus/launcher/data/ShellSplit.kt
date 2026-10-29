@@ -10,15 +10,8 @@ import android.os.Process
 import java.io.File
 
 /**
- * Split screen through Android's own split-screen command (the one `adb shell dumpsys activity
- * service SystemUIService WMShell splitscreen moveToSideStage <task> <side>` runs).
- *
- * An ordinary app's "open next to the current app" request is ignored unless it comes from the app
- * in front, and the accessibility "toggle split screen" action is refused on some phones. This
- * command works from anywhere, but it needs the DUMP permission, which only a one-time
- * `adb shell pm grant <package> android.permission.DUMP` can give. With it Folark reads Android's
- * list of recent tasks to find the task number of the app it just opened, and sends the command.
- * Nothing is kept or sent anywhere.
+ * Split screen through Android's own split-screen command (`dumpsys activity service
+ * SystemUIService WMShell splitscreen moveToSideStage <task> <side>`).
  */
 object ShellSplit {
 
@@ -47,10 +40,9 @@ object ShellSplit {
         "adb shell \"pm grant $packageName android.permission.DUMP; pm grant $packageName android.permission.PACKAGE_USAGE_STATS\""
 
     /** Runs `dumpsys activity <args>` in this process and returns what it printed; null if refused. */
+    @Synchronized
     internal fun dump(context: Context, args: Array<String>): String? = runCatching {
-        // A file, not a pipe: the system writes the whole reply before the call returns, and a
-        // long reply would fill a pipe and stall both sides.
-        val file = File(context.cacheDir, "shell_split.txt")
+        val file = File(context.cacheDir, "shell_split_${Thread.currentThread().id}.txt")
         val ok = ParcelFileDescriptor.open(
             file,
             ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE,
@@ -62,11 +54,7 @@ object ShellSplit {
 
     /** The task number of [packageName]'s newest task, from Android's list of recent tasks. */
     fun taskIdOf(context: Context, packageName: String): Int? {
-        val text = dump(context, arrayOf("recents"))
-        if (text == null) return null
-        // Each task starts at a "Recent #n" line; its number appears as "#123" there and/or as
-        // "taskId=123" / "id=123" further down. The package shows up in its intent, activity or
-        // affinity, in whichever format this Android version prints.
+        val text = dump(context, arrayOf("recents")) ?: return null
         val blocks = mutableListOf<StringBuilder>()
         for (line in text.lineSequence()) {
             if (line.contains("Recent #")) blocks += StringBuilder()
@@ -85,21 +73,20 @@ object ShellSplit {
     }
 
     /** A task shown in split screen: its number and app. */
-    data class SplitTask(val taskId: Int, val packageName: String)
+    data class SplitTask(val taskId: Int, val packageName: String, val visible: Boolean = true)
 
     /**
-     * The tasks in split screen now, from Android's window hierarchy: the visible tasks inside the
-     * split stages (stage_a, stage_b, and Motorola's stage_c for three apps). Empty when no split
-     * screen is open or the dump is refused.
+     * All tasks currently parented inside WM Shell's split stages (`stage_a`, `stage_b`, `stage_c`),
+     * whether currently visible on screen or in the background.
      */
-    fun splitTasks(context: Context): List<SplitTask> {
+    private fun queryStagedTasks(context: Context, visibleOnly: Boolean): List<SplitTask> {
         val text = dump(context, arrayOf("activities")) ?: return emptyList()
         val found = LinkedHashMap<Int, SplitTask>()
         var stageIndent = -1
         for (line in text.lineSequence()) {
             val star = line.indexOf("* Task{")
             if (star < 0) continue
-            if (line.contains("name=stage_")) {
+            if (line.contains("name=stage_") || line.contains("(stage_")) {
                 stageIndent = star
                 continue
             }
@@ -108,15 +95,30 @@ object ShellSplit {
                 stageIndent = -1
                 continue
             }
-            if (!line.contains("visible=true") && !line.contains("visibleRequested=true")) continue
+            val isVis = line.contains("visible=true") || line.contains("visibleRequested=true")
+            if (visibleOnly && !isVis) continue
             val id = Regex("""Task\{\S+ #(\d+)""").find(line)?.groupValues?.get(1)?.toIntOrNull() ?: continue
             val pkg = Regex("""\bA=\d+:([\w.]+)""").find(line)?.groupValues?.get(1)
                 ?: Regex("""\bI=([\w.]+)/""").find(line)?.groupValues?.get(1)
-                ?: continue
-            found.putIfAbsent(id, SplitTask(id, pkg))
+                ?: ""
+            found.putIfAbsent(id, SplitTask(id, pkg, isVis))
         }
         return found.values.toList()
     }
+
+    /**
+     * The tasks visibly sharing the split screen right now.
+     */
+    fun splitTasks(context: Context): List<SplitTask> =
+        queryStagedTasks(context, visibleOnly = true).filter { it.packageName.isNotEmpty() }
+
+    /**
+     * Every task ID currently attached to any split stage (visible or backgrounded).
+     * Used to prevent `SplitScreenController.moveToStage` from throwing
+     * `IllegalArgumentException: taskId is in split<id>` and crashing SystemUI.
+     */
+    fun allStagedTaskIds(context: Context): Set<Int> =
+        queryStagedTasks(context, visibleOnly = false).map { it.taskId }.toSet()
 
     /** Swaps the two sides of the split screen. */
     fun swapSides(context: Context): Boolean = wmShell(context, "splitscreen", "switchSplitPosition")
@@ -131,17 +133,24 @@ object ShellSplit {
     private fun wmShell(context: Context, vararg command: String): Boolean =
         dump(context, arrayOf("service", "SystemUIService", "WMShell", *command)) != null
 
-    /** Moves task [taskId] into the side half, [right] or left, beside the app behind it. */
+    /**
+     * Moves task [taskId] into the side half, [right] (1) or left (0), beside the standard task
+     * currently in front on screen.
+     */
     fun moveToSide(context: Context, taskId: Int, right: Boolean): Boolean {
-        // WM Shell's moveToStage throws IllegalArgumentException("taskId is in split<id>") when the
-        // task is ALREADY a split member — and it throws on WM Shell's own HandlerThread inside
-        // System UI, where Folark cannot catch it, so System UI is killed (drops to the lock screen).
-        // Never re-issue the command for a task that is already in the split: it is already placed.
-        if (splitTasks(context).any { it.taskId == taskId }) return true
-        dump(
+        val sideStr = if (right) "1" else "0"
+        if (taskId <= 0) return false
+
+        val allStaged = allStagedTaskIds(context)
+        if (taskId in allStaged) {
+            exitSplit(context, taskId)
+            Thread.sleep(150L)
+        }
+
+        val res = dump(
             context,
-            arrayOf("service", "SystemUIService", "WMShell", "splitscreen", "moveToSideStage", taskId.toString(), if (right) "1" else "0"),
-        ) ?: return false
-        return true
+            arrayOf("service", "SystemUIService", "WMShell", "splitscreen", "moveToSideStage", taskId.toString(), sideStr),
+        )
+        return res != null
     }
 }

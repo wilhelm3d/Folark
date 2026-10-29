@@ -49,3 +49,10 @@ Android launcherin teeman asetukset.zip
 
 # Editor / script backups
 *.bak
+
+SystemUI.zip
+SystemUI_Decompiled/
+SystemUI_Extracted/
+jadx.zip
+jadx/
+split_debug.log
