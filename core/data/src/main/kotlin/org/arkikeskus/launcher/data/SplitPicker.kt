@@ -21,7 +21,8 @@ object SplitPicker {
         addFlags(
             Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                Intent.FLAG_ACTIVITY_NO_ANIMATION,
+                Intent.FLAG_ACTIVITY_NO_ANIMATION or
+                Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT,
         )
         putExtra(EXTRA_FIRST_PACKAGE, firstPackage)
         putExtra(EXTRA_RIGHT, right)
@@ -46,7 +47,7 @@ object SplitPicker {
                     if (firstApp != null) appRepository.launch(firstApp)
                 }
             }
-            delay(180L)
+            delay(150L)
             withContext(Dispatchers.Main) {
                 if (firstOnRight) {
                     if (firstApp != null) appRepository.launch(firstApp)
@@ -54,13 +55,13 @@ object SplitPicker {
                     runCatching { context.startActivity(pickerIntent, noAnim) }
                 }
             }
-            delay(160L)
+            delay(120L)
             withContext(Dispatchers.IO) {
                 if (firstOnRight) {
                     var tId = firstTaskId ?: ShellSplit.taskIdOf(context, firstPackage)
                     repeat(6) {
                         if (tId != null) return@repeat
-                        delay(40L)
+                        delay(30L)
                         tId = ShellSplit.taskIdOf(context, firstPackage)
                     }
                     if (tId != null) ShellSplit.moveToSide(context, tId, right = true)
@@ -69,9 +70,9 @@ object SplitPicker {
                     repeat(6) {
                         pickerId = ShellSplit.taskIdOf(context, context.packageName)
                         if (pickerId != null) return@repeat
-                        delay(40L)
+                        delay(30L)
                     }
-                    if (pickerId != null) ShellSplit.moveToSide(context, pickerId, right = true)
+                    if (pickerId != null) ShellSplit.moveToSide(context, pickerId, right = false)
                 }
             }
             return

@@ -1,6 +1,9 @@
 package org.arkikeskus.launcher.recents
 
+import android.app.ActivityOptions
+import android.content.Intent
 import android.os.Bundle
+import android.os.Process
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -10,12 +13,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.arkikeskus.launcher.data.SplitPicker
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
 import org.arkikeskus.launcher.feature.appdrawer.SplitPickerDrawer
+import org.arkikeskus.launcher.model.AppItem
 
-/**
- * The split-select picker: Folark's app drawer, shown full screen to choose the second app for a
- * split. Once an app is tapped, [SplitPickerViewModel.formSplit] opens it beside the first (dragged)
- * app — the first one on the side it was dropped — and this screen closes.
- */
 @AndroidEntryPoint
 class SplitPickerActivity : ComponentActivity() {
 
@@ -33,11 +32,25 @@ class SplitPickerActivity : ComponentActivity() {
                     apps = apps,
                     folders = folders,
                     onPick = { app ->
-                        viewModel.formSplit(firstPackage, right, app)
-                        finish()
+                        if (isInMultiWindowMode && app.user == Process.myUserHandle() && launchInThisStage(app)) {
+                            finishAndRemoveTask()
+                        } else {
+                            viewModel.formSplit(firstPackage, right, app)
+                            finishAndRemoveTask()
+                        }
                     },
                 )
             }
         }
     }
+
+    private fun launchInThisStage(app: AppItem): Boolean = runCatching {
+        val launchIntent = Intent(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_LAUNCHER)
+            .setComponent(app.componentName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        val opts = ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, android.R.anim.fade_out).toBundle()
+        startActivity(launchIntent, opts)
+        true
+    }.getOrDefault(false)
 }
