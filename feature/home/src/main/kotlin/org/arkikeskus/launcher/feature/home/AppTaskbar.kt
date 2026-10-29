@@ -2276,20 +2276,16 @@ internal class AppTaskbar(private val context: Context) {
             launchApp(app)
             return
         }
+        val repo = repository ?: return
         scope.launch {
-            if (right) {
-                // App goes right, Picker goes left.
-                runCatching { context.startActivity(SplitPicker.intent(context, app.packageName, right)) }
-                delay(300L)
-                repository?.launchBeside(app)
-            } else {
-                // App goes left, Picker goes right.
-                launchApp(app)
-                delay(300L)
-                val intent = SplitPicker.intent(context, app.packageName, right)
-                intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
-                runCatching { context.startActivity(intent) }
-            }
+            SplitPicker.openBesideApp(
+                context = context,
+                appRepository = repo,
+                firstApp = app,
+                firstPackage = app.packageName,
+                firstTaskId = null,
+                firstOnRight = right,
+            )
         }
     }
 

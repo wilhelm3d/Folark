@@ -1,12 +1,11 @@
 package org.arkikeskus.launcher.recents
 
-import org.arkikeskus.launcher.data.SplitThree
 import android.app.ActivityManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +28,7 @@ import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.SplitPicker
+import org.arkikeskus.launcher.data.SplitThree
 import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.data.root.RootTasks
@@ -36,7 +36,6 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
-import android.content.Intent
 
 /** One card in Folark's Recents: an open app, or the apps sharing a split screen. */
 data class RecentsCard(
@@ -63,10 +62,6 @@ data class RecentsState(
     val cards: List<RecentsCard> = emptyList(),
 )
 
-/**
- * Folark's own Recents (Settings ▸ Recents): what is open, read from Android's task list, with
- * root extras (screenshots, closing one app) when root is there right now.
- */
 @HiltViewModel
 class RecentsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -75,21 +70,15 @@ class RecentsViewModel @Inject constructor(
     @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
-    /** Recents settings are shared by both displays. */
     val settings: StateFlow<LauncherSettings> = settingsRepository.settings(ScreenType.INNER)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings())
 
-    /** Packages the user has muted from Recents (persistent; see [toggleMute]). */
     val mutedApps: StateFlow<Set<String>> = settingsRepository.mutedApps
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     private val _state = MutableStateFlow(RecentsState())
     val state: StateFlow<RecentsState> = _state.asStateFlow()
 
-    /**
-     * The screenshots, decoded small (see [decode]) and held in a cache bounded by bytes: the
-     * least recently shown ones go first when it is full. [_thumbnails] is what the screen draws.
-     */
     private val cache = object : android.util.LruCache<Int, ImageBitmap>(thumbnailBudget()) {
         override fun sizeOf(key: Int, value: ImageBitmap): Int = value.asAndroidBitmap().allocationByteCount
     }
@@ -98,14 +87,12 @@ class RecentsViewModel @Inject constructor(
 
     private var loadJob: Job? = null
 
-    /** Reads what is open again (each time Recents comes to the front). */
     fun refresh() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             val s = settingsRepository.settings(ScreenType.INNER).first()
             val result = withContext(Dispatchers.IO) { load(s) }
             _state.value = result
-            // Screenshots of apps no longer open are let go.
             val ids = result.cards.flatMap { c -> c.tasks.map { it.taskId } }.toSet()
             cache.snapshot().keys.filterNot { it in ids }.forEach { cache.remove(it) }
             publish()
@@ -118,8 +105,8 @@ class RecentsViewModel @Inject constructor(
         val needRoot = s.recents.thumbnails || s.recents.rootClose || (s.recents.pinned.isNotEmpty() && (s.recents.pinKeepAlive || s.recents.btnCloseAll))
         val root = needRoot && RootShell.available()
         val apps = appRepository.apps.first()
-        // Apps sharing the visible split screen stay together on one card.
-        val inSplit = ShellSplit.splitTasks(context).map { it.taskId }.toSet()
+        // Use stagedSplitTasks so active split pairs stay grouped on one card even when Recents is covering them.
+        val inSplit = ShellSplit.stagedSplitTasks(context).map { it.taskId }.toSet()
         val splitGroup = tasks.filter { it.taskId in inSplit }
         val cards = ArrayList<RecentsCard>()
         var splitAdded = false
@@ -137,16 +124,13 @@ class RecentsViewModel @Inject constructor(
                 )
             } else {
                 val app = appFor(task, apps)
-                // Only apps that have a place in the drawer: no system plumbing.
                 if (app == null) continue
                 cards += RecentsCard(listOf(task), listOf(app), app.label, task.inactiveMs, pinned = pinKey(task) in s.recents.pinned)
             }
         }
         val ordered = if (s.recents.sort == LauncherSettings.RECENTS_SORT_NAME) cards.sortedBy { it.label.lowercase() } else cards
-        // Pinned apps first (in the same order among themselves); they never fall off the end.
         val sorted = ordered.sortedByDescending { it.pinned }
         val shown = sorted.filter { it.pinned } + sorted.filterNot { it.pinned }.take((s.recents.maxApps - sorted.count { it.pinned }).coerceAtLeast(0))
-        // Pinned apps kept in memory: their priority is given again (Android resets it).
         if (root && s.recents.pinKeepAlive) {
             val running = shown.filter { it.pinned }.flatMap { c -> c.tasks.map { it.packageName } }.toSet()
             if (running.isNotEmpty()) rememberExemptions(RootTasks.protect(running))
@@ -158,11 +142,6 @@ class RecentsViewModel @Inject constructor(
         apps.firstOrNull { it.packageName == task.packageName && it.user.hashCode() == task.userId }
             ?: apps.firstOrNull { it.packageName == task.packageName }
 
-    /**
-     * Android's screenshots of the open apps. First its saved files (quick, one by one so the first
-     * cards fill in at once); the ones it has only in memory, or keeps elsewhere on this Android
-     * version, are then asked from Android's task manager through the root helper, all together.
-     */
     private fun loadThumbnails(cards: List<RecentsCard>) {
         viewModelScope.launch(Dispatchers.IO) {
             val missing = ArrayList<Int>()
@@ -187,11 +166,6 @@ class RecentsViewModel @Inject constructor(
         _thumbnails.value = cache.snapshot()
     }
 
-    /**
-     * A screenshot decoded no bigger than a card needs: shrunk by whole steps (halving) until it
-     * is at most [THUMB_MAX_EDGE] px on its long side, in 16-bit colour (screenshots have no see-
-     * through parts). A full inner-screen picture would take ~20 MB; this takes well under 1 MB.
-     */
     private fun decode(bytes: ByteArray): ImageBitmap? = runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -213,16 +187,31 @@ class RecentsViewModel @Inject constructor(
 
     // ------------------------------------------------------------------ actions
 
-    /** Brings [card] back to the front, as it was (a split comes back as a split). */
-    fun open(card: RecentsCard) {
-        val task = card.tasks.first()
+    private fun openSingleTask(task: OpenTask, app: AppItem?) {
         val moved = runCatching {
             context.getSystemService(ActivityManager::class.java).moveTaskToFront(task.taskId, 0)
         }.isSuccess
-        if (!moved) card.apps.firstOrNull()?.let { appRepository.launch(it) }
+        if (!moved && app != null) appRepository.launch(app)
     }
 
-    /** Closes [card]'s apps (root), then shows the list again. */
+    /** Brings [card] back to the front, as it was (a split comes back as a split). */
+    fun open(card: RecentsCard) {
+        if (card.isSplit && card.tasks.size >= 2) {
+            appScope.launch {
+                openSingleTask(card.tasks[0], card.apps.getOrNull(0))
+                delay(160L)
+                withContext(Dispatchers.IO) {
+                    if (ShellSplit.splitTasks(context).size < 2) {
+                        ShellSplit.moveToSideFast(context, card.tasks[1].taskId, right = true)
+                    }
+                }
+            }
+            return
+        }
+        val task = card.tasks.first()
+        openSingleTask(task, card.apps.firstOrNull())
+    }
+
     fun close(card: RecentsCard) {
         _state.value = _state.value.copy(cards = _state.value.cards - card)
         viewModelScope.launch(Dispatchers.IO) {
@@ -232,11 +221,6 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Closes everything but the pinned apps. Without pins: Android's own "clear all" (needs only
-     * the DUMP grant), else root. With pins: root closes the others one by one (without root
-     * Android's "clear all" can't leave any open, so it closes the pinned ones too).
-     */
     fun closeAll() {
         val cards = _state.value.cards
         val root = _state.value.root
@@ -251,11 +235,6 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /** Pins or unpins [card]'s apps; with root and the setting, keeps them in memory (or stops). */
-    /**
-     * Saves the apps of a split card as an app pair (Settings ▸ App pairs; then on home and the
-     * taskbar too). False when one of its apps isn't known (not installed for this user any more).
-     */
     fun saveAsPair(card: RecentsCard): Boolean {
         val apps = card.apps
         if (apps.size !in 2..3 || apps.any { it == null }) return false
@@ -291,7 +270,6 @@ class RecentsViewModel @Inject constructor(
                     rememberExemptions(RootTasks.protect(packages))
                 } else {
                     val exempt = settingsRepository.pinExemptions()
-                    // Still pinned for another profile: leave it.
                     val stillPinned = next.map { it.substringBefore('/') }.toSet()
                     for (p in packages - stillPinned) RootTasks.unprotect(p, p in exempt)
                     settingsRepository.setPinExemptions(exempt - (packages - stillPinned))
@@ -305,7 +283,6 @@ class RecentsViewModel @Inject constructor(
         appScope.launch { settingsRepository.setPinExemptions(settingsRepository.pinExemptions() + added) }
     }
 
-    /** Android's App info page of [card]'s app (for the right profile). */
     fun appInfo(card: RecentsCard) {
         val app = card.apps.firstOrNull() ?: return
         runCatching {
@@ -318,34 +295,40 @@ class RecentsViewModel @Inject constructor(
         card.apps.firstOrNull()?.let { appRepository.launchFloating(it) }
     }
 
-    /** A split card back to one app full screen. */
     fun unsplit(card: RecentsCard) {
         val keep = card.tasks.first().taskId
         appScope.launch(Dispatchers.IO) { ShellSplit.exitSplit(context, keep) }
     }
 
     /**
-     * Split view: the first two side by side, a third joining the split where the phone supports
-     * three (Razr Fold) or else as a pop-up, a fourth as a pop-up. Runs on after Recents closes.
+     * Split view: clears any stale split stage first so WMShell never rejects a previously staged
+     * task with "App does not support split screen", brings [picked][0] to the front, and docks [picked][1].
      */
     fun openTogether(picked: List<RecentsCard>, thirdInSplit: Boolean, threeApp: Boolean = false) {
         if (picked.size < 2) return
         val tasks = picked.map { it.tasks.first() }
         appScope.launch {
-            open(picked[0])
+            // 1. If any task is still stuck in a previous split stage, exit split keeping tasks[0] first!
+            withContext(Dispatchers.IO) {
+                val staged = ShellSplit.allStagedTaskIds(context)
+                if (staged.isNotEmpty()) {
+                    ShellSplit.exitSplit(context, tasks[0].taskId)
+                    delay(120L)
+                }
+            }
+            // 2. Bring the first app to the front full-screen
+            openSingleTask(tasks[0], picked[0].apps.firstOrNull())
             delay(SPLIT_STEP_MS)
-            withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, tasks[1].taskId, right = true) }
+            // 3. Dock the second app into the right split stage
+            withContext(Dispatchers.IO) {
+                ShellSplit.moveToSideFast(context, tasks[1].taskId, right = true)
+            }
             if (picked.size >= 3) {
                 delay(SPLIT_STEP_MS)
-                // Tiling the third pane means asking SystemUI's module to start a task into a third
-                // slot, which can crash System UI on some ROMs, so it is off by default: the third app
-                // floats instead (reliable everywhere). Only when the user opts in do we try to tile.
                 val tileThird = thirdInSplit && settings.value.launch.threeAppNative
                 val joined = tileThird && withContext(Dispatchers.IO) {
-                    // A real third pane through Folark's module in SystemUI; else Android's own
-                    // split command (some phones take a third there), else it floats (below).
                     (threeApp && SplitThree.ready(context) && SplitThree.addThird(context, taskId = tasks[2].taskId)) || run {
-                        ShellSplit.moveToSide(context, tasks[2].taskId, right = true)
+                        ShellSplit.moveToSideFast(context, tasks[2].taskId, right = true)
                         delay(SPLIT_STEP_MS)
                         ShellSplit.splitTasks(context).any { it.taskId == tasks[2].taskId }
                     }
@@ -359,17 +342,11 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * [third] dropped on the split card [pair]: the pair comes back to the front, then [third]
-     * joins it as a third pane (Folark's SystemUI module); without the module it floats on top.
-     */
     fun addThird(pair: RecentsCard, third: RecentsCard) {
         val task = third.tasks.firstOrNull() ?: return
         appScope.launch {
             open(pair)
             delay(SPLIT_STEP_MS)
-            // Same trade-off as [openTogether]: tile the third pane only on opt-in (it can crash
-            // System UI on some ROMs); otherwise it floats.
             val joined = settings.value.launch.threeAppNative && withContext(Dispatchers.IO) {
                 SplitThree.ready(context) && SplitThree.addThird(context, taskId = task.taskId)
             }
@@ -377,11 +354,6 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * [with] dropped on pane [paneIndex] of the multi-app card [target]: the split is rebuilt with
-     * that pane's app swapped for [with]. Android has no in-place pane swap, so the split is torn
-     * down and reopened from the new trio (a brief flash) — best effort, like [openTogether].
-     */
     fun replacePane(target: RecentsCard, paneIndex: Int, with: RecentsCard) {
         if (paneIndex !in target.tasks.indices || target.tasks.size < 2) return
         if (with.tasks.first().taskId in target.tasks.map { it.taskId }) return
@@ -397,86 +369,68 @@ class RecentsViewModel @Inject constructor(
         openTogether(panes, thirdInSplit = true, threeApp = true)
     }
 
-    /**
-     * [card] long-press-dragged to a screen edge (inner screen, Aero-style): top = full screen; left
-     * or right = the app into that split half beside whatever is behind Recents. A floating (pop-up)
-     * app dragged to a side is pulled into the split this way. Best effort, like the other split ops.
-     */
     fun placeAtEdge(card: RecentsCard, edge: Int) {
         when (edge) {
             EDGE_TOP -> open(card)
             EDGE_BOTTOM -> popUp(card)
             EDGE_LEFT, EDGE_RIGHT -> {
-                // Show Folark's picker to choose the partner; it then builds the split from the two
-                // real apps (the dragged app on the side it was dropped).
-                val pkg = card.tasks.firstOrNull()?.packageName ?: return
+                val task = card.tasks.firstOrNull() ?: return
                 val right = edge == EDGE_RIGHT
-                // We must launch the first app and the SplitPicker side-by-side natively.
-                val intent = context.packageManager.getLaunchIntentForPackage(pkg) ?: return
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                
-                if (right) {
-                    // First app on the right, picker on the left.
-                    // Start picker fullscreen, then launch first app adjacent to it (which naturally places it on the right).
-                    runCatching { context.startActivity(SplitPicker.intent(context, pkg, right)) }
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        val firstApp = card.apps.firstOrNull()
-                        if (firstApp != null) appRepository.launchBeside(firstApp)
-                    }, 300)
-                } else {
-                    // First app on the left, picker on the right.
-                    // Start first app fullscreen, then launch picker adjacent to it (which places the picker on the right).
-                    runCatching { appRepository.launch(card.apps.firstOrNull() ?: return@runCatching) }
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        val pickerIntent = SplitPicker.intent(context, pkg, right)
-                        pickerIntent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
-                        runCatching { context.startActivity(pickerIntent) }
-                    }, 300)
+                val firstApp = card.apps.firstOrNull()
+                appScope.launch {
+                    SplitPicker.openBesideApp(
+                        context = context,
+                        appRepository = appRepository,
+                        firstApp = firstApp,
+                        firstPackage = task.packageName,
+                        firstTaskId = task.taskId,
+                        firstOnRight = right,
+                    )
                 }
             }
         }
     }
 
-    /** Whether split view can work: Android's split command needs the one-time DUMP grant. */
     fun canSplit(): Boolean = ShellSplit.hasDump(context)
 
-    /** A fresh root check (Settings, or Recents opened after root was turned on again). */
     fun recheckRoot() {
         viewModelScope.launch(Dispatchers.IO) { RootShell.available(recheck = true) }
     }
 
     /**
-     * Attached view: [main] and [peek] in split screen, then the divider dragged near the edge so
-     * [peek] only peeks in at [side] ("left"/"right"), [peekFraction] of the [screen] width. The
-     * drag is a touch made by Folark's accessibility service (or root), as a finger would do it.
+     * Attached (peek) view: clears stale split state first, pairs [main] and [peek], and snaps to
+     * Motorola's peek target (or drags the divider to a safe non-dismiss peek fraction).
      */
     fun openAttached(main: RecentsCard, peek: RecentsCard, side: String, peekFraction: Float, screen: android.graphics.Rect) {
         val mainTask = main.tasks.firstOrNull() ?: return
+        val peekTask = peek.tasks.firstOrNull() ?: return
         val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
         appScope.launch {
-            open(peek)
+            withContext(Dispatchers.IO) {
+                val staged = ShellSplit.allStagedTaskIds(context)
+                if (staged.isNotEmpty()) {
+                    ShellSplit.exitSplit(context, peekTask.taskId)
+                    delay(120L)
+                }
+            }
+            openSingleTask(peekTask, peek.apps.firstOrNull())
             delay(SPLIT_STEP_MS)
-            val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, mainTask.taskId, right = left) }
+            val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSideFast(context, mainTask.taskId, right = left) }
             if (!moved) return@launch
-            // Peek it. By default Folark drags the divider like a finger (Android's normal input path,
-            // which it handles safely); only when the user opts into native peek do we ask SystemUI's
-            // module to snap — that cold snap can crash System UI on some ROMs, so it is off by default.
-            if (settings.value.recents.attachedNative &&
-                SplitThree.ready(context) &&
+
+            if (SplitThree.ready(context) &&
                 SplitThree.snap(context, if (left) SplitThree.SNAP_PEEK_LEFT else SplitThree.SNAP_PEEK_RIGHT)
             ) return@launch
+
             delay(ATTACH_SETTLE_MS)
+            val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
             val y = screen.exactCenterY()
             val from = screen.exactCenterX()
-            val to = if (left) screen.left + screen.width() * peekFraction else screen.right - screen.width() * peekFraction
+            val to = if (left) screen.left + screen.width() * safeFraction else screen.right - screen.width() * safeFraction
             DividerDrag.drag(from, y, to, y)
         }
     }
 
-    /**
-     * Motorola's native two-app split-select: [card] goes into split and the system's own app
-     * picker chooses the other app. Uses Moto's SplitScreenController.startTaskWithSelectRequest.
-     */
     fun nativeSplitSelect(card: RecentsCard) {
         val task = card.tasks.firstOrNull()?.taskId ?: return
         val index = if (settings.value.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_RIGHT) 1 else 0
@@ -487,10 +441,6 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Motorola's native three-app split-select: while [card]'s split is showing, the system shows
-     * its picker for the third app (requestEnterThreeAppsSplitSelectByGesture).
-     */
     fun nativeThreeAppSelect(card: RecentsCard) {
         appScope.launch {
             open(card)
@@ -499,38 +449,27 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * A split card's two apps as peek view, the one at [side] peeking in. Same reliability trade-off
-     * as [openAttached]: the finger-style divider drag by default, SystemUI's native snap only on opt-in.
-     */
     fun peekSplit(card: RecentsCard, side: String, screen: android.graphics.Rect, peekFraction: Float) {
         val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
         appScope.launch {
             open(card)
-            if (settings.value.recents.attachedNative &&
-                SplitThree.ready(context) &&
+            if (SplitThree.ready(context) &&
                 SplitThree.snap(context, if (left) SplitThree.SNAP_PEEK_LEFT else SplitThree.SNAP_PEEK_RIGHT)
             ) return@launch
             delay(ATTACH_SETTLE_MS)
+            val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
             val y = screen.exactCenterY()
             val from = screen.exactCenterX()
-            val to = if (left) screen.left + screen.width() * peekFraction else screen.right - screen.width() * peekFraction
+            val to = if (left) screen.left + screen.width() * safeFraction else screen.right - screen.width() * safeFraction
             DividerDrag.drag(from, y, to, y)
         }
     }
 
-    /**
-     * Mute or unmute every app on [card], persistently. The muted set is stored so it survives a
-     * restart of Folark and of the app; on root it is enforced with appops PLAY_AUDIO (ignore to
-     * mute, allow to unmute), which the system keeps across app restarts and reboots. Whether a
-     * given ROM honours the PLAY_AUDIO op varies, so this is best-effort when it isn't honoured.
-     */
     fun toggleMute(card: RecentsCard) {
         val pkgs = card.tasks.map { it.packageName }.filter { it.isNotBlank() }.toSet()
         if (pkgs.isEmpty()) return
         appScope.launch {
             val current = settingsRepository.mutedPackages()
-            // "Mute" when none of the card's apps are muted yet; otherwise this is an "Unmute".
             val muting = pkgs.none { it in current }
             settingsRepository.setMutedPackages(if (muting) current + pkgs else current - pkgs)
             withContext(Dispatchers.IO) {
@@ -543,16 +482,13 @@ class RecentsViewModel @Inject constructor(
     }
 
     private companion object {
-        /** Long side of a decoded screenshot, px (a card is rarely bigger). */
         const val THUMB_MAX_EDGE = 720
 
-        /** Screenshot memory: an eighth of what the app may use, at most 48 MB. */
         fun thumbnailBudget(): Int = (Runtime.getRuntime().maxMemory() / 8).coerceAtMost(48L * 1024 * 1024).toInt()
 
-        const val SPLIT_STEP_MS = 450L
-        const val ATTACH_SETTLE_MS = 900L
+        const val SPLIT_STEP_MS = 200L
+        const val ATTACH_SETTLE_MS = 350L
 
-        /** Package names allowed into a shell command (never anything that could inject). */
         val SAFE_PKG = Regex("[A-Za-z0-9_.]+")
     }
 }

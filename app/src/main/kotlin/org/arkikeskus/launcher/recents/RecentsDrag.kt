@@ -126,8 +126,7 @@ internal class RecentsDrag {
                     COMBINE_REPLACE
                 }
                 hit.isSplit -> COMBINE_THIRD
-                pointer.x < r.center.x -> COMBINE_SPLIT
-                else -> COMBINE_ATTACHED
+                else -> COMBINE_SPLIT
             }
         } else if (allowEdge && screenW > 0f && screenH > 0f) {
             // Not over a card: which screen edge the finger is near (Aero-style placement).

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Open the notification shade with a swipe-down gesture. -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+
+    <!-- Optional: contacts in app-drawer search; requested at runtime, gated by a setting. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Search actions: "timer 10 min" and "alarm 7:30" hand the clock app a timer or alarm to
+         confirm (an ordinary permission, granted at install). -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
+    <!-- Optional: the smartspace widget's next-calendar-event row; requested at runtime from the
+         widget itself. Clock + date work without it. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
+    <!-- Optional: the smartspace widget's weather (Open-Meteo needs rough coordinates); requested at
+         runtime from the widget/intro. A cached coarse fix is read — no active location requests. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Optional: mobile-signal level for the home status bar; requested at runtime when the status
+         bar is enabled. Battery + Wi-Fi need no permission and work without it. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- Home status bar indicators: Wi-Fi / mobile / VPN / data-saver state (normal permissions, no
+         runtime prompt). Without ACCESS_NETWORK_STATE the connectivity callbacks throw. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- Android 11 only: BluetoothAdapter.ACTION_STATE_CHANGED is delivered with the legacy
+         BLUETOOTH receiver-permission pre-S, so without this the status-bar Bluetooth flag never
+         refreshes there. Android 12+ needs no permission for adapter state. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <!-- Device-status widget: battery level of connected Bluetooth devices (Android 12+ runtime
+         permission, asked only when the user taps the widget's "Allow" hint). Nothing is scanned. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- ACCESS_WIFI_STATE would otherwise IMPLY a required android.hardware.wifi feature and let
+         stores filter out Wi-Fi-less devices; every Wi-Fi indicator degrades gracefully without it. -->
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+    <!-- A home launcher legitimately interacts with every installed app (open, uninstall, app info,
+         notification badges). Without this, package-visibility filtering in a non-debuggable build
+         silently blocks those cross-app intents (e.g. uninstall opens nothing). -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+
+    <!-- Android 15+: lets the default launcher see Private Space, to show it in the drawer as a
+         locked section (Settings ▸ App drawer ▸ Private Space). -->
+    <uses-permission android:name="android.permission.ACCESS_HIDDEN_PROFILES" />
+
+    <!-- Required so the system package installer honors our ACTION_DELETE uninstall request; without
+         it the uninstaller silently rejects the call ("does not have REQUEST_DELETE_PACKAGES"). -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Usage access (granted by the user in Android's settings): the taskbar's recent apps. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <!-- Only usable after `adb shell pm grant <package> android.permission.DUMP`: the taskbar's split
+         screen (finding the opened app's task and sending Android's split-screen command). -->
+    <uses-permission android:name="android.permission.DUMP" tools:ignore="ProtectedPermissions" />
+
+    <!-- Only usable after `adb shell pm grant <package> android.permission.WRITE_SECURE_SETTINGS`:
+         Settings ▸ Permissions ▸ System controls (keeping Folark's accessibility service on, the
+         top refresh rate, the system animation speed). -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+
+    <!-- Folark Recents: bring an open app back to the front. -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+
+    <!-- See which apps expose a launcher activity (for the app drawer). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".LauncherApplication"
+        android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ArkikeskusLauncher.Starting">
+
+        <!-- Portrait-locked like most launchers: the home grid's fixed 6 rows don't fit a phone in
+             landscape (rows/widgets would overlap). Android 12L+ ignores the lock on large screens
+             (tablets, unfolded foldables), which is the desired behavior there. -->
+        <activity
+            android:name=".LauncherActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize|stateHidden"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
+            android:theme="@style/Theme.ArkikeskusLauncher.Starting">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
+            android:label="@string/settings_label"
+            android:theme="@style/Theme.ArkikeskusLauncher" />
+
+        <!-- Folark Recents (Settings ▸ Recents): a passing screen over the wallpaper. -->
+        <activity
+            android:name=".recents.RecentsActivity"
+            android:exported="true"
+            android:permission="android.permission.START_TASKS_FROM_RECENTS"
+            android:launchMode="singleTask"
+            android:taskAffinity="org.arkikeskus.launcher.recents"
+            android:excludeFromRecents="true"
+            android:noHistory="false"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
+            android:theme="@style/Theme.ArkikeskusLauncher.Recents" />
+
+        <!-- Split-select picker: Folark's app drawer shown in the empty pane of a split. Resizeable
+             so it lives in a split stage; its own task so it can be paired beside the dragged app. -->
+        <activity
+            android:name=".recents.SplitPickerActivity"
+            android:exported="false"
+            android:taskAffinity="org.arkikeskus.launcher.splitpicker"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Folark's module for Vector (LSPosed): hands the system launcher's Recents over to Folark
+             Recents. Only active if you install Vector and enable Folark for the launcher there. -->
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription" android:value="@string/xposed_description" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <meta-data android:name="xposedscope" android:resource="@array/xposed_scope" />
+
+        <!-- Copied pictures in the clipboard history, handed back to the clipboard or shared
+             (read-only, only the files in the private clips folder). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.clips"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clip_paths" />
+        </provider>
+
+        <!-- Tells that module whether Settings ▸ Recents ▸ Replace Android's Recents is on (a yes/no only). -->
+        <provider
+            android:name=".xposed.RecentsHookState"
+            android:authorities="org.arkikeskus.launcher.recentshook"
+            android:exported="true" />
+
+        <!-- Notification dots: the system binds this once the user grants notification access. -->
+        <service
+            android:name=".notifications.NotificationDotListenerService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>
