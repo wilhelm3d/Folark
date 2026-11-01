@@ -134,7 +134,8 @@
             android:taskAffinity="org.arkikeskus.launcher.splitpicker"
             android:launchMode="singleTask"
             android:resizeableActivity="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
+            android:excludeFromRecents="true"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|fontScale"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- Folark's module for Vector (LSPosed): hands the system launcher's Recents over to Folark

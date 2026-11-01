@@ -119,12 +119,13 @@ open class AppRepository @Inject constructor(
         val result = source.launchAppPair(pair)
         if (result.isSuccess) {
             scope.launch {
-                withContext(Dispatchers.IO) {
-                    val staged = ShellSplit.allStagedTaskIds(context)
-                    if (staged.isNotEmpty()) {
-                        ShellSplit.exitSplit(context, -1)
-                        delay(120L)
-                    }
+                // An earlier split still staged (hidden behind Home) would take the second app in:
+                // close it first. When the pair's first app was part of it (it just came back with
+                // that split), it stays in front.
+                if (ShellSplit.hasDump(context)) withContext(Dispatchers.IO) {
+                    val app1 = pair.app1ComponentName.packageName
+                    val keep = ShellSplit.stagedSplitTasks(context).firstOrNull { it.packageName == app1 }?.taskId ?: -1
+                    ShellSplit.exitSplit(context, keep)
                 }
                 // Every app that opened is counted, in one write at the end.
                 val launched = mutableListOf(pair.app1Key)

@@ -31,9 +31,18 @@ object SplitThree {
     const val EXTRA_SNAP = "snap"
     /** Native split-select: 1 = two-app picker (startTaskWithSelectRequest), 2 = three-app select. */
     const val EXTRA_SELECT = "select"
+    /** Two running tasks into split screen in one step (see [startSplitTasks]). */
     const val EXTRA_SPLIT_TASKS = "split_tasks"
+    const val EXTRA_TASK_1 = "split_task_1"
+    const val EXTRA_TASK_2 = "split_task_2"
+    const val EXTRA_SPLIT_POSITION = "split_position"
+    const val EXTRA_SNAP_POSITION = "split_snap_position"
     /** The split index / position hint that goes with a select request. */
     const val EXTRA_POS = "pos"
+
+    /** WM Shell's split positions (SplitScreenConstants). */
+    const val SPLIT_POSITION_LEFT = 0
+    const val SPLIT_POSITION_RIGHT = 1
 
     /** Half and half. */
     const val SNAP_EVEN = 1
@@ -125,13 +134,26 @@ object SplitThree {
     }
 
     /**
+     * Two running tasks into split screen in one step (WM Shell's `startTasks`): [taskId1] on
+     * [splitPosition] ([SPLIT_POSITION_LEFT] / [SPLIT_POSITION_RIGHT]), [taskId2] on the other side,
+     * divided as [snapPosition] (a SNAP_* value). Both tasks must be running: with one missing,
+     * Android would just open the other full screen, so this refuses instead.
+     */
+    suspend fun startSplitTasks(context: Context, taskId1: Int, taskId2: Int, splitPosition: Int, snapPosition: Int = SNAP_EVEN): Boolean {
+        if (Build.VERSION.SDK_INT < 34 || taskId1 <= 0 || taskId2 <= 0 || taskId1 == taskId2) return false
+        return send(context) {
+            putExtra(EXTRA_SPLIT_TASKS, true)
+            putExtra(EXTRA_TASK_1, taskId1)
+            putExtra(EXTRA_TASK_2, taskId2)
+            putExtra(EXTRA_SPLIT_POSITION, splitPosition)
+            putExtra(EXTRA_SNAP_POSITION, snapPosition)
+        }
+    }
+
+    /**
      * Motorola's native three-app split-select (only while a split is showing): the system shows
      * its picker for the third app. [position] is the place hint (as Moto's gesture manager passes).
      */
-    suspend fun startSplitTasks(context: Context, taskId1: Int, taskId2: Int, snapPosition: Int): Boolean {
-        return send(context) { putExtra(EXTRA_SPLIT_TASKS, true); putExtra("taskId1", taskId1); putExtra("taskId2", taskId2); putExtra("snapPosition", snapPosition) }
-    }
-
     suspend fun selectThird(context: Context, position: Int): Boolean {
         if (Build.VERSION.SDK_INT < 34) return false
         return send(context) { putExtra(EXTRA_SELECT, 2); putExtra(EXTRA_POS, position) }

@@ -18,14 +18,36 @@ import org.arkikeskus.launcher.data.SplitThree
 import java.lang.reflect.Field
 import java.util.concurrent.Executor
 
+/**
+ * The SystemUI half of Folark's native split screen. Android 17's split screen (WM Shell, inside
+ * SystemUI) can tile two or three apps, but nothing on the phone offers that to a launcher, so this
+ * hook lets Folark ask for it:
+ *
+ * - it keeps the live `SplitScreenController` (caught when it starts, or the first time it is used),
+ * - it listens for Folark's requests, accepted only when Android confirms the sender is Folark
+ *   (`getSentFromPackage`, Android 14+), so no other app can start tasks through it,
+ * - it runs each request on WM Shell's own thread: two running tasks into a split ([startSplitTasksNative]),
+ *   a third app into the third place ([attempt]), a divider snap ([snapTo]) or Motorola's own
+ *   split-select ([selectNative]),
+ * - and it tells Folark whether that worked, so Folark can fall back to its other ways.
+ *
+ * Every step is wrapped: if anything is missing or different on another phone, it just answers
+ * "no" and Folark uses the old way.
+ */
 internal object SplitThreeHook {
     private const val CONTROLLER = "com.android.wm.shell.splitscreen.SplitScreenController"
     private const val FOLARK = "org.arkikeskus.launcher"
 
+    /** WM Shell's split positions (SplitScreenConstants): the new app goes on the right / bottom. */
     private const val SPLIT_POSITION_BOTTOM_OR_RIGHT = 1
+
+    /** The third place of a split (0 and 1 are the two halves). */
     private const val THIRD_INDEX = 2
+
     private const val WAIT_STEP_MS = 100L
     private const val WAIT_TRIES = 25
+
+    /** How long the divider takes to glide to its new place (as when dropped by a finger). */
     private const val SNAP_MS = 350
 
     @Volatile private var controller: Any? = null
@@ -85,6 +107,7 @@ internal object SplitThreeHook {
 
     private fun BroadcastReceiver.handle(context: Context, intent: Intent) {
         val request = intent.getStringExtra(SplitThree.EXTRA_REQUEST) ?: return
+        // Only Folark may ask (Android itself vouches for the sender since Android 14).
         if (Build.VERSION.SDK_INT < 34 || sentFromPackage != FOLARK) {
             log("split hook: refused request from ${if (Build.VERSION.SDK_INT >= 34) sentFromPackage else "?"}")
             return
@@ -92,6 +115,7 @@ internal object SplitThreeHook {
         val c = controller ?: return reply(context, request, false)
         val executor = mainExecutor(c) ?: return reply(context, request, false)
 
+        // A layout change for the split showing now (Android's peek view, or half and half).
         val snap = intent.getIntExtra(SplitThree.EXTRA_SNAP, -1)
         if (snap >= 0) {
             executor.execute { snapTo(context, c, request, snap, 0) }
@@ -99,13 +123,15 @@ internal object SplitThreeHook {
         }
 
         if (intent.getBooleanExtra(SplitThree.EXTRA_SPLIT_TASKS, false)) {
-            val t1 = intent.getIntExtra("taskId1", -1)
-            val t2 = intent.getIntExtra("taskId2", -1)
-            val pos = intent.getIntExtra("snapPosition", 1)
-            executor.execute { startSplitTasksNative(context, c, request, t1, t2, pos) }
+            val t1 = intent.getIntExtra(SplitThree.EXTRA_TASK_1, -1)
+            val t2 = intent.getIntExtra(SplitThree.EXTRA_TASK_2, -1)
+            val position = intent.getIntExtra(SplitThree.EXTRA_SPLIT_POSITION, SPLIT_POSITION_BOTTOM_OR_RIGHT)
+            val snapPosition = intent.getIntExtra(SplitThree.EXTRA_SNAP_POSITION, SplitThree.SNAP_EVEN)
+            executor.execute { startSplitTasksNative(context, c, request, t1, t2, position, snapPosition) }
             return
         }
 
+        // Motorola's own split-select (its system app picker), mirroring SplitScreenGestureManager.
         val select = intent.getIntExtra(SplitThree.EXTRA_SELECT, 0)
         if (select > 0) {
             val pos = intent.getIntExtra(SplitThree.EXTRA_POS, 0)
@@ -122,6 +148,7 @@ internal object SplitThreeHook {
         executor.execute { attempt(context, c, request, task, launch, userId, 0) }
     }
 
+    /** On WM Shell's thread: once two apps are in split screen, start the third into the third place. */
     private fun attempt(context: Context, c: Any, request: String, task: Int, launch: PendingIntent?, userId: Int, tries: Int) {
         val visible = runCatching { c.javaClass.getMethod("isSplitScreenVisible").invoke(c) as Boolean }.getOrDefault(false)
         if (!visible) {
@@ -136,12 +163,15 @@ internal object SplitThreeHook {
         }
         val ok = runCatching {
             if (task > 0) {
+                // startTask(int taskId, int position, Bundle options, WindowContainerToken, int index)
                 val m = c.javaClass.methods.first {
                     it.name == "startTask" && it.parameterTypes.size == 5 &&
                         it.parameterTypes[4] == Int::class.javaPrimitiveType
                 }
                 m.invoke(c, task, SPLIT_POSITION_BOTTOM_OR_RIGHT, null, null, THIRD_INDEX)
             } else {
+                // startIntent(PendingIntent, int userId, Intent fillIn, int position, Bundle options,
+                //             WindowContainerToken, int index)
                 val m = c.javaClass.methods.first {
                     it.name == "startIntent" && it.parameterTypes.size == 7 &&
                         it.parameterTypes[0] == PendingIntent::class.java &&
@@ -157,6 +187,12 @@ internal object SplitThreeHook {
         reply(context, request, ok)
     }
 
+    /**
+     * On WM Shell's thread: moves the split's divider to the snap target [snap], exactly where a
+     * finger dragging the divider ends (SplitLayout.snapToTarget), so Android sets up the layout the
+     * same way, peek strip included. Waits for the split to be showing first. Never picks a dismiss
+     * target (the first and last ones), which would close the split instead.
+     */
     private fun snapTo(context: Context, c: Any, request: String, snap: Int, tries: Int) {
         val visible = runCatching { c.javaClass.getMethod("isSplitScreenVisible").invoke(c) as Boolean }.getOrDefault(false)
         if (!visible) {
@@ -197,20 +233,52 @@ internal object SplitThreeHook {
         reply(context, request, ok)
     }
 
-    private fun startSplitTasksNative(context: Context, c: Any, request: String, task1: Int, task2: Int, pos: Int) {
+    /**
+     * On WM Shell's thread: [task1] and [task2] into split screen in one step, [task1] on
+     * [position] (0 left / 1 right) and [task2] on the other side, divided as [snapPosition].
+     * `startTasks(int, Bundle, int, Bundle, int position, int snapPosition, RemoteTransition,
+     * InstanceId)`. Refuses unless both tasks are running: WM Shell opens a lone task full screen
+     * (task 2 = -1) and throws on a task it doesn't know.
+     */
+    private fun startSplitTasksNative(
+        context: Context, c: Any, request: String, task1: Int, task2: Int, position: Int, snapPosition: Int,
+    ) {
         val ok = runCatching {
-            val m = methods(c.javaClass).firstOrNull { it.name == "startTasks" && it.parameterTypes.size >= 6 }
-                ?: error("startTasks not found")
+            if (task1 <= 0 || task2 <= 0 || task1 == task2) error("two different tasks needed ($task1, $task2)")
+            if (!isRunningTask(c, task1) || !isRunningTask(c, task2)) error("a task isn't running ($task1, $task2)")
+            val int = Int::class.javaPrimitiveType
+            val m = methods(c.javaClass).firstOrNull {
+                val p = it.parameterTypes
+                it.name == "startTasks" && p.size == 8 && p[0] == int && p[1] == Bundle::class.java &&
+                    p[2] == int && p[3] == Bundle::class.java && p[4] == int && p[5] == int
+            } ?: error("startTasks(int, Bundle, int, Bundle, int, int, …) not found")
             m.isAccessible = true
-            m.invoke(c, task1, Bundle(), task2, Bundle(), pos, 1, null, null)
+            m.invoke(c, task1, Bundle(), task2, Bundle(), position, snapPosition, null, null)
             true
         }.getOrElse {
-            log("startTasks failed: $it")
+            log("split: startTasks failed: $it")
             false
         }
         reply(context, request, ok)
     }
 
+    /** WM Shell knows [taskId] as a running task (unknown ones make it throw); true when it can't tell. */
+    private fun isRunningTask(c: Any, taskId: Int): Boolean = runCatching {
+        val organizer = field(c, "mTaskOrganizer") ?: return true
+        val get = methods(organizer.javaClass).firstOrNull {
+            it.name == "getRunningTaskInfo" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Int::class.javaPrimitiveType
+        } ?: return true
+        get.isAccessible = true
+        get.invoke(organizer, taskId) != null
+    }.getOrDefault(true)
+
+    /**
+     * On WM Shell's thread: hand off to Motorola's own split-select (its system app picker), exactly
+     * as `SplitScreenGestureManager` does. [mode] 1 = two-app: `startTaskWithSelectRequest(taskId,
+     * options, index, bounds, leftRight)` on the controller; 2 = three-app:
+     * `requestEnterThreeAppsSplitSelectByGesture(position)` on the controller's `mImpl`, only while a
+     * split is showing. Everything is wrapped, so a signature that differs just answers "no".
+     */
     private fun selectNative(context: Context, c: Any, request: String, mode: Int, task: Int, pos: Int) {
         val ok = runCatching {
             if (mode == 2) {
@@ -222,6 +290,7 @@ internal object SplitThreeHook {
                 m.invoke(impl, pos)
             } else {
                 if (task <= 0) error("no task")
+                // startTaskWithSelectRequest(int taskId, Bundle options, int index, Rect bounds, boolean leftRight)
                 val m = methods(c.javaClass).first { it.name == "startTaskWithSelectRequest" && it.parameterTypes.size == 5 }
                 m.isAccessible = true
                 m.invoke(c, task, Bundle(), pos, null, true)
@@ -248,6 +317,7 @@ internal object SplitThreeHook {
         }.start()
     }
 
+    /** WM Shell's main executor: the controller's `mMainExecutor`, or any Executor field it has. */
     private fun mainExecutor(c: Any): Executor? =
         (field(c, "mMainExecutor") as? Executor)
             ?: allFields(c.javaClass).firstOrNull { Executor::class.java.isAssignableFrom(it.type) }

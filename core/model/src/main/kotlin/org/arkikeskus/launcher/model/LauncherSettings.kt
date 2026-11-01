@@ -612,8 +612,10 @@ data class LauncherSettings(
          *  the divider like a finger, which some ROMs handle far more reliably (the module's cold
          *  snap can crash System UI on certain builds). On: the exact native peek strip, where it works. */
         val attachedNative: Boolean = false,
-        /** Which execution flow to use when forming split screen from the picker. */
+        /** How a split screen is formed (drag to an edge, the split picker): one of SPLIT_ENGINE_*. */
         val splitEngine: Int = SPLIT_ENGINE_INTENT_ROUTING,
+        /** How the split picker (the drawer beside a dragged app) looks. */
+        val picker: SplitPickerLook = SplitPickerLook(),
     )
 
     /** Root features (all off unless root is enabled). */
@@ -655,10 +657,16 @@ data class LauncherSettings(
 
 
     companion object {
+        /** Split engines. Automatic: the Vector module's native split when it runs in System UI,
+         *  else WM Shell's commands (with the DUMP grant, or through root). */
         const val SPLIT_ENGINE_INTENT_ROUTING = 1
+        /** WM Shell's split commands only (needs the one-time DUMP grant). */
         const val SPLIT_ENGINE_CLASSIC = 2
+        /** The Vector module's native split only (commands only while the module isn't running). */
         const val SPLIT_ENGINE_LSPOSED = 3
+        /** WM Shell's split commands through root (no DUMP grant needed). */
         const val SPLIT_ENGINE_ROOT = 4
+        val SPLIT_ENGINES = listOf(SPLIT_ENGINE_INTENT_ROUTING, SPLIT_ENGINE_CLASSIC, SPLIT_ENGINE_LSPOSED, SPLIT_ENGINE_ROOT)
 
         const val UNLOCK_STYLE_DISPLAY = "display"
         const val UNLOCK_STYLE_ZOOM = "zoom"

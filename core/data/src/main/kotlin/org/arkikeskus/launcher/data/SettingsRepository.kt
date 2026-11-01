@@ -20,6 +20,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.withLiquidGlass
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.SplitPickerLook
 import javax.inject.Inject
 import java.util.concurrent.atomic.AtomicReferenceArray
 import javax.inject.Singleton
@@ -791,7 +792,22 @@ class SettingsRepository @Inject constructor(
         attachedPeek = (p[Keys.RECENTS_ATTACHED_PEEK] ?: 0.12f)
             .coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK),
         attachedNative = p[Keys.RECENTS_ATTACHED_NATIVE] ?: false,
-        splitEngine = p[Keys.RECENTS_SPLIT_ENGINE] ?: LauncherSettings.SPLIT_ENGINE_INTENT_ROUTING,
+        splitEngine = p[Keys.RECENTS_SPLIT_ENGINE]?.takeIf { it in LauncherSettings.SPLIT_ENGINES }
+            ?: LauncherSettings.SPLIT_ENGINE_INTENT_ROUTING,
+        picker = splitPickerLook(p),
+    )
+
+    private fun splitPickerLook(p: Preferences): SplitPickerLook = SplitPickerLook(
+        columns = (p[Keys.SPLIT_PICKER_COLUMNS] ?: 5).coerceIn(SplitPickerLook.MIN_COLUMNS, SplitPickerLook.MAX_COLUMNS),
+        iconSize = (p[Keys.SPLIT_PICKER_ICON] ?: 46).coerceIn(SplitPickerLook.MIN_ICON, SplitPickerLook.MAX_ICON),
+        labels = p[Keys.SPLIT_PICKER_LABELS] ?: true,
+        folders = p[Keys.SPLIT_PICKER_FOLDERS] ?: true,
+        recents = p[Keys.SPLIT_PICKER_RECENTS]?.takeIf { it in SplitPickerLook.RECENTS_STYLES } ?: SplitPickerLook.RECENTS_ICONS,
+        recentsCount = (p[Keys.SPLIT_PICKER_RECENTS_COUNT] ?: 5).coerceIn(SplitPickerLook.MIN_RECENTS, SplitPickerLook.MAX_RECENTS),
+        sort = p[Keys.SPLIT_PICKER_SORT]?.takeIf { it in SplitPickerLook.SORTS } ?: SplitPickerLook.SORT_NAME,
+        search = p[Keys.SPLIT_PICKER_SEARCH] ?: false,
+        opacity = (p[Keys.SPLIT_PICKER_OPACITY] ?: 0.95f).coerceIn(SplitPickerLook.MIN_OPACITY, SplitPickerLook.MAX_OPACITY),
+        openAnim = p[Keys.SPLIT_PICKER_OPEN_ANIM]?.takeIf { it in SplitPickerLook.OPEN_ANIMS } ?: SplitPickerLook.OPEN_ZOOM,
     )
 
     /** [p] with every Recents look setting the outer screen has its own value for replaced by it. */
@@ -812,6 +828,26 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setRecentsAttachedNative(value: Boolean) = edit { it[Keys.RECENTS_ATTACHED_NATIVE] = value }
     suspend fun setRecentsSplitEngine(value: Int) = edit { it[Keys.RECENTS_SPLIT_ENGINE] = value }
+    suspend fun setSplitPickerColumns(value: Int) = edit {
+        it[Keys.SPLIT_PICKER_COLUMNS] = value.coerceIn(SplitPickerLook.MIN_COLUMNS, SplitPickerLook.MAX_COLUMNS)
+    }
+    suspend fun setSplitPickerIconSize(value: Int) = edit {
+        it[Keys.SPLIT_PICKER_ICON] = value.coerceIn(SplitPickerLook.MIN_ICON, SplitPickerLook.MAX_ICON)
+    }
+    suspend fun setSplitPickerLabels(value: Boolean) = edit { it[Keys.SPLIT_PICKER_LABELS] = value }
+    suspend fun setSplitPickerFolders(value: Boolean) = edit { it[Keys.SPLIT_PICKER_FOLDERS] = value }
+    suspend fun setSplitPickerRecents(value: String) = edit { it[Keys.SPLIT_PICKER_RECENTS] = value }
+    suspend fun setSplitPickerRecentsCount(value: Int) = edit {
+        it[Keys.SPLIT_PICKER_RECENTS_COUNT] = value.coerceIn(SplitPickerLook.MIN_RECENTS, SplitPickerLook.MAX_RECENTS)
+    }
+    suspend fun setSplitPickerSort(value: String) = edit { it[Keys.SPLIT_PICKER_SORT] = value }
+    suspend fun setSplitPickerSearch(value: Boolean) = edit { it[Keys.SPLIT_PICKER_SEARCH] = value }
+    suspend fun setSplitPickerOpenAnim(value: String) = edit {
+        if (value in SplitPickerLook.OPEN_ANIMS) it[Keys.SPLIT_PICKER_OPEN_ANIM] = value
+    }
+    suspend fun setSplitPickerOpacity(value: Float) = edit {
+        it[Keys.SPLIT_PICKER_OPACITY] = value.coerceIn(SplitPickerLook.MIN_OPACITY, SplitPickerLook.MAX_OPACITY)
+    }
     suspend fun setTaskbarHandleHint(value: Boolean) = edit { it[Keys.TASKBAR_HANDLE_HINT] = value }
     suspend fun setTaskbarHandleStyle(value: String) = edit { it[Keys.TASKBAR_HANDLE_STYLE] = value }
     suspend fun setTaskbarHideButton(value: Boolean) = edit { it[Keys.TASKBAR_HIDE_BUTTON] = value }

@@ -75,6 +75,7 @@ import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.SplitPicker
+import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.model.LauncherSettings
@@ -2271,7 +2272,8 @@ internal class AppTaskbar(private val context: Context) {
      * Uses the native FLAG_ACTIVITY_LAUNCH_ADJACENT so WM Shell properly docks both windows.
      */
     private fun openSplitPick(app: AppItem, right: Boolean) {
-        if (!ShellSplit.available(context)) {
+        // The picker needs WM Shell's commands: the DUMP grant, or root (known from an earlier check).
+        if (!ShellSplit.hasDump(context) && RootShell.lastKnown != true) {
             Toast.makeText(context, R.string.taskbar_split_setup_needed, Toast.LENGTH_LONG).show()
             launchApp(app)
             return

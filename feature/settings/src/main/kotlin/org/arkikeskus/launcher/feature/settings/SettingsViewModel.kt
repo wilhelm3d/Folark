@@ -266,6 +266,16 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsAttachedPeek(value: Float) = update { repository.setRecentsAttachedPeek(value) }
     fun setRecentsAttachedNative(value: Boolean) = update { repository.setRecentsAttachedNative(value) }
     fun setRecentsSplitEngine(value: Int) = update { repository.setRecentsSplitEngine(value) }
+    fun setSplitPickerColumns(value: Int) = update { repository.setSplitPickerColumns(value) }
+    fun setSplitPickerIconSize(value: Int) = update { repository.setSplitPickerIconSize(value) }
+    fun setSplitPickerLabels(value: Boolean) = update { repository.setSplitPickerLabels(value) }
+    fun setSplitPickerFolders(value: Boolean) = update { repository.setSplitPickerFolders(value) }
+    fun setSplitPickerRecents(value: String) = update { repository.setSplitPickerRecents(value) }
+    fun setSplitPickerRecentsCount(value: Int) = update { repository.setSplitPickerRecentsCount(value) }
+    fun setSplitPickerSort(value: String) = update { repository.setSplitPickerSort(value) }
+    fun setSplitPickerSearch(value: Boolean) = update { repository.setSplitPickerSearch(value) }
+    fun setSplitPickerOpacity(value: Float) = update { repository.setSplitPickerOpacity(value) }
+    fun setSplitPickerOpenAnim(value: String) = update { repository.setSplitPickerOpenAnim(value) }
     fun setTaskbarHandleHint(value: Boolean) = update { repository.setTaskbarHandleHint(value) }
     fun setTaskbarHandleStyle(value: String) = update { repository.setTaskbarHandleStyle(value) }
     fun setTaskbarHideButton(value: Boolean) = update { repository.setTaskbarHideButton(value) }

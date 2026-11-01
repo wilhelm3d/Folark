@@ -202,7 +202,7 @@ class RecentsViewModel @Inject constructor(
                 delay(160L)
                 withContext(Dispatchers.IO) {
                     if (ShellSplit.splitTasks(context).size < 2) {
-                        ShellSplit.moveToSideFast(context, card.tasks[1].taskId, right = true)
+                        ShellSplit.moveToSide(context, card.tasks[1].taskId, right = true)
                     }
                 }
             }
@@ -308,27 +308,22 @@ class RecentsViewModel @Inject constructor(
         if (picked.size < 2) return
         val tasks = picked.map { it.tasks.first() }
         appScope.launch {
-            // 1. If any task is still stuck in a previous split stage, exit split keeping tasks[0] first!
-            withContext(Dispatchers.IO) {
-                val staged = ShellSplit.allStagedTaskIds(context)
-                if (staged.isNotEmpty()) {
-                    ShellSplit.exitSplit(context, tasks[0].taskId)
-                    delay(120L)
-                }
-            }
+            // 1. A task still in an earlier split can't be moved: close that split (keeping tasks[0]),
+            //    waiting until WM Shell has let the tasks go.
+            withContext(Dispatchers.IO) { ShellSplit.exitSplit(context, tasks[0].taskId) }
             // 2. Bring the first app to the front full-screen
             openSingleTask(tasks[0], picked[0].apps.firstOrNull())
             delay(SPLIT_STEP_MS)
             // 3. Dock the second app into the right split stage
             withContext(Dispatchers.IO) {
-                ShellSplit.moveToSideFast(context, tasks[1].taskId, right = true)
+                ShellSplit.moveToSide(context, tasks[1].taskId, right = true)
             }
             if (picked.size >= 3) {
                 delay(SPLIT_STEP_MS)
                 val tileThird = thirdInSplit && settings.value.launch.threeAppNative
                 val joined = tileThird && withContext(Dispatchers.IO) {
                     (threeApp && SplitThree.ready(context) && SplitThree.addThird(context, taskId = tasks[2].taskId)) || run {
-                        ShellSplit.moveToSideFast(context, tasks[2].taskId, right = true)
+                        ShellSplit.moveToSide(context, tasks[2].taskId, right = true)
                         delay(SPLIT_STEP_MS)
                         ShellSplit.splitTasks(context).any { it.taskId == tasks[2].taskId }
                     }
@@ -406,16 +401,10 @@ class RecentsViewModel @Inject constructor(
         val peekTask = peek.tasks.firstOrNull() ?: return
         val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
         appScope.launch {
-            withContext(Dispatchers.IO) {
-                val staged = ShellSplit.allStagedTaskIds(context)
-                if (staged.isNotEmpty()) {
-                    ShellSplit.exitSplit(context, peekTask.taskId)
-                    delay(120L)
-                }
-            }
+            withContext(Dispatchers.IO) { ShellSplit.exitSplit(context, peekTask.taskId) }
             openSingleTask(peekTask, peek.apps.firstOrNull())
             delay(SPLIT_STEP_MS)
-            val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSideFast(context, mainTask.taskId, right = left) }
+            val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, mainTask.taskId, right = left) }
             if (!moved) return@launch
 
             if (SplitThree.ready(context) &&

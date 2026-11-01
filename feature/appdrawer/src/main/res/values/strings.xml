@@ -55,4 +55,6 @@
     <string name="drawer_private_space_empty">No apps here yet</string>
     <string name="search_section_actions">Actions</string>
     <string name="search_action_no_app">No app on this phone can do that</string>
+    <string name="split_picker_recent">RECENT APPS</string>
+    <string name="split_picker_back">Back</string>
 </resources>
