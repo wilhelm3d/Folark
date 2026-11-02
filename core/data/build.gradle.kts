@@ -15,10 +15,10 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
-// NOTE: when the first real Migration + MigrationTestHelper test is added, register the exported
-// schemas as androidTest assets so the helper can load them. The AGP 9 Kotlin-DSL `sourceSets[...]`
-// accessor throws a ClassCastException, so do it then with the API that works on this AGP, e.g.
-// androidComponents/onVariants or copying schemas into androidTest assets via a Copy task.
+// MigrationTestHelper reads the exported schemas from androidTest assets. The AGP 9 Kotlin-DSL
+// `sourceSets[...]` accessor throws a ClassCastException, so they are kept as copies in
+// src/androidTest/assets/<database>/ instead; SchemaCopiesTest (a JVM unit test) fails when a copy
+// differs from core/data/schemas, so after a version bump copy the new N.json there too.
 
 dependencies {
     implementation(project(":core:model"))

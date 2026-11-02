@@ -28,6 +28,15 @@ data class SplitPickerLook(
     val opacity: Float = 0.95f,
     /** How the picked app opens in the picker's half: one of OPEN_*. */
     val openAnim: String = OPEN_ZOOM,
+    /** A row of the apps you marked as favorites ([favoriteKeys], in the order added). */
+    val favorites: Boolean = true,
+    val favoriteKeys: List<String> = emptyList(),
+    /** A row of the apps the dragged app was last put beside. */
+    val recentPairs: Boolean = true,
+    /** A Peek switch at the top: the pick then opens as Android's peek view (needs the Vector module). */
+    val peekToggle: Boolean = true,
+    /** Long-press an app for "Open as pop-up", "Open full screen" and favorites. */
+    val longPress: Boolean = true,
 ) {
     companion object {
         const val RECENTS_OFF = "off"

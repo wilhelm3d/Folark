@@ -114,33 +114,53 @@ open class AppRepository @Inject constructor(
 
     fun deleteAppPair(id: String) = scope.launch { settingsRepository.deleteAppPair(id) }
 
-    /** Launches both apps of [pair] as a split screen: the first one normally, the second beside it. */
+    /**
+     * Opens the scene [pair]: the first app normally, the second beside it, in the scene's layout
+     * (half and half, a third, two thirds, peek), and the third app as a third pane or floating.
+     * On the cover screen a scene set to "first app only" just opens its first app.
+     */
     fun launchAppPair(pair: AppPair): Result<Unit> {
         val result = source.launchAppPair(pair)
+        if (result.isSuccess && pair.coverMode == AppPair.COVER_FIRST && !Screens.innerShowing(context)) {
+            scope.launch { appUsageRepository.recordLaunches(listOf(pair.app1Key)) }
+            return result
+        }
         if (result.isSuccess) {
             scope.launch {
                 // An earlier split still staged (hidden behind Home) would take the second app in:
                 // close it first. When the pair's first app was part of it (it just came back with
                 // that split), it stays in front.
                 if (ShellSplit.hasDump(context)) withContext(Dispatchers.IO) {
-                    val app1 = pair.app1ComponentName.packageName
-                    val keep = ShellSplit.stagedSplitTasks(context).firstOrNull { it.packageName == app1 }?.taskId ?: -1
-                    ShellSplit.exitSplit(context, keep)
+                    val read = ShellSplit.snapshot(context)
+                    val keep = read?.splitStaged?.firstOrNull { it.isApp(pair.app1ComponentName.packageName) }?.id ?: -1
+                    ShellSplit.exitSplit(context, keep, read = read)
                 }
                 // Every app that opened is counted, in one write at the end.
                 val launched = mutableListOf(pair.app1Key)
                 delay(SPLIT_SECOND_APP_DELAY_MS)
+                val thirdInPane = pair.hasThirdApp && when (pair.thirdMode) {
+                    AppPair.THIRD_PANE -> true
+                    AppPair.THIRD_FLOAT -> false
+                    else -> cachedThreeAppSplit
+                }
                 if (source.launchAppPairSecond(pair).isSuccess) {
                     launched += pair.app2Key
                     settleIntoSplit(pair.app2ComponentName.packageName)
-                    // A peek pair: the second app slides off to peek in from the right edge.
-                    if (pair.peek && !pair.hasThirdApp) source.snapSplit(SplitThree.SNAP_PEEK_RIGHT)
+                    // The scene's layout, for the first app wherever it landed (Vector module). Not
+                    // with a third pane coming: three panes have their own layout.
+                    val layout = pair.effectiveLayout
+                    if (layout != AppPair.LAYOUT_EVEN && !thirdInPane) {
+                        val first = if (ShellSplit.hasDump(context)) withContext(Dispatchers.IO) {
+                            ShellSplit.snapshot(context)?.taskOf(pair.app1ComponentName.packageName)?.id
+                        } else null
+                        source.snapSplit(SplitThree.snapForLayout(layout), forTask = first ?: -1)
+                    }
                 }
                 if (pair.hasThirdApp) {
                     // The third app joins the split as a third pane (Vector module in SystemUI), or
                     // else floats over the pair once the split has settled.
                     delay(SPLIT_THIRD_APP_DELAY_MS)
-                    val inSplit = cachedThreeAppSplit && source.launchAppPairThirdInSplit(pair)
+                    val inSplit = thirdInPane && source.launchAppPairThirdInSplit(pair)
                     if (inSplit || source.launchAppPairThird(pair, floatingWindowSize()).isSuccess) {
                         launched += pair.app3Key
                     }

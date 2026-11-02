@@ -21,6 +21,7 @@ import org.arkikeskus.launcher.model.withLiquidGlass
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SplitPickerLook
+import org.arkikeskus.launcher.model.DropZones
 import javax.inject.Inject
 import java.util.concurrent.atomic.AtomicReferenceArray
 import javax.inject.Singleton
@@ -311,6 +312,11 @@ class SettingsRepository @Inject constructor(
                 enabled = p[Keys.showStatusBar(screenType)] ?: false,
                 hideSystem = p[Keys.hideSystemStatusBar(screenType)] ?: false,
                 scrimOpacity = (p[Keys.statusBarScrimOpacity(screenType)] ?: 0.6f).coerceIn(0f, 1f),
+                systemPadding = p[Keys.SYSTEM_BAR_PADDING] ?: false,
+                systemPaddingInner = (p[Keys.SYSTEM_BAR_PADDING_INNER] ?: 14)
+                    .coerceIn(LauncherSettings.MIN_SYSTEM_PADDING, LauncherSettings.MAX_SYSTEM_PADDING),
+                systemPaddingCover = (p[Keys.SYSTEM_BAR_PADDING_COVER] ?: 10)
+                    .coerceIn(LauncherSettings.MIN_SYSTEM_PADDING, LauncherSettings.MAX_SYSTEM_PADDING),
             ),
             fold = LauncherSettings.Fold(
                 halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
@@ -420,6 +426,8 @@ class SettingsRepository @Inject constructor(
                     LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
                 systemMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
                 pinnedPairs = p[Keys.TASKBAR_PAIRS]?.split("\n")?.filter { it.isNotEmpty() }.orEmpty(),
+                coverBar = p[Keys.TASKBAR_COVER_BAR] ?: false,
+                coverCount = (p[Keys.TASKBAR_COVER_COUNT] ?: 5).coerceIn(LauncherSettings.MIN_COVER_BAR, LauncherSettings.MAX_COVER_BAR),
             ),
             live = LauncherSettings.Live(
                 popupNotifications = p[Keys.POPUP_NOTIFICATIONS] ?: true,
@@ -452,6 +460,7 @@ class SettingsRepository @Inject constructor(
                     .let { if (it in LauncherSettings.FLOATING_SIZES) it else LauncherSettings.FLOATING_SIZE_MEDIUM },
                 threeAppSplit = p[Keys.THREE_APP_SPLIT] ?: true,
                 threeAppNative = p[Keys.THREE_APP_NATIVE] ?: false,
+                aspectRatioMenu = p[Keys.ASPECT_RATIO_MENU] ?: true,
             ),
         )
     }
@@ -495,6 +504,11 @@ class SettingsRepository @Inject constructor(
                 app3ClassName = parts.getOrNull(12).orEmpty(),
                 app3UserSerial = parts.getOrNull(13)?.toLongOrNull() ?: 0L,
                 peek = parts.getOrNull(14) == "1",
+                // Scenes (Settings ▸ Scenes): absent in pairs saved by older versions.
+                layout = parts.getOrNull(15)?.takeIf { it in AppPair.LAYOUTS }
+                    ?: if (parts.getOrNull(14) == "1") AppPair.LAYOUT_PEEK else AppPair.LAYOUT_EVEN,
+                thirdMode = parts.getOrNull(16)?.takeIf { it in AppPair.THIRD_MODES } ?: AppPair.THIRD_AUTO,
+                coverMode = parts.getOrNull(17)?.takeIf { it in AppPair.COVER_MODES } ?: AppPair.COVER_SPLIT,
             )
         } ?: emptyList()
 
@@ -515,7 +529,10 @@ class SettingsRepository @Inject constructor(
                 p.app3Package,
                 p.app3ClassName,
                 p.app3UserSerial.toString(),
-                if (p.peek) "1" else "0",
+                if (p.effectiveLayout == AppPair.LAYOUT_PEEK) "1" else "0",
+                p.effectiveLayout,
+                p.thirdMode,
+                p.coverMode,
             ).joinToString("\t")
         }
 
@@ -795,6 +812,13 @@ class SettingsRepository @Inject constructor(
         splitEngine = p[Keys.RECENTS_SPLIT_ENGINE]?.takeIf { it in LauncherSettings.SPLIT_ENGINES }
             ?: LauncherSettings.SPLIT_ENGINE_INTENT_ROUTING,
         picker = splitPickerLook(p),
+        dropZones = DropZones.ALL.fold(DropZones(haptics = p[Keys.DROP_ZONE_HAPTICS] ?: true)) { z, id ->
+            z.with(id, p[Keys.dropZone(id)] ?: true)
+        },
+        splitUndo = p[Keys.SPLIT_UNDO] ?: true,
+        splitRatioMenu = p[Keys.SPLIT_RATIO_MENU] ?: true,
+        openWith = p[Keys.SPLIT_OPEN_WITH] ?: false,
+        notificationSplit = p[Keys.NOTIFICATION_SPLIT] ?: true,
     )
 
     private fun splitPickerLook(p: Preferences): SplitPickerLook = SplitPickerLook(
@@ -808,7 +832,16 @@ class SettingsRepository @Inject constructor(
         search = p[Keys.SPLIT_PICKER_SEARCH] ?: false,
         opacity = (p[Keys.SPLIT_PICKER_OPACITY] ?: 0.95f).coerceIn(SplitPickerLook.MIN_OPACITY, SplitPickerLook.MAX_OPACITY),
         openAnim = p[Keys.SPLIT_PICKER_OPEN_ANIM]?.takeIf { it in SplitPickerLook.OPEN_ANIMS } ?: SplitPickerLook.OPEN_ZOOM,
+        favorites = p[Keys.SPLIT_PICKER_FAVORITES] ?: true,
+        favoriteKeys = orderedLines(p[Keys.SPLIT_PICKER_FAVORITE_KEYS]),
+        recentPairs = p[Keys.SPLIT_PICKER_RECENT_PAIRS] ?: true,
+        peekToggle = p[Keys.SPLIT_PICKER_PEEK_TOGGLE] ?: true,
+        longPress = p[Keys.SPLIT_PICKER_LONG_PRESS] ?: true,
     )
+
+    /** Like [lines], keeping the order (first added first). */
+    private fun orderedLines(raw: String?): List<String> =
+        raw?.split("\n")?.filter { it.isNotBlank() }?.distinct() ?: emptyList()
 
     /** [p] with every Recents look setting the outer screen has its own value for replaced by it. */
     @Suppress("UNCHECKED_CAST")
@@ -842,6 +875,35 @@ class SettingsRepository @Inject constructor(
     }
     suspend fun setSplitPickerSort(value: String) = edit { it[Keys.SPLIT_PICKER_SORT] = value }
     suspend fun setSplitPickerSearch(value: Boolean) = edit { it[Keys.SPLIT_PICKER_SEARCH] = value }
+    suspend fun setDropZone(zone: String, on: Boolean) = edit { if (zone in DropZones.ALL) it[Keys.dropZone(zone)] = on }
+    suspend fun setDropZoneHaptics(value: Boolean) = edit { it[Keys.DROP_ZONE_HAPTICS] = value }
+    suspend fun setSplitUndo(value: Boolean) = edit { it[Keys.SPLIT_UNDO] = value }
+    suspend fun setSplitRatioMenu(value: Boolean) = edit { it[Keys.SPLIT_RATIO_MENU] = value }
+    suspend fun setSplitOpenWith(value: Boolean) = edit { it[Keys.SPLIT_OPEN_WITH] = value }
+    suspend fun setNotificationSplit(value: Boolean) = edit { it[Keys.NOTIFICATION_SPLIT] = value }
+    suspend fun setSystemBarPadding(value: Boolean) = edit { it[Keys.SYSTEM_BAR_PADDING] = value }
+    suspend fun setSystemBarPaddingInner(value: Int) = edit {
+        it[Keys.SYSTEM_BAR_PADDING_INNER] = value.coerceIn(LauncherSettings.MIN_SYSTEM_PADDING, LauncherSettings.MAX_SYSTEM_PADDING)
+    }
+    suspend fun setSystemBarPaddingCover(value: Int) = edit {
+        it[Keys.SYSTEM_BAR_PADDING_COVER] = value.coerceIn(LauncherSettings.MIN_SYSTEM_PADDING, LauncherSettings.MAX_SYSTEM_PADDING)
+    }
+    suspend fun setTaskbarCoverBar(value: Boolean) = edit { it[Keys.TASKBAR_COVER_BAR] = value }
+    suspend fun setTaskbarCoverCount(value: Int) = edit {
+        it[Keys.TASKBAR_COVER_COUNT] = value.coerceIn(LauncherSettings.MIN_COVER_BAR, LauncherSettings.MAX_COVER_BAR)
+    }
+    suspend fun setAspectRatioMenu(value: Boolean) = edit { it[Keys.ASPECT_RATIO_MENU] = value }
+    suspend fun setSplitPickerFavorites(value: Boolean) = edit { it[Keys.SPLIT_PICKER_FAVORITES] = value }
+    suspend fun setSplitPickerRecentPairs(value: Boolean) = edit { it[Keys.SPLIT_PICKER_RECENT_PAIRS] = value }
+    suspend fun setSplitPickerPeekToggle(value: Boolean) = edit { it[Keys.SPLIT_PICKER_PEEK_TOGGLE] = value }
+    suspend fun setSplitPickerLongPress(value: Boolean) = edit { it[Keys.SPLIT_PICKER_LONG_PRESS] = value }
+
+    /** Adds [appKey] to the split picker's favorites, or takes it out when it is one already. */
+    suspend fun toggleSplitPickerFavorite(appKey: String) = edit {
+        val now = orderedLines(it[Keys.SPLIT_PICKER_FAVORITE_KEYS])
+        it[Keys.SPLIT_PICKER_FAVORITE_KEYS] = (if (appKey in now) now - appKey else now + appKey).joinToString("\n")
+    }
+
     suspend fun setSplitPickerOpenAnim(value: String) = edit {
         if (value in SplitPickerLook.OPEN_ANIMS) it[Keys.SPLIT_PICKER_OPEN_ANIM] = value
     }

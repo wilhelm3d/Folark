@@ -74,9 +74,10 @@ import org.arkikeskus.launcher.data.NotificationBadgeRepository
 import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
-import org.arkikeskus.launcher.data.SplitPicker
-import org.arkikeskus.launcher.data.root.RootShell
+import org.arkikeskus.launcher.data.SplitApp
+import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.DropZones
 import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
@@ -88,6 +89,7 @@ import kotlin.math.abs
 internal interface AppTaskbarEntryPoint {
     fun settingsRepository(): SettingsRepository
     fun appRepository(): AppRepository
+    fun splitCoordinator(): SplitCoordinator
     fun appUsageRepository(): AppUsageRepository
     fun launcherAppsSource(): LauncherAppsSource
     fun notificationBadgeRepository(): NotificationBadgeRepository
@@ -126,6 +128,8 @@ private data class TaskbarSetup(
     val mediaBadge: Boolean,
     val systemDrag: Boolean,
     val edgeSnap: Boolean,
+    /** Which of the six drop zones are on, and the tick on entering one (shared with Recents). */
+    val zones: DropZones = DropZones(),
     val recentsButton: String,
     val runningApps: Boolean,
     val runningDots: Boolean,
@@ -151,6 +155,12 @@ private data class TaskbarSetup(
     /** Saved app pairs / trios pinned on the bar (ids from settings, then the pairs themselves). */
     val pairIds: List<String>,
     val pairs: List<AppPair> = emptyList(),
+    /** The slim bar on the cover screen ([coverCount] apps), and the split menu's divider sizes. */
+    val coverBar: Boolean = false,
+    val coverCount: Int = 5,
+    val ratioMenu: Boolean = true,
+    /** Long-press a live activity's card: "Split" opens it beside the last app. */
+    val notificationSplit: Boolean = true,
 )
 
 /**
@@ -259,6 +269,7 @@ internal class AppTaskbar(private val context: Context) {
     private val iconViews = HashMap<String, View>()
 
     private var repository: AppRepository? = null
+    private var split: SplitCoordinator? = null
     private var source: LauncherAppsSource? = null
     /** Icons of the apps the bar has shown lately; the least recently shown go first when full. */
     private val iconCache = IconCache(ICON_CACHE_SIZE)
@@ -285,6 +296,11 @@ internal class AppTaskbar(private val context: Context) {
         val settingsRepository = entry.settingsRepository()
         val appRepository = entry.appRepository()
         repository = appRepository
+        split = entry.splitCoordinator()
+        // "Undo split" for a few seconds after a split forms (any way: the taskbar, Recents, the picker).
+        scope.launch { split?.undoOffer?.collect { offer -> if (offer != null) showUndo() else hideUndo() } }
+        // "Open with …" for a few seconds after an app you often pair is opened (off by default).
+        scope.launch { split?.suggestion?.collect { offer -> if (offer != null) showSuggestion(offer) else hideSuggestion() } }
         source = entry.launcherAppsSource()
         runCatching {
             context.registerReceiver(
@@ -340,6 +356,7 @@ internal class AppTaskbar(private val context: Context) {
                     mediaBadge = s.taskbar.mediaBadge,
                     systemDrag = s.taskbar.systemDrag,
                     edgeSnap = s.taskbar.edgeSnap,
+                    zones = s.recents.dropZones,
                     // Folark Recents switched off: the button opens Android's again.
                     recentsButton = s.taskbar.recentsButton.let {
                         if (it == LauncherSettings.TASKBAR_RECENTS_FOLARK && !s.recents.enabled) LauncherSettings.TASKBAR_RECENTS_SYSTEM else it
@@ -365,6 +382,10 @@ internal class AppTaskbar(private val context: Context) {
                     nudgeEffect = s.icons.nudgeEffect,
                     nudgeSoftness = s.icons.nudgeSoftness,
                     pairIds = s.taskbar.pinnedPairs,
+                    coverBar = s.taskbar.coverBar,
+                    coverCount = s.taskbar.coverCount,
+                    ratioMenu = s.recents.splitRatioMenu,
+                    notificationSplit = s.recents.notificationSplit,
                 )
             }.combine(appRepository.appPairs) { setup, saved ->
                 setup.copy(pairs = setup.pairIds.mapNotNull { id -> saved.firstOrNull { it.id == id } })
@@ -428,6 +449,8 @@ internal class AppTaskbar(private val context: Context) {
 
     fun stop() {
         TaskbarSpace.set(0)
+        hideUndo()
+        hideSuggestion()
         scope.cancel()
         media.stop()
         handler.removeCallbacksAndMessages(null)
@@ -441,12 +464,48 @@ internal class AppTaskbar(private val context: Context) {
     private fun largeScreen(): Boolean =
         context.resources.configuration.smallestScreenWidthDp >= LARGE_SCREEN_DP
 
+    /**
+     * The setup for the screen in use: the full one on the inner screen; on the cover screen the
+     * slim bar when it is switched on (Settings ▸ Taskbar ▸ Cover screen), else none.
+     */
+    private fun current(): TaskbarSetup? {
+        val s = setup ?: return null
+        if (largeScreen()) return s
+        return if (s.coverBar) s.forCover() else null
+    }
+
+    /**
+     * The cover screen's bar: only apps, at most [TaskbarSetup.coverCount] of them (pinned first,
+     * then recent ones), smaller, never kept open and never on home: a corner swipe brings it up.
+     */
+    private fun TaskbarSetup.forCover(): TaskbarSetup {
+        val pins = pinned.take(coverCount)
+        return copy(
+            pinned = pins,
+            recentCount = (coverCount - pins.size).coerceAtLeast(0),
+            iconSizeDp = iconSizeDp.coerceAtMost(COVER_ICON_DP),
+            spacingDp = spacingDp.coerceAtMost(COVER_SPACING_DP),
+            onHome = false,
+            keepOpen = false,
+            hideButton = false,
+            mediaEnabled = false,
+            liveEnabled = false,
+            pairIds = emptyList(),
+            pairs = emptyList(),
+            splitControls = false,
+            alwaysApps = emptySet(),
+            autoHideApps = emptySet(),
+            miniApps = emptySet(),
+        )
+    }
+
     /** Re-evaluates whether the taskbar belongs on screen, and in which form. */
     fun refresh(rebuild: Boolean = false) {
-        val s = setup
+        // Null on the cover screen unless its slim bar is on (see [current]).
+        val s = current()
         // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
-        ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty() || s.autoHideApps.isNotEmpty() || s.miniApps.isNotEmpty()) && screenOn && largeScreen())
-        val active = s != null && s.enabled && screenOn && largeScreen() && keyguard?.isKeyguardLocked != true &&
+        ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty() || s.autoHideApps.isNotEmpty() || s.miniApps.isNotEmpty()) && screenOn)
+        val active = s != null && s.enabled && screenOn && keyguard?.isKeyguardLocked != true &&
             (s.pinned.isNotEmpty() || s.pairs.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
         if (!active || s == null) {
             expanded = false
@@ -1140,7 +1199,7 @@ internal class AppTaskbar(private val context: Context) {
                         ghostMove(event.rawX, event.rawY, hint)
                         // Edge-snap: the edge the finger is over. Otherwise up-right = split, up-left = float.
                         val next = if (s.edgeSnap) {
-                            edgeAction(event.rawX, event.rawY, up)
+                            edgeAction(event.rawX, event.rawY, up, s.zones)
                         } else when {
                             up < armDistance * 0.6f -> ACTION_NONE
                             dx > armDistance -> ACTION_SPLIT
@@ -1162,6 +1221,13 @@ internal class AppTaskbar(private val context: Context) {
                             }
                         }
                         if (next != action) {
+                            // A tick on entering a drop zone (not on leaving one).
+                            if (next != ACTION_NONE && s.edgeSnap && s.zones.haptics) {
+                                view.performHapticFeedback(
+                                    if (Build.VERSION.SDK_INT >= 34) android.view.HapticFeedbackConstants.SEGMENT_TICK
+                                    else android.view.HapticFeedbackConstants.CLOCK_TICK,
+                                )
+                            }
                             action = next
                             val big = action != ACTION_NONE
                             ghostIcon?.animate()?.scaleX(if (big) 1.2f else 1f)?.scaleY(if (big) 1.2f else 1f)?.setDuration(110)?.start()
@@ -1189,7 +1255,8 @@ internal class AppTaskbar(private val context: Context) {
                         // Top-centre: peek view. Bottom-centre: three-app split (join an open split,
                         // else start a two-app split as the base).
                         ACTION_PEEK -> openSplit(app, peek = true)
-                        ACTION_THREE -> if (splitOpen) addThird(app) else openSplit(app)
+                        // A split showing: the app joins it; none: the picker chooses two more apps.
+                        ACTION_THREE -> if (splitOpen) addThird(app) else openSplitPick(app, right = false, three = true)
                     }
                     if (chosen != ACTION_NONE) {
                         expanded = false
@@ -1293,6 +1360,19 @@ internal class AppTaskbar(private val context: Context) {
                         rows += context.getString(R.string.taskbar_split_even) to {
                             scope.launch { SplitThree.snap(context, SplitThree.SNAP_EVEN) }
                             Unit
+                        }
+                        // Divider sizes: each app two thirds (Settings ▸ Recents ▸ Split screen).
+                        if (s.ratioMenu) {
+                            tasks.forEach { task ->
+                                val label = allApps.firstOrNull { it.packageName == task.packageName }?.label ?: task.packageName
+                                rows += context.getString(R.string.taskbar_split_two_thirds, label) to {
+                                    scope.launch {
+                                        val ok = split?.snapTo(SplitThree.SNAP_TWO_THIRDS, forTask = task.taskId) == true
+                                        if (!ok) Toast.makeText(context, R.string.taskbar_split_no_third, Toast.LENGTH_LONG).show()
+                                    }
+                                    Unit
+                                }
+                            }
                         }
                     }
                     tasks.forEach { task ->
@@ -1688,6 +1768,12 @@ internal class AppTaskbar(private val context: Context) {
         }
         item.actions.take(3).forEach { action ->
             buttons.addView(button(action.title, false) { sendNotificationIntent(context, action.intent) },
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(6) })
+        }
+        // Beside the last app in split screen (Settings ▸ Recents ▸ Split screen).
+        val intent = item.contentIntent
+        if (s.notificationSplit && intent != null && largeScreen()) {
+            buttons.addView(button(context.getString(R.string.taskbar_live_split), false) { openBeside(intent, item.packageName, item.userSerial) },
                 LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(6) })
         }
         buttons.addView(button(org.arkikeskus.launcher.model.LiveActivity.OPEN_LABEL, true) {
@@ -2217,103 +2303,184 @@ internal class AppTaskbar(private val context: Context) {
     }
 
     private fun launchApp(app: AppItem) {
-        repository?.launch(app)
+        if (repository?.launch(app)?.isSuccess == true) split?.opened(app)
     }
 
     // ------------------------------------------------------------------ split screen
 
     /**
-     * Puts [app] in split screen beside the app in front: [app] is opened (it covers the current
-     * app), then Android's split-screen command moves it into the right half, so the app that was
-     * in front fills the left half. On the home screen there is no app to split with, so the most
-     * recent app is opened first. Without the one-time permission (see [ShellSplit]) the app just
-     * opens, with a note on where to set split screen up.
+     * Puts [app] in split screen beside the app in front, on the [right] side (see
+     * [SplitCoordinator.pairWithFront]). On the home screen there is no app to split with, so the
+     * most recent app goes beside it. When no split can be made the app just opens, with a note on
+     * where to set split screen up.
      */
     private fun openSplit(app: AppItem, right: Boolean = setup?.splitSide != LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT, peek: Boolean = false) {
-        if (!ShellSplit.available(context)) {
-            Toast.makeText(context, R.string.taskbar_split_setup_needed, Toast.LENGTH_LONG).show()
-            launchApp(app)
-            return
-        }
+        val coordinator = split ?: return launchApp(app)
         val partner = if (homeVisible) recents.firstOrNull { it.key != app.key } else null
         if (homeVisible && partner == null) {
             launchApp(app)
             return
         }
         scope.launch {
-            if (partner != null) {
-                launchApp(partner)
-                delay(SPLIT_PARTNER_DELAY_MS)
-            }
-            launchApp(app)
-            delay(SPLIT_SETTLE_DELAY_MS)
-            var taskId: Int? = null
-            repeat(SPLIT_FIND_TRIES) {
-                if (taskId == null) {
-                    taskId = withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, app.packageName) }
-                    if (taskId == null) delay(SPLIT_RETRY_MS)
-                }
-            }
-            val id = taskId
-            if (id == null) {
+            if (!coordinator.canSplit()) {
+                Toast.makeText(context, R.string.taskbar_split_setup_needed, Toast.LENGTH_LONG).show()
+                launchApp(app)
                 return@launch
             }
-            withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, id, right = right) }
-            if (peek) {
-                // Narrow the split so the dragged app only peeks in (Android's own peek layout).
-                delay(SPLIT_SETTLE_DELAY_MS)
-                SplitThree.snap(context, if (right) SplitThree.SNAP_PEEK_RIGHT else SplitThree.SNAP_PEEK_LEFT)
-            }
+            if (!coordinator.pairWithFront(app, appOnRight = right, partnerIfHome = partner, peek = peek)) launchApp(app)
         }
     }
 
     /**
-     * Split-select: [app] opens on one side and Folark's picker drawer on the other. 
-     * Uses the native FLAG_ACTIVITY_LAUNCH_ADJACENT so WM Shell properly docks both windows.
+     * Split-select: [app] opens on one side and Folark's picker drawer on the other; [three]: the
+     * picker (full screen) chooses two more apps for a three-app split (see [SplitCoordinator.openPicker]).
      */
-    private fun openSplitPick(app: AppItem, right: Boolean) {
-        // The picker needs WM Shell's commands: the DUMP grant, or root (known from an earlier check).
-        if (!ShellSplit.hasDump(context) && RootShell.lastKnown != true) {
-            Toast.makeText(context, R.string.taskbar_split_setup_needed, Toast.LENGTH_LONG).show()
-            launchApp(app)
-            return
-        }
-        val repo = repository ?: return
+    private fun openSplitPick(app: AppItem, right: Boolean, three: Boolean = false) {
+        val coordinator = split ?: return launchApp(app)
         scope.launch {
-            SplitPicker.openBesideApp(
-                context = context,
-                appRepository = repo,
-                firstApp = app,
-                firstPackage = app.packageName,
-                firstTaskId = null,
-                firstOnRight = right,
-            )
+            if (!coordinator.canSplit()) {
+                Toast.makeText(context, R.string.taskbar_split_setup_needed, Toast.LENGTH_LONG).show()
+                launchApp(app)
+                return@launch
+            }
+            coordinator.openPicker(SplitApp(app), firstOnRight = right, three = three)
         }
     }
 
+    /**
+     * A notification's [intent] (from [packageName], profile [userSerial]) in split screen beside the
+     * last app; opened normally when that can't be done.
+     */
+    private fun openBeside(intent: android.app.PendingIntent, packageName: String, userSerial: Long) {
+        val coordinator = split
+        scope.launch {
+            val userId = runCatching {
+                context.getSystemService(android.os.UserManager::class.java)?.getUserForSerialNumber(userSerial)?.hashCode()
+            }.getOrNull() ?: (Process.myUid() / 100_000)
+            val ok = coordinator != null && coordinator.openBeside(intent, packageName, userId)
+            if (!ok) {
+                Toast.makeText(context, R.string.taskbar_live_split_failed, Toast.LENGTH_SHORT).show()
+                sendNotificationIntent(context, intent)
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ "Open with …"
+
+    private var suggestionWindow: View? = null
+    private val suggestionTimeout = Runnable { split?.dismissSuggestion(passedOver = true) }
+
+    /** "Open with Maps": a pill above the bar; a tap puts the partner beside the app, untouched it goes. */
+    private fun showSuggestion(offer: SplitCoordinator.Suggestion) {
+        hideSuggestion()
+        if (!largeScreen()) return
+        val pill = TextView(context).apply {
+            text = context.getString(R.string.taskbar_open_with, offer.partner.label)
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setPadding(dp(18), dp(10), dp(18), dp(10))
+            elevation = dpf(6f)
+            background = GradientDrawable().apply {
+                cornerRadius = dpf(22f)
+                setColor(Color.argb(235, 28, 32, 38))
+                setStroke(dp(1), Color.argb(60, 255, 255, 255))
+            }
+            contentDescription = text
+            setOnClickListener {
+                performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                handler.removeCallbacks(suggestionTimeout)
+                split?.let { c -> scope.launch { c.acceptSuggestion() } }
+            }
+            alpha = 0f
+            translationY = dpf(12f)
+        }
+        val params = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, systemBottomInset() + dp(UNDO_ABOVE_BAR_DP))
+        if (runCatching { windowManager.addView(pill, params) }.isSuccess) {
+            suggestionWindow = pill
+            pill.animate().alpha(1f).translationY(0f).setDuration(160).start()
+            handler.postDelayed(suggestionTimeout, SUGGEST_MS)
+        }
+    }
+
+    private fun hideSuggestion() {
+        handler.removeCallbacks(suggestionTimeout)
+        val pill = suggestionWindow ?: return
+        suggestionWindow = null
+        runCatching { windowManager.removeView(pill) }
+    }
+
+    // ------------------------------------------------------------------ undo split
+
+    private var undoWindow: View? = null
+    private val undoTimeout = Runnable { split?.dismissUndo() }
+
+    /**
+     * A small "Undo split" pill above the bar: tapping it closes the split that just formed, keeping
+     * the app that was there before. It goes by itself after [UNDO_MS].
+     */
+    private fun showUndo() {
+        hideUndo()
+        if (!largeScreen()) return
+        val pill = TextView(context).apply {
+            text = context.getString(R.string.taskbar_undo_split)
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            setPadding(dp(18), dp(10), dp(18), dp(10))
+            elevation = dpf(6f)
+            background = GradientDrawable().apply {
+                cornerRadius = dpf(22f)
+                setColor(Color.argb(235, 28, 32, 38))
+                setStroke(dp(1), Color.argb(60, 255, 255, 255))
+            }
+            contentDescription = text
+            setOnClickListener {
+                performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                hideUndo()
+                split?.let { c -> scope.launch { c.undo() } }
+            }
+            alpha = 0f
+            translationY = dpf(12f)
+        }
+        val params = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, systemBottomInset() + dp(UNDO_ABOVE_BAR_DP))
+        if (runCatching { windowManager.addView(pill, params) }.isSuccess) {
+            undoWindow = pill
+            pill.animate().alpha(1f).translationY(0f).setDuration(160).start()
+            handler.postDelayed(undoTimeout, UNDO_MS)
+        }
+    }
+
+    private fun hideUndo() {
+        handler.removeCallbacks(undoTimeout)
+        val pill = undoWindow ?: return
+        undoWindow = null
+        runCatching { windowManager.removeView(pill) }
+    }
+
     /** The screen edge the finger is over while dragging (edge-snap): the six Recents-style zones. */
-    private fun edgeAction(rawX: Float, rawY: Float, up: Float): Int {
+    private fun edgeAction(rawX: Float, rawY: Float, up: Float, zones: DropZones): Int {
         if (up < dp(28)) return ACTION_NONE // lift the icon clear of the bar first
         val m = context.resources.displayMetrics
         val w = m.widthPixels.toFloat()
         val h = m.heightPixels.toFloat()
+        val centre = rawX > w * 0.40f && rawX < w * 0.60f
+        // A zone that is off (Settings ▸ Recents ▸ Split screen ▸ Drop zones) leaves its part of the
+        // screen to the next one, or to nothing.
         return when {
             // Centre of the top/bottom edges: peek and three-app split (same zones as Recents).
-            rawY < h * 0.22f && rawX > w * 0.40f && rawX < w * 0.60f -> ACTION_PEEK
-            rawY > h * 0.78f && rawX > w * 0.40f && rawX < w * 0.60f -> ACTION_THREE
-            rawX < w * 0.32f -> ACTION_SPLIT_LEFT
-            rawX > w * 0.68f -> ACTION_SPLIT_RIGHT
-            rawY < h * 0.16f -> ACTION_TOP
-            rawY > h * 0.84f -> ACTION_FLOAT
+            zones.peek && rawY < h * 0.22f && centre -> ACTION_PEEK
+            zones.three && rawY > h * 0.78f && centre -> ACTION_THREE
+            zones.left && rawX < w * 0.32f -> ACTION_SPLIT_LEFT
+            zones.right && rawX > w * 0.68f -> ACTION_SPLIT_RIGHT
+            zones.top && rawY < h * 0.16f -> ACTION_TOP
+            zones.bottom && rawY > h * 0.84f -> ACTION_FLOAT
             else -> ACTION_NONE
         }
     }
 
     /** Adds [app] as the third pane of the two-app split showing now (Android's own three-way split). */
     private fun addThird(app: AppItem) {
-        scope.launch {
-            withContext(Dispatchers.IO) { SplitThree.addThird(context, component = app.componentName, user = app.user) }
-        }
+        val coordinator = split ?: return
+        scope.launch { coordinator.addThird(SplitApp(app), native = true, orSideStage = false) }
     }
 
     // ------------------------------------------------------------------ recent apps
@@ -2326,10 +2493,10 @@ internal class AppTaskbar(private val context: Context) {
     private fun loadRecents(rebuild: Boolean, force: Boolean = true) {
         // A forced rebuild still waiting (its read cancelled by this newer call) is carried over.
         pendingForce = pendingForce || force
-        val s = setup ?: run { refresh(rebuild); return }
+        val s = current() ?: run { refresh(rebuild); return }
         recentsJob?.cancel()
         // Nothing on screen would show recent apps: no usage query.
-        if (!s.enabled || !screenOn || !largeScreen() || (homeVisible && !s.onHome)) {
+        if (!s.enabled || !screenOn || (homeVisible && !s.onHome)) {
             pendingForce = false
             refresh(rebuild)
             return
@@ -2463,15 +2630,19 @@ internal class AppTaskbar(private val context: Context) {
         private const val EXTRA_DRAG_PENDING_INTENT = "android.intent.extra.PENDING_INTENT"
         private const val EXTRA_DISALLOW_HIT_REGION = "DISALLOW_HIT_REGION"
         private const val LARGE_SCREEN_DP = 600
+        /** The cover screen's slim bar: its largest icons and gaps (dp). */
+        private const val COVER_ICON_DP = 44
+        private const val COVER_SPACING_DP = 6
+        /** How long "Open with …" stays. */
+        private const val SUGGEST_MS = 4_000L
+        /** How long "Undo split" stays. */
+        private const val UNDO_MS = 5_000L
+        private const val UNDO_ABOVE_BAR_DP = 84
         private const val AUTO_COLLAPSE_MS = 6_000L
         private const val HANDLE_WIDTH_DP = 64
         private const val HANDLE_HEIGHT_DP = 40
         private const val RECENT_WINDOW_MS = 12L * 60 * 60 * 1000
         private const val USAGE_OVERLAP_MS = 10_000L
-        private const val SPLIT_SETTLE_DELAY_MS = 150L
-        private const val SPLIT_PARTNER_DELAY_MS = 450L
-        private const val SPLIT_FIND_TRIES = 10
-        private const val SPLIT_RETRY_MS = 100L
 
         /** Whether Folark's own home screen (or its app drawer) is in front. */
         @Volatile

@@ -325,6 +325,23 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_cover_bar),
+            subtitle = stringResource(R.string.settings_taskbar_cover_bar_desc),
+            checked = s.taskbar.coverBar,
+            onCheckedChange = viewModel::setTaskbarCoverBar,
+        )
+        if (s.taskbar.coverBar) {
+            ExpressiveStepperRow(
+                title = stringResource(R.string.settings_taskbar_cover_count),
+                value = s.taskbar.coverCount,
+                min = LauncherSettings.MIN_COVER_BAR,
+                max = LauncherSettings.MAX_COVER_BAR,
+                onValueChange = viewModel::setTaskbarCoverCount,
+            )
+        }
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_media),
             subtitle = stringResource(R.string.settings_taskbar_media_desc),
             checked = s.taskbar.mediaEnabled,

@@ -44,6 +44,7 @@ class RecentsHook : IXposedHookLoadPackage {
             if (!lpparam.isFirstApplication || lpparam.processName != SYSTEMUI) return
             UnlockHook.install(loader, ::log)
             SplitThreeHook.install(loader, ::log)
+            StatusBarPaddingHook.install(loader, ::log)
             return
         }
         val helper = find("com.android.quickstep.OverviewCommandHelper", loader)

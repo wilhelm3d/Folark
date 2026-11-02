@@ -235,6 +235,32 @@ private fun AppearanceSectionContent(
         StatusBarIconsRow()
         ExpressiveRowDivider()
 
+        // Android's own status bar (both displays, Vector module): room at its ends.
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_system_bar_padding),
+            subtitle = stringResource(R.string.settings_system_bar_padding_desc),
+            checked = s.statusBar.systemPadding,
+            onCheckedChange = viewModel::setSystemBarPadding,
+            shared = true,
+        )
+        if (s.statusBar.systemPadding) {
+            ExpressiveStepperRow(
+                title = stringResource(R.string.settings_system_bar_padding_inner),
+                value = s.statusBar.systemPaddingInner,
+                min = LauncherSettings.MIN_SYSTEM_PADDING,
+                max = LauncherSettings.MAX_SYSTEM_PADDING,
+                onValueChange = viewModel::setSystemBarPaddingInner,
+            )
+            ExpressiveStepperRow(
+                title = stringResource(R.string.settings_system_bar_padding_cover),
+                value = s.statusBar.systemPaddingCover,
+                min = LauncherSettings.MIN_SYSTEM_PADDING,
+                max = LauncherSettings.MAX_SYSTEM_PADDING,
+                onValueChange = viewModel::setSystemBarPaddingCover,
+            )
+        }
+        ExpressiveRowDivider()
+
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_tonal),
             checked = s.widgets.tonalBackground,

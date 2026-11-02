@@ -35,7 +35,7 @@ private val Context.settingsDataStore by preferencesDataStore(
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
-private val MIGRATION_5_6 = object : Migration(5, 6) {
+internal val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE home_items ADD COLUMN spanX INTEGER NOT NULL DEFAULT 1")
         db.execSQL("ALTER TABLE home_items ADD COLUMN spanY INTEGER NOT NULL DEFAULT 1")
@@ -44,7 +44,7 @@ private val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
-private val MIGRATION_6_7 = object : Migration(6, 7) {
+internal val MIGRATION_6_7 = object : Migration(6, 7) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE home_items ADD COLUMN builtinType TEXT")
     }
@@ -98,17 +98,23 @@ object DataModule {
             // pre-v5 dev versions (1–4, which never shipped a migration) so an old test install resets
             // instead of crashing; v5 onward is migrated, so the user's home layout survives upgrades.
             .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2, 3, 4)
-            .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(*LAUNCHER_DB_MIGRATIONS)
             .build()
 
     @Provides
     fun provideHomeItemDao(database: LauncherDatabase): HomeItemDao = database.homeItemDao()
 }
 
-private val MIGRATION_7_8 = object : Migration(7, 8) {
+internal val MIGRATION_7_8 = object : Migration(7, 8) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE home_items ADD COLUMN screenType TEXT NOT NULL DEFAULT 'OUTER'")
         db.execSQL("DROP INDEX IF EXISTS index_home_items_containerId_page_cellX_cellY")
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_home_items_screenType_containerId_page_cellX_cellY ON home_items (screenType, containerId, page, cellX, cellY)")
     }
 }
+
+/**
+ * Every migration of launcher.db, oldest first: what [DataModule] opens the database with, and what
+ * LauncherDatabaseMigrationTest runs against the exported schemas (core/data/schemas).
+ */
+internal val LAUNCHER_DB_MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)

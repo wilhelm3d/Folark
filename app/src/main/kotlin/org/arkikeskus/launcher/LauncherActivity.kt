@@ -141,10 +141,13 @@ class LauncherActivity : ComponentActivity() {
             }
 
             // Live hinge (Inner display ▸ Fold transition): the hinge sensor is read only while
-            // home is started and that transition is chosen for the inner display.
+            // home is started and that transition is chosen for the inner display. Started, not
+            // resumed: unfolding switches displays (home pauses on the way), and the effect has to
+            // follow the hinge from the first degrees. Battery saver: the plain timed transition
+            // plays instead and the sensor stays off.
             val innerSettingsFlow = remember { settingsRepository.settings(ScreenType.INNER) }
             val innerSettings by innerSettingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
-            val liveHinge = innerSettings.fold.transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available
+            val liveHinge = innerSettings.fold.transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE && hinge.available && !batterySaver
             LifecycleStartEffect(liveHinge) {
                 if (liveHinge) hinge.start()
                 onStopOrDispose { hinge.stop() }

@@ -59,8 +59,8 @@
     <string name="xposed_description">Opens Folark Recents instead of the system launcher\'s Recents (swipe up and hold, the taskbar\'s Recents, the Recents key). Turn it on in Folark: Settings ▸ Recents ▸ Replace Android\'s Recents. In System UI it only tells Folark when the lock screen starts to leave, so the unlock-to-home animation starts in step, and, when Folark asks, adds a third app to a split screen or switches it to Android\'s peek view.</string>
     <string name="recents_menu_split_three">Split 3 apps</string>
     <string name="recents_menu_peek">Peek view</string>
-    <string name="recents_menu_save_pair">Save as app pair</string>
-    <string name="recents_pair_saved">Saved. Add it to home or the taskbar in Settings ▸ App pairs</string>
+    <string name="recents_menu_save_pair">Save as scene</string>
+    <string name="recents_pair_saved">Saved as a scene, with its layout. Add it to home or the taskbar in Settings ▸ Scenes</string>
     <string name="recents_pair_not_saved">Can\'t save: one of these apps isn\'t installed any more</string>
     <string name="recents_mode_two">2 apps</string>
     <string name="recents_mode_three">3 apps</string>
@@ -77,4 +77,5 @@
         <item>com.google.android.apps.nexuslauncher</item>
         <item>com.android.systemui</item>
     </string-array>
+    <string name="split_native_paused">System UI restarted right after a split request, so Folark\'s native split is paused and the split commands are used instead. Settings ▸ Recents ▸ Split screen can turn it back on.</string>
 </resources>

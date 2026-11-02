@@ -352,6 +352,13 @@ fun AppDrawerScreen(
             preferAbove = preferAbove,
             actions = listOfNotNull(
                 PopupAction(stringResource(R.string.app_info), LauncherIcons.Info) { AppActions.openAppInfo(context, app) },
+                if (uiState.aspectRatioMenu && AppActions.canOpenAspectRatio(context, app)) {
+                    PopupAction(stringResource(org.arkikeskus.launcher.ui.R.string.app_aspect_ratio), LauncherIcons.SwapHoriz) {
+                        AppActions.openAspectRatio(context, app)
+                    }
+                } else {
+                    null
+                },
                 PopupAction(stringResource(R.string.rename), LauncherIcons.Edit) { renameTarget = app },
                 // The icon picker lives with the home screen (shared drag controller), like the split picker.
                 PopupAction(stringResource(R.string.change_icon), LauncherIcons.SwapVert) {

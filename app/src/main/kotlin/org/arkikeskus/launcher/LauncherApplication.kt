@@ -52,5 +52,15 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                     runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.RecentsHookState.STATE_URI, null) }
                 }
         }
+        // The module in System UI keeps the status bar margins (Settings ▸ Motorola): tell it when they change.
+        appScope.launch {
+            settingsRepository.settings(ScreenType.INNER)
+                .map { Triple(it.statusBar.systemPadding, it.statusBar.systemPaddingInner, it.statusBar.systemPaddingCover) }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect {
+                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.StatusBarPaddingHook.CHANGED_URI, null) }
+                }
+        }
     }
 }

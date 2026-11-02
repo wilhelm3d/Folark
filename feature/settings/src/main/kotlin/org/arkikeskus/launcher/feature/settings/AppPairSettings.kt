@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -61,6 +63,7 @@ internal fun AppPairsManager(
     BackHandler(onBack = onBack)
     val palette = LocalExpressivePalette.current
     var showCreator by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<AppPair?>(null) }
 
     Surface(modifier = modifier, color = palette.bg) {
         Column(
@@ -103,6 +106,7 @@ internal fun AppPairsManager(
                         onLaunch = { onLaunchAppPair(pair) },
                         onAddToHome = { onAddAppPairToHome(pair) },
                         onDelete = { onDeleteAppPair(pair.id) },
+                        onEdit = { editing = pair },
                         onTaskbar = { onToggleTaskbar(pair) },
                         onTaskbarPinned = pair.id in taskbarPairs,
                     )
@@ -111,14 +115,22 @@ internal fun AppPairsManager(
         }
     }
 
-    if (showCreator) {
+    if (showCreator || editing != null) {
+        val initial = editing
         AppPairCreatorDialog(
             apps = apps,
-            onDismiss = { showCreator = false },
-            onConfirm = { name, app1, app2, app3, peek ->
+            initial = initial,
+            onDismiss = {
+                showCreator = false
+                editing = null
+            },
+            onConfirm = { scene ->
+                val app1 = scene.app1
+                val app2 = scene.app2
+                val app3 = scene.app3
                 val pair = AppPair(
-                    id = UUID.randomUUID().toString(),
-                    name = name,
+                    id = initial?.id ?: UUID.randomUUID().toString(),
+                    name = scene.name,
                     app1Key = app1.key,
                     app1Package = app1.packageName,
                     app1ClassName = app1.className,
@@ -131,14 +143,29 @@ internal fun AppPairsManager(
                     app3Package = app3?.packageName.orEmpty(),
                     app3ClassName = app3?.className.orEmpty(),
                     app3UserSerial = app3?.userSerial ?: 0L,
-                    peek = peek,
+                    peek = scene.layout == AppPair.LAYOUT_PEEK,
+                    layout = scene.layout,
+                    thirdMode = scene.thirdMode,
+                    coverMode = scene.coverMode,
                 )
                 onSaveAppPair(pair)
                 showCreator = false
+                editing = null
             },
         )
     }
 }
+
+/** What the scene dialog hands back. */
+private class SceneDraft(
+    val name: String,
+    val app1: AppItem,
+    val app2: AppItem,
+    val app3: AppItem?,
+    val layout: String,
+    val thirdMode: String,
+    val coverMode: String,
+)
 
 @Composable
 private fun AppPairRow(
@@ -149,6 +176,7 @@ private fun AppPairRow(
     onDelete: () -> Unit,
     onTaskbar: () -> Unit = {},
     onTaskbarPinned: Boolean = false,
+    onEdit: () -> Unit = {},
 ) {
     val palette = LocalExpressivePalette.current
     val context = LocalContext.current
@@ -174,7 +202,8 @@ private fun AppPairRow(
                     Text(pair.name, fontWeight = FontWeight.Bold, color = palette.text)
                     Text(
                         "${app1?.label ?: ""} & ${app2?.label ?: ""}" + (app3?.let { " + ${it.label}" } ?: "") +
-                            (if (pair.peek) " · " + stringResource(R.string.settings_app_pair_peek_short) else ""),
+                            " · " + stringResource(layoutLabel(pair.effectiveLayout)) +
+                            (if (pair.coverMode == AppPair.COVER_FIRST) " · " + stringResource(R.string.settings_scene_cover_first_short) else ""),
                         fontSize = 12.sp,
                         color = palette.faint,
                     )
@@ -186,6 +215,9 @@ private fun AppPairRow(
                     android.widget.Toast.makeText(context, addedMessage, android.widget.Toast.LENGTH_SHORT).show()
                 }) {
                     Text(stringResource(R.string.settings_app_pair_add_home), color = Accent)
+                }
+                TextButton(onClick = onEdit) {
+                    Text(stringResource(R.string.settings_scene_edit), color = Accent)
                 }
                 TextButton(onClick = onTaskbar) {
                     Text(
@@ -201,28 +233,61 @@ private fun AppPairRow(
     }
 }
 
+private fun layoutLabel(layout: String): Int = when (layout) {
+    AppPair.LAYOUT_FIRST_THIRD -> R.string.settings_scene_layout_third
+    AppPair.LAYOUT_FIRST_TWO_THIRDS -> R.string.settings_scene_layout_two_thirds
+    AppPair.LAYOUT_PEEK -> R.string.settings_app_pair_peek_short
+    else -> R.string.settings_scene_layout_even
+}
+
+/** One choice of several, as a row of chips under a title. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SceneChoice(title: String, options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+    val palette = LocalExpressivePalette.current
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, color = palette.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            options.forEach { (key, label) ->
+                androidx.compose.material3.FilterChip(
+                    selected = key == selected,
+                    onClick = { onSelect(key) },
+                    label = { Text(label, fontSize = 12.sp) },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppPairCreatorDialog(
     apps: List<AppItem>,
+    initial: AppPair?,
     onDismiss: () -> Unit,
-    onConfirm: (String, AppItem, AppItem, AppItem?, Boolean) -> Unit,
+    onConfirm: (SceneDraft) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var selectedApp1 by remember { mutableStateOf<AppItem?>(null) }
-    var selectedApp2 by remember { mutableStateOf<AppItem?>(null) }
-    // Optional: a third app that opens in a floating window over the split pair.
-    var selectedApp3 by remember { mutableStateOf<AppItem?>(null) }
+    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
+    var selectedApp1 by remember { mutableStateOf(initial?.let { p -> apps.firstOrNull { it.key == p.app1Key } }) }
+    var selectedApp2 by remember { mutableStateOf(initial?.let { p -> apps.firstOrNull { it.key == p.app2Key } }) }
+    // Optional: a third app, as a third pane or floating over the two.
+    var selectedApp3 by remember { mutableStateOf(initial?.takeIf { it.hasThirdApp }?.let { p -> apps.firstOrNull { it.key == p.app3Key } }) }
     var showApp1Picker by remember { mutableStateOf(false) }
     var showApp2Picker by remember { mutableStateOf(false) }
     var showApp3Picker by remember { mutableStateOf(false) }
-    // Open as Android's peek view (the second app peeking in from the edge) instead of half and half.
-    var peek by remember { mutableStateOf(false) }
+    var layout by remember { mutableStateOf(initial?.effectiveLayout ?: AppPair.LAYOUT_EVEN) }
+    var thirdMode by remember { mutableStateOf(initial?.thirdMode ?: AppPair.THIRD_AUTO) }
+    // New scenes open just their first app on the cover screen; old pairs keep their split there.
+    var coverMode by remember { mutableStateOf(initial?.coverMode ?: AppPair.COVER_FIRST) }
+    val tapToChoose = stringResource(R.string.settings_scene_tap_to_choose)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.settings_create_app_pair)) },
+        title = { Text(stringResource(if (initial == null) R.string.settings_create_app_pair else R.string.settings_scene_edit_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -231,12 +296,12 @@ private fun AppPairCreatorDialog(
                 )
                 ExpressiveActionItem(
                     title = stringResource(R.string.settings_select_app_1),
-                    description = selectedApp1?.label ?: "Tap to choose",
+                    description = selectedApp1?.label ?: tapToChoose,
                     onClick = { showApp1Picker = true },
                 )
                 ExpressiveActionItem(
                     title = stringResource(R.string.settings_select_app_2),
-                    description = selectedApp2?.label ?: "Tap to choose",
+                    description = selectedApp2?.label ?: tapToChoose,
                     onClick = { showApp2Picker = true },
                 )
                 ExpressiveActionItem(
@@ -245,21 +310,69 @@ private fun AppPairCreatorDialog(
                     // Tapping again with an app chosen clears it: the third app is optional.
                     onClick = { if (selectedApp3 != null) selectedApp3 = null else showApp3Picker = true },
                 )
-                if (selectedApp3 == null) {
-                    ExpressiveSwitchRow(
-                        title = stringResource(R.string.settings_app_pair_peek),
-                        subtitle = stringResource(R.string.settings_app_pair_peek_desc),
-                        checked = peek,
-                        onCheckedChange = { peek = it },
+                val app1Label = selectedApp1?.label ?: stringResource(R.string.settings_select_app_1)
+                if (selectedApp3 == null || thirdMode == AppPair.THIRD_FLOAT) {
+                    SceneChoice(
+                        title = stringResource(R.string.settings_scene_layout),
+                        options = listOf(
+                            AppPair.LAYOUT_EVEN to stringResource(R.string.settings_scene_layout_even),
+                            AppPair.LAYOUT_FIRST_THIRD to stringResource(R.string.settings_scene_layout_app_third, app1Label),
+                            AppPair.LAYOUT_FIRST_TWO_THIRDS to stringResource(R.string.settings_scene_layout_app_two_thirds, app1Label),
+                            AppPair.LAYOUT_PEEK to stringResource(R.string.settings_app_pair_peek_short),
+                        ),
+                        selected = layout,
+                        onSelect = { layout = it },
+                    )
+                    if (layout != AppPair.LAYOUT_EVEN) {
+                        Text(
+                            stringResource(R.string.settings_scene_layout_needs_module),
+                            color = LocalExpressivePalette.current.faint,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+                if (selectedApp3 != null) {
+                    SceneChoice(
+                        title = stringResource(R.string.settings_scene_third),
+                        options = listOf(
+                            AppPair.THIRD_AUTO to stringResource(R.string.settings_scene_third_auto),
+                            AppPair.THIRD_PANE to stringResource(R.string.settings_scene_third_pane),
+                            AppPair.THIRD_FLOAT to stringResource(R.string.settings_scene_third_float),
+                        ),
+                        selected = thirdMode,
+                        onSelect = { thirdMode = it },
                     )
                 }
+                SceneChoice(
+                    title = stringResource(R.string.settings_scene_cover),
+                    options = listOf(
+                        AppPair.COVER_SPLIT to stringResource(R.string.settings_scene_cover_split),
+                        AppPair.COVER_FIRST to stringResource(R.string.settings_scene_cover_first, app1Label),
+                    ),
+                    selected = coverMode,
+                    onSelect = { coverMode = it },
+                )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (name.isNotBlank() && selectedApp1 != null && selectedApp2 != null) {
-                        onConfirm(name, selectedApp1!!, selectedApp2!!, selectedApp3, peek && selectedApp3 == null)
+                    val a = selectedApp1
+                    val b = selectedApp2
+                    if (name.isNotBlank() && a != null && b != null) {
+                        val c = selectedApp3
+                        onConfirm(
+                            SceneDraft(
+                                name = name,
+                                app1 = a,
+                                app2 = b,
+                                app3 = c,
+                                // Three panes have Android's own layout.
+                                layout = if (c != null && thirdMode != AppPair.THIRD_FLOAT) AppPair.LAYOUT_EVEN else layout,
+                                thirdMode = thirdMode,
+                                coverMode = coverMode,
+                            ),
+                        )
                     }
                 },
                 enabled = name.isNotBlank() && selectedApp1 != null && selectedApp2 != null,

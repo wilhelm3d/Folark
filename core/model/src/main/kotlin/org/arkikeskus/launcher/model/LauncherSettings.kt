@@ -315,6 +315,11 @@ data class LauncherSettings(
         /** Darkness of the scrim drawn behind the themed status bar (0 = none, 1 = solid black); keeps the
          *  clock/indicators legible over bright wallpapers. Own setting, like [Dock.backgroundOpacity]. */
         val scrimOpacity: Float = 0.6f,
+        /** Android's own status bar (Folark's Vector module in System UI, both displays): at least
+         *  [systemPaddingInner] / [systemPaddingCover] dp of room at its left and right ends. */
+        val systemPadding: Boolean = false,
+        val systemPaddingInner: Int = 14,
+        val systemPaddingCover: Int = 10,
     )
 
     /** Folding: half-open mode, fold/unfold actions and the live hinge. */
@@ -481,6 +486,9 @@ data class LauncherSettings(
         val systemMode: Int = 1,
         /** Saved app pairs (and trios) pinned on Folark's taskbar, by pair id. */
         val pinnedPairs: List<String> = emptyList(),
+        /** A slim bar on the cover screen too: opened from a bottom corner, [coverCount] apps. */
+        val coverBar: Boolean = false,
+        val coverCount: Int = 5,
     )
 
     /** Live activities and notification pop-ups. */
@@ -616,6 +624,16 @@ data class LauncherSettings(
         val splitEngine: Int = SPLIT_ENGINE_INTENT_ROUTING,
         /** How the split picker (the drawer beside a dragged app) looks. */
         val picker: SplitPickerLook = SplitPickerLook(),
+        /** Which drop zones a dragged app has (Recents, the taskbar, the home drop bar). */
+        val dropZones: DropZones = DropZones(),
+        /** An "Undo split" pill on the taskbar for a few seconds after a split forms. */
+        val splitUndo: Boolean = true,
+        /** Divider sizes (⅓, ½, ⅔) in the taskbar's split menu (needs Folark's Vector module). */
+        val splitRatioMenu: Boolean = true,
+        /** "Open with …": opening an app you often pair offers its usual partner for a few seconds. */
+        val openWith: Boolean = false,
+        /** Long-press a notification (Folark's widgets, the taskbar) to open it beside the last app. */
+        val notificationSplit: Boolean = true,
     )
 
     /** Root features (all off unless root is enabled). */
@@ -653,10 +671,17 @@ data class LauncherSettings(
          *  floats instead, because asking SystemUI to start a task into a third pane can crash System
          *  UI on some ROMs. On: the real tiled third pane, where the ROM supports it. */
         val threeAppNative: Boolean = false,
+        /** "Aspect ratio…" in the app menus: Android's own per-app aspect ratio page, where the
+         *  phone has it. */
+        val aspectRatioMenu: Boolean = true,
     )
 
 
     companion object {
+        const val MIN_SYSTEM_PADDING = 0
+        const val MAX_SYSTEM_PADDING = 40
+        const val MIN_COVER_BAR = 3
+        const val MAX_COVER_BAR = 7
         /** Split engines. Automatic: the Vector module's native split when it runs in System UI,
          *  else WM Shell's commands (with the DUMP grant, or through root). */
         const val SPLIT_ENGINE_INTENT_ROUTING = 1

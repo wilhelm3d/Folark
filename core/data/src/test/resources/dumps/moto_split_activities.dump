@@ -1,0 +1,50 @@
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+Display #0 (activities from top to bottom):
+  * Task{2b44497 #16561 name=SplitRoot type=undefined U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=3}
+    * Task{69d0e6d #16562 name=stage_a type=undefined U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=1}
+      * Task{25d56ff #16523 type=standard A=10240:com.google.android.dialer U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=1}
+        * Hist  #0: ActivityRecord{143049305 u0 com.google.android.dialer/.Main t16523}
+    * Task{5e066f0 #16563 name=stage_b type=undefined U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=1}
+      * Task{ffd7910 #16479 type=standard A=10451:com.example.chat U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=2}
+          * Hist  #1: ActivityRecord{91181370 u0 com.example.chat/.Main t16479}
+          * Hist  #0: ActivityRecord{49569535 u0 com.example.chat/.Main t16479}
+          * Hist  #0: ActivityRecord{253107230 u0 com.example.chat/.Main t16479}
+    * Task{d1f35ab #16564 name=stage_c type=undefined U=0 rootTaskId=16561 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+  * Task{399af6d #16566 type=undefined U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Task{e669c33 #16567 type=undefined I=org.arkikeskus.launcher/.LauncherActivity nonResizable U=0 rootTaskId=16566 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Hist  #0: ActivityRecord{126619670 u0 org.arkikeskus.launcher/.Main t16567}
+  * Task{69ecd97 #16565 type=recents I=com.motorola.launcher3/com.android.quickstep.RecentsActivity U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Hist  #0: ActivityRecord{103465265 u0 com.motorola.launcher3/.Main t16565}
+  * Task{f9493e1 #16582 type=standard A=10518:com.example.photos U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Hist  #0: ActivityRecord{169928683 u0 com.example.photos/.Main t16582}
+  * Task{5ad9044 #16574 type=standard A=10443:com.example.game nonResizable minWidth=400 minHeight=300 U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Hist  #0: ActivityRecord{234387158 u0 com.example.game/.Main t16574}
+  * Task{e8cb5ed #16545 type=standard A=10285:com.android.vending U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Hist  #0: ActivityRecord{229725796 u0 com.android.vending/.Main t16545}
+  * Task{4555c22 #16482 type=standard A=10496:com.example.notes U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Hist  #0: ActivityRecord{23478415 u0 com.example.notes/.Main t16482}
+  * Task{f803551 #16506 type=standard A=10247:com.google.android.apps.messaging U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Hist  #0: ActivityRecord{152235995 u0 com.google.android.apps.messaging/.Main t16506}
+  * Task{7284342 #16560 name=Bubbles type=undefined U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=1}
+    * Task{2d02fbe #0 name=Bubbles-visibility-barrier type=undefined U=0 rootTaskId=16560 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+  * Task{f9f8346 #16532 type=standard A=10305:com.google.android.deskclock U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+    * Hist  #0: ActivityRecord{190291336 u0 com.google.android.deskclock/.Main t16532}
+          * DefaultTaskDisplayArea (organized)
+    TaskDisplayArea DefaultTaskDisplayArea
+      * Task{2b44497 #16561 name=SplitRoot type=undefined U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=3}
+        * Task{69d0e6d #16562 name=stage_a type=undefined U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=1}
+          * Task{25d56ff #16523 type=standard A=10240:com.google.android.dialer U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=1}
+        * Task{5e066f0 #16563 name=stage_b type=undefined U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=1}
+          * Task{ffd7910 #16479 type=standard A=10451:com.example.chat U=0 rootTaskId=16561 visible=true visibleRequested=true mode=multi-window translucent=false sz=2}
+        * Task{d1f35ab #16564 name=stage_c type=undefined U=0 rootTaskId=16561 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+      * Task{399af6d #16566 type=undefined U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+        * Task{e669c33 #16567 type=undefined I=org.arkikeskus.launcher/.LauncherActivity nonResizable U=0 rootTaskId=16566 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Task{69ecd97 #16565 type=recents I=com.motorola.launcher3/com.android.quickstep.RecentsActivity U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Task{f9493e1 #16582 type=standard A=10518:com.example.photos U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Task{5ad9044 #16574 type=standard A=10443:com.example.game nonResizable minWidth=400 minHeight=300 U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Task{e8cb5ed #16545 type=standard A=10285:com.android.vending U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Task{4555c22 #16482 type=standard A=10496:com.example.notes U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Task{f803551 #16506 type=standard A=10247:com.google.android.apps.messaging U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}
+      * Task{7284342 #16560 name=Bubbles type=undefined U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=1}
+        * Task{2d02fbe #0 name=Bubbles-visibility-barrier type=undefined U=0 rootTaskId=16560 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}
+      * Task{f9f8346 #16532 type=standard A=10305:com.google.android.deskclock U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}

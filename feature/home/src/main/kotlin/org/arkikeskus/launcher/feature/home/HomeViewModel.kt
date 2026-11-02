@@ -201,6 +201,7 @@ class HomeViewModel @Inject constructor(
     notificationBadgeRepository: NotificationBadgeRepository,
     private val signalMonitor: org.arkikeskus.launcher.launcher.system.SignalMonitor,
     private val iconPackRepository: org.arkikeskus.launcher.data.IconPackRepository,
+    private val splitCoordinator: org.arkikeskus.launcher.data.SplitCoordinator,
 ) : ViewModel() {
 
     /** The current screen layout profile. */
@@ -562,9 +563,9 @@ class HomeViewModel @Inject constructor(
     )
 
     fun launch(appItem: AppItem) {
-        appRepository.launch(appItem).onFailure {
-            Log.w("HomeViewModel", "Failed to launch ${appItem.key}", it)
-        }
+        appRepository.launch(appItem)
+            .onSuccess { splitCoordinator.opened(appItem) } // "Open with …", when switched on
+            .onFailure { Log.w("HomeViewModel", "Failed to launch ${appItem.key}", it) }
     }
 
     /**
@@ -679,6 +680,22 @@ class HomeViewModel @Inject constructor(
     }
 
     /** Opens [first] and [second] side by side as a split screen. */
+    /**
+     * Dropped on a split zone pill: [app] on that side and Folark's split picker in the other half
+     * ([zone] THREE: the picker chooses two more apps). False when no split can be made here.
+     */
+    suspend fun openSplitPicker(app: AppItem, zone: String): Boolean {
+        if (!splitCoordinator.canSplit()) return false
+        viewModelScope.launch {
+            splitCoordinator.openPicker(
+                org.arkikeskus.launcher.data.SplitApp(app),
+                firstOnRight = zone == org.arkikeskus.launcher.model.DropZones.RIGHT,
+                three = zone == org.arkikeskus.launcher.model.DropZones.THREE,
+            )
+        }
+        return true
+    }
+
     fun launchSplit(first: AppItem, second: AppItem) {
         appRepository.launchSplit(first, second).onFailure {
             Log.w("HomeViewModel", "Failed to launch ${first.key} for split screen", it)

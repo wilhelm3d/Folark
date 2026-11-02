@@ -5,6 +5,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.arkikeskus.launcher.data.ModuleTools
+import org.arkikeskus.launcher.data.SplitDiagnostics
+import org.arkikeskus.launcher.data.SplitHistory
+import org.arkikeskus.launcher.data.SplitThree
+import org.arkikeskus.launcher.model.DropZones
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.SplitPickerLook
 import kotlin.math.roundToInt
@@ -86,6 +106,50 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
                 },
             ),
         )
+        SplitGuardRow()
+        ExpressiveRowDivider()
+        SplitCheckRow(s.recents.splitEngine)
+        ExpressiveRowDivider()
+        DropZonesRow(s.recents.dropZones, onToggle = { zone, on -> viewModel.setDropZone(zone, on) })
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drop_zone_haptics),
+            subtitle = stringResource(R.string.settings_drop_zone_haptics_desc),
+            checked = s.recents.dropZones.haptics,
+            onCheckedChange = viewModel::setDropZoneHaptics,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_undo),
+            subtitle = stringResource(R.string.settings_split_undo_desc),
+            checked = s.recents.splitUndo,
+            onCheckedChange = viewModel::setSplitUndo,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_ratio_menu),
+            subtitle = stringResource(R.string.settings_split_ratio_menu_desc),
+            checked = s.recents.splitRatioMenu,
+            onCheckedChange = viewModel::setSplitRatioMenu,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_notification_split),
+            subtitle = stringResource(R.string.settings_notification_split_desc),
+            checked = s.recents.notificationSplit,
+            onCheckedChange = viewModel::setNotificationSplit,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_open_with),
+            subtitle = stringResource(R.string.settings_split_open_with_desc),
+            checked = s.recents.openWith,
+            onCheckedChange = viewModel::setSplitOpenWith,
+        )
+        ExpressiveRowDivider()
+        RestartSystemUiRow()
+        ExpressiveRowDivider()
+        ModuleLogRow()
     }
 
     // While a slider is dragged the preview follows the finger (the saved value catches up after).
@@ -164,6 +228,46 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
             )
         }
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_picker_favorites),
+            subtitle = stringResource(R.string.settings_split_picker_favorites_desc),
+            checked = look.favorites,
+            onCheckedChange = viewModel::setSplitPickerFavorites,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_picker_pairs),
+            subtitle = stringResource(R.string.settings_split_picker_pairs_desc),
+            checked = look.recentPairs,
+            onCheckedChange = viewModel::setSplitPickerRecentPairs,
+        )
+        if (look.recentPairs) {
+            val context = LocalContext.current
+            ExpressiveRowDivider()
+            ExpressiveActionItem(
+                title = stringResource(R.string.settings_split_picker_forget),
+                description = stringResource(R.string.settings_split_picker_forget_desc),
+                onClick = {
+                    SplitHistory.clear(context)
+                    android.widget.Toast.makeText(context, R.string.settings_split_picker_forgotten, android.widget.Toast.LENGTH_SHORT).show()
+                },
+            )
+        }
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_picker_peek_toggle),
+            subtitle = stringResource(R.string.settings_split_picker_peek_toggle_desc),
+            checked = look.peekToggle,
+            onCheckedChange = viewModel::setSplitPickerPeekToggle,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_picker_long_press),
+            subtitle = stringResource(R.string.settings_split_picker_long_press_desc),
+            checked = look.longPress,
+            onCheckedChange = viewModel::setSplitPickerLongPress,
+        )
+        ExpressiveRowDivider()
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_split_picker_sort),
             options = listOf(
@@ -202,6 +306,246 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
                 },
             ),
         )
+    }
+}
+
+/**
+ * Shown while the crash guard has paused the module's split requests (System UI restarted right
+ * after one): what happened, and a way to allow them again.
+ */
+@Composable
+private fun SplitGuardRow() {
+    val context = LocalContext.current
+    var paused by remember { mutableStateOf(SplitThree.pausedInfo(context)) }
+    LifecycleResumeEffect(Unit) {
+        paused = SplitThree.pausedInfo(context)
+        onPauseOrDispose { }
+    }
+    val info = paused ?: return
+    ExpressiveRowDivider()
+    ExpressiveActionItem(
+        title = stringResource(R.string.settings_split_native_paused),
+        description = stringResource(
+            R.string.settings_split_native_paused_desc,
+            java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(info.first)),
+        ),
+        onClick = {
+            SplitThree.resume(context)
+            paused = null
+        },
+    )
+}
+
+/** Restart System UI (root), after the module was installed or updated: asks first. */
+@Composable
+private fun RestartSystemUiRow() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var asking by remember { mutableStateOf(false) }
+    ExpressiveActionItem(
+        title = stringResource(R.string.settings_restart_systemui),
+        description = stringResource(R.string.settings_restart_systemui_desc),
+        onClick = { asking = true },
+    )
+    if (!asking) return
+    AlertDialog(
+        onDismissRequest = { asking = false },
+        title = { Text(stringResource(R.string.settings_restart_systemui)) },
+        text = { Text(stringResource(R.string.settings_restart_systemui_confirm)) },
+        confirmButton = {
+            TextButton(onClick = {
+                asking = false
+                scope.launch {
+                    val ok = withContext(Dispatchers.IO) { ModuleTools.restartSystemUi() }
+                    if (!ok) android.widget.Toast.makeText(context, R.string.settings_restart_systemui_failed, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }) { Text(stringResource(R.string.settings_restart_systemui_go)) }
+        },
+        dismissButton = {
+            TextButton(onClick = { asking = false }) { Text(stringResource(R.string.settings_cancel)) }
+        },
+    )
+}
+
+/** The module's own log lines (root), to see what it did or why a split didn't form. */
+@Composable
+private fun ModuleLogRow() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var text by remember { mutableStateOf<String?>(null) }
+    var running by remember { mutableStateOf(false) }
+    val noRoot = stringResource(R.string.settings_module_log_no_root)
+    val empty = stringResource(R.string.settings_module_log_empty)
+    ExpressiveActionItem(
+        title = stringResource(if (running) R.string.settings_root_working else R.string.settings_module_log),
+        description = stringResource(R.string.settings_module_log_desc),
+        onClick = {
+            if (!running) {
+                running = true
+                scope.launch {
+                    val log = withContext(Dispatchers.IO) { runCatching { ModuleTools.moduleLog() }.getOrNull() }
+                    text = when {
+                        log == null -> noRoot
+                        log.isEmpty() -> empty
+                        else -> log
+                    }
+                    running = false
+                }
+            }
+        },
+    )
+    val shown = text ?: return
+    AlertDialog(
+        onDismissRequest = { text = null },
+        title = { Text(stringResource(R.string.settings_module_log)) },
+        text = {
+            SelectionContainer {
+                Text(
+                    shown,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                context.getSystemService(android.content.ClipboardManager::class.java)
+                    ?.setPrimaryClip(android.content.ClipData.newPlainText("Folark module log", shown))
+            }) { Text(stringResource(R.string.settings_recents_check_copy)) }
+        },
+        dismissButton = {
+            TextButton(onClick = { text = null }) { Text(stringResource(R.string.settings_taskbar_done)) }
+        },
+    )
+}
+
+/** Check split screen: runs [SplitDiagnostics] and shows what each part answered. */
+@Composable
+private fun SplitCheckRow(engine: Int) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var report by remember { mutableStateOf<String?>(null) }
+    var running by remember { mutableStateOf(false) }
+    ExpressiveActionItem(
+        title = stringResource(if (running) R.string.settings_root_working else R.string.settings_split_check),
+        description = stringResource(R.string.settings_split_check_desc),
+        onClick = {
+            if (!running) {
+                running = true
+                scope.launch {
+                    report = withContext(Dispatchers.IO) {
+                        runCatching { SplitDiagnostics.report(context, engine) }
+                            .getOrElse { "Check failed: ${it.javaClass.simpleName}: ${it.message}" }
+                    }
+                    running = false
+                }
+            }
+        },
+    )
+    val text = report ?: return
+    AlertDialog(
+        onDismissRequest = { report = null },
+        title = { Text(stringResource(R.string.settings_split_check)) },
+        text = {
+            SelectionContainer {
+                Text(
+                    text,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                context.getSystemService(android.content.ClipboardManager::class.java)
+                    ?.setPrimaryClip(android.content.ClipData.newPlainText("split check", text))
+            }) { Text(stringResource(R.string.settings_recents_check_copy)) }
+        },
+        dismissButton = {
+            TextButton(onClick = { report = null }) { Text(stringResource(R.string.settings_taskbar_done)) }
+        },
+    )
+}
+
+/**
+ * Drop zones: a small screen showing the six zones where they are (the ones on lit, tap one to
+ * switch it), and the same as labelled chips.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun DropZonesRow(zones: DropZones, onToggle: (String, Boolean) -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(stringResource(R.string.settings_drop_zones), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            stringResource(R.string.settings_drop_zones_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+        androidx.compose.foundation.layout.BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .height(170.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF11161B), Color(0xFF05080A)))),
+        ) {
+            val w = maxWidth
+            val h = maxHeight
+            // Where each zone sits, as fractions of the screen (as Recents and the taskbar test them).
+            @Composable
+            fun zone(id: String, x0: Float, y0: Float, x1: Float, y1: Float, label: Int) {
+                val on = zones.isOn(id)
+                Box(
+                    Modifier
+                        .offset(w * x0, h * y0)
+                        .size(w * (x1 - x0), h * (y1 - y0))
+                        .padding(2.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (on) accent.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.04f))
+                        .border(1.dp, if (on) accent.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                        .clickable { onToggle(id, !on) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(label),
+                        color = Color.White.copy(alpha = if (on) 0.95f else 0.4f),
+                        fontSize = 10.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 2,
+                    )
+                }
+            }
+            zone(DropZones.LEFT, 0f, 0.16f, 0.32f, 0.84f, R.string.settings_drop_zone_left)
+            zone(DropZones.RIGHT, 0.68f, 0.16f, 1f, 0.84f, R.string.settings_drop_zone_right)
+            zone(DropZones.TOP, 0f, 0f, 1f, 0.16f, R.string.settings_drop_zone_top)
+            zone(DropZones.BOTTOM, 0f, 0.84f, 1f, 1f, R.string.settings_drop_zone_bottom)
+            zone(DropZones.PEEK, 0.38f, 0f, 0.62f, 0.22f, R.string.settings_drop_zone_peek)
+            zone(DropZones.THREE, 0.38f, 0.78f, 0.62f, 1f, R.string.settings_drop_zone_three)
+        }
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            listOf(
+                DropZones.LEFT to R.string.settings_drop_zone_left,
+                DropZones.RIGHT to R.string.settings_drop_zone_right,
+                DropZones.TOP to R.string.settings_drop_zone_top,
+                DropZones.BOTTOM to R.string.settings_drop_zone_bottom,
+                DropZones.PEEK to R.string.settings_drop_zone_peek,
+                DropZones.THREE to R.string.settings_drop_zone_three,
+            ).forEach { (id, label) ->
+                val on = zones.isOn(id)
+                androidx.compose.material3.FilterChip(
+                    selected = on,
+                    onClick = { onToggle(id, !on) },
+                    label = { Text(stringResource(label)) },
+                )
+            }
+        }
     }
 }
 
@@ -299,6 +643,12 @@ private fun PickerMock(look: SplitPickerLook, accent: Color, modifier: Modifier)
         ) {
             if (look.search) {
                 Box(Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f)))
+            }
+            // Favorites (your marked apps) and Paired before, as small rows of icons.
+            listOf(look.favorites to 0, look.recentPairs to 4).filter { it.first }.forEach { (_, from) ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally)) {
+                    repeat(3) { i -> Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(mockColor(from + i))) }
+                }
             }
             if (look.recents != SplitPickerLook.RECENTS_OFF) {
                 val previews = look.recents == SplitPickerLook.RECENTS_PREVIEWS

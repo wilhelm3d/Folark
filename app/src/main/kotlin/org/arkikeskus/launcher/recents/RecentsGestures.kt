@@ -173,10 +173,14 @@ internal fun RecentsEnv.cardModifier(
                         } else if (dragging) {
                             val before = drag.target
                             val beforeMode = drag.mode
+                            val beforeEdge = drag.edge
                             drag.move(d)
                             // A tick on reaching a card, and again on moving between its two halves.
                             if (drag.target != null && (drag.target != before || drag.mode != beforeMode)) {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            } else if (drag.target == null && drag.edge != EDGE_NONE && drag.edge != beforeEdge && drag.zones.haptics) {
+                                // …and on entering a drop zone at the screen's edge.
+                                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                             }
                         }
                         if (dragging) change.consume()

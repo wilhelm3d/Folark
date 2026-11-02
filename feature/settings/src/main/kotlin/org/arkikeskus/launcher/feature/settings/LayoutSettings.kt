@@ -247,6 +247,14 @@ internal fun DisplayProfilesSection(
         )
         ExpressiveRowDivider()
 
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_aspect_ratio_menu),
+            subtitle = stringResource(R.string.settings_aspect_ratio_menu_desc),
+            checked = s.launch.aspectRatioMenu,
+            onCheckedChange = viewModel::setAspectRatioMenu,
+        )
+        ExpressiveRowDivider()
+
         FloatingSizeRow(s = s, viewModel = viewModel)
         MotoPopupGestureRow()
     }

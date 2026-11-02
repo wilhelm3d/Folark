@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -40,7 +41,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
+import org.arkikeskus.launcher.data.SettingsRepository
+import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.data.StatusNotification
+import org.arkikeskus.launcher.model.ScreenType
+import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalScreenType
@@ -49,8 +54,31 @@ import javax.inject.Inject
 @HiltViewModel
 class InteractiveNotificationWidgetViewModel @Inject constructor(
     private val badgeRepository: NotificationBadgeRepository,
-    appRepository: AppRepository,
+    private val appRepository: AppRepository,
+    private val splitCoordinator: SplitCoordinator,
+    settingsRepository: SettingsRepository,
 ) : ViewModel() {
+
+    /** A long press offers "Open in split screen" (Settings ▸ Recents ▸ Split screen). */
+    val splitOn = settingsRepository.settings(ScreenType.INNER).map { it.recents.notificationSplit }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /**
+     * Opens [notification] beside the app used last, in split screen; when that can't be done it
+     * opens on its own, as a tap would.
+     */
+    fun openInSplit(notification: StatusNotification, context: Context) {
+        val intent = notification.contentIntent ?: return invokeAction(null, notification.packageName, context)
+        viewModelScope.launch {
+            val userId = runCatching {
+                context.getSystemService(android.os.UserManager::class.java)?.getUserForSerialNumber(notification.userSerial)?.hashCode()
+            }.getOrNull() ?: (android.os.Process.myUid() / 100_000)
+            if (!splitCoordinator.openBeside(intent, notification.packageName, userId)) {
+                android.widget.Toast.makeText(context, R.string.notification_open_split_failed, android.widget.Toast.LENGTH_SHORT).show()
+                invokeAction(intent, notification.packageName, context)
+            }
+        }
+    }
 
     val allNotifications = badgeRepository.allNotifications
     val pinnedKeys = badgeRepository.pinnedKeys
@@ -108,6 +136,7 @@ fun InteractiveNotificationWidget(
     val notifications by viewModel.allNotifications.collectAsStateWithLifecycle()
     val pinnedKeys by viewModel.pinnedKeys.collectAsStateWithLifecycle()
     val appsByPackage by viewModel.appsByPackage.collectAsStateWithLifecycle()
+    val splitOn by viewModel.splitOn.collectAsStateWithLifecycle()
 
     val grouped = remember(notifications) {
         notifications.groupBy { it.packageName }
@@ -191,7 +220,12 @@ fun InteractiveNotificationWidget(
                                 onCancel = { viewModel.cancelNotification(notif.key) },
                                 onTogglePin = { viewModel.togglePin(notif.key) },
                                 onActionClick = { viewModel.invokeAction(it, notif.packageName, context) },
-                                onContentClick = { viewModel.invokeAction(notif.contentIntent, notif.packageName, context) }
+                                onContentClick = { viewModel.invokeAction(notif.contentIntent, notif.packageName, context) },
+                                onOpenInSplit = if (splitOn && notif.contentIntent != null) {
+                                    { viewModel.openInSplit(notif, context) }
+                                } else {
+                                    null
+                                },
                             )
                         }
                     }
@@ -201,7 +235,7 @@ fun InteractiveNotificationWidget(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun InteractiveNotificationItem(
     notification: StatusNotification,
@@ -209,8 +243,11 @@ fun InteractiveNotificationItem(
     onCancel: () -> Unit,
     onTogglePin: () -> Unit,
     onActionClick: (PendingIntent?) -> Unit,
-    onContentClick: () -> Unit
+    onContentClick: () -> Unit,
+    /** A long press offers to open it in split screen (null: no long press). */
+    onOpenInSplit: (() -> Unit)? = null,
 ) {
+    var menu by remember { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
@@ -271,9 +308,21 @@ fun InteractiveNotificationItem(
                 .fillMaxWidth()
                 .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
                 .border(0.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                .clickable { onContentClick() }
+                .combinedClickable(
+                    onClick = { onContentClick() },
+                    onLongClick = onOpenInSplit?.let { { menu = true } },
+                )
                 .padding(12.dp)
         ) {
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.notification_open_split)) },
+                    onClick = {
+                        menu = false
+                        onOpenInSplit?.invoke()
+                    },
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val iconBitmap = rememberNotifSmallIcon(notification, 24.dp)
                 if (iconBitmap != null) {

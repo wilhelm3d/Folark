@@ -441,14 +441,14 @@ class LauncherAppsSource @Inject constructor(
      * appear): call it off the main thread. False when the task wasn't found or the command refused.
      */
     fun moveIntoSplit(packageName: String): Boolean {
-        var taskId: Int? = null
-        for (attempt in 0 until SPLIT_FIND_TRIES) {
-            taskId = ShellSplit.taskIdOf(context, packageName)
-            if (taskId != null) break
+        repeat(SPLIT_FIND_TRIES) {
+            // One read per try: it finds the task and is what the move is checked against.
+            val read = ShellSplit.snapshot(context)
+            val id = read?.taskOf(packageName)?.id
+            if (read != null && id != null) return ShellSplit.moveToSide(context, id, right = true, read = read)
             Thread.sleep(SPLIT_RETRY_MS)
         }
-        val id = taskId ?: return false
-        return ShellSplit.moveToSide(context, id, right = true)
+        return false
     }
 
     /**
@@ -460,7 +460,7 @@ class LauncherAppsSource @Inject constructor(
             SplitThree.addThird(context, component = pair.app3ComponentName, user = userForSerial(pair.app3UserSerial))
 
     /** Switches the split showing now to Android's layout [snap] (see [SplitThree.snap]). */
-    suspend fun snapSplit(snap: Int): Boolean = SplitThree.ready(context) && SplitThree.snap(context, snap)
+    suspend fun snapSplit(snap: Int, forTask: Int = -1): Boolean = SplitThree.ready(context) && SplitThree.snap(context, snap, forTask)
 
     /** Opens the optional third app of [pair] in a floating window over the split pair. */
     fun launchAppPairThird(pair: AppPair, size: String): Result<Unit> = runCatching {

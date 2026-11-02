@@ -61,6 +61,8 @@ data class AppDrawerUiState(
     val desktopLocked: Boolean = false,
     /** Multi-window settings: which of the floating / split entries the long-press menu offers. */
     val floatingLaunchEnabled: Boolean = true,
+    /** "Aspect ratio…" in the app menu (where the phone has Android's page). */
+    val aspectRatioMenu: Boolean = true,
     val splitLaunchEnabled: Boolean = true,
     /** The display's icon-size multiplier (Settings ▸ Grid). */
     val iconSizeScale: Float = 1f,
@@ -120,6 +122,7 @@ class AppDrawerViewModel @Inject constructor(
     notificationBadgeRepository: NotificationBadgeRepository,
     private val searchAggregator: SearchAggregator,
     private val appUsageRepository: org.arkikeskus.launcher.data.AppUsageRepository,
+    private val splitCoordinator: org.arkikeskus.launcher.data.SplitCoordinator,
 ) : ViewModel() {
 
     private val _screenType = MutableStateFlow(ScreenType.OUTER)
@@ -193,6 +196,7 @@ class AppDrawerViewModel @Inject constructor(
             iconShape = settings.icons.shape,
             desktopLocked = settings.home.desktopLocked,
             floatingLaunchEnabled = settings.launch.floatingEnabled,
+            aspectRatioMenu = settings.launch.aspectRatioMenu,
             splitLaunchEnabled = settings.launch.splitEnabled,
             iconSizeScale = settings.icons.sizeScale,
             folderTabsEnabled = settings.drawer.folderTabs,
@@ -316,6 +320,7 @@ class AppDrawerViewModel @Inject constructor(
     /** Launches [appItem]; returns whether it started, so the drawer only closes on success. */
     fun onAppClick(appItem: AppItem): Boolean =
         appRepository.launch(appItem)
+            .onSuccess { splitCoordinator.opened(appItem) } // "Open with …", when switched on
             .onFailure { Log.w("AppDrawerViewModel", "Failed to launch ${appItem.key}", it) }
             .isSuccess
 

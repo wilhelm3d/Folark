@@ -27,13 +27,15 @@ import org.arkikeskus.launcher.data.OpenTask
 import org.arkikeskus.launcher.data.OpenTasks
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ShellSplit
-import org.arkikeskus.launcher.data.SplitPicker
+import org.arkikeskus.launcher.data.SplitApp
+import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.data.SplitThree
 import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.data.root.RootTasks
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 
@@ -68,6 +70,7 @@ class RecentsViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val settingsRepository: SettingsRepository,
     @ApplicationScope private val appScope: CoroutineScope,
+    private val splitCoordinator: SplitCoordinator,
 ) : ViewModel() {
 
     val settings: StateFlow<LauncherSettings> = settingsRepository.settings(ScreenType.INNER)
@@ -197,20 +200,24 @@ class RecentsViewModel @Inject constructor(
     /** Brings [card] back to the front, as it was (a split comes back as a split). */
     fun open(card: RecentsCard) {
         if (card.isSplit && card.tasks.size >= 2) {
-            appScope.launch {
-                openSingleTask(card.tasks[0], card.apps.getOrNull(0))
-                delay(160L)
-                withContext(Dispatchers.IO) {
-                    if (ShellSplit.splitTasks(context).size < 2) {
-                        ShellSplit.moveToSide(context, card.tasks[1].taskId, right = true)
-                    }
-                }
-            }
+            appScope.launch { openNow(card) }
             return
         }
         val task = card.tasks.first()
         openSingleTask(task, card.apps.firstOrNull())
     }
+
+    /** [open], waiting until the card is in front (a split: until it is a split again). */
+    private suspend fun openNow(card: RecentsCard) {
+        if (card.isSplit && card.tasks.size >= 2) {
+            if (!splitCoordinator.restore(card.splitApp(0), card.splitApp(1))) openSingleTask(card.tasks[0], card.apps.getOrNull(0))
+        } else {
+            openSingleTask(card.tasks.first(), card.apps.firstOrNull())
+            delay(SPLIT_STEP_MS)
+        }
+    }
+
+    private fun RecentsCard.splitApp(i: Int) = SplitApp(tasks[i].packageName, apps.getOrNull(i), tasks[i].taskId)
 
     fun close(card: RecentsCard) {
         _state.value = _state.value.copy(cards = _state.value.cards - card)
@@ -235,21 +242,33 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Saves the split [card] as a scene: its apps in order, and (with the Vector module) where the
+     * divider is now, so the scene opens the same way.
+     */
     fun saveAsPair(card: RecentsCard): Boolean {
         val apps = card.apps
         if (apps.size !in 2..3 || apps.any { it == null }) return false
         val (a, b) = apps.requireNoNulls()
         val c = apps.getOrNull(2)
-        appRepository.saveAppPair(
-            org.arkikeskus.launcher.model.AppPair(
-                id = java.util.UUID.randomUUID().toString(),
-                name = apps.joinToString(" + ") { it!!.label },
-                app1Key = a.key, app1Package = a.packageName, app1ClassName = a.className, app1UserSerial = a.userSerial,
-                app2Key = b.key, app2Package = b.packageName, app2ClassName = b.className, app2UserSerial = b.userSerial,
-                app3Key = c?.key.orEmpty(), app3Package = c?.packageName.orEmpty(),
-                app3ClassName = c?.className.orEmpty(), app3UserSerial = c?.userSerial ?: 0L,
-            ),
-        )
+        val firstTask = card.tasks.firstOrNull()?.taskId ?: -1
+        appScope.launch {
+            val layout = if (c == null) SplitThree.layoutForSnap(SplitThree.currentSnap(context, firstTask)) else AppPair.LAYOUT_EVEN
+            appRepository.saveAppPair(
+                AppPair(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = apps.joinToString(" + ") { it!!.label },
+                    app1Key = a.key, app1Package = a.packageName, app1ClassName = a.className, app1UserSerial = a.userSerial,
+                    app2Key = b.key, app2Package = b.packageName, app2ClassName = b.className, app2UserSerial = b.userSerial,
+                    app3Key = c?.key.orEmpty(), app3Package = c?.packageName.orEmpty(),
+                    app3ClassName = c?.className.orEmpty(), app3UserSerial = c?.userSerial ?: 0L,
+                    peek = layout == AppPair.LAYOUT_PEEK,
+                    layout = layout,
+                    // A trio saved from a three-pane split opens as one again.
+                    thirdMode = if (c != null && card.tasks.size >= 3) AppPair.THIRD_PANE else AppPair.THIRD_AUTO,
+                ),
+            )
+        }
         return true
     }
 
@@ -297,37 +316,25 @@ class RecentsViewModel @Inject constructor(
 
     fun unsplit(card: RecentsCard) {
         val keep = card.tasks.first().taskId
-        appScope.launch(Dispatchers.IO) { ShellSplit.exitSplit(context, keep) }
+        appScope.launch { splitCoordinator.exit(keep) }
     }
 
     /**
-     * Split view: clears any stale split stage first so WMShell never rejects a previously staged
-     * task with "App does not support split screen", brings [picked][0] to the front, and docks [picked][1].
+     * Split view: [picked][0] left and [picked][1] right as one split (any older split is closed
+     * first, see [SplitCoordinator.pair]); a third joins as a third pane ([thirdInSplit] with
+     * Android's three-way split through the module when [threeApp]) or else floats, and a fourth floats.
      */
     fun openTogether(picked: List<RecentsCard>, thirdInSplit: Boolean, threeApp: Boolean = false) {
         if (picked.size < 2) return
-        val tasks = picked.map { it.tasks.first() }
         appScope.launch {
-            // 1. A task still in an earlier split can't be moved: close that split (keeping tasks[0]),
-            //    waiting until WM Shell has let the tasks go.
-            withContext(Dispatchers.IO) { ShellSplit.exitSplit(context, tasks[0].taskId) }
-            // 2. Bring the first app to the front full-screen
-            openSingleTask(tasks[0], picked[0].apps.firstOrNull())
-            delay(SPLIT_STEP_MS)
-            // 3. Dock the second app into the right split stage
-            withContext(Dispatchers.IO) {
-                ShellSplit.moveToSide(context, tasks[1].taskId, right = true)
+            val formed = splitCoordinator.pair(first = picked[1].splitApp(0), second = picked[0].splitApp(0), firstOnRight = true)
+            if (!formed) {
+                openSingleTask(picked[0].tasks.first(), picked[0].apps.firstOrNull())
+                return@launch
             }
             if (picked.size >= 3) {
-                delay(SPLIT_STEP_MS)
                 val tileThird = thirdInSplit && settings.value.launch.threeAppNative
-                val joined = tileThird && withContext(Dispatchers.IO) {
-                    (threeApp && SplitThree.ready(context) && SplitThree.addThird(context, taskId = tasks[2].taskId)) || run {
-                        ShellSplit.moveToSide(context, tasks[2].taskId, right = true)
-                        delay(SPLIT_STEP_MS)
-                        ShellSplit.splitTasks(context).any { it.taskId == tasks[2].taskId }
-                    }
-                }
+                val joined = tileThird && splitCoordinator.addThird(picked[2].splitApp(0), native = threeApp)
                 if (!joined) popUp(picked[2])
             }
             if (picked.size >= 4) {
@@ -338,13 +345,11 @@ class RecentsViewModel @Inject constructor(
     }
 
     fun addThird(pair: RecentsCard, third: RecentsCard) {
-        val task = third.tasks.firstOrNull() ?: return
+        if (third.tasks.isEmpty()) return
         appScope.launch {
-            open(pair)
-            delay(SPLIT_STEP_MS)
-            val joined = settings.value.launch.threeAppNative && withContext(Dispatchers.IO) {
-                SplitThree.ready(context) && SplitThree.addThird(context, taskId = task.taskId)
-            }
+            openNow(pair)
+            val joined = settings.value.launch.threeAppNative &&
+                splitCoordinator.addThird(third.splitApp(0), native = true, orSideStage = false)
             if (!joined) popUp(third)
         }
     }
@@ -369,19 +374,12 @@ class RecentsViewModel @Inject constructor(
             EDGE_TOP -> open(card)
             EDGE_BOTTOM -> popUp(card)
             EDGE_LEFT, EDGE_RIGHT -> {
-                val task = card.tasks.firstOrNull() ?: return
-                val right = edge == EDGE_RIGHT
-                val firstApp = card.apps.firstOrNull()
-                appScope.launch {
-                    SplitPicker.openBesideApp(
-                        context = context,
-                        appRepository = appRepository,
-                        firstApp = firstApp,
-                        firstPackage = task.packageName,
-                        firstTaskId = task.taskId,
-                        firstOnRight = right,
-                    )
-                }
+                if (card.tasks.isEmpty()) return
+                appScope.launch { splitCoordinator.openPicker(card.splitApp(0), firstOnRight = edge == EDGE_RIGHT) }
+            }
+            EDGE_THREE -> {
+                if (card.tasks.isEmpty()) return
+                appScope.launch { splitCoordinator.openPicker(card.splitApp(0), firstOnRight = false, three = true) }
             }
         }
     }
@@ -401,15 +399,14 @@ class RecentsViewModel @Inject constructor(
         val peekTask = peek.tasks.firstOrNull() ?: return
         val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
         appScope.launch {
-            withContext(Dispatchers.IO) { ShellSplit.exitSplit(context, peekTask.taskId) }
-            openSingleTask(peekTask, peek.apps.firstOrNull())
-            delay(SPLIT_STEP_MS)
-            val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, mainTask.taskId, right = left) }
-            if (!moved) return@launch
-
-            if (SplitThree.ready(context) &&
-                SplitThree.snap(context, if (left) SplitThree.SNAP_PEEK_LEFT else SplitThree.SNAP_PEEK_RIGHT)
-            ) return@launch
+            // The peeking app on its side, the main app on the other.
+            val formed = splitCoordinator.pair(
+                first = SplitApp(peekTask.packageName, peek.apps.firstOrNull(), peekTask.taskId),
+                second = SplitApp(mainTask.packageName, main.apps.firstOrNull(), mainTask.taskId),
+                firstOnRight = !left,
+            )
+            if (!formed) return@launch
+            if (splitCoordinator.snapPeek(peekOnLeft = left)) return@launch
 
             delay(ATTACH_SETTLE_MS)
             val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
@@ -424,16 +421,14 @@ class RecentsViewModel @Inject constructor(
         val task = card.tasks.firstOrNull()?.taskId ?: return
         val index = if (settings.value.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_RIGHT) 1 else 0
         appScope.launch {
-            open(card)
-            delay(SPLIT_STEP_MS)
+            openNow(card)
             SplitThree.splitSelect(context, task, index)
         }
     }
 
     fun nativeThreeAppSelect(card: RecentsCard) {
         appScope.launch {
-            open(card)
-            delay(SPLIT_STEP_MS)
+            openNow(card)
             SplitThree.selectThird(context, 3)
         }
     }
@@ -441,10 +436,8 @@ class RecentsViewModel @Inject constructor(
     fun peekSplit(card: RecentsCard, side: String, screen: android.graphics.Rect, peekFraction: Float) {
         val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
         appScope.launch {
-            open(card)
-            if (SplitThree.ready(context) &&
-                SplitThree.snap(context, if (left) SplitThree.SNAP_PEEK_LEFT else SplitThree.SNAP_PEEK_RIGHT)
-            ) return@launch
+            openNow(card)
+            if (splitCoordinator.snapPeek(peekOnLeft = left)) return@launch
             delay(ATTACH_SETTLE_MS)
             val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
             val y = screen.exactCenterY()

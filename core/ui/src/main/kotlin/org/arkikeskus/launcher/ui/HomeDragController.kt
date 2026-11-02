@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.DropZones
 
 /** Which surface an in-progress drag was picked up from. */
 enum class DragSource { Home, Dock, Drawer }
@@ -129,10 +130,43 @@ class HomeDragController {
      *  HomeScreen shows the icon picker for it and clears it. */
     var iconPickRequest by mutableStateOf<AppItem?>(null)
 
+    /**
+     * On the unfolded screen the drop bar has a pill per split zone instead of one "Split" pill:
+     * Left / Right (the app there, Folark's split picker in the other half) and Three (the picker
+     * chooses two more apps), each only when its drop zone is on. HomeScreen publishes their bounds
+     * while they show (and clears them when they don't), and [dropZones] which are on.
+     */
+    var splitLeftBounds by mutableStateOf(Rect.Zero)
+    var splitRightBounds by mutableStateOf(Rect.Zero)
+    var splitThreeBounds by mutableStateOf(Rect.Zero)
+    var dropZones by mutableStateOf(DropZones())
+
+    /** A drop on one of those pills: the app and the zone (DropZones.LEFT / RIGHT / THREE). */
+    var splitSideRequest by mutableStateOf<Pair<AppItem, String>?>(null)
+
+    /** The split zone pill under [p], or null. */
+    fun splitSideAt(p: Offset): String? {
+        if (!splitEnabled) return null
+        fun Rect.has(o: Offset) = !isEmpty && contains(o)
+        return when {
+            dropZones.left && splitLeftBounds.has(p) -> DropZones.LEFT
+            dropZones.right && splitRightBounds.has(p) -> DropZones.RIGHT
+            dropZones.three && splitThreeBounds.has(p) -> DropZones.THREE
+            else -> null
+        }
+    }
+
     fun isOverSplit(p: Offset): Boolean = splitEnabled && !splitBounds.isEmpty && splitBounds.contains(p)
 
-    /** A drop of [app] at [p]: true (and the partner picker opens) when it landed on the split target. */
+    /**
+     * A drop of [app] at [p]: true when it landed on a split target — a zone pill ([splitSideRequest])
+     * or the single "Split" pill ([splitRequest], the partner picker).
+     */
     fun dropOnSplit(app: AppItem, p: Offset): Boolean {
+        splitSideAt(p)?.let { zone ->
+            splitSideRequest = app to zone
+            return true
+        }
         if (!isOverSplit(p)) return false
         splitRequest = app
         return true

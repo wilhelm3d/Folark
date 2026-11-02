@@ -14,7 +14,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.abs
 
@@ -34,8 +34,10 @@ internal fun rememberHingeFold(enabled: Boolean): State<Float> {
             fold.animateTo(it, spring(stiffness = Spring.StiffnessLow))
         }
     }
-    // Only while home is started: the hinge sensor wakes the phone, so it is not kept on in the dark.
-    LifecycleStartEffect(enabled, context) {
+    // Only while home is resumed (in front, nothing over it): the hinge sensor wakes the phone, so it
+    // is not kept on in the dark, nor behind Folark Recents or the split picker (see-through, so home
+    // stays started under them).
+    LifecycleResumeEffect(enabled, context) {
         val sensors = context.getSystemService(SensorManager::class.java)
         val sensor = if (enabled) runCatching { sensors?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE) }.getOrNull() else null
         val listener = object : SensorEventListener {
@@ -49,7 +51,7 @@ internal fun rememberHingeFold(enabled: Boolean): State<Float> {
         }
         if (sensor != null) runCatching { sensors?.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI) }
         else target.floatValue = 0f
-        onStopOrDispose {
+        onPauseOrDispose {
             if (sensor != null) runCatching { sensors?.unregisterListener(listener) }
             target.floatValue = 0f
         }

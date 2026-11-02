@@ -62,6 +62,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
+import org.arkikeskus.launcher.model.DropZones
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -108,6 +110,7 @@ import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
 import org.arkikeskus.launcher.ui.component.LocalAppLabelScale
 import org.arkikeskus.launcher.ui.component.LocalBatterySaver
+import org.arkikeskus.launcher.ui.component.LocalHomeCovered
 import org.arkikeskus.launcher.ui.component.LocalIconPack
 import org.arkikeskus.launcher.data.MotoLinks
 import org.arkikeskus.launcher.ui.component.LocalIconShape
@@ -542,7 +545,9 @@ fun HomeScreen(
         val parallaxOffset = remember { mutableStateOf<State<Offset>?>(null) }
         HomeParallax(enabledSetting = settings.home.parallaxWallpaper, out = parallaxOffset)
         // Half folded: home leans with the hinge (HingeTilt.kt), read in the layer below.
-        val hingeFold = rememberHingeFold(enabled = settings.fold.hingeTilt && halfFoldHinge != null && !LocalBatterySaver.current)
+        val hingeFold = rememberHingeFold(
+            enabled = settings.fold.hingeTilt && halfFoldHinge != null && !LocalBatterySaver.current && !LocalHomeCovered.current,
+        )
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -836,6 +841,26 @@ fun HomeScreen(
             (dragController.source == DragSource.Home || dragController.source == DragSource.Dock)) ||
             dragController.localDragging
         val showSplitTarget = dragController.moving && settings.launch.splitEnabled
+        // Unfolded: a pill per split drop zone that is on (Left / Right / Three); folded, or with
+        // those three zones off: the single "Split" pill and its partner picker.
+        val zones = settings.recents.dropZones
+        val splitZones = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) {
+            listOfNotNull(
+                DropZones.LEFT.takeIf { zones.left },
+                DropZones.RIGHT.takeIf { zones.right },
+                DropZones.THREE.takeIf { zones.three },
+            )
+        } else {
+            emptyList()
+        }
+        LaunchedEffect(showSplitTarget, splitZones) {
+            dragController.dropZones = if (splitZones.isEmpty()) DropZones(left = false, right = false, three = false) else zones
+            // Bounds of pills that aren't shown must never catch a drop.
+            if (!showSplitTarget || DropZones.LEFT !in splitZones) dragController.splitLeftBounds = androidx.compose.ui.geometry.Rect.Zero
+            if (!showSplitTarget || DropZones.RIGHT !in splitZones) dragController.splitRightBounds = androidx.compose.ui.geometry.Rect.Zero
+            if (!showSplitTarget || DropZones.THREE !in splitZones) dragController.splitThreeBounds = androidx.compose.ui.geometry.Rect.Zero
+            if (!showSplitTarget || splitZones.isNotEmpty()) dragController.splitBounds = androidx.compose.ui.geometry.Rect.Zero
+        }
         if (showRemoveTarget || showSplitTarget) {
             Row(
                 modifier = Modifier
@@ -854,6 +879,16 @@ fun HomeScreen(
                 val overSplit by remember(dragController) {
                     derivedStateOf { dragController.isOverSplit(dragController.rootPosition) }
                 }
+                val overZone by remember(dragController) {
+                    derivedStateOf { dragController.splitSideAt(dragController.rootPosition) }
+                }
+                // A tick on entering a drop target (Settings ▸ Recents ▸ Split screen ▸ Drop zones).
+                val zoneHaptics = LocalHapticFeedback.current
+                LaunchedEffect(overZone, overSplit, overRemove) {
+                    if (zones.haptics && (overZone != null || overSplit || overRemove)) {
+                        zoneHaptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
+                    }
+                }
                 if (showRemoveTarget) {
                     DragTargetPill(
                         icon = LauncherIcons.Close,
@@ -863,7 +898,7 @@ fun HomeScreen(
                         modifier = Modifier.onGloballyPositioned { dragController.removeBounds = it.boundsInRoot() },
                     )
                 }
-                if (showSplitTarget) {
+                if (showSplitTarget && splitZones.isEmpty()) {
                     DragTargetPill(
                         icon = LauncherIcons.SwapHoriz,
                         label = stringResource(R.string.drag_split),
@@ -871,6 +906,30 @@ fun HomeScreen(
                         activeColor = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.onGloballyPositioned { dragController.splitBounds = it.boundsInRoot() },
                     )
+                }
+                if (showSplitTarget) {
+                    splitZones.forEach { zone ->
+                        DragTargetPill(
+                            icon = LauncherIcons.SwapHoriz,
+                            label = stringResource(
+                                when (zone) {
+                                    DropZones.LEFT -> R.string.drag_split_left
+                                    DropZones.RIGHT -> R.string.drag_split_right
+                                    else -> R.string.drag_split_three
+                                },
+                            ),
+                            active = overZone == zone,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.onGloballyPositioned { c ->
+                                val r = c.boundsInRoot()
+                                when (zone) {
+                                    DropZones.LEFT -> dragController.splitLeftBounds = r
+                                    DropZones.RIGHT -> dragController.splitRightBounds = r
+                                    else -> dragController.splitThreeBounds = r
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -932,6 +991,15 @@ fun HomeScreen(
         }
     }
 
+    // Dropped on a split zone pill: Folark's split picker beside it (or, for Three, two more apps).
+    // Without a way to make the split (no grant, root or module), the partner picker below instead.
+    dragController.splitSideRequest?.let { (app, zone) ->
+        LaunchedEffect(app, zone) {
+            dragController.splitSideRequest = null
+            if (!viewModel.openSplitPicker(app, zone)) dragController.splitRequest = app
+        }
+    }
+
     // An app is waiting for its split-screen partner (dropped on the split target, or chosen from a
     // long-press menu on home, the dock or the drawer).
     dragController.splitRequest?.let { first ->
@@ -980,6 +1048,13 @@ fun HomeScreen(
             preferAbove = menu.preferAbove,
             actions = listOfNotNull(
                 PopupAction(stringResource(R.string.app_info), LauncherIcons.Info) { AppActions.openAppInfo(context, menu.app) },
+                if (settings.launch.aspectRatioMenu && AppActions.canOpenAspectRatio(context, menu.app)) {
+                    PopupAction(stringResource(org.arkikeskus.launcher.ui.R.string.app_aspect_ratio), LauncherIcons.SwapHoriz) {
+                        AppActions.openAspectRatio(context, menu.app)
+                    }
+                } else {
+                    null
+                },
                 PopupAction(stringResource(R.string.rename), LauncherIcons.Edit) { renameTarget = menu.app },
                 PopupAction(stringResource(R.string.change_icon), LauncherIcons.SwapVert) {
                     dragController.iconPickRequest = menu.app

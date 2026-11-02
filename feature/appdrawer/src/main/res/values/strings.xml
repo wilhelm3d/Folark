@@ -57,4 +57,13 @@
     <string name="search_action_no_app">No app on this phone can do that</string>
     <string name="split_picker_recent">RECENT APPS</string>
     <string name="split_picker_back">Back</string>
+    <string name="split_picker_choose">Choose an app</string>
+    <string name="split_picker_choose_more">Choose %2$d apps · %1$d chosen</string>
+    <string name="split_picker_peek">Peek</string>
+    <string name="split_picker_favorites">FAVORITES</string>
+    <string name="split_picker_paired">PAIRED BEFORE</string>
+    <string name="split_picker_open_popup">Open as pop-up</string>
+    <string name="split_picker_open_full">Open full screen</string>
+    <string name="split_picker_favorite">Add to favorites</string>
+    <string name="split_picker_unfavorite">Remove from favorites</string>
 </resources>

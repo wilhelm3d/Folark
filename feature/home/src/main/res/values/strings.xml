@@ -143,6 +143,9 @@
     <string name="widget_category_all">All Widgets</string>
     <string name="widget_hero_desc">Place widgets directly on your desktop — drag a widget or tap + Add Widget.</string>
     <string name="drag_split">Split</string>
+    <string name="drag_split_left">Split left</string>
+    <string name="drag_split_right">Split right</string>
+    <string name="drag_split_three">Three apps</string>
     <string name="open_floating">Open in floating window</string>
     <string name="add_floating_shortcut">Add floating shortcut to home</string>
     <string name="open_split">Open in split screen</string>
@@ -185,6 +188,7 @@
     <string name="taskbar_handle">Open taskbar</string>
     <string name="taskbar_handle_text">Apps</string>
     <string name="taskbar_hide">Hide taskbar</string>
+    <string name="taskbar_undo_split">↶  Undo split</string>
     <string name="taskbar_split_hint">Release to open in split screen</string>
     <string name="weather_day_widget_name">Weather day</string>
     <string name="weather_big_widget_name">Weather day (large)</string>
@@ -245,4 +249,11 @@
     <string name="taskbar_split_peek_left">Left app peeks in</string>
     <string name="taskbar_split_peek_right">Right app peeks in</string>
     <string name="taskbar_split_even">Half and half</string>
+    <string name="taskbar_split_two_thirds">%1$s two thirds</string>
+    <string name="taskbar_split_no_third">This split\'s divider has no stop at two thirds here, or Folark\'s Vector module isn\'t running in System UI</string>
+    <string name="taskbar_live_split">Split</string>
+    <string name="taskbar_live_split_failed">Couldn\'t put it beside another app, so it opened on its own</string>
+    <string name="taskbar_open_with">Open with %1$s</string>
+    <string name="notification_open_split">Open in split screen</string>
+    <string name="notification_open_split_failed">No other app to put it beside, or split screen isn\'t set up: opened on its own</string>
 </resources>

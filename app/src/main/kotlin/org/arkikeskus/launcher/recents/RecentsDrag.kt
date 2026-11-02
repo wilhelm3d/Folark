@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.recents
 
+import org.arkikeskus.launcher.model.DropZones
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +88,8 @@ internal class RecentsDrag {
 
     /** Long-press-drag to a screen edge places the app there (inner screen only). */
     var allowEdge = false
+    /** Which drop zones are on (Settings ▸ Recents ▸ Split screen ▸ Drop zones). */
+    var zones: DropZones = DropZones()
     var screenW = 0f
     var screenH = 0f
     private var pendingEdge: Pair<RecentsCard, Int>? = null
@@ -130,17 +133,20 @@ internal class RecentsDrag {
             }
         } else if (allowEdge && screenW > 0f && screenH > 0f) {
             // Not over a card: which screen edge the finger is near (Aero-style placement).
+            val z = zones
+            val centre = pointer.x > screenW * 0.38f && pointer.x < screenW * 0.62f
             edge = when {
                 // Central drop targets at the very top and bottom: peek (top-centre) and three-app
                 // split (bottom-centre) — Windows/Samsung-style extra targets.
-                pointer.y < screenH * 0.22f && pointer.x > screenW * 0.38f && pointer.x < screenW * 0.62f -> EDGE_PEEK
-                pointer.y > screenH * 0.78f && pointer.x > screenW * 0.38f && pointer.x < screenW * 0.62f -> EDGE_THREE
+                z.peek && pointer.y < screenH * 0.22f && centre -> EDGE_PEEK
+                z.three && pointer.y > screenH * 0.78f && centre -> EDGE_THREE
                 // The four directions: top = full screen, bottom = floating window, sides = that split
-                // half. Generous bands (not just the corners), with a dead zone in the middle.
-                pointer.y < screenH * 0.16f -> EDGE_TOP
-                pointer.y > screenH * 0.84f -> EDGE_BOTTOM
-                pointer.x < screenW * 0.32f -> EDGE_LEFT
-                pointer.x > screenW * 0.68f -> EDGE_RIGHT
+                // half. Generous bands (not just the corners), with a dead zone in the middle. A zone
+                // that is off leaves its part of the screen to the next one (or to nothing).
+                z.top && pointer.y < screenH * 0.16f -> EDGE_TOP
+                z.bottom && pointer.y > screenH * 0.84f -> EDGE_BOTTOM
+                z.left && pointer.x < screenW * 0.32f -> EDGE_LEFT
+                z.right && pointer.x > screenW * 0.68f -> EDGE_RIGHT
                 else -> EDGE_NONE
             }
         }

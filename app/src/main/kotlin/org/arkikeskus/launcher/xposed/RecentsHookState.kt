@@ -5,6 +5,9 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -12,6 +15,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.arkikeskus.launcher.data.SettingsRepository
+import org.arkikeskus.launcher.data.SplitEvents
 import org.arkikeskus.launcher.data.SplitThree
 import org.arkikeskus.launcher.model.ScreenType
 
@@ -30,14 +34,26 @@ class RecentsHookState : ContentProvider() {
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
         if (method == SystemUnlock.METHOD_UNLOCK) return onUnlock(extras)
-        if (method == SplitThree.METHOD_READY || method == SplitThree.METHOD_RESULT) {
-            // Only SystemUI (Folark's module there) answers three-app split requests.
+        if (method == SplitThree.METHOD_READY || method == SplitThree.METHOD_RESULT || method == SplitEvents.METHOD_EVENT) {
+            // Only SystemUI (Folark's module there) answers split requests and reports split changes.
             if (callingPackage != RecentsHook.SYSTEMUI) return null
             val context = context ?: return null
-            if (method == SplitThree.METHOD_READY) SplitThree.onReady(context)
-            else SplitThree.onResult(arg, extras?.getBoolean(SplitThree.EXTRA_OK) == true)
+            when (method) {
+                SplitThree.METHOD_READY -> if (SplitThree.onReady(context)) {
+                    // System UI restarted right after a split request: the crash guard paused them.
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, org.arkikeskus.launcher.R.string.split_native_paused, Toast.LENGTH_LONG).show()
+                    }
+                }
+                SplitThree.METHOD_RESULT -> SplitThree.onResult(
+                    context, arg, extras?.getBoolean(SplitThree.EXTRA_OK) == true,
+                    extras?.takeIf { it.containsKey(SplitThree.EXTRA_VALUE) }?.getInt(SplitThree.EXTRA_VALUE),
+                )
+                else -> extras?.let { SplitEvents.onEvent(it) }
+            }
             return null
         }
+        if (method == StatusBarPaddingHook.METHOD) return statusBarPadding()
         if (method != "state") return null
         val context = context ?: return null
         // Only the launchers in the module's scope ask this (anyone else could fake "module active").
@@ -64,6 +80,23 @@ class RecentsHookState : ContentProvider() {
         return Bundle().apply {
             putBoolean("replace", settings?.recents?.enabled == true && settings.recents.replaceSystem)
             putBoolean("search", settings?.recents?.navHandleOpensSearch == true)
+        }
+    }
+
+    /** System UI (the module's [StatusBarPaddingHook]) asks how much room to keep at the status bar's ends. */
+    private fun statusBarPadding(): Bundle? {
+        if (callingPackage != RecentsHook.SYSTEMUI) return null
+        val context = context ?: return null
+        val s = runCatching {
+            runBlocking {
+                EntryPointAccessors.fromApplication(context, Deps::class.java)
+                    .settingsRepository().settings(ScreenType.INNER).first().statusBar
+            }
+        }.getOrNull() ?: return null
+        return Bundle().apply {
+            putBoolean(StatusBarPaddingHook.EXTRA_ON, s.systemPadding)
+            putInt(StatusBarPaddingHook.EXTRA_INNER, s.systemPaddingInner)
+            putInt(StatusBarPaddingHook.EXTRA_COVER, s.systemPaddingCover)
         }
     }
 

@@ -42,6 +42,36 @@ object AppActions {
         }
     }
 
+    /** Android's per-app aspect ratio page (Android 14+, where the phone maker left it on). */
+    private const val ACTION_ASPECT_RATIO = "android.settings.MANAGE_USER_ASPECT_RATIO_SETTINGS"
+
+    @Volatile private var aspectPage: Boolean? = null
+
+    /**
+     * Whether "Aspect ratio…" can be offered for [appItem]: the phone has Android's aspect ratio
+     * page, and the app is in Folark's own profile (the page opens for that profile only).
+     */
+    fun canOpenAspectRatio(context: Context, appItem: AppItem): Boolean {
+        if (appItem.user != Process.myUserHandle()) return false
+        val known = aspectPage
+        if (known != null) return known
+        val found = runCatching {
+            context.packageManager.resolveActivity(aspectRatioIntent(appItem.packageName), 0) != null
+        }.getOrDefault(false)
+        aspectPage = found
+        return found
+    }
+
+    /** Opens Android's aspect ratio page for [appItem] (full screen, 16:9, 4:3… set by the phone maker). */
+    fun openAspectRatio(context: Context, appItem: AppItem) {
+        val opened = runCatching { context.startActivity(aspectRatioIntent(appItem.packageName)) }.isSuccess
+        if (!opened) runCatching { Toast.makeText(context, R.string.app_aspect_ratio_unavailable, Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun aspectRatioIntent(packageName: String) = Intent(ACTION_ASPECT_RATIO)
+        .setData(Uri.fromParts("package", packageName, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
     /**
      * Uninstalls [appItem]. The personal profile uses the system uninstall dialog directly; other
      * profiles (work / Private Space) have no reliable public profile-aware uninstall intent, so we

@@ -271,6 +271,7 @@ internal fun RecentsScreen(
     drag.allowReplace = settings.launch.threeAppSplit
     // Aero edge placement: inner screen only, where there is room for side-by-side apps.
     drag.allowEdge = wide
+    drag.zones = settings.recents.dropZones
     with(LocalDensity.current) {
         drag.screenW = LocalConfiguration.current.screenWidthDp.dp.toPx()
         drag.screenH = LocalConfiguration.current.screenHeightDp.dp.toPx()
@@ -598,7 +599,9 @@ private fun DragLayer(drag: RecentsDrag, env: RecentsEnv) {
                         when (drag.droppedEdge) {
                             // Peek and three-app use Folark's in-Recents picker (seeded with this app).
                             EDGE_PEEK -> env.onPeekPick(c)
-                            EDGE_THREE -> env.onSplitThree(c)
+                            // A split card: pick its third app among the cards; one app: Folark's
+                            // picker chooses two more apps (any app, open or not).
+                            EDGE_THREE -> if (c.isSplit) env.onSplitThree(c) else env.onPlaceAtEdge(c, EDGE_THREE)
                             // Left/right open the app on that side with Folark's split picker on the
                             // other; top = full screen; bottom = floating window (all via placeAtEdge).
                             else -> env.onPlaceAtEdge(c, drag.droppedEdge)

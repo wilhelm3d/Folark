@@ -9,4 +9,6 @@
     <string name="shortcut_pin">Pin to home screen</string>
     <string name="app_info_unavailable">Could not open the app\'s details</string>
     <string name="popup_notification_dismiss">Dismiss</string>
+    <string name="app_aspect_ratio">Aspect ratio…</string>
+    <string name="app_aspect_ratio_unavailable">This phone doesn\'t have Android\'s aspect ratio page</string>
 </resources>

@@ -15,19 +15,15 @@ import java.io.File
  * WMShell splitscreen …`). Needs the one-time DUMP grant ([grantCommand]); with [root] the same
  * commands run through `su` instead, so no grant is needed.
  *
+ * What is open comes from one read of the window hierarchy, a [TaskSnapshot]: callers that take
+ * several steps read once and pass it along ([snapshot]) instead of reading for every question.
+ *
  * WM Shell throws on its own thread (System UI restarts) when `moveToSideStage` gets a task that is
  * already in split screen or isn't running, so [moveToSide] checks both first. Every blocking
  * function here runs `dumpsys`: call them off the main thread.
  */
 object ShellSplit {
 
-    // Built once: the parsers below run over thousands of `dumpsys` lines.
-    private val TASK_ID = Regex("""Task\{\S+ #(\d+)""")
-    private val TASK_ID_EQ = Regex("""taskId=(\d+)""")
-    private val ID_EQ = Regex("""\bid=(\d+)""")
-    private val STAGE = Regex("""stage_[abc]""")
-    private val PKG_INTENT = Regex("""\bI=([\w.]+)/""")
-    private val PKG_AFFINITY = Regex("""\bA=\d+:([\w.]+)""")
     private val SAFE_ARG = Regex("""^[\w.\-]+$""")
 
     private const val EXIT_WAIT_MS = 800L
@@ -78,120 +74,52 @@ object ShellSplit {
         }.getOrNull()
     }
 
-    /**
-     * The newest task of [packageName] (from Recents, newest first). The name must stand on its own
-     * (`com.foo` never matches `com.foo.bar`). The task may no longer be running: [moveToSide] checks.
-     */
-    fun taskIdOf(context: Context, packageName: String, root: Boolean = false): Int? {
-        if (packageName.isEmpty()) return null
-        val text = dump(context, arrayOf("recents"), root) ?: return null
-        val name = Regex("""(?<![\w.])${Regex.escape(packageName)}(?![\w.])""")
-        var block: StringBuilder? = null
-        fun check(b: StringBuilder?): Int? {
-            val body = b?.toString() ?: return null
-            if (body.contains("type=home") || !name.containsMatchIn(body)) return null
-            return TASK_ID_EQ.find(body)?.groupValues?.get(1)?.toIntOrNull()
-                ?: TASK_ID.find(body)?.groupValues?.get(1)?.toIntOrNull()
-                ?: ID_EQ.find(body)?.groupValues?.get(1)?.toIntOrNull()
-        }
-        for (line in text.lineSequence()) {
-            if (line.contains("Recent #")) {
-                check(block)?.let { return it }
-                block = StringBuilder()
-            }
-            block?.appendLine(line)
-        }
-        return check(block)
-    }
+    /** One read of what is open (null when Android wouldn't say). */
+    fun snapshot(context: Context, root: Boolean = false): TaskSnapshot? =
+        dump(context, arrayOf("activities"), root)?.let { ShellSplitParser.parse(it, context.packageName) }
+
+    /** The front-most running task of [packageName] (the name must match exactly). */
+    fun taskIdOf(context: Context, packageName: String, root: Boolean = false, read: TaskSnapshot? = null): Int? =
+        (read ?: snapshot(context, root))?.taskOf(packageName)?.id
 
     data class SplitTask(val taskId: Int, val packageName: String, val visible: Boolean = true)
 
-    /**
-     * One read of the window hierarchy: every running task, every task in a split stage (any app,
-     * Folark's picker included), and one app per stage for [splitTasks] (Folark's own tasks left out).
-     */
-    private class Tasks(val running: Set<Int>, val stagedIds: Set<Int>, val staged: List<SplitTask>)
-
-    private fun readTasks(context: Context, root: Boolean, visibleOnly: Boolean = false): Tasks? {
-        val text = dump(context, arrayOf("activities"), root) ?: return null
-        val running = HashSet<Int>()
-        val stagedIds = HashSet<Int>()
-        val perStage = LinkedHashMap<String, SplitTask>()
-        var stageIndent = -1
-        var currentStage = ""
-        for (line in text.lineSequence()) {
-            if (line.startsWith("Display ") || line.contains("TaskDisplayArea") || line.startsWith("RootHomeTask")) {
-                stageIndent = -1
-                currentStage = ""
-            }
-            val star = line.indexOf("* Task{")
-            if (star < 0) continue
-            val id = TASK_ID.find(line)?.groupValues?.get(1)?.toIntOrNull() ?: continue
-            val stage = STAGE.find(line)?.value
-            if (stage != null) {
-                stageIndent = star
-                currentStage = stage
-                continue
-            }
-            val pkg = PKG_INTENT.find(line)?.groupValues?.get(1)
-                ?: PKG_AFFINITY.find(line)?.groupValues?.get(1)
-                ?: ""
-            if (pkg.isNotEmpty()) running += id
-            if (stageIndent < 0) continue
-            if (star <= stageIndent) {
-                stageIndent = -1
-                currentStage = ""
-                continue
-            }
-            if (star > stageIndent + 4) continue
-            if (line.contains("type=home") || line.contains("type=recents") || line.contains("mode=fullscreen")) continue
-            stagedIds += id
-            val isVis = (line.contains("visible=true") || line.contains("visibleRequested=true")) &&
-                !line.contains("visible=false")
-            if (visibleOnly && !isVis) continue
-            // Folark's own tasks (its split picker's affinity is "<package>.splitpicker") are no split app.
-            if (pkg.isNotEmpty() && !pkg.startsWith(context.packageName)) {
-                perStage.putIfAbsent(currentStage, SplitTask(id, pkg, isVis))
-            }
-        }
-        return Tasks(running, stagedIds, perStage.values.toList())
-    }
+    private fun TaskSnapshot.Task.asSplitTask() = SplitTask(id, packageName, visible)
 
     /** The two (or three) apps of the split screen showing now; empty when there is none. */
-    fun splitTasks(context: Context, root: Boolean = false): List<SplitTask> {
-        val visible = readTasks(context, root, visibleOnly = true)?.staged.orEmpty()
-        return if (visible.size >= 2) visible else emptyList()
-    }
+    fun splitTasks(context: Context, root: Boolean = false, read: TaskSnapshot? = null): List<SplitTask> =
+        (read ?: snapshot(context, root))?.splitShowing.orEmpty().map { it.asSplitTask() }
 
     /** Like [splitTasks], also while the split is hidden (behind Recents or Home). */
-    fun stagedSplitTasks(context: Context, root: Boolean = false): List<SplitTask> {
-        val staged = readTasks(context, root)?.staged.orEmpty()
-        return if (staged.size >= 2) staged else emptyList()
-    }
+    fun stagedSplitTasks(context: Context, root: Boolean = false, read: TaskSnapshot? = null): List<SplitTask> =
+        (read ?: snapshot(context, root))?.splitStaged.orEmpty().map { it.asSplitTask() }
 
     /** Every task in a split stage, any app (Folark's picker included). */
-    fun allStagedTaskIds(context: Context, root: Boolean = false): Set<Int> =
-        readTasks(context, root)?.stagedIds.orEmpty()
+    fun allStagedTaskIds(context: Context, root: Boolean = false, read: TaskSnapshot? = null): Set<Int> =
+        (read ?: snapshot(context, root))?.stagedIds.orEmpty()
 
     /** True when [taskId] is running and could be moved into split screen right now. */
-    fun isRunning(context: Context, taskId: Int, root: Boolean = false): Boolean =
-        taskId > 0 && readTasks(context, root)?.running?.contains(taskId) == true
+    fun isRunning(context: Context, taskId: Int, root: Boolean = false, read: TaskSnapshot? = null): Boolean =
+        taskId > 0 && (read ?: snapshot(context, root))?.isRunning(taskId) == true
 
     fun swapSides(context: Context, root: Boolean = false): Boolean =
         wmShell(context, root, "splitscreen", "switchSplitPosition")
 
     /**
      * Closes any split screen (staged or showing), keeping [keepTaskId] in front (-1: none), and
-     * waits until WM Shell has really let the tasks go, so a [moveToSide] right after doesn't meet
-     * them still in their stage. Does nothing when no split is staged.
+     * (with [wait]) waits until WM Shell has really let the tasks go, so a [moveToSide] right after
+     * doesn't meet them still in their stage. Does nothing when no split is staged ([read]: what is
+     * open now, if already known).
      */
-    fun exitSplit(context: Context, keepTaskId: Int, root: Boolean = false): Boolean {
-        if (readTasks(context, root)?.stagedIds.isNullOrEmpty()) return true
+    fun exitSplit(context: Context, keepTaskId: Int, root: Boolean = false, read: TaskSnapshot? = null, wait: Boolean = true): Boolean {
+        val now = read ?: snapshot(context, root)
+        if (now?.stagedIds.isNullOrEmpty()) return true
         if (!wmShell(context, root, "splitscreen", "exitSplitScreen", keepTaskId.toString())) return false
+        if (!wait) return true
         val until = System.currentTimeMillis() + EXIT_WAIT_MS
         while (System.currentTimeMillis() < until) {
             Thread.sleep(EXIT_POLL_MS)
-            if (readTasks(context, root)?.stagedIds.isNullOrEmpty()) return true
+            if (snapshot(context, root)?.stagedIds.isNullOrEmpty()) return true
         }
         return false
     }
@@ -201,13 +129,14 @@ object ShellSplit {
     /**
      * Moves the running task [taskId] into split screen, on the right ([right]) or left; the app
      * behind it fills the other half. Never sends a task WM Shell would throw on: one already in a
-     * split (true, it is in split screen already) or one that isn't running (false).
+     * split (true, it is in split screen already) or one that isn't running (false). [read]: what is
+     * open now, if just read.
      */
-    fun moveToSide(context: Context, taskId: Int, right: Boolean, root: Boolean = false): Boolean {
+    fun moveToSide(context: Context, taskId: Int, right: Boolean, root: Boolean = false, read: TaskSnapshot? = null): Boolean {
         if (taskId <= 0) return false
-        val tasks = readTasks(context, root) ?: return false
-        if (taskId in tasks.stagedIds) return true
-        if (taskId !in tasks.running) return false
+        val now = read ?: snapshot(context, root) ?: return false
+        if (now.isStaged(taskId)) return true
+        if (!now.isRunning(taskId)) return false
         return wmShell(context, root, "splitscreen", "moveToSideStage", taskId.toString(), if (right) "1" else "0")
     }
 

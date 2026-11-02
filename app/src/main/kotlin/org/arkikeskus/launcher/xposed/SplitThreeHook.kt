@@ -14,9 +14,12 @@ import android.view.animation.PathInterpolator
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import org.arkikeskus.launcher.data.SplitEvents
 import org.arkikeskus.launcher.data.SplitThree
 import java.lang.reflect.Field
+import java.lang.reflect.Proxy
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * The SystemUI half of Folark's native split screen. Android 17's split screen (WM Shell, inside
@@ -29,7 +32,10 @@ import java.util.concurrent.Executor
  * - it runs each request on WM Shell's own thread: two running tasks into a split ([startSplitTasksNative]),
  *   a third app into the third place ([attempt]), a divider snap ([snapTo]) or Motorola's own
  *   split-select ([selectNative]),
- * - and it tells Folark whether that worked, so Folark can fall back to its other ways.
+ * - it tells Folark whether that worked, so Folark can fall back to its other ways,
+ * - and it adds a listener to WM Shell's split screen ([attachListener]) that passes every change on
+ *   to Folark (an app entering or leaving a split stage, the split showing or hiding), so Folark
+ *   waits for the change instead of reading Android's window list again and again.
  *
  * Every step is wrapped: if anything is missing or different on another phone, it just answers
  * "no" and Folark uses the old way.
@@ -50,12 +56,23 @@ internal object SplitThreeHook {
     /** How long the divider takes to glide to its new place (as when dropped by a finger). */
     private const val SNAP_MS = 350
 
+    /** How far (of the divider's whole travel) a stop may be from a third and still count as one. */
+    private const val THIRD_REACH = 0.08f
+
+    private const val LISTENER = "com.android.wm.shell.splitscreen.SplitScreen\$SplitScreenListener"
+
     @Volatile private var controller: Any? = null
     @Volatile private var listening = false
+    @Volatile private var loader: ClassLoader? = null
+    @Volatile private var splitListener: Any? = null
+    @Volatile private var appContext: Context? = null
+    /** Everything sent to Folark goes out here, in order and off WM Shell's thread. */
+    private val outbox = Executors.newSingleThreadExecutor()
     private var log: (String) -> Unit = {}
 
     fun install(loader: ClassLoader, log: (String) -> Unit) {
         this.log = log
+        this.loader = loader
         val cls = runCatching { XposedHelpers.findClass(CONTROLLER, loader) }.getOrNull()
         if (cls == null) {
             log("no $CONTROLLER in SystemUI; split hook stays off")
@@ -92,11 +109,14 @@ internal object SplitThreeHook {
             return
         }
         log("split hook: ready (SplitScreenController captured)")
-        Thread {
+        appContext = context
+        // "Ready" first, then the listener's state: Folark resets what it knows on "ready".
+        outbox.execute {
             runCatching {
                 context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), SplitThree.METHOD_READY, null, null)
             }
-        }.start()
+        }
+        mainExecutor(c)?.execute { attachListener(context, c) }
     }
 
     private val receiver = object : BroadcastReceiver() {
@@ -115,10 +135,37 @@ internal object SplitThreeHook {
         val c = controller ?: return reply(context, request, false)
         val executor = mainExecutor(c) ?: return reply(context, request, false)
 
-        // A layout change for the split showing now (Android's peek view, or half and half).
+        // Folark wants the split state now (it started after System UI, or lost track).
+        if (intent.getBooleanExtra(SplitThree.EXTRA_EVENTS, false)) {
+            executor.execute { reply(context, request, attachListener(context, c)) }
+            return
+        }
+
+        // Where the divider is now, seen from one of the split's apps (a scene saved from Recents).
+        if (intent.getBooleanExtra(SplitThree.EXTRA_QUERY_SNAP, false)) {
+            val forTask = intent.getIntExtra(SplitThree.EXTRA_SNAP_FOR_TASK, -1)
+            executor.execute { querySnap(context, c, request, forTask) }
+            return
+        }
+
+        // A layout change for the split showing now (peek, a third, half and half…).
         val snap = intent.getIntExtra(SplitThree.EXTRA_SNAP, -1)
         if (snap >= 0) {
-            executor.execute { snapTo(context, c, request, snap, 0) }
+            val forTask = intent.getIntExtra(SplitThree.EXTRA_SNAP_FOR_TASK, -1)
+            executor.execute { snapTo(context, c, request, snap, 0, forTask) }
+            return
+        }
+
+        // A notification's intent beside a running app, in one step.
+        if (intent.getBooleanExtra(SplitThree.EXTRA_INTENT_AND_TASK, false)) {
+            @Suppress("DEPRECATION")
+            val pending = intent.getParcelableExtra<PendingIntent>(SplitThree.EXTRA_INTENT)
+            val userId = intent.getIntExtra(SplitThree.EXTRA_USER_ID, 0)
+            val taskId = intent.getIntExtra(SplitThree.EXTRA_TASK, -1)
+            val position = intent.getIntExtra(SplitThree.EXTRA_SPLIT_POSITION, SPLIT_POSITION_BOTTOM_OR_RIGHT)
+            val snapPosition = intent.getIntExtra(SplitThree.EXTRA_SNAP_POSITION, SplitThree.SNAP_EVEN)
+            if (pending == null || taskId <= 0) return reply(context, request, false)
+            executor.execute { startIntentAndTaskNative(context, c, request, pending, userId, taskId, position, snapPosition) }
             return
         }
 
@@ -191,35 +238,38 @@ internal object SplitThreeHook {
      * On WM Shell's thread: moves the split's divider to the snap target [snap], exactly where a
      * finger dragging the divider ends (SplitLayout.snapToTarget), so Android sets up the layout the
      * same way, peek strip included. Waits for the split to be showing first. Never picks a dismiss
-     * target (the first and last ones), which would close the split instead.
+     * target (the first and last ones), which would close the split instead. With [forTask] the snap
+     * is meant for that task as if it sat left / on top: turned round when it sits on the other side.
+     * A third or two thirds the divider has no stop for is refused (no silent half and half).
      */
-    private fun snapTo(context: Context, c: Any, request: String, snap: Int, tries: Int) {
+    private fun snapTo(context: Context, c: Any, request: String, snap: Int, tries: Int, forTask: Int = -1) {
         val visible = runCatching { c.javaClass.getMethod("isSplitScreenVisible").invoke(c) as Boolean }.getOrDefault(false)
         if (!visible) {
             if (tries < WAIT_TRIES) {
-                Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({ snapTo(context, c, request, snap, tries + 1) }, WAIT_STEP_MS)
+                Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({ snapTo(context, c, request, snap, tries + 1, forTask) }, WAIT_STEP_MS)
             } else {
                 reply(context, request, false)
             }
             return
         }
         val ok = runCatching {
-            val stage = field(c, "mStageCoordinator") ?: error("no StageCoordinator")
-            val manager = field(stage, "mSplitLayoutManager") ?: error("no SplitLayoutManager")
-            val layout = field(manager, "mSplitLayout") ?: error("no SplitLayout")
+            val wanted = if (forTask > 0 && splitPosition(c, forTask) == SPLIT_POSITION_BOTTOM_OR_RIGHT) mirrored(snap) else snap
+            val layout = splitLayout(c)
             val algorithm = field(layout, "mDividerSnapAlgorithm") ?: error("no DividerSnapAlgorithm")
             val targets = (field(algorithm, "mTargets") as? List<*>).orEmpty().filterNotNull()
 
             // Never pick index 0 (dismiss start) or last index (dismiss end):
             // Match exact snapPosition first, then fall back to DividerSnapAlgorithm's non-dismiss split targets.
             val nonDismiss = if (targets.size >= 3) targets.subList(1, targets.size - 1) else targets
-            val target = nonDismiss.firstOrNull { field(it, "snapPosition") == snap }
-                ?: when (snap) {
+            val target = nonDismiss.firstOrNull { field(it, "snapPosition") == wanted }
+                ?: when (wanted) {
                     SplitThree.SNAP_PEEK_LEFT -> field(algorithm, "mFirstSplitTarget") ?: nonDismiss.firstOrNull()
                     SplitThree.SNAP_PEEK_RIGHT -> field(algorithm, "mLastSplitTarget") ?: nonDismiss.lastOrNull()
+                    SplitThree.SNAP_ONE_THIRD -> nearest(targets, nonDismiss, 1f / 3)
+                    SplitThree.SNAP_TWO_THIRDS -> nearest(targets, nonDismiss, 2f / 3)
                     else -> field(algorithm, "mMiddleTarget") ?: nonDismiss.getOrNull(nonDismiss.size / 2)
                 }
-                ?: error("no valid split snap target for $snap")
+                ?: error("no valid split snap target for $wanted")
 
             val position = field(layout, "mDividerPosition") as? Int ?: error("no divider position")
             val method = methods(layout.javaClass).first { it.name == "snapToTarget" && it.parameterTypes.size == 4 }
@@ -228,6 +278,99 @@ internal object SplitThreeHook {
             true
         }.getOrElse {
             log("split layout: can't snap to $snap: $it")
+            false
+        }
+        reply(context, request, ok)
+    }
+
+    /**
+     * On WM Shell's thread: the snap position the divider is at now (the nearest stop), seen from
+     * [forTask] as if it sat left / on top. Refused when [forTask] isn't in the split.
+     */
+    private fun querySnap(context: Context, c: Any, request: String, forTask: Int) {
+        val value = runCatching {
+            val side = splitPosition(c, forTask)
+            if (side != 0 && side != SPLIT_POSITION_BOTTOM_OR_RIGHT) error("task $forTask isn't in the split")
+            val layout = splitLayout(c)
+            val algorithm = field(layout, "mDividerSnapAlgorithm") ?: error("no DividerSnapAlgorithm")
+            val targets = (field(algorithm, "mTargets") as? List<*>).orEmpty().filterNotNull()
+            val position = field(layout, "mDividerPosition") as? Int ?: error("no divider position")
+            val closest = targets.minByOrNull { kotlin.math.abs(((field(it, "position") as? Int) ?: Int.MAX_VALUE / 2) - position) }
+                ?: error("no snap targets")
+            val snap = field(closest, "snapPosition") as? Int ?: error("no snapPosition")
+            if (side == SPLIT_POSITION_BOTTOM_OR_RIGHT) mirrored(snap) else snap
+        }.getOrElse {
+            log("split layout: can't read the divider: $it")
+            null
+        }
+        reply(context, request, value != null, value)
+    }
+
+    /** The SplitLayout of the split screen (the divider and its stops). */
+    private fun splitLayout(c: Any): Any {
+        val stage = field(c, "mStageCoordinator") ?: error("no StageCoordinator")
+        field(stage, "mSplitLayout")?.let { return it }
+        val manager = field(stage, "mSplitLayoutManager") ?: error("no SplitLayoutManager")
+        return field(manager, "mSplitLayout") ?: error("no SplitLayout")
+    }
+
+    /** Which side [taskId] sits on: 0 left / top, 1 right / bottom, -1 not in the split (or unknown). */
+    private fun splitPosition(c: Any, taskId: Int): Int = runCatching {
+        val m = c.javaClass.methods.firstOrNull {
+            it.name == "getSplitPosition" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Int::class.javaPrimitiveType
+        } ?: return@runCatching -1
+        m.invoke(c, taskId) as Int
+    }.getOrDefault(-1)
+
+    /** The same layout seen from the other side (a third ↔ two thirds, peek left ↔ peek right). */
+    private fun mirrored(snap: Int): Int = when (snap) {
+        SplitThree.SNAP_ONE_THIRD -> SplitThree.SNAP_TWO_THIRDS
+        SplitThree.SNAP_TWO_THIRDS -> SplitThree.SNAP_ONE_THIRD
+        SplitThree.SNAP_PEEK_LEFT -> SplitThree.SNAP_PEEK_RIGHT
+        SplitThree.SNAP_PEEK_RIGHT -> SplitThree.SNAP_PEEK_LEFT
+        else -> snap
+    }
+
+    /**
+     * The stop among [candidates] nearest to [fraction] of the way across (from the dismiss stops at
+     * both ends of [all]), or null when none is within reach of it: then the phone has no such stop
+     * (the middle one or a peek strip is not a third).
+     */
+    private fun nearest(all: List<Any>, candidates: List<Any>, fraction: Float): Any? {
+        val start = all.firstOrNull()?.let { field(it, "position") as? Int } ?: return null
+        val end = all.lastOrNull()?.let { field(it, "position") as? Int } ?: return null
+        val span = (end - start).toFloat()
+        if (span <= 0f) return null
+        val goal = start + span * fraction
+        val best = candidates.minByOrNull { kotlin.math.abs(((field(it, "position") as? Int) ?: return@minByOrNull Float.MAX_VALUE) - goal) }
+            ?: return null
+        val at = field(best, "position") as? Int ?: return null
+        return best.takeIf { kotlin.math.abs(at - goal) <= span * THIRD_REACH }
+    }
+
+    /**
+     * On WM Shell's thread: [pending] (a notification's tap action) into split screen beside the
+     * running task [taskId], in one step. `startIntentAndTask(PendingIntent, int userId, Bundle,
+     * int taskId, Bundle, int position, int snapPosition, RemoteTransition, InstanceId)`. Refuses
+     * unless [taskId] is running (WM Shell throws on a task it doesn't know).
+     */
+    private fun startIntentAndTaskNative(
+        context: Context, c: Any, request: String, pending: PendingIntent, userId: Int, taskId: Int, position: Int, snapPosition: Int,
+    ) {
+        val ok = runCatching {
+            if (!isRunningTask(c, taskId)) error("task $taskId isn't running")
+            val m = c.javaClass.methods.firstOrNull {
+                it.name == "startIntentAndTask" && it.parameterTypes.size == 9 &&
+                    it.parameterTypes[0] == PendingIntent::class.java &&
+                    it.parameterTypes[1] == Int::class.javaPrimitiveType &&
+                    it.parameterTypes[3] == Int::class.javaPrimitiveType &&
+                    it.parameterTypes[5] == Int::class.javaPrimitiveType &&
+                    it.parameterTypes[6] == Int::class.javaPrimitiveType
+            } ?: error("no startIntentAndTask(PendingIntent, int, Bundle, int, Bundle, int, int, …) here")
+            m.invoke(c, pending, userId, Bundle(), taskId, Bundle(), position, snapPosition, null, null)
+            true
+        }.getOrElse {
+            log("split hook: intent beside task $taskId failed: $it")
             false
         }
         reply(context, request, ok)
@@ -303,15 +446,93 @@ internal object SplitThreeHook {
         reply(context, request, ok)
     }
 
+    /**
+     * On WM Shell's thread: adds Folark's listener to the split screen's listeners (once), then has
+     * WM Shell send it the state now, as it does for every new listener (`sendStatusToListener`).
+     */
+    private fun attachListener(context: Context, c: Any): Boolean = runCatching {
+        val stage = field(c, "mStageCoordinator") ?: error("no StageCoordinator")
+        @Suppress("UNCHECKED_CAST")
+        val listeners = field(stage, "mListeners") as? MutableList<Any> ?: error("no listener list")
+        val listener = splitListener ?: newListener()?.also { splitListener = it } ?: error("no $LISTENER")
+        if (listeners.none { it === listener }) listeners.add(listener)
+        methods(stage.javaClass).firstOrNull { it.name == "sendStatusToListener" && it.parameterTypes.size == 1 }
+            ?.apply { isAccessible = true }
+            ?.invoke(stage, listener)
+        send(context, Bundle().apply { putInt(SplitEvents.EXTRA_KIND, SplitEvents.KIND_ATTACHED) })
+        true
+    }.getOrElse {
+        log("split events: can't listen: $it")
+        false
+    }
+
+    /**
+     * A `SplitScreen.SplitScreenListener` made at run time (the interface lives in System UI). It
+     * passes the changes on and never throws: it runs on WM Shell's own thread.
+     */
+    private fun newListener(): Any? = runCatching {
+        val cl = loader ?: return null
+        val type = Class.forName(LISTENER, false, cl)
+        Proxy.newProxyInstance(cl, arrayOf(type)) { proxy, method, args ->
+            when (method.name) {
+                "equals" -> proxy === args?.getOrNull(0)
+                "hashCode" -> System.identityHashCode(proxy)
+                "toString" -> "FolarkSplitListener"
+                else -> {
+                    runCatching { onListenerCall(method.name, args) }
+                    defaultFor(method.returnType)
+                }
+            }
+        }
+    }.getOrNull()
+
+    private fun onListenerCall(name: String, args: Array<out Any?>?) {
+        val context = appContext ?: return
+        when (name) {
+            "onTaskStageChanged" -> send(context, Bundle().apply {
+                putInt(SplitEvents.EXTRA_KIND, SplitEvents.KIND_STAGE)
+                putInt(SplitEvents.EXTRA_TASK, args?.getOrNull(0) as? Int ?: return)
+                putInt(SplitEvents.EXTRA_STAGE, args.getOrNull(1) as? Int ?: SplitEvents.STAGE_NONE)
+                putBoolean(SplitEvents.EXTRA_VISIBLE, args.getOrNull(2) as? Boolean ?: false)
+            })
+            "onSplitVisibilityChanged" -> send(context, Bundle().apply {
+                putInt(SplitEvents.EXTRA_KIND, SplitEvents.KIND_VISIBLE)
+                putBoolean(SplitEvents.EXTRA_VISIBLE, args?.getOrNull(0) as? Boolean ?: false)
+            })
+        }
+    }
+
+    /** What a listener method gives back: nothing for the void ones (all today), a zero otherwise. */
+    private fun defaultFor(type: Class<*>): Any? = when (type) {
+        java.lang.Boolean.TYPE -> false
+        Integer.TYPE -> 0
+        java.lang.Long.TYPE -> 0L
+        java.lang.Float.TYPE -> 0f
+        java.lang.Double.TYPE -> 0.0
+        else -> null
+    }
+
+    /** Passes a split change on to Folark (its RecentsHookState), off WM Shell's thread. */
+    private fun send(context: Context, extras: Bundle) {
+        outbox.execute {
+            runCatching {
+                context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), SplitEvents.METHOD_EVENT, null, extras)
+            }
+        }
+    }
+
     private fun methods(cls: Class<*>): List<java.lang.reflect.Method> = generateSequence(cls) { it.superclass }
         .flatMap { it.declaredMethods.asSequence() }.toList()
 
-    private fun reply(context: Context, request: String, ok: Boolean) {
+    private fun reply(context: Context, request: String, ok: Boolean, value: Int? = null) {
         Thread {
             runCatching {
                 context.contentResolver.call(
                     Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), SplitThree.METHOD_RESULT, request,
-                    Bundle().apply { putBoolean(SplitThree.EXTRA_OK, ok) },
+                    Bundle().apply {
+                        putBoolean(SplitThree.EXTRA_OK, ok)
+                        if (value != null) putInt(SplitThree.EXTRA_VALUE, value)
+                    },
                 )
             }
         }.start()

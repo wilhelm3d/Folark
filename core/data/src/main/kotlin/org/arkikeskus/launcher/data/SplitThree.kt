@@ -37,15 +37,30 @@ object SplitThree {
     const val EXTRA_TASK_2 = "split_task_2"
     const val EXTRA_SPLIT_POSITION = "split_position"
     const val EXTRA_SNAP_POSITION = "split_snap_position"
+    /** With [EXTRA_SNAP]: the snap is meant for this task as if it sat left / on top (the module
+     *  turns it round when the task is on the other side). */
+    const val EXTRA_SNAP_FOR_TASK = "snap_for_task"
+    /** Asks for the split's current snap position (answered in [EXTRA_VALUE]), for [EXTRA_SNAP_FOR_TASK]. */
+    const val EXTRA_QUERY_SNAP = "query_snap"
+    /** A notification's (or any) PendingIntent beside a running task in one step (see [startIntentAndTask]). */
+    const val EXTRA_INTENT_AND_TASK = "intent_and_task"
+    /** A number that comes back with an answer. */
+    const val EXTRA_VALUE = "value"
     /** The split index / position hint that goes with a select request. */
     const val EXTRA_POS = "pos"
+    /** Attach the split listener (if it isn't) and send the split state now (see [SplitEvents]). */
+    const val EXTRA_EVENTS = "events"
 
     /** WM Shell's split positions (SplitScreenConstants). */
     const val SPLIT_POSITION_LEFT = 0
     const val SPLIT_POSITION_RIGHT = 1
 
+    /** The left (or top) app a third, the other two thirds (SNAP_TO_2_33_66). */
+    const val SNAP_ONE_THIRD = 0
     /** Half and half. */
     const val SNAP_EVEN = 1
+    /** The left (or top) app two thirds (SNAP_TO_2_66_33). */
+    const val SNAP_TWO_THIRDS = 2
     /** Android's peek view: the left app 90%, the right one peeking in from the edge (SNAP_TO_2_90_10). */
     const val SNAP_PEEK_RIGHT = 3
     /** Android's peek view: the right app 90%, the left one peeking in from the edge (SNAP_TO_2_10_90). */
@@ -61,26 +76,93 @@ object SplitThree {
     private const val READY_FOR_MS = 14L * 24 * 3600 * 1000
     private const val TIMEOUT_MS = 4_500L
 
+    // Crash guard: a System UI start this soon after a request means the request most likely
+    // brought System UI down; the module's split requests then pause until allowed again.
+    private const val LAST_REQUEST_AT = "split3_last_request_at"
+    private const val LAST_REQUEST_KIND = "split3_last_request_kind"
+    private const val PAUSED_AT = "split3_paused_at"
+    private const val PAUSED_AFTER = "split3_paused_after"
+    private const val CRASH_WINDOW_MS = 15_000L
+    private const val LAST_ANSWER = "split3_last_answer"
+
     private val waiting = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+    private val values = ConcurrentHashMap<String, Int>()
+    private val kinds = ConcurrentHashMap<String, String>()
 
-    /** SystemUI says the three-app split can be asked for (the module is running there). */
-    fun onReady(context: Context) {
-        runCatching {
-            context.getSharedPreferences(PREFS, 0).edit().putLong(READY_AT, System.currentTimeMillis()).apply()
-        }
-    }
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, 0)
 
-    /** SystemUI's answer to request [request]. */
-    fun onResult(request: String?, ok: Boolean) {
+    /**
+     * System UI (Folark's module there) has started. True when it started right after one of
+     * Folark's requests: the module's split requests are paused from now on ([paused]) and the
+     * caller tells the person so.
+     */
+    fun onReady(context: Context): Boolean = runCatching {
+        val p = prefs(context)
+        val now = System.currentTimeMillis()
+        val lastAt = p.getLong(LAST_REQUEST_AT, 0L)
+        val crashed = lastAt > 0L && now - lastAt in 0..CRASH_WINDOW_MS
+        val edit = p.edit().putLong(READY_AT, now).remove(LAST_REQUEST_AT)
+        if (crashed) edit.putLong(PAUSED_AT, now).putString(PAUSED_AFTER, p.getString(LAST_REQUEST_KIND, null))
+        edit.apply()
+        SplitEvents.onSystemUiRestart()
+        waiting.values.forEach { it.complete(false) }
+        crashed
+    }.getOrDefault(false)
+
+    /** System UI's answer to request [request] ([value]: a number it sent back, if any). */
+    fun onResult(context: Context, request: String?, ok: Boolean, value: Int? = null) {
         request ?: return
+        if (value != null) values[request] = value
+        val kind = kinds.remove(request)
+        if (kind != null) {
+            runCatching {
+                prefs(context).edit()
+                    // LAST_REQUEST_AT stays: WM Shell can still throw on its own thread after answering.
+                    .putString(LAST_ANSWER, "$kind ${if (ok) "ok" else "failed"} at ${System.currentTimeMillis()}")
+                    .apply()
+            }
+        }
         waiting.remove(request)?.complete(ok)
     }
 
-    /** The module has said it is ready in SystemUI (since SystemUI last started, give or take). */
-    fun ready(context: Context): Boolean = Build.VERSION.SDK_INT >= 34 && runCatching {
-        val at = context.getSharedPreferences(PREFS, 0).getLong(READY_AT, 0L)
+    /** The module is running in System UI (it said so since System UI last started, give or take). */
+    fun running(context: Context): Boolean = Build.VERSION.SDK_INT >= 34 && runCatching {
+        val at = prefs(context).getLong(READY_AT, 0L)
         at > 0L && System.currentTimeMillis() - at < READY_FOR_MS
     }.getOrDefault(false)
+
+    /** The module can be asked: it is [running] and its requests aren't [paused]. */
+    fun ready(context: Context): Boolean = running(context) && !paused(context)
+
+    /** The module's requests are paused by the crash guard (System UI restarted right after one). */
+    fun paused(context: Context): Boolean = runCatching { prefs(context).getLong(PAUSED_AT, 0L) > 0L }.getOrDefault(false)
+
+    /** When the crash guard paused them, and after which request (for Settings), or null. */
+    fun pausedInfo(context: Context): Pair<Long, String?>? = runCatching {
+        val p = prefs(context)
+        val at = p.getLong(PAUSED_AT, 0L)
+        if (at > 0L) at to p.getString(PAUSED_AFTER, null) else null
+    }.getOrNull()
+
+    /** Lets the module be asked again (Settings ▸ Recents ▸ Split screen). */
+    fun resume(context: Context) {
+        runCatching { prefs(context).edit().remove(PAUSED_AT).remove(PAUSED_AFTER).apply() }
+    }
+
+    /** System UI's last answer ("startTasks ok at <ms>"), for the split screen check. */
+    fun lastAnswer(context: Context): String? = runCatching { prefs(context).getString(LAST_ANSWER, null) }.getOrNull()
+
+    /** When the module last said it started in System UI (0: never). */
+    fun readyAt(context: Context): Long = runCatching { prefs(context).getLong(READY_AT, 0L) }.getOrDefault(0L)
+
+    /**
+     * Asks the module to attach its split listener (if it isn't) and to send the split state now,
+     * so [SplitEvents] goes [SplitEvents.live] without waiting for a change.
+     */
+    suspend fun requestEvents(context: Context): Boolean {
+        if (!ready(context)) return false
+        return send(context, kind = null) { putExtra(EXTRA_EVENTS, true) }
+    }
 
     /**
      * With two apps in split screen (or about to be), adds a third as the third pane: the open task
@@ -96,7 +178,7 @@ object SplitThree {
         if (Build.VERSION.SDK_INT < 34) return false
         if (taskId == null && component == null) return false
         if (taskId == null && user != null && user != Process.myUserHandle()) return false
-        return send(context) { request ->
+        return send(context, "addThird") { request ->
             if (taskId != null) {
                 putExtra(EXTRA_TASK, taskId)
             } else if (component != null) {
@@ -118,9 +200,61 @@ object SplitThree {
      * half and half ([SNAP_EVEN]) — as if the divider had been dragged there. False when the
      * module isn't running in SystemUI or the phone has no such layout.
      */
-    suspend fun snap(context: Context, snap: Int): Boolean {
+    suspend fun snap(context: Context, snap: Int, forTask: Int = -1): Boolean {
         if (Build.VERSION.SDK_INT < 34) return false
-        return send(context) { putExtra(EXTRA_SNAP, snap) }
+        return send(context, "snap") {
+            putExtra(EXTRA_SNAP, snap)
+            if (forTask > 0) putExtra(EXTRA_SNAP_FOR_TASK, forTask)
+        }
+    }
+
+    /**
+     * The snap position the two-app split is at now, seen from [forTask] (as if it sat left / on
+     * top), or null when the module can't tell (no split, [forTask] not in it, no module).
+     */
+    suspend fun currentSnap(context: Context, forTask: Int): Int? {
+        if (Build.VERSION.SDK_INT < 34 || forTask <= 0 || !ready(context)) return null
+        var asked: String? = null
+        val ok = send(context, kind = null) { request ->
+            asked = request
+            putExtra(EXTRA_QUERY_SNAP, true)
+            putExtra(EXTRA_SNAP_FOR_TASK, forTask)
+        }
+        val value = asked?.let { values.remove(it) }
+        return if (ok) value else null
+    }
+
+    /**
+     * [intent] (a notification's tap action) into split screen beside the running task [taskId], in
+     * one step (WM Shell's `startIntentAndTask`): the intent's app on [intentOnRight]'s side, half
+     * and half. [userId] is the profile the intent belongs to.
+     */
+    suspend fun startIntentAndTask(context: Context, intent: PendingIntent, userId: Int, taskId: Int, intentOnRight: Boolean): Boolean {
+        if (Build.VERSION.SDK_INT < 34 || taskId <= 0) return false
+        return send(context, "startIntentAndTask") {
+            putExtra(EXTRA_INTENT_AND_TASK, true)
+            putExtra(EXTRA_INTENT, intent)
+            putExtra(EXTRA_USER_ID, userId)
+            putExtra(EXTRA_TASK, taskId)
+            putExtra(EXTRA_SPLIT_POSITION, if (intentOnRight) SPLIT_POSITION_RIGHT else SPLIT_POSITION_LEFT)
+            putExtra(EXTRA_SNAP_POSITION, SNAP_EVEN)
+        }
+    }
+
+    /** The snap for a scene's [layout] (AppPair.LAYOUT_*), for its first app as if it sat left / on top. */
+    fun snapForLayout(layout: String): Int = when (layout) {
+        org.arkikeskus.launcher.model.AppPair.LAYOUT_FIRST_THIRD -> SNAP_ONE_THIRD
+        org.arkikeskus.launcher.model.AppPair.LAYOUT_FIRST_TWO_THIRDS -> SNAP_TWO_THIRDS
+        org.arkikeskus.launcher.model.AppPair.LAYOUT_PEEK -> SNAP_PEEK_RIGHT
+        else -> SNAP_EVEN
+    }
+
+    /** The other way round: a scene layout for a [snap] seen from its first app. */
+    fun layoutForSnap(snap: Int?): String = when (snap) {
+        SNAP_ONE_THIRD -> org.arkikeskus.launcher.model.AppPair.LAYOUT_FIRST_THIRD
+        SNAP_TWO_THIRDS -> org.arkikeskus.launcher.model.AppPair.LAYOUT_FIRST_TWO_THIRDS
+        SNAP_PEEK_RIGHT -> org.arkikeskus.launcher.model.AppPair.LAYOUT_PEEK
+        else -> org.arkikeskus.launcher.model.AppPair.LAYOUT_EVEN
     }
 
     /**
@@ -130,7 +264,7 @@ object SplitThree {
      */
     suspend fun splitSelect(context: Context, taskId: Int, index: Int): Boolean {
         if (Build.VERSION.SDK_INT < 34) return false
-        return send(context) { putExtra(EXTRA_SELECT, 1); putExtra(EXTRA_TASK, taskId); putExtra(EXTRA_POS, index) }
+        return send(context, "splitSelect") { putExtra(EXTRA_SELECT, 1); putExtra(EXTRA_TASK, taskId); putExtra(EXTRA_POS, index) }
     }
 
     /**
@@ -141,7 +275,7 @@ object SplitThree {
      */
     suspend fun startSplitTasks(context: Context, taskId1: Int, taskId2: Int, splitPosition: Int, snapPosition: Int = SNAP_EVEN): Boolean {
         if (Build.VERSION.SDK_INT < 34 || taskId1 <= 0 || taskId2 <= 0 || taskId1 == taskId2) return false
-        return send(context) {
+        return send(context, "startTasks") {
             putExtra(EXTRA_SPLIT_TASKS, true)
             putExtra(EXTRA_TASK_1, taskId1)
             putExtra(EXTRA_TASK_2, taskId2)
@@ -156,14 +290,25 @@ object SplitThree {
      */
     suspend fun selectThird(context: Context, position: Int): Boolean {
         if (Build.VERSION.SDK_INT < 34) return false
-        return send(context) { putExtra(EXTRA_SELECT, 2); putExtra(EXTRA_POS, position) }
+        return send(context, "selectThird") { putExtra(EXTRA_SELECT, 2); putExtra(EXTRA_POS, position) }
     }
 
-    /** Sends one request to SystemUI (Android shares Folark's identity with it) and waits for the answer. */
-    private suspend fun send(context: Context, fill: Intent.(request: String) -> Unit): Boolean {
+    /**
+     * Sends one request to SystemUI (Android shares Folark's identity with it) and waits for the
+     * answer. A request that changes the split ([kind] set) is noted first, so the crash guard can
+     * tell whether a System UI restart came right after it.
+     */
+    private suspend fun send(context: Context, kind: String?, fill: Intent.(request: String) -> Unit): Boolean {
+        if (kind != null && paused(context)) return false
         val request = UUID.randomUUID().toString()
         val answer = CompletableDeferred<Boolean>()
         waiting[request] = answer
+        if (kind != null) {
+            kinds[request] = kind
+            runCatching {
+                prefs(context).edit().putLong(LAST_REQUEST_AT, System.currentTimeMillis()).putString(LAST_REQUEST_KIND, kind).apply()
+            }
+        }
         val intent = Intent(ACTION).setPackage(SYSTEMUI).putExtra(EXTRA_REQUEST, request)
         intent.fill(request)
         val sent = runCatching {
@@ -172,10 +317,14 @@ object SplitThree {
         }.isSuccess
         if (!sent) {
             waiting.remove(request)
+            kinds.remove(request)
             return false
         }
         val ok = withTimeoutOrNull(TIMEOUT_MS) { answer.await() }
         waiting.remove(request)
+        kinds.remove(request)
+        // A number nobody reads (no caller asked) mustn't pile up.
+        if (ok != true) values.remove(request)
         return ok == true
     }
 

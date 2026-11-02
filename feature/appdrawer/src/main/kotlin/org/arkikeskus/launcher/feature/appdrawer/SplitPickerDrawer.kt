@@ -5,9 +5,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,12 +28,17 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -73,6 +81,9 @@ import org.arkikeskus.launcher.model.SplitPickerLook
 import org.arkikeskus.launcher.ui.component.AppIcon
 import kotlin.math.roundToInt
 
+/** What a long-press in the split picker offers instead of putting the app in the split. */
+enum class SplitPickAction { POPUP, FULL_SCREEN, FAVORITE }
+
 /** A recently used app for the picker's top row; [thumbnail] only with previews on (and root). */
 data class SplitRecentItem(
     val taskId: Int,
@@ -88,7 +99,13 @@ data class SplitRecentItem(
  *
  * With the Zoom opening animation the tapped icon grows to fill the drawer first (the drawer sinks
  * back behind it) and [onPick] comes once it has; otherwise [onPick] comes at once.
+ *
+ * Above the apps, each as set in [look]: your favorites, the apps the dragged one was last put
+ * beside ([partners]), and the recently used ones. With [pickCount] 2 (a three-app split) taps
+ * choose two apps, numbered, and [onPickAll] gets both. [peek] non-null shows a Peek switch;
+ * [onAction] (with the long-press menu on) gets "pop-up", "full screen" and favorite choices.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SplitPickerDrawer(
     apps: List<AppItem>,
@@ -98,6 +115,12 @@ fun SplitPickerDrawer(
     look: SplitPickerLook = SplitPickerLook(),
     recents: List<SplitRecentItem> = emptyList(),
     firstPackageToHide: String = "",
+    partners: List<AppItem> = emptyList(),
+    pickCount: Int = 1,
+    onPickAll: (List<AppItem>) -> Unit = {},
+    peek: Boolean? = null,
+    onPeekChange: (Boolean) -> Unit = {},
+    onAction: ((AppItem, SplitPickAction) -> Unit)? = null,
 ) {
     val columns = look.columns.coerceIn(SplitPickerLook.MIN_COLUMNS, SplitPickerLook.MAX_COLUMNS)
     val iconSize = look.iconSize.coerceIn(SplitPickerLook.MIN_ICON, SplitPickerLook.MAX_ICON).dp
@@ -111,6 +134,21 @@ fun SplitPickerDrawer(
         val inFolders = realFolders.flatMapTo(HashSet()) { f -> f.apps.map { it.key } }
         shown.filter { it.key !in inFolders }
     }
+    val favorites = remember(shown, look.favorites, look.favoriteKeys) {
+        if (!look.favorites) emptyList()
+        else shown.associateBy { it.key }.let { byKey -> look.favoriteKeys.mapNotNull { byKey[it] } }
+    }
+    val pairedBefore = remember(partners, firstPackageToHide, look.recentPairs) {
+        if (!look.recentPairs) emptyList() else partners.filter { it.packageName != firstPackageToHide }
+    }
+    val menu = if (look.longPress && onAction != null) {
+        TileMenu(isFavorite = { it.key in look.favoriteKeys }, onAction = onAction)
+    } else {
+        null
+    }
+    // A three-app split: the apps chosen so far, in order.
+    val chosen = remember { mutableStateListOf<AppItem>() }
+    val badge: (AppItem) -> Int? = { a -> chosen.indexOfFirst { it.key == a.key }.takeIf { it >= 0 }?.plus(1) }
 
     var open by rememberSaveable { mutableStateOf<Long?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -124,9 +162,15 @@ fun SplitPickerDrawer(
     var opening by remember { mutableStateOf<Opening?>(null) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val progress = remember { Animatable(0f) }
-    val zoom = look.openAnim == SplitPickerLook.OPEN_ZOOM && ValueAnimator.areAnimatorsEnabled()
+    val zoom = pickCount == 1 && look.openAnim == SplitPickerLook.OPEN_ZOOM && ValueAnimator.areAnimatorsEnabled()
     val pick: (AppItem, Rect?) -> Unit = pick@{ app, from ->
         if (opening != null) return@pick
+        if (pickCount > 1) {
+            val at = chosen.indexOfFirst { it.key == app.key }
+            if (at >= 0) chosen.removeAt(at) else chosen.add(app)
+            if (chosen.size >= pickCount) onPickAll(chosen.toList())
+            return@pick
+        }
         if (zoom && from != null) opening = Opening(app, from.translate(-origin)) else onPick(app)
     }
     LaunchedEffect(opening) {
@@ -158,16 +202,32 @@ fun SplitPickerDrawer(
                     alpha = 1f - 0.7f * q
                 },
         ) {
+            if (pickCount > 1 || peek != null) {
+                Header(
+                    text = if (pickCount > 1) stringResource(R.string.split_picker_choose_more, chosen.size, pickCount)
+                    else stringResource(R.string.split_picker_choose),
+                    peek = peek,
+                    onPeekChange = onPeekChange,
+                )
+            }
             if (look.search && current == null) {
                 SearchField(query = query, onQuery = { query = it })
             }
-            if (!searching && current == null && look.recents != SplitPickerLook.RECENTS_OFF && recents.isNotEmpty()) {
-                RecentsRow(recents.take(look.recentsCount), previews = look.recents == SplitPickerLook.RECENTS_PREVIEWS, labels = look.labels, onPick = pick)
+            if (!searching && current == null) {
+                if (favorites.isNotEmpty()) {
+                    AppRow(stringResource(R.string.split_picker_favorites), favorites, look.labels, menu, badge, pick)
+                }
+                if (pairedBefore.isNotEmpty()) {
+                    AppRow(stringResource(R.string.split_picker_paired), pairedBefore, look.labels, menu, badge, pick)
+                }
+                if (look.recents != SplitPickerLook.RECENTS_OFF && recents.isNotEmpty()) {
+                    RecentsRow(recents.take(look.recentsCount), previews = look.recents == SplitPickerLook.RECENTS_PREVIEWS, labels = look.labels, onPick = pick)
+                }
             }
 
             when {
                 searching -> AppGrid(columns) {
-                    items(results, key = { it.key }) { app -> AppTile(app, iconSize, look.labels) { pick(app, it) } }
+                    items(results, key = { it.key }) { app -> AppTile(app, iconSize, look.labels, menu, badge(app)) { pick(app, it) } }
                 }
                 current != null -> {
                     Row(
@@ -180,14 +240,14 @@ fun SplitPickerDrawer(
                         Text(current.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                     AppGrid(columns) {
-                        items(current.apps, key = { it.key }) { app -> AppTile(app, iconSize, look.labels) { pick(app, it) } }
+                        items(current.apps, key = { it.key }) { app -> AppTile(app, iconSize, look.labels, menu, badge(app)) { pick(app, it) } }
                     }
                 }
                 else -> AppGrid(columns) {
                     items(realFolders, key = { "f${it.id}" }) { folder -> FolderTile(folder, iconSize, look.labels) { open = folder.id } }
                     val pad = (columns - realFolders.size % columns) % columns
                     if (realFolders.isNotEmpty() && pad > 0) item(span = { GridItemSpan(pad) }) { Box(Modifier) }
-                    items(loose, key = { it.key }) { app -> AppTile(app, iconSize, look.labels) { pick(app, it) } }
+                    items(loose, key = { it.key }) { app -> AppTile(app, iconSize, look.labels, menu, badge(app)) { pick(app, it) } }
                 }
             }
         }
@@ -247,6 +307,70 @@ private fun AppGrid(columns: Int, content: androidx.compose.foundation.lazy.grid
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,
     )
+}
+
+/** The picker's long-press menu: what it offers, and where the choice goes. */
+private class TileMenu(val isFavorite: (AppItem) -> Boolean, val onAction: (AppItem, SplitPickAction) -> Unit)
+
+private val ACCENT = Color(0xFF5A9BF2)
+
+/** "Choose an app" / "Choose 2 apps · 1 chosen", with the Peek switch when there is one. */
+@Composable
+private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        if (peek != null) {
+            FilterChip(
+                selected = peek,
+                onClick = { onPeekChange(!peek) },
+                label = { Text(stringResource(R.string.split_picker_peek)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    labelColor = Color.White.copy(alpha = 0.8f),
+                    selectedContainerColor = ACCENT.copy(alpha = 0.35f),
+                    selectedLabelColor = Color.White,
+                ),
+            )
+        }
+    }
+}
+
+/** A titled row of apps (favorites, paired before), like the recent apps row. */
+@Composable
+private fun AppRow(
+    title: String,
+    apps: List<AppItem>,
+    labels: Boolean,
+    menu: TileMenu?,
+    badge: (AppItem) -> Int?,
+    onPick: (AppItem, Rect?) -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            title,
+            color = Color.White.copy(alpha = 0.5f),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+        ) {
+            items(apps, key = { "${title}_${it.key}" }) { app ->
+                AppTile(app, 42.dp, labels, menu, badge(app)) { onPick(app, it) }
+            }
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            color = Color.White.copy(alpha = 0.10f),
+        )
+    }
 }
 
 @Composable
@@ -350,19 +474,52 @@ private fun RecentsRow(items: List<SplitRecentItem>, previews: Boolean, labels: 
     }
 }
 
+/**
+ * One app: tap to pick (with where its icon is, for the zoom), long-press for [menu]. [badge]: its
+ * number among the apps chosen for a three-app split.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AppTile(app: AppItem, iconSize: Dp, labels: Boolean, onClick: (Rect?) -> Unit) {
+private fun AppTile(app: AppItem, iconSize: Dp, labels: Boolean, menu: TileMenu?, badge: Int?, onClick: (Rect?) -> Unit) {
     val density = LocalDensity.current
     var bounds by remember { mutableStateOf<Rect?>(null) }
+    var expanded by remember { mutableStateOf(false) }
     Box(
         Modifier
             .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick(bounds) }
+            .combinedClickable(
+                onClick = { onClick(bounds) },
+                onLongClick = if (menu != null) ({ expanded = true }) else null,
+            )
             .padding(2.dp)
             .onGloballyPositioned { bounds = iconRect(it.boundsInRoot(), iconSize, density) },
         contentAlignment = Alignment.TopCenter,
     ) {
         AppIcon(app, labelColor = Color.White, iconSize = iconSize, showLabel = labels, maxLabelLines = 1)
+        if (badge != null) {
+            Box(
+                Modifier.align(Alignment.TopEnd).size(20.dp).clip(CircleShape).background(ACCENT),
+                contentAlignment = Alignment.Center,
+            ) { Text("$badge", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+        }
+        if (menu != null) {
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.split_picker_open_popup)) },
+                    onClick = { expanded = false; menu.onAction(app, SplitPickAction.POPUP) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.split_picker_open_full)) },
+                    onClick = { expanded = false; menu.onAction(app, SplitPickAction.FULL_SCREEN) },
+                )
+                DropdownMenuItem(
+                    text = {
+                        Text(stringResource(if (menu.isFavorite(app)) R.string.split_picker_unfavorite else R.string.split_picker_favorite))
+                    },
+                    onClick = { expanded = false; menu.onAction(app, SplitPickAction.FAVORITE) },
+                )
+            }
+        }
     }
 }
 
