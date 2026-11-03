@@ -334,7 +334,8 @@
     <string name="settings_anim_stack">Stack</string>
     <string name="settings_taskbar">Taskbar over apps</string>
     <string name="settings_taskbar_desc">On the inner screen: a handle at the bottom opens your dock apps. Drag an icon up to open it in split screen</string>
-    <string name="settings_taskbar_grant_desc">The taskbar is drawn by the accessibility service. It reads nothing from the screen</string>
+    <string name="settings_taskbar_overlay_grant">Allow display over other apps</string>
+    <string name="settings_taskbar_grant_desc">The taskbar is drawn in Folark\'s own windows over other apps. It reads nothing from the screen. Per-app rules use Usage access (or the accessibility service, if it is on)</string>
     <string name="settings_az_index_size">A-Z index bar size</string>
     <string name="settings_drawer_corner">Drawer corner radius</string>
     <string name="settings_drawer_corner_auto">Auto</string>
@@ -487,7 +488,7 @@
     <string name="settings_system_controls_needed_toast">Needs the one-time setup first: see Setup above</string>
     <string name="settings_system_controls_refused">Android didn\'t allow this change</string>
     <string name="settings_keep_accessibility">Keep Folark\'s service on</string>
-    <string name="settings_keep_accessibility_desc">If Android switches Folark\'s accessibility service off (after an update or a crash), Folark turns it back on, so the taskbar and screen lock keep working</string>
+    <string name="settings_keep_accessibility_desc">If Android switches Folark\'s accessibility service off (after an update or a crash), Folark turns it back on, so screen lock and the system actions keep working</string>
     <string name="settings_smooth_display">Smooth display</string>
     <string name="settings_smooth_display_hz">%1$d Hz</string>
     <string name="settings_system_animation_speed">System animation speed</string>
@@ -729,7 +730,7 @@
     <string name="settings_root_keep_notifications">Notification access without settings</string>
     <string name="settings_root_keep_notifications_desc">Dots, pop-ups, live activities, icon nudge</string>
     <string name="settings_root_keep_accessibility">Keep the accessibility service on</string>
-    <string name="settings_root_keep_accessibility_desc">Turned back on if Android switches it off (taskbar, lock, Recents key)</string>
+    <string name="settings_root_keep_accessibility_desc">Turned back on if Android switches it off (lock, Recents key)</string>
     <string name="settings_root_keep_widgets">Add widgets without asking</string>
     <string name="settings_root_keep_widgets_desc">No "Allow Folark to create widgets?" question</string>
     <string name="settings_root_state_granted">granted</string>

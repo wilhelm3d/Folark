@@ -62,5 +62,8 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                     runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.StatusBarPaddingHook.CHANGED_URI, null) }
                 }
         }
+        // Folark's taskbar in its own overlay windows, when "Display over other apps" is allowed
+        // (otherwise the accessibility service hosts it, if enabled).
+        runCatching { org.arkikeskus.launcher.feature.home.TaskbarHost.refresh(this) }
     }
 }

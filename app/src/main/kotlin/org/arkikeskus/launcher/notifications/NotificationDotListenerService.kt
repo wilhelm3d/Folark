@@ -286,10 +286,20 @@ class NotificationDotListenerService : NotificationListenerService() {
         badgeRepository.nudge("${sbn.packageName}/$serial", color)
     }
 
+    /** Icon colours by "package:lastUpdateTime", so an app update (a new icon) is coloured afresh. */
     private val iconColors = HashMap<String, Int?>()
 
     /** The most vivid colour of an app's icon (its brand colour, usually), or null for a grey one. */
-    private fun iconColor(pkg: String): Int? = iconColors.getOrPut(pkg) {
+    private fun iconColor(pkg: String): Int? {
+        val updated = runCatching { packageManager.getPackageInfo(pkg, 0).lastUpdateTime }.getOrDefault(0L)
+        val key = "$pkg:$updated"
+        if (iconColors.containsKey(key)) return iconColors[key]
+        // An older entry of the same app is stale now.
+        iconColors.keys.removeAll { it.startsWith("$pkg:") }
+        return computeIconColor(pkg).also { iconColors[key] = it }
+    }
+
+    private fun computeIconColor(pkg: String): Int? =
         runCatching {
             val drawable = packageManager.getApplicationIcon(pkg)
             val size = 24
@@ -301,8 +311,10 @@ class NotificationDotListenerService : NotificationListenerService() {
             var r = 0f
             var g = 0f
             var b = 0f
-            for (y in 0 until size) for (x in 0 until size) {
-                val c = bitmap.getPixel(x, y)
+            // One call for all pixels instead of one per pixel.
+            val pixels = IntArray(size * size)
+            bitmap.getPixels(pixels, 0, size, 0, 0, size, size)
+            for (c in pixels) {
                 if (android.graphics.Color.alpha(c) < 200) continue
                 android.graphics.Color.colorToHSV(c, hsv)
                 // Vivid, not too dark or washed out, counts most.
@@ -316,7 +328,6 @@ class NotificationDotListenerService : NotificationListenerService() {
             bitmap.recycle()
             if (weight < 1f) null else android.graphics.Color.rgb((r / weight).toInt(), (g / weight).toInt(), (b / weight).toInt())
         }.getOrNull()
-    }
 
     /** Keep the notification active in Android so every new message can be checked for exceptions. */
     private fun holdForBatch(sbn: StatusBarNotification) {

@@ -21,8 +21,8 @@
 - **Independent Screen Profiles**: Maintain separate workspace grid configurations (up to 8x8), icon sizes, dock items, wallpapers, and background themes for the outer cover display vs. inner main display.
 - **Hardware-Accurate Posture Detection**: Real-time posture tracking using Android `WindowInfoTracker` supporting Closed, Flat (Unfolded), and Half-Opened / Flex Tabletop postures.
 - **Live Hinge Unfold Animations**: Spatial 3D book-sweep, portal, drop, water-ripple, and doors unfold transitions tied directly to physical hinge angle sensors.
-- **Hinge-Aware Parallax Wallpapers**: Gyroscope/accelerometer motion-sensor driven wallpaper depth shift across the fold crease.
-- **LTPO Dynamic Refresh Rate Throttling**: Ramps refresh rate up to 120Hz/144Hz during touch gestures, automatically stepping down to 60Hz after 3 seconds of inactivity to preserve battery life.
+- **Hinge-Aware Parallax Wallpapers**: Rotation-vector (gyroscope fallback) driven wallpaper depth shift across the fold crease.
+- **Adaptive Refresh Rate**: On Android 16+ displays with adaptive refresh rate (LTPO), Folark leaves the rate to the system so a still home screen can drop below 60 Hz. On other displays it asks for the panel's top mode (capped by Smooth display) while touched and settles at 60 Hz about 3 seconds after the last touch.
 - **Fold-Aware Orientation Lock**: Respects separate orientation preferences for closed vs opened fold states.
 
 ---
@@ -41,7 +41,7 @@
 - **Live Task Screenshots (`LruCache`)**: High-resolution task screenshots decoded on-demand via a daemonized root shell (`RootTasks.snapshot`) with 720px `RGB_565` downsampling to keep RAM under 48MB.
 - **Individual & Batch App Termination**: Force-stop specific background apps or execute "Close All" while protecting pinned apps.
 - **Process Memory Protection (Pin Keep-Alive)**: Pin critical apps to the top of Recents and use root process protection (`RootTasks.protect`) to prevent Android's OOM killer from terminating them.
-- **Daemonized `su` Shell Architecture**: High-performance persistent root shell session (`RootShell`) with automatic 30s idle timeout and fast IPC execution (~1-5ms response).
+- **Daemonized `su` Shell Architecture**: Persistent root shells (`RootShell`), one for quick commands and one for slow jobs such as screenshots, each closed after 30 s idle; a command costs milliseconds instead of a new `su` start.
 
 ---
 
@@ -65,16 +65,16 @@
 ---
 
 ### 🪟 6. Multitasking, Gestures & Taskbar
-- **Accessibility Taskbar Overlay**: A pull-up taskbar for unfolded displays that works above all apps without requiring system overlay permissions.
+- **Taskbar Overlay**: A pull-up taskbar for unfolded displays that works above all apps, drawn in Folark's own windows with "Display over other apps" (falls back to the accessibility service only without that permission).
 - **App Pair & Triple-App Creator**: Group up to 3 apps into single-tap split-screen / floating window shortcuts with deep intent support.
-- **Double-Tap To Lock (`LockAccessibilityService`)**: Instant screen locking via Accessibility Service or root.
+- **Double-Tap To Lock (`LockAccessibilityService`)**: Instant screen locking via Accessibility Service or root. The service never reads screen content; it follows the app in front only while taskbar per-app rules or Replace Android's Recents need it.
 - **Morphing App Transitions**: Smooth `makeClipRevealAnimation` transitions connecting app icons to launching activities.
 - **Tactile Bouncy Scale Feedback**: Spring-based touch scale feedback on icon presses and card taps.
 
 ---
 
 ### ⚡ 7. Android 17 & Architecture Efficiency
-- **AppFunctions Search Integration**: On-device natural language and quick-action search indexing powered by Android 16/17 AppFunctions APIs.
+- **On-Device Search Actions**: Quick actions typed into search ("timer 10 min", "alarm 7:30"), calculator and unit conversion, contacts, app shortcuts and settings, all on the device.
 - **Zero-Wakeup Minute Ticker**: Syncs UI clock elements precisely at minute boundaries without continuous CPU wakeups.
 - **100% Lifecycle-Aware Flow Collection**: Every state subscription uses `collectAsStateWithLifecycle()`, automatically pausing flow collection when screens are covered or off.
 - **Eager App Caching**: Background package events and Binder IPC callback scans are shared eagerly across all ViewModels to eliminate duplicate system scans.

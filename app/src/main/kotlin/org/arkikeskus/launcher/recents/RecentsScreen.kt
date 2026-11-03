@@ -420,6 +420,10 @@ internal fun RecentsScreen(
                 Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (edgeToEdge) 0.dp else side)) {
                     when {
                         !state.canList -> NeedsGrant(accent)
+                        state.unreadable -> Text(
+                            stringResource(R.string.recents_unreadable),
+                            color = Muted, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center),
+                        )
                         !state.loading && state.cards.isEmpty() -> Text(
                             stringResource(R.string.recents_nothing_open_long),
                             color = Muted, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center),

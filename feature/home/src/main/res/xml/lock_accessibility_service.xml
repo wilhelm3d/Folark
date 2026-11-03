@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Deliberately minimal: no accessibilityEventTypes (the service receives no events) and no
-     window-content access. The service exists solely for performGlobalAction(LOCK_SCREEN). -->
+<!-- Deliberately minimal: no accessibilityEventTypes by default and no window-content access.
+     The service turns TYPE_WINDOW_STATE_CHANGED on at runtime only while taskbar per-app rules or
+     "Replace Android's Recents" need the app in front (LockAccessibilityService.watchApps). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/lock_service_description"
     android:accessibilityFeedbackType="feedbackGeneric"

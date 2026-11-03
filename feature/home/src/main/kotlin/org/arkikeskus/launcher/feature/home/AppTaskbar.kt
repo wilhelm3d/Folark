@@ -172,13 +172,24 @@ private data class TaskbarSetup(
  *  - Tap an icon to open the app. Drag it up and to the right for split screen, up and to the left
  *    for a floating window.
  *
- * It lives in accessibility overlay windows owned by [LockAccessibilityService], the only kind of
- * window an app may keep above other apps, full-screen ones included, without the "display over
- * other apps" permission. It draws its own views and starts apps; it reads nothing from the screen.
+ * It lives in application overlay windows when the user allowed "Display over other apps" (hosted by
+ * [TaskbarHost]), and otherwise in accessibility overlay windows owned by [LockAccessibilityService].
+ * It draws its own views and starts apps; it reads nothing from the screen.
  * Recent apps come from Android's usage history when the user allowed Usage access, otherwise from
  * the apps opened through Folark.
  */
-internal class AppTaskbar(private val context: Context) {
+internal class AppTaskbar(
+    private val context: Context,
+    /** The window type of every window of the bar: an ordinary application overlay when Folark may
+     *  display over other apps (see [TaskbarHost]), else the accessibility service's overlay. */
+    private val windowType: Int = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+) {
+
+    /** Application overlays are untrusted: Android 12+ blocks touches through a NOT_TOUCHABLE one
+     *  unless it is at most this opaque (InputManager's maximum obscuring opacity). */
+    private val passThroughAlpha: Float? =
+        if (windowType == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) MAX_OBSCURING_ALPHA else null
+
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
@@ -401,7 +412,10 @@ internal class AppTaskbar(private val context: Context) {
                 // Per-app rules need to know which app is in front: only then is the service told.
                 // ...and so does handing Android's Recents over to Folark Recents.
                 LockAccessibilityService.replaceSystemRecents = next.replaceRecents
-                LockAccessibilityService.watchApps(next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty() || next.autoHideApps.isNotEmpty() || next.miniApps.isNotEmpty() || next.replaceRecents)
+                val perAppRules = next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty() || next.autoHideApps.isNotEmpty() || next.miniApps.isNotEmpty()
+                LockAccessibilityService.watchApps(perAppRules || next.replaceRecents)
+                // Without the accessibility service, the app in front comes from the usage history.
+                TaskbarHost.watchApps(context, perAppRules && next.enabled)
                 // The media session is only followed while the media icon is wanted.
                 if (next.enabled && next.mediaEnabled) media.start() else media.stop()
                 // Only Folark's own launch order moved (every launch): rebuild only if the recent apps changed.
@@ -568,10 +582,14 @@ internal class AppTaskbar(private val context: Context) {
         val params = WindowManager.LayoutParams(
             1,
             1,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.TOP or Gravity.START }
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            // Nothing to see in it, and as an application overlay it must not block touches below.
+            if (passThroughAlpha != null) alpha = 0f
+        }
         if (runCatching { windowManager.addView(view, params) }.isSuccess) probe = view
     }
 
@@ -596,7 +614,7 @@ internal class AppTaskbar(private val context: Context) {
 
     private var lastNightMode = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
 
-    /** A fold, unfold, rotation or dark/light switch (from the accessibility service). */
+    /** A fold, unfold, rotation or dark/light switch (from its host). */
     fun onConfigurationChanged() {
         val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         val nightChanged = night != lastNightMode
@@ -622,7 +640,7 @@ internal class AppTaskbar(private val context: Context) {
     private fun params(gravity: Int, x: Int, y: Int, watchOutside: Boolean = false) = WindowManager.LayoutParams(
         WindowManager.LayoutParams.WRAP_CONTENT,
         WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+        windowType,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             (if (watchOutside) WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH else 0) or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
@@ -1445,7 +1463,7 @@ internal class AppTaskbar(private val context: Context) {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -1687,7 +1705,7 @@ internal class AppTaskbar(private val context: Context) {
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                windowType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -1797,7 +1815,7 @@ internal class AppTaskbar(private val context: Context) {
         val params = WindowManager.LayoutParams(
             width,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -2096,13 +2114,13 @@ internal class AppTaskbar(private val context: Context) {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
-        )
+        ).apply { passThroughAlpha?.let { alpha = it } }
         if (runCatching { windowManager.addView(root, params) }.isSuccess) {
             ghostWindow = root
             ghostIcon = copy
@@ -2643,6 +2661,9 @@ internal class AppTaskbar(private val context: Context) {
         private const val HANDLE_HEIGHT_DP = 40
         private const val RECENT_WINDOW_MS = 12L * 60 * 60 * 1000
         private const val USAGE_OVERLAP_MS = 10_000L
+
+        /** InputManager.getMaximumObscuringOpacityForTouch()'s default (Android 12+). */
+        private const val MAX_OBSCURING_ALPHA = 0.8f
 
         /** Whether Folark's own home screen (or its app drawer) is in front. */
         @Volatile

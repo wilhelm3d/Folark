@@ -81,9 +81,16 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = if (keystorePropsFile.exists()) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            // No key file: the release APK is left UNSIGNED (never signed with the debug key, which
+            // anyone has and which would lock installed copies to it). F-Droid's build server signs
+            // unsigned releases itself, so this must not fail the build either.
+            signingConfig = if (keystorePropsFile.exists()) signingConfigs.getByName("release") else null
         }
     }
+}
+
+if (!keystorePropsFile.exists()) {
+    logger.warn("Folark: no keystore.properties - assembleRelease builds an UNSIGNED APK (sign it, or add the key file).")
 }
 
 dependencies {

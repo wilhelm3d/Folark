@@ -101,7 +101,7 @@ class RecentsHook : IXposedHookLoadPackage {
                     if (!replaceOn(context)) return
                     val home = target.declaringJavaClass.enumConstants?.firstOrNull { (it as Enum<*>).name == "HOME" } ?: return
                     param.result = home
-                    main.postDelayed({ openFolarkRecents(context, toggle = false) }, AFTER_HOME_MS)
+                    main.postDelayed({ openFolarkRecents(context, toggle = false) }, afterHomeMs(context))
                 }
             })
         } else {
@@ -241,6 +241,20 @@ class RecentsHook : IXposedHookLoadPackage {
         }.onFailure { log("can't open Folark Recents: $it") }
     }
 
+    /**
+     * How long the launcher's swipe-home animation runs here: [AFTER_HOME_MS] at normal speed,
+     * scaled by Developer options ▸ Animator duration scale (0 when animations are off), so Folark
+     * Recents neither waits on a fast phone nor covers a slow animation half-way.
+     */
+    private fun afterHomeMs(context: Context): Long {
+        val scale = runCatching {
+            android.provider.Settings.Global.getFloat(
+                context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
+            )
+        }.getOrDefault(1f).coerceIn(0f, 10f)
+        return (AFTER_HOME_MS * scale).toLong().coerceAtLeast(MIN_AFTER_HOME_MS)
+    }
+
     private fun appContext(): Context? = runCatching {
         Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as? Context
     }.getOrNull()
@@ -270,6 +284,8 @@ class RecentsHook : IXposedHookLoadPackage {
 
         /** Lets the launcher's own swipe-home finish before Folark Recents opens over home. */
         private const val AFTER_HOME_MS = 260L
+        /** Even with animations off, a frame or two for the launcher to finish going home. */
+        private const val MIN_AFTER_HOME_MS = 32L
         /** How old Folark's answer may be before it is asked again (in the background). */
         private const val CACHE_MS = 30_000L
 

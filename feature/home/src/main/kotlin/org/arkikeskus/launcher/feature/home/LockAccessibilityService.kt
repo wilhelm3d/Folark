@@ -9,28 +9,50 @@ import org.arkikeskus.launcher.data.root.RootActions
 import org.arkikeskus.launcher.data.root.RootFeatures
 
 /**
- * Double-tap-to-lock, and the host of the optional taskbar over other apps.
+ * Double-tap-to-lock, a few system actions, and the fallback host of the taskbar.
  *
  * Locking: `performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)` when the home screen detects a
  * double-tap on empty space — locking the screen simply isn't possible for a normal app any other
- * way (short of a device-admin policy that breaks fingerprint unlock).
+ * way (short of a device-admin policy that breaks fingerprint unlock). Also Android's Recents,
+ * quick switch, split-screen toggle and the divider drag (a dispatched gesture).
  *
- * Taskbar (Settings ▸ off by default): [AppTaskbar] draws Folark's own handle and app row in an
- * accessibility overlay window, the only window an app may keep above other apps without the
- * "display over other apps" permission.
+ * Taskbar: normally drawn in Folark's own overlay windows ([TaskbarHost], "Display over other
+ * apps"). Only without that permission does this service host it in accessibility overlay windows.
  *
- * Either way the service reads no accessibility events and no screen content: see
- * res/xml/lock_accessibility_service.xml (no event types, no window content).
+ * What it reads: no screen content, ever (res/xml/lock_accessibility_service.xml: no window
+ * content). By default it also receives no events. Only while taskbar per-app rules exist, or
+ * while Settings ▸ Recents ▸ Replace Android's Recents is on, does it subscribe to
+ * TYPE_WINDOW_STATE_CHANGED ([watchApps]), and from those it reads only the package and class name
+ * of the window that came to the front.
  */
 class LockAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        taskbar = AppTaskbar(this).also { it.start() }
+        // The taskbar may have asked for the app in front before the service was connected.
+        watchApps(watchWanted)
+        hostTaskbarIfNeeded()
+        TaskbarHost.onAccessibilityChanged(this)
     }
 
     private var taskbar: AppTaskbar? = null
+
+    /** Hosts the taskbar here only when Folark's own overlay host can't run it. */
+    private fun hostHere() {
+        if (taskbar != null || TaskbarHost.overlayRunning || TaskbarHost.canUseOverlay(this)) return
+        taskbar = AppTaskbar(this).also {
+            it.start()
+            TaskbarHost.attachAccessibilityBar(it)
+        }
+    }
+
+    private fun releaseHere() {
+        val bar = taskbar ?: return
+        taskbar = null
+        bar.stop()
+        TaskbarHost.attachAccessibilityBar(null)
+    }
 
     /** Folding or unfolding: the taskbar only belongs on the large display. */
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -39,8 +61,8 @@ class LockAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Only while Settings ▸ Taskbar has per-app rules (see [watchApps]): which app came to the
-     * front, by package name. Nothing else is read from the event.
+     * Only while per-app taskbar rules exist or Replace Android's Recents is on (see [watchApps]):
+     * which app came to the front, by package and class name. Nothing else is read from the event.
      */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
@@ -51,7 +73,8 @@ class LockAccessibilityService : AccessibilityService() {
         }
         // System UI (shade, Recents) and the keyboard aren't apps in front.
         if (pkg == "com.android.systemui" || pkg == keyboardPackage()) return
-        taskbar?.onForegroundApp(pkg)
+        // Whichever host runs the bar (the overlay one too: this is more exact than usage events).
+        TaskbarHost.onForegroundApp(pkg)
     }
 
     /** Android's Recents screen: the system's Recents app (Motorola's launcher here) showing its Recents activity. */
@@ -109,13 +132,29 @@ class LockAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         if (instance === this) instance = null
-        taskbar?.stop()
-        taskbar = null
+        releaseHere()
+        TaskbarHost.onAccessibilityChanged(this)
         super.onDestroy()
     }
 
     companion object {
         private var instance: LockAccessibilityService? = null
+
+        /** What [watchApps] was last asked, applied again when the service connects. */
+        @Volatile private var watchWanted = false
+
+        /** Whether the service is enabled and connected now. */
+        val isRunning: Boolean get() = instance != null
+
+        /** Folark's overlay host takes the taskbar: the service gives its own up. */
+        fun releaseTaskbar() {
+            instance?.releaseHere()
+        }
+
+        /** The overlay host stopped (no permission any more): the service hosts the bar if it runs. */
+        fun hostTaskbarIfNeeded() {
+            instance?.hostHere()
+        }
 
         /** Settings ▸ Recents ▸ Replace Android's Recents (kept up to date by the taskbar's settings). */
         @Volatile var replaceSystemRecents: Boolean = false
@@ -128,7 +167,7 @@ class LockAccessibilityService : AccessibilityService() {
         fun setHomeVisible(visible: Boolean) {
             if (AppTaskbar.homeVisible == visible) return
             AppTaskbar.homeVisible = visible
-            instance?.taskbar?.onHomeVisibilityChanged()
+            TaskbarHost.current?.onHomeVisibilityChanged()
         }
 
         /**
@@ -190,6 +229,7 @@ class LockAccessibilityService : AccessibilityService() {
 
         /** Hears which app comes to the front ([on]), or nothing at all (the default). */
         fun watchApps(on: Boolean) {
+            watchWanted = on
             val service = instance ?: return
             runCatching {
                 val info = service.serviceInfo ?: return

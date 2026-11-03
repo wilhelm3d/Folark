@@ -123,7 +123,7 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
                 context.startActivity(intent)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("NotificationWidget", "can't open $packageName", e)
         }
     }
 }

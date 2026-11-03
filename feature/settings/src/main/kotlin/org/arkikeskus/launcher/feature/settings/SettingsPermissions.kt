@@ -145,21 +145,26 @@ internal fun StatusBarToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) 
     )
 }
 
-/** The taskbar over other apps: it is drawn by the accessibility service, so that must be allowed. */
+/**
+ * The taskbar over other apps: drawn in Folark's own overlay windows, so "Display over other apps"
+ * must be allowed (the accessibility service is no longer needed for it).
+ */
 @Composable
 internal fun TaskbarToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
     val context = LocalContext.current
-    var serviceEnabled by remember { mutableStateOf(lockServiceEnabled(context)) }
+    var overlayAllowed by remember { mutableStateOf(canDrawOverlays(context)) }
     LifecycleResumeEffect(Unit) {
-        serviceEnabled = lockServiceEnabled(context)
+        overlayAllowed = canDrawOverlays(context)
         onPauseOrDispose { }
     }
-    fun openAccessibilitySettings() {
-        runCatching {
-            context.startActivity(
-                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
+    fun openOverlaySettings() {
+        val exact = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", context.packageName, null))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opened = runCatching { context.startActivity(exact) }.isSuccess
+        if (!opened) {
+            runCatching {
+                context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
         }
     }
     ExpressiveSwitchRow(
@@ -168,17 +173,20 @@ internal fun TaskbarToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
         checked = enabled,
         onCheckedChange = { wantOn ->
             onSetEnabled(wantOn)
-            if (wantOn && !lockServiceEnabled(context)) openAccessibilitySettings()
+            if (wantOn && !canDrawOverlays(context)) openOverlaySettings()
         },
     )
-    if (enabled && !serviceEnabled) {
+    if (enabled && !overlayAllowed) {
         ExpressiveActionItem(
-            title = stringResource(R.string.settings_double_tap_lock_grant),
+            title = stringResource(R.string.settings_taskbar_overlay_grant),
             description = stringResource(R.string.settings_taskbar_grant_desc),
-            onClick = { openAccessibilitySettings() },
+            onClick = { openOverlaySettings() },
         )
     }
 }
+
+internal fun canDrawOverlays(context: Context): Boolean =
+    runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
 
 @Composable
 internal fun PermissionsSection(

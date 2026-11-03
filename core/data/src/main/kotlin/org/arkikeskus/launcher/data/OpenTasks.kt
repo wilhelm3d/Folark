@@ -23,7 +23,39 @@ object OpenTasks {
     /** The open apps, newest first; null without the DUMP grant (or when Android refused). */
     fun list(context: android.content.Context): List<OpenTask>? {
         val text = ShellSplit.dump(context, arrayOf("recents")) ?: return null
-        return parse(text, context.packageName)
+        val tasks = parse(text, context.packageName)
+        val problem = formatProblem(text, tasks)
+        if (problem != null && formatProblem == null) {
+            android.util.Log.w("OpenTasks", "dumpsys activity recents not understood: $problem")
+        }
+        formatProblem = problem
+        return tasks
+    }
+
+    /**
+     * Why the last read of the task list looked unreadable (Android printed tasks in a form this
+     * parser doesn't know, e.g. after a system update), or null when it read fine. An empty list
+     * with a problem set means "can't tell", not "nothing open". Shown in Recents and in
+     * Settings ▸ Recents ▸ Check split screen.
+     */
+    @Volatile
+    var formatProblem: String? = null
+        private set
+
+    /** Pure check, for tests: tasks are in [text] but [parsed] found none of them. */
+    fun formatProblem(text: String, parsed: List<OpenTask>): String? {
+        if (parsed.isNotEmpty()) return null
+        val blocks = text.lineSequence().count { it.contains("Recent #") }
+        val taskLines = TASK_ID.findAll(text).count() + TASK_ID_FIELD.findAll(text).count()
+        return when {
+            // "Recent #" blocks whose task id, type or package can't be read. Blocks that are all
+            // home/Recents (type≠standard) or Folark itself are a real empty list, not a problem.
+            blocks > 0 && text.lineSequence().filter { it.contains("Recent #") }
+                .none { TASK_ID.containsMatchIn(it) || TYPE.containsMatchIn(it) } ->
+                "$blocks task entries without a readable id or type"
+            blocks == 0 && taskLines > 0 -> "$taskLines tasks listed, but no \"Recent #\" entries"
+            else -> null
+        }
     }
 
     /**

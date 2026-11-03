@@ -41,10 +41,16 @@ object SystemTaskbar {
         if (mode !in listOf(MODE_ALWAYS, MODE_GESTURE, MODE_OFF)) return false
         val pkg = launcherPackage()
         if (!Regex("^[A-Za-z0-9_.]+$").matches(pkg)) return false
+        // The launcher is stopped BEFORE the edit (a running launcher writes its prefs back from
+        // memory and would undo it), and again after it, in case Android restarted it in between
+        // (it is the bound Recents/gesture service) and it read the old file.
         val script = """
-            F=/data/user_de/0/$pkg/shared_prefs/boot_aware_prefs.xml
+            U=${'$'}(am get-current-user 2>/dev/null | tr -cd '0-9')
+            [ -n "${'$'}U" ] || U=0
+            F=/data/user_de/${'$'}U/$pkg/shared_prefs/boot_aware_prefs.xml
             D=${'$'}(dirname "${'$'}F")
             [ -d "${'$'}D" ] || exit 1
+            am force-stop --user ${'$'}U $pkg
             [ -f "${'$'}F" ] || printf '<?xml version="1.0" encoding="utf-8" standalone="yes" ?>\n<map>\n</map>\n' > "${'$'}F"
             if grep -q 'name="TASKBAR_MODE_NO_BUTTON_KEY"' "${'$'}F"; then
               sed -i 's|<int name="TASKBAR_MODE_NO_BUTTON_KEY" value="[0-9]*" />|<int name="TASKBAR_MODE_NO_BUTTON_KEY" value="$mode" />|' "${'$'}F"
@@ -54,7 +60,7 @@ object SystemTaskbar {
             chown ${'$'}(stat -c %u:%g "${'$'}D") "${'$'}F"
             chmod 660 "${'$'}F"
             restorecon "${'$'}F" 2>/dev/null
-            am force-stop $pkg
+            am force-stop --user ${'$'}U $pkg
             grep -o 'name="TASKBAR_MODE_NO_BUTTON_KEY" value="[0-9]*"' "${'$'}F"
         """.trimIndent()
         return RootShell.available() && RootShell.run(script, APPLY_TIMEOUT_MS)?.contains("value=\"$mode\"") == true

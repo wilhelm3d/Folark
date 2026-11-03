@@ -15,7 +15,7 @@ object RootTasks {
      */
     fun snapshot(taskId: Int, userId: Int): ByteArray? {
         if (taskId < 0 || userId < 0) return null
-        return RootShell.runBytes(snapshotCommand(taskId, userId))?.takeIf { it.size > MIN_JPEG_BYTES }
+        return RootShell.runBytes(snapshotCommand(taskId, userId), bulk = true)?.takeIf { it.size > MIN_JPEG_BYTES }
     }
 
     private fun snapshotCommand(taskId: Int, userId: Int): String {

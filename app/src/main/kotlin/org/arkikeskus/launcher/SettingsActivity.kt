@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
 import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
@@ -33,7 +34,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val foldStates = foldStateMonitor.foldStateFlow(this, lifecycleScope)
+        val foldStates = foldStateMonitor.foldStateFlow(this, lifecycleScope, recheck = configChanges)
         setContent {
             val foldState by foldStates.collectAsStateWithLifecycle()
             val screenType = foldState.screenType
@@ -68,5 +69,13 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** A fold/unfold moves this window to another display: the fold state is worked out again. */
+    private val configChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        configChanges.tryEmit(Unit)
     }
 }

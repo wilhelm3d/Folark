@@ -62,6 +62,9 @@ data class RecentsState(
     val canList: Boolean = true,
     val root: Boolean = false,
     val cards: List<RecentsCard> = emptyList(),
+    /** Android listed tasks in a form Folark can't read (see OpenTasks.formatProblem): an empty
+     *  list then means "can't tell", not "nothing open". */
+    val unreadable: Boolean = false,
 )
 
 @HiltViewModel
@@ -105,6 +108,9 @@ class RecentsViewModel @Inject constructor(
 
     private suspend fun load(s: LauncherSettings): RecentsState {
         val tasks = OpenTasks.list(context) ?: return RecentsState(loading = false, canList = false)
+        if (tasks.isEmpty() && OpenTasks.formatProblem != null) {
+            return RecentsState(loading = false, canList = true, unreadable = true)
+        }
         val needRoot = s.recents.thumbnails || s.recents.rootClose || (s.recents.pinned.isNotEmpty() && (s.recents.pinKeepAlive || s.recents.btnCloseAll))
         val root = needRoot && RootShell.available()
         val apps = appRepository.apps.first()

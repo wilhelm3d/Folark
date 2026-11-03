@@ -1,0 +1,188 @@
+package org.arkikeskus.launcher.feature.home
+
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
+import android.content.ComponentCallbacks
+import android.content.Context
+import android.content.res.Configuration
+import android.hardware.display.DisplayManager
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
+import android.view.Display
+import android.view.WindowManager
+
+/**
+ * Where Folark's taskbar ([AppTaskbar]) lives.
+ *
+ * - **Overlay** (preferred): when the user allowed "Display over other apps", the bar runs in
+ *   ordinary application overlay windows owned by Folark's own process. No accessibility service is
+ *   needed for it, which is what app stores expect of a taskbar. While its windows show, Android
+ *   keeps the process at "perceptible" priority, so no foreground service (and no notification) is
+ *   needed either.
+ * - **Accessibility** (fallback): without that permission, [LockAccessibilityService] hosts it in
+ *   accessibility overlay windows, as before, if the user enabled the service.
+ *
+ * Only one host runs the bar at a time. [refresh] decides; it is called when Folark starts and each
+ * time home comes back (the permission may have been given or taken in the meantime). Main thread.
+ */
+object TaskbarHost {
+
+    /** The bar that runs now, whichever host owns it; null when none runs. */
+    @Volatile
+    internal var current: AppTaskbar? = null
+        private set
+
+    /** The overlay-hosted bar, with its window context and the callbacks registered on it. */
+    private var overlayBar: AppTaskbar? = null
+    private var overlayContext: Context? = null
+    private var overlayCallbacks: ComponentCallbacks? = null
+
+    /** Whether the bar runs in Folark's own overlay windows right now. */
+    val overlayRunning: Boolean get() = overlayBar != null
+
+    /** Whether Folark may display over other apps (the overlay host can run). */
+    fun canUseOverlay(context: Context): Boolean = runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
+
+    /** Starts or stops the overlay host to match the permission; hands the bar over between hosts. */
+    fun refresh(context: Context) {
+        val app = context.applicationContext
+        if (canUseOverlay(app)) {
+            if (overlayBar == null) {
+                // The accessibility service gives its bar up first: two bars would double every window.
+                LockAccessibilityService.releaseTaskbar()
+                startOverlay(app)
+            }
+        } else if (overlayBar != null) {
+            stopOverlay()
+            LockAccessibilityService.hostTaskbarIfNeeded()
+        }
+    }
+
+    private fun startOverlay(app: Context) {
+        val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        val windowContext = runCatching {
+            val display = app.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+                ?: return@runCatching null
+            app.createDisplayContext(display).createWindowContext(type, null)
+        }.getOrNull() ?: return
+        val bar = AppTaskbar(windowContext, type)
+        val callbacks = object : ComponentCallbacks {
+            // A fold or unfold: the bar only belongs on the large display.
+            override fun onConfigurationChanged(newConfig: Configuration) {
+                overlayBar?.onConfigurationChanged()
+            }
+
+            @Deprecated("Required by ComponentCallbacks")
+            override fun onLowMemory() = Unit
+        }
+        runCatching { windowContext.registerComponentCallbacks(callbacks) }
+        overlayContext = windowContext
+        overlayCallbacks = callbacks
+        overlayBar = bar
+        current = bar
+        bar.start()
+    }
+
+    private fun stopOverlay() {
+        val bar = overlayBar ?: return
+        stopWatching()
+        bar.stop()
+        overlayCallbacks?.let { cb -> runCatching { overlayContext?.unregisterComponentCallbacks(cb) } }
+        overlayBar = null
+        overlayContext = null
+        overlayCallbacks = null
+        if (current === bar) current = null
+    }
+
+    /** The accessibility service took the bar (no overlay permission) or gave it back. */
+    internal fun attachAccessibilityBar(bar: AppTaskbar?) {
+        if (overlayBar == null) current = bar
+    }
+
+    // ---------------------------------------------------------------- the app in front
+
+    /**
+     * Per-app taskbar rules need to know which app is in front. The accessibility service hears it
+     * directly when it is on; without it, the overlay host reads Android's usage events (Usage
+     * access) about once a second, and only while there are rules and the screen is on.
+     */
+    fun watchApps(context: Context, on: Boolean) {
+        val main = Looper.getMainLooper()
+        if (Looper.myLooper() != main) {
+            Handler(main).post { watchApps(context, on) }
+            return
+        }
+        wantWatch = on
+        if (on && overlayBar != null && !LockAccessibilityService.isRunning) startWatching(context.applicationContext)
+        else stopWatching()
+    }
+
+    /** The accessibility service saw [packageName] come to the front. */
+    internal fun onForegroundApp(packageName: String) {
+        current?.onForegroundApp(packageName)
+    }
+
+    private var wantWatch = false
+    private var watcher: HandlerThread? = null
+    private var watchHandler: Handler? = null
+    private var lastEventAt = 0L
+    private var lastForeground: String? = null
+
+    private fun startWatching(app: Context) {
+        if (watcher != null) return
+        val thread = HandlerThread("folark-taskbar-apps").apply { start() }
+        val handler = Handler(thread.looper)
+        watcher = thread
+        watchHandler = handler
+        lastEventAt = System.currentTimeMillis() - FIRST_LOOK_BACK_MS
+        val usage = app.getSystemService(UsageStatsManager::class.java)
+        val power = app.getSystemService(PowerManager::class.java)
+        val main = Handler(Looper.getMainLooper())
+        val tick = object : Runnable {
+            override fun run() {
+                if (watchHandler !== handler) return
+                if (power?.isInteractive != false && usage != null) {
+                    val now = System.currentTimeMillis()
+                    var newest: String? = null
+                    runCatching {
+                        val events = usage.queryEvents(lastEventAt, now)
+                        val event = UsageEvents.Event()
+                        while (events.hasNextEvent()) {
+                            events.getNextEvent(event)
+                            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                                newest = event.packageName
+                                lastEventAt = maxOf(lastEventAt, event.timeStamp)
+                            }
+                        }
+                    }
+                    val pkg = newest
+                    if (pkg != null && pkg != lastForeground && pkg != "com.android.systemui") {
+                        lastForeground = pkg
+                        main.post { current?.onForegroundApp(pkg) }
+                    }
+                }
+                handler.postDelayed(this, WATCH_EVERY_MS)
+            }
+        }
+        handler.post(tick)
+    }
+
+    private fun stopWatching() {
+        watchHandler?.removeCallbacksAndMessages(null)
+        watchHandler = null
+        watcher?.quitSafely()
+        watcher = null
+        lastForeground = null
+    }
+
+    /** The accessibility service started or stopped: it hears the app in front itself, or no longer. */
+    internal fun onAccessibilityChanged(context: Context) {
+        watchApps(context, wantWatch)
+    }
+
+    private const val WATCH_EVERY_MS = 1_000L
+    private const val FIRST_LOOK_BACK_MS = 10_000L
+}

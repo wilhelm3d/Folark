@@ -282,4 +282,25 @@ class FoldStateMonitorTest {
             monitor.computeFoldState(FakeFoldingFeature(FoldingFeature.State.HALF_OPENED), null, activity),
         ).isEqualTo(FoldState.HALF_OPENED)
     }
+
+    @Test
+    @Config(qualifiers = "w800dp-h880dp")
+    fun `a lost folding feature on the inner panel keeps the previous open state`() {
+        // Folark in multi-window, or an empty layout emission mid configuration change: the window
+        // no longer spans the hinge, but the display is still the inner panel.
+        val activity = Robolectric.buildActivity(Activity::class.java).get()
+        val monitor = FoldStateMonitor()
+
+        assertThat(monitor.computeFoldState(null, FoldState.OPENED, activity)).isEqualTo(FoldState.OPENED)
+        assertThat(monitor.computeFoldState(null, FoldState.HALF_OPENED, activity)).isEqualTo(FoldState.HALF_OPENED)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h780dp")
+    fun `a lost folding feature on a cover-sized display is CLOSED`() {
+        val activity = Robolectric.buildActivity(Activity::class.java).get()
+        val monitor = FoldStateMonitor()
+
+        assertThat(monitor.computeFoldState(null, FoldState.OPENED, activity)).isEqualTo(FoldState.CLOSED)
+    }
 }
