@@ -213,12 +213,16 @@ class SettingsRepository @Inject constructor(
                 tabsExclusive = p[Keys.DRAWER_TABS_EXCLUSIVE] ?: true,
                 showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
                 innerSidebar = p[Keys.innerSidebarAppDrawer(screenType)] ?: false,
+                azHoldScroll = p[Keys.DRAWER_AZ_HOLD_SCROLL] ?: true,
+                twoPane = p[Keys.DRAWER_TWO_PANE] ?: false,
             ),
             search = LauncherSettings.Search(
                 contacts = p[Keys.SEARCH_CONTACTS] ?: false,
                 shortcuts = p[Keys.SEARCH_SHORTCUTS] ?: true,
                 web = p[Keys.SEARCH_WEB] ?: true,
                 actions = p[Keys.SEARCH_ACTIONS] ?: true,
+                settingsPages = p[Keys.SEARCH_SETTINGS_PAGES] ?: true,
+                inlineShortcuts = p[Keys.SEARCH_INLINE_SHORTCUTS] ?: true,
             ),
             icons = LauncherSettings.Icons(
                 forceThemedIcons = p[Keys.FORCE_THEMED_ICONS] ?: false,
@@ -423,6 +427,7 @@ class SettingsRepository @Inject constructor(
                 taskbarHandleStyle = p[Keys.TASKBAR_HANDLE_STYLE] ?: LauncherSettings.TASKBAR_HANDLE_LINE,
                 hideButton = p[Keys.TASKBAR_HIDE_BUTTON] ?: true,
                 taskbarAnim = p[Keys.TASKBAR_ANIM] ?: LauncherSettings.TASKBAR_ANIM_SLIDE,
+                launchGlow = (p[Keys.TASKBAR_LAUNCH_GLOW] ?: LauncherSettings.LAUNCH_GLOW_APP),
                 source = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
                     LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
                 systemMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
@@ -674,6 +679,13 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
     suspend fun setRecentsThumbnails(value: Boolean) = edit { it[Keys.RECENTS_THUMBNAILS] = value }
     suspend fun setRecentsSpeakerBadge(value: Boolean) = edit { it[Keys.RECENTS_SPEAKER_BADGE] = value }
+    suspend fun setTaskbarLaunchGlow(value: String) = edit { it[Keys.TASKBAR_LAUNCH_GLOW] = value }
+    suspend fun setDrawerTwoPane(value: Boolean) = edit { it[Keys.DRAWER_TWO_PANE] = value }
+    suspend fun setDrawerAzHoldScroll(value: Boolean) = edit { it[Keys.DRAWER_AZ_HOLD_SCROLL] = value }
+    suspend fun setSearchInlineShortcuts(value: Boolean) = edit { it[Keys.SEARCH_INLINE_SHORTCUTS] = value }
+    suspend fun setSearchSettingsPages(value: Boolean) = edit { it[Keys.SEARCH_SETTINGS_PAGES] = value }
+    suspend fun setRecentsMemoryBadge(value: Boolean) = edit { it[Keys.RECENTS_MEMORY_BADGE] = value }
+    suspend fun setRecentsGroupSplits(value: Boolean) = edit { it[Keys.RECENTS_GROUP_SPLITS] = value }
     suspend fun setRecentsRootClose(value: Boolean) = edit { it[Keys.RECENTS_ROOT_CLOSE] = value }
     suspend fun setTaskbarRunningApps(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_APPS] = value }
     suspend fun setTaskbarRunningDots(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_DOTS] = value }
@@ -761,6 +773,8 @@ class SettingsRepository @Inject constructor(
         thirdInSplit = p[Keys.RECENTS_THIRD_IN_SPLIT] ?: true,
         thumbnails = p[Keys.RECENTS_THUMBNAILS] ?: true,
         speakerBadge = p[Keys.RECENTS_SPEAKER_BADGE] ?: false,
+        groupSplits = p[Keys.RECENTS_GROUP_SPLITS] ?: true,
+        memoryBadge = p[Keys.RECENTS_MEMORY_BADGE] ?: false,
         rootClose = p[Keys.RECENTS_ROOT_CLOSE] ?: true,
         enterAnimation = (p[Keys.RECENTS_ENTER] ?: LauncherSettings.RECENTS_ENTER_RISE)
             .let { if (it in LauncherSettings.RECENTS_ENTERS) it else LauncherSettings.RECENTS_ENTER_RISE },

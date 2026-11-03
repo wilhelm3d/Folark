@@ -101,6 +101,9 @@ internal class RecentsDrag {
         settling = false
         landing = null
         pending = null
+        pinnedToTaskbar = false
+        // The taskbar comes up as a drop target (drop the card on it to pin the app).
+        org.arkikeskus.launcher.ui.TaskbarDropTarget.dragging(true)
         update()
     }
 
@@ -156,6 +159,18 @@ internal class RecentsDrag {
     fun release() {
         if (card == null || settling) return
         val held = card
+        // Over the taskbar (brought up for the drag): pin the card's app(s) there; it flies home.
+        if (held != null && org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(pointer.x, pointer.y)) {
+            held.apps.filterNotNull().forEach { org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(it) }
+            pinnedToTaskbar = true
+            pending = null
+            pendingEdge = null
+            landing = origin
+            target = null
+            settling = true
+            org.arkikeskus.launcher.ui.TaskbarDropTarget.dragging(false)
+            return
+        }
         val onto = cards.firstOrNull { it.key == target }
         pending = onto?.let { it to mode }
         // No card under the finger but at a screen edge: an Aero edge placement instead.
@@ -177,7 +192,11 @@ internal class RecentsDrag {
         return if (held != null && drop != null) Triple(held, drop.first, drop.second) else null
     }
 
+    /** The last drop pinned the card's app(s) to the taskbar (for a confirming tick). */
+    var pinnedToTaskbar = false
+
     fun cancel() {
+        if (card != null) org.arkikeskus.launcher.ui.TaskbarDropTarget.dragging(false)
         card = null
         target = null
         paneIndex = -1

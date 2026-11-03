@@ -244,6 +244,21 @@ internal class AppTaskbar(
         settingsRepo = settingsRepository
         // A drop from the drawer or home onto the bar pins the app (while the bar stays on home).
         org.arkikeskus.launcher.ui.TaskbarDropTarget.onPin = { app -> pin(app) }
+        // Recents: while a card is dragged the bar comes up as a drop target, then goes again.
+        org.arkikeskus.launcher.ui.TaskbarDropTarget.onDragging = { dragging ->
+            handler.post {
+                if (dragging) {
+                    if (shownMode != MODE_BAR && shownMode != MODE_BAR_FIXED) {
+                        expanded = true
+                        handler.removeCallbacks(collapse)
+                        refresh(rebuild = true)
+                    }
+                } else if (expanded && !homeVisible) {
+                    handler.removeCallbacks(collapse)
+                    handler.postDelayed(collapse, AUTO_COLLAPSE_MS / 2)
+                }
+            }
+        }
         val appRepository = entry.appRepository()
         repository = appRepository
         split = entry.splitCoordinator()
@@ -289,6 +304,7 @@ internal class AppTaskbar(
                     handleStyle = s.taskbar.taskbarHandleStyle,
                     hideButton = s.taskbar.hideButton,
                     taskbarAnim = s.taskbar.taskbarAnim,
+                    launchGlow = s.taskbar.launchGlow,
                     onHome = s.taskbar.onHome,
                     keepOpen = s.taskbar.keepOpen,
                     themedIcons = s.icons.useThemedIcons,
@@ -832,13 +848,30 @@ internal class AppTaskbar(
     private fun animateBarIn(view: View, anim: String) {
         val dist = dpf(90f)
         view.animate().cancel()
-        view.translationY = 0f; view.alpha = 1f; view.scaleX = 1f; view.scaleY = 1f
+        view.translationY = 0f; view.alpha = 1f; view.scaleX = 1f; view.scaleY = 1f; view.rotationX = 0f
         val a = view.animate()
         when (anim) {
             LauncherSettings.TASKBAR_ANIM_FADE -> { view.alpha = 0f; a.alpha(1f).setDuration(220L) }
             LauncherSettings.TASKBAR_ANIM_SCALE -> { view.scaleX = 0.82f; view.scaleY = 0.82f; view.alpha = 0f; a.scaleX(1f).scaleY(1f).alpha(1f).setDuration(240L).interpolator = DecelerateInterpolator() }
             LauncherSettings.TASKBAR_ANIM_RISE -> { view.translationY = dist; view.alpha = 0f; a.translationY(0f).alpha(1f).setDuration(260L).interpolator = DecelerateInterpolator() }
             LauncherSettings.TASKBAR_ANIM_BOUNCE -> { view.translationY = dist; a.translationY(0f).setDuration(430L).interpolator = OvershootInterpolator(2.4f) }
+            LauncherSettings.TASKBAR_ANIM_FLIP -> {
+                // Tips up about its bottom edge.
+                view.pivotY = view.height.toFloat().takeIf { it > 0f } ?: dpf(64f)
+                view.pivotX = view.width / 2f
+                view.cameraDistance = 12_000f * context.resources.displayMetrics.density
+                view.rotationX = 90f; view.alpha = 0f
+                a.rotationX(0f).alpha(1f).setDuration(320L).interpolator = DecelerateInterpolator(1.6f)
+            }
+            LauncherSettings.TASKBAR_ANIM_UNFOLD -> {
+                view.pivotX = view.width / 2f
+                view.scaleX = 0.08f; view.alpha = 0f
+                a.scaleX(1f).alpha(1f).setDuration(340L).interpolator = DecelerateInterpolator(2f)
+            }
+            LauncherSettings.TASKBAR_ANIM_POP -> {
+                view.scaleX = 0.6f; view.scaleY = 0.6f; view.alpha = 0f
+                a.scaleX(1f).scaleY(1f).alpha(1f).setDuration(380L).interpolator = OvershootInterpolator(1.8f)
+            }
             else -> { view.translationY = dist; a.translationY(0f).setDuration(240L).interpolator = DecelerateInterpolator() } // SLIDE
         }
         a.start()
@@ -853,6 +886,13 @@ internal class AppTaskbar(
             LauncherSettings.TASKBAR_ANIM_FADE -> a.alpha(0f)
             LauncherSettings.TASKBAR_ANIM_SCALE -> a.scaleX(0.82f).scaleY(0.82f).alpha(0f)
             LauncherSettings.TASKBAR_ANIM_RISE -> a.translationY(dist).alpha(0f)
+            LauncherSettings.TASKBAR_ANIM_FLIP -> {
+                view.pivotY = view.height.toFloat()
+                view.cameraDistance = 12_000f * context.resources.displayMetrics.density
+                a.rotationX(90f).alpha(0f)
+            }
+            LauncherSettings.TASKBAR_ANIM_UNFOLD -> a.scaleX(0.08f).alpha(0f)
+            LauncherSettings.TASKBAR_ANIM_POP -> a.scaleX(0.6f).scaleY(0.6f).alpha(0f)
             else -> a.translationY(dist) // SLIDE, BOUNCE
         }
         a.withEndAction { onEnd() }.start()
@@ -1069,10 +1109,9 @@ internal class AppTaskbar(
         barRow = row
         barColumn = column
         if (animateIn) animateBarIn(column, s.taskbarAnim)
-        if (fixed && homeVisible) {
-            // Tell home and the drawer where the bar's top edge is, whenever it is laid out again.
-            row.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishSpace(v) }
-        }
+        // Tell home and the drawer where the bar's top edge is (and drags where to drop to pin),
+        // whenever it is laid out again.
+        row.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishSpace(v) }
         // A drag over a split screen is handled differently when a third app isn't wanted.
         if (!fixed || !homeVisible) checkSplitForThirdApp(s)
         if (!fixed) {
@@ -1083,22 +1122,26 @@ internal class AppTaskbar(
 
     /** The room from the bar's top edge to the bottom of the screen, for home and the drawer. */
     private fun publishSpace(barRow: View) {
-        if (!barRow.isAttachedToWindow || !homeVisible || shownMode != MODE_BAR_FIXED) return
+        if (!barRow.isAttachedToWindow) return
         val location = IntArray(2)
         barRow.getLocationOnScreen(location)
-        val screenHeight = windowManager.currentWindowMetrics.bounds.height()
-        TaskbarSpace.set(screenHeight - location[1] + dp(SPACE_GAP_DP))
+        // Where an app (or a Recents card) can be dropped to pin it: wherever the bar is up.
         org.arkikeskus.launcher.ui.TaskbarDropTarget.bounds = android.graphics.Rect(
             location[0], location[1], location[0] + barRow.width, location[1] + barRow.height,
         )
+        if (!homeVisible || shownMode != MODE_BAR_FIXED) return
+        val screenHeight = windowManager.currentWindowMetrics.bounds.height()
+        TaskbarSpace.set(screenHeight - location[1] + dp(SPACE_GAP_DP))
     }
 
     /** The bar's backdrop for the chosen theme; null for the see-through one. */
     private fun barBackground(s: TaskbarSetup): Drawable? {
         val alpha = (s.opacity.coerceIn(0f, 1f) * 255).toInt()
         if (s.theme == LauncherSettings.TASKBAR_THEME_GLASS) return glassBackground(alpha)
+        if (s.theme == LauncherSettings.TASKBAR_THEME_NEON) return neonBackground(alpha)
         val (fill, rim) = when (s.theme) {
             LauncherSettings.TASKBAR_THEME_CLEAR -> return null
+            LauncherSettings.TASKBAR_THEME_AMOLED -> Color.argb(maxOf(alpha, 235), 0, 0, 0) to Color.argb(28, 255, 255, 255)
             LauncherSettings.TASKBAR_THEME_FROSTED -> Color.argb((alpha * 0.55f).toInt(), 40, 42, 48) to Color.argb(70, 255, 255, 255)
             LauncherSettings.TASKBAR_THEME_LIGHT -> Color.argb(alpha, 242, 243, 246) to Color.argb(40, 0, 0, 0)
             LauncherSettings.TASKBAR_THEME_ACCENT -> {
@@ -1114,6 +1157,28 @@ internal class AppTaskbar(
             setColor(fill)
             setStroke(dp(1), rim)
         }
+    }
+
+    /**
+     * Neon: near-black, with a rim in the accent colour and a soft glow of it inside the edge
+     * (two layers: the glow is a wider, fainter stroke under the sharp one).
+     */
+    private fun neonBackground(alpha: Int): Drawable {
+        val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getColor(android.R.color.system_accent1_300)
+        } else Color.rgb(90, 160, 255)
+        fun withAlpha(a: Int) = Color.argb(a, Color.red(accent), Color.green(accent), Color.blue(accent))
+        val glow = GradientDrawable().apply {
+            cornerRadius = dpf(28f)
+            setColor(Color.argb(maxOf(alpha, 200), 8, 9, 14))
+            setStroke(dp(5), withAlpha(55))
+        }
+        val rim = GradientDrawable().apply {
+            cornerRadius = dpf(28f)
+            setColor(Color.TRANSPARENT)
+            setStroke(dp(2), withAlpha(230))
+        }
+        return android.graphics.drawable.LayerDrawable(arrayOf(glow, rim))
     }
 
     /** Liquid Glass: milky see-through fill, bright rim, and a sheen along the top. */

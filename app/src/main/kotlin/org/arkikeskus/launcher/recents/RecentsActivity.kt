@@ -36,6 +36,7 @@ class RecentsActivity : ComponentActivity() {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val state by viewModel.state.collectAsStateWithLifecycle()
             val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
+            val memory by viewModel.memory.collectAsStateWithLifecycle()
             val mutedApps by viewModel.mutedApps.collectAsStateWithLifecycle()
             // Liquid Glass: Android blurs whatever is behind Recents (home, or the app).
             val blurPx = if (settings.recents.glass) (settings.recents.glassBlur * resources.displayMetrics.density).toInt() else 0
@@ -54,6 +55,7 @@ class RecentsActivity : ComponentActivity() {
                 RecentsScreen(
                     state = state,
                     thumbnails = thumbnails,
+                    memory = memory,
                     settings = settings,
                     onOpen = { card -> viewModel.open(card); leave() },
                     onClose = viewModel::close,

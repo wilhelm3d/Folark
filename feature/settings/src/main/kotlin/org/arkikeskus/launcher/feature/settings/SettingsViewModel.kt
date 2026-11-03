@@ -214,6 +214,13 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsThirdInSplit(value: Boolean) = update { repository.setRecentsThirdInSplit(value) }
     fun setRecentsThumbnails(value: Boolean) = update { repository.setRecentsThumbnails(value) }
     fun setRecentsSpeakerBadge(value: Boolean) = update { repository.setRecentsSpeakerBadge(value) }
+    fun setTaskbarLaunchGlow(value: String) = update { repository.setTaskbarLaunchGlow(value) }
+    fun setDrawerTwoPane(value: Boolean) = update { repository.setDrawerTwoPane(value) }
+    fun setDrawerAzHoldScroll(value: Boolean) = update { repository.setDrawerAzHoldScroll(value) }
+    fun setSearchInlineShortcuts(value: Boolean) = update { repository.setSearchInlineShortcuts(value) }
+    fun setSearchSettingsPages(value: Boolean) = update { repository.setSearchSettingsPages(value) }
+    fun setRecentsMemoryBadge(value: Boolean) = update { repository.setRecentsMemoryBadge(value) }
+    fun setRecentsGroupSplits(value: Boolean) = update { repository.setRecentsGroupSplits(value) }
     fun setRecentsRootClose(value: Boolean) = update { repository.setRecentsRootClose(value) }
     fun setTaskbarRunningApps(value: Boolean) = update { repository.setTaskbarRunningApps(value) }
     fun setTaskbarRunningDots(value: Boolean) = update { repository.setTaskbarRunningDots(value) }

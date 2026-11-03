@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -356,6 +358,52 @@ internal fun DrawerTabRow(tabs: List<Pair<Long, String>>, selected: Long?, onSel
                     .background(if (isSelected) accent else palette.btn, RoundedCornerShape(50))
                     .clickable { onSelect(id) }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
+
+/** Width of the two-pane drawer's tab list (inner screen). */
+private val TAB_RAIL_WIDTH = 168.dp
+
+/**
+ * The two-pane drawer's left column (Settings ▸ App drawer ▸ Two-pane, unfolded): "All" and every
+ * tab as a vertical list; the chosen one is filled with the accent colour, which slides softly
+ * between them.
+ */
+@Composable
+internal fun DrawerTabRail(tabs: List<Pair<Long, String>>, selected: Long?, onSelect: (Long?) -> Unit) {
+    val palette = LocalExpressivePalette.current
+    val accent = LocalAccent.current
+    Column(
+        modifier = Modifier
+            .width(TAB_RAIL_WIDTH)
+            .fillMaxHeight()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val all: List<Pair<Long?, String>> =
+            listOf<Pair<Long?, String>>(null to stringResource(R.string.drawer_tab_all)) + tabs
+        all.forEach { (id, name) ->
+            val isSelected = id == selected
+            val fill by androidx.compose.animation.animateColorAsState(
+                targetValue = if (isSelected) accent else Color.Transparent,
+                animationSpec = androidx.compose.animation.core.tween(220),
+                label = "tabRailFill",
+            )
+            Text(
+                text = name,
+                color = if (isSelected) Color.White else palette.text,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.SemiBold else null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(fill, RoundedCornerShape(16.dp))
+                    .clickable { onSelect(id) }
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
             )
         }
     }

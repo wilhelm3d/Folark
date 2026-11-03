@@ -331,6 +331,10 @@ class LauncherAppsSource @Inject constructor(
                 intArrayOf(R.anim.folark_open_slide_fast, R.anim.folark_open_slide_normal, R.anim.folark_open_slide_slow)[tier]
             LauncherSettings.APP_OPEN_FADE ->
                 intArrayOf(R.anim.folark_open_fade_fast, R.anim.folark_open_fade_normal, R.anim.folark_open_fade_slow)[tier]
+            LauncherSettings.APP_OPEN_POP ->
+                intArrayOf(R.anim.folark_open_pop_fast, R.anim.folark_open_pop_normal, R.anim.folark_open_pop_slow)[tier]
+            LauncherSettings.APP_OPEN_UNFOLD ->
+                intArrayOf(R.anim.folark_open_unfold_fast, R.anim.folark_open_unfold_normal, R.anim.folark_open_unfold_slow)[tier]
             LauncherSettings.APP_OPEN_NONE -> return ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
             else -> return null
         }

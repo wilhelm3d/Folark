@@ -143,6 +143,30 @@ object RootTasks {
         RootShell.run(script)
     }
 
+    /**
+     * How much memory (resident, KB) each of [packages] is using, all its processes together
+     * ("pkg" and "pkg:service"), from one `ps` call. Empty without root.
+     */
+    fun memoryKb(packages: Collection<String>): Map<String, Long> {
+        val wanted = packages.filter { PACKAGE.matches(it) }.toSet()
+        if (wanted.isEmpty()) return emptyMap()
+        val out = RootShell.run("ps -A -o RSS,NAME") ?: return emptyMap()
+        return parseMemory(out, wanted)
+    }
+
+    /** [memoryKb]'s parsing: "RSS NAME" lines, summed per package in [wanted]. */
+    internal fun parseMemory(psOutput: String, wanted: Set<String>): Map<String, Long> {
+        val totals = HashMap<String, Long>()
+        for (line in psOutput.lineSequence()) {
+            val parts = line.trim().split(Regex("\\s+"), limit = 2)
+            if (parts.size < 2) continue
+            val kb = parts[0].toLongOrNull() ?: continue
+            val pkg = parts[1].substringBefore(':')
+            if (pkg in wanted) totals[pkg] = (totals[pkg] ?: 0L) + kb
+        }
+        return totals
+    }
+
     /** Stops [packageName] completely (its tasks stay listed until Android tidies them up). */
     fun forceStop(packageName: String): Boolean {
         if (!PACKAGE.matches(packageName)) return false

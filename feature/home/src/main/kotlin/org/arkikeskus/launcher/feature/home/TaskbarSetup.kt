@@ -42,6 +42,8 @@ internal data class TaskbarSetup(
     val handleStyle: String,
     val hideButton: Boolean,
     val taskbarAnim: String,
+    /** The glow when an app starts from the bar (LauncherSettings.LAUNCH_GLOW_*). */
+    val launchGlow: String = org.arkikeskus.launcher.model.LauncherSettings.LAUNCH_GLOW_APP,
     val onHome: Boolean,
     val keepOpen: Boolean,
     val themedIcons: Boolean,

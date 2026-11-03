@@ -58,6 +58,7 @@
     <string name="split_picker_recent">RECENT APPS</string>
     <string name="split_picker_back">Back</string>
     <string name="split_picker_choose">Choose an app</string>
+    <string name="split_picker_size">Size</string>
     <string name="split_picker_choose_more">Choose %2$d apps · %1$d chosen</string>
     <string name="split_picker_peek">Peek</string>
     <string name="split_picker_favorites">FAVORITES</string>

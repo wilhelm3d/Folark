@@ -4,8 +4,8 @@ import android.graphics.Rect
 import org.arkikeskus.launcher.model.AppItem
 
 /**
- * Where the taskbar sits on screen while it is shown on home, so an app dragged from the drawer or
- * the home grid can be dropped onto it to pin it. The taskbar (feature/home) publishes its bounds and
+ * Where the taskbar sits on screen while it is up, so an app dragged from the drawer, the home grid
+ * or Recents can be dropped onto it to pin it. The taskbar (feature/home) publishes its bounds and
  * how to pin; the drag code here only asks [isOver] and calls [pin], so neither depends on the other.
  */
 object TaskbarDropTarget {
@@ -26,8 +26,17 @@ object TaskbarDropTarget {
 
     fun pin(app: AppItem): Boolean = onPin?.invoke(app) == true
 
+    /** Brings the bar up while something is dragged that could be dropped on it (true), lets it go again (false). */
+    @Volatile
+    var onDragging: ((Boolean) -> Unit)? = null
+
+    fun dragging(on: Boolean) {
+        onDragging?.invoke(on)
+    }
+
     fun clear() {
         bounds = null
         onPin = null
+        onDragging = null
     }
 }

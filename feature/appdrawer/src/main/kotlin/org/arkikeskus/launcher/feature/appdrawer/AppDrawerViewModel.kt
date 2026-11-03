@@ -78,6 +78,12 @@ data class AppDrawerUiState(
     val shortcutResults: List<SearchResult.Shortcut> = emptyList(),
     val actionResults: List<SearchResult.Action> = emptyList(),
     val searchWeb: Boolean = true,
+    /** The top app found shows its shortcuts right under it (Settings ▸ Search). */
+    val searchInlineShortcuts: Boolean = true,
+    /** Unfolded: tabs in a list on the left, their apps on the right (Settings ▸ Drawer). */
+    val twoPane: Boolean = false,
+    /** A-Z bar: hold a letter, then slide to fine-scroll (Settings ▸ Drawer). */
+    val azHoldScroll: Boolean = true,
     val showFrequentApps: Boolean = false,
     /** Settings ▸ App drawer ▸ Clipboard row. */
     val clipboardRow: Boolean = false,
@@ -204,6 +210,9 @@ class AppDrawerViewModel @Inject constructor(
             folderTabsEnabled = settings.drawer.folderTabs,
             tabsExclusive = settings.drawer.tabsExclusive,
             searchWeb = settings.search.web,
+            searchInlineShortcuts = settings.search.inlineShortcuts,
+            twoPane = settings.drawer.twoPane,
+            azHoldScroll = settings.drawer.azHoldScroll,
             showFrequentApps = settings.drawer.showFrequentApps,
             clipboardRow = settings.drawer.clipboardRow,
             appLabelTextScale = settings.icons.labelTextScale,

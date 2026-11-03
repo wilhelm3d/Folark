@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import org.arkikeskus.launcher.model.LauncherSettings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +42,11 @@ import org.arkikeskus.launcher.ui.expressive.LocalAccent
 
 // The A–Z index bar and letter headers (split out of AppDrawerScreen.kt).
 
+/** How long the finger rests on a letter before sliding scrolls finely instead. */
+private const val FINE_SCROLL_HOLD_MS = 350L
+/** Finger travel on the bar × this = list scroll, in fine-scroll mode. */
+private const val FINE_SCROLL_SPEED = 2.5f
+
 /** The heading letter an app is filed under: its first letter, or '#' for digits and symbols. */
 internal fun drawerLetterOf(app: AppItem): Char =
     app.label.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#'
@@ -66,6 +73,9 @@ internal fun DrawerIndexBar(
     /** When set, the letter under the finger is reported here (null on release) and the bar draws
      *  no bubble of its own: the drawer shows it large instead. */
     onActiveLetter: ((Char?) -> Unit)? = null,
+    /** When set: hold the finger still on a letter for a moment, then slide, and the moves come
+     *  here as a scroll distance (px) instead of picking letters — a fine scroll within the list. */
+    onFineScroll: ((Float) -> Unit)? = null,
 ) {
     val alphabet = remember { listOf('#') + ('A'..'Z').toList() }
     // The gesture blocks below live as long as the bar: always call the newest callback (it holds
@@ -92,6 +102,32 @@ internal fun DrawerIndexBar(
         }
     }
 
+    val currentFineScroll by rememberUpdatedState(onFineScroll)
+    val haptics = LocalHapticFeedback.current
+    // Fine scroll: when the finger last moved, and whether the hold switched it to fine scrolling.
+    var lastMoveAt by remember { mutableStateOf(0L) }
+    var fine by remember { mutableStateOf(false) }
+
+    /** One drag step: letters, or (after a hold) a smooth scroll along the bar's direction. */
+    fun dragStep(position: Offset, amount: Offset) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val isVertical = currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
+        val along = if (isVertical) amount.y else amount.x
+        val scroll = currentFineScroll
+        if (scroll != null && !fine && kotlin.math.abs(along) > 0.5f && lastMoveAt > 0 && now - lastMoveAt >= FINE_SCROLL_HOLD_MS) {
+            fine = true
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+        if (kotlin.math.abs(along) > 0.5f) lastMoveAt = now
+        if (fine && scroll != null) scroll(along * FINE_SCROLL_SPEED) else updateSelection(position)
+    }
+
+    fun dragEnded() {
+        selectedLetter = null
+        fine = false
+        lastMoveAt = 0L
+    }
+
     Box(modifier = modifier) {
         val isVertical = position == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || position == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
         if (isVertical) {
@@ -111,10 +147,13 @@ internal fun DrawerIndexBar(
                     }
                     .pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { offset -> updateSelection(offset) },
-                            onDragEnd = { selectedLetter = null },
-                            onDragCancel = { selectedLetter = null },
-                            onDrag = { change, _ -> updateSelection(change.position) },
+                            onDragStart = { offset ->
+                                updateSelection(offset)
+                                lastMoveAt = android.os.SystemClock.uptimeMillis()
+                            },
+                            onDragEnd = { dragEnded() },
+                            onDragCancel = { dragEnded() },
+                            onDrag = { change, amount -> dragStep(change.position, amount) },
                         )
                     },
                 verticalArrangement = Arrangement.SpaceEvenly,
@@ -148,10 +187,13 @@ internal fun DrawerIndexBar(
                     }
                     .pointerInput(Unit) {
                         detectDragGestures(
-                            onDragStart = { offset -> updateSelection(offset) },
-                            onDragEnd = { selectedLetter = null },
-                            onDragCancel = { selectedLetter = null },
-                            onDrag = { change, _ -> updateSelection(change.position) },
+                            onDragStart = { offset ->
+                                updateSelection(offset)
+                                lastMoveAt = android.os.SystemClock.uptimeMillis()
+                            },
+                            onDragEnd = { dragEnded() },
+                            onDragCancel = { dragEnded() },
+                            onDrag = { change, amount -> dragStep(change.position, amount) },
                         )
                     },
                 horizontalArrangement = Arrangement.SpaceEvenly,

@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.recents
 
+import org.arkikeskus.launcher.data.LaunchOrigin
 import androidx.compose.ui.res.pluralStringResource
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableIntStateOf
@@ -171,6 +172,8 @@ internal class RecentsEnv(
     val onToggleAudio: (String) -> Unit = {},
     /** Place a long-press-dragged card at a screen edge (inner screen only), one of EDGE_*. */
     val onPlaceAtEdge: (RecentsCard, Int) -> Unit = { _, _ -> },
+    /** Memory in use per package (KB), for the memory label on cards (empty: no label). */
+    val memory: Map<String, Long> = emptyMap(),
     /** Persistent per-app mute (menu, beneath App info): whether this card is muted, and the toggle. */
     val isMuted: (RecentsCard) -> Boolean = { false },
     val onToggleMute: (RecentsCard) -> Unit = {},
@@ -207,6 +210,8 @@ internal class RecentsEnv(
 internal fun RecentsScreen(
     state: RecentsState,
     thumbnails: Map<Int, ImageBitmap>,
+    /** Memory in use per package (KB); empty when the memory label is off. */
+    memory: Map<String, Long> = emptyMap(),
     settings: LauncherSettings,
     onOpen: (RecentsCard) -> Unit,
     onClose: (RecentsCard) -> Unit,
@@ -265,6 +270,7 @@ internal fun RecentsScreen(
     }
     var confirmAll by remember { mutableStateOf(false) }
     val drag = remember { RecentsDrag() }
+    val hostView = androidx.compose.ui.platform.LocalView.current
     val menu = remember { RecentsMenuState() }
     drag.cards = state.cards
     drag.allowThird = settings.launch.threeAppSplit
@@ -292,7 +298,21 @@ internal fun RecentsScreen(
         drag = drag,
         glass = glass,
         onTap = { card ->
-            if (!selecting) onOpen(card)
+            if (!selecting) {
+                // The app grows out of this card as it comes back.
+                drag.bounds[card.key]?.let { r ->
+                    val at = IntArray(2)
+                    hostView.getLocationOnScreen(at)
+                    LaunchOrigin.rect(
+                        hostView,
+                        android.graphics.Rect(
+                            at[0] + r.left.toInt(), at[1] + r.top.toInt(),
+                            at[0] + r.right.toInt(), at[1] + r.bottom.toInt(),
+                        ),
+                    )
+                }
+                onOpen(card)
+            }
             else if (card in picked) picked.remove(card)
             else if ((if (openAt > 0) openAt else MAX_PICK) > picked.size && !card.isSplit) picked.add(card)
         },
@@ -310,6 +330,7 @@ internal fun RecentsScreen(
         onCloseAll = onCloseAll,
         onSavePair = onSavePair,
         speakerBadge = settings.recents.speakerBadge,
+        memory = memory,
         audioActive = { pkg -> audio.active(pkg) },
         audioPlaying = { pkg -> audio.playing(pkg) },
         onToggleAudio = { pkg -> audio.toggle(pkg) },
@@ -900,6 +921,23 @@ internal fun CardPicture(card: RecentsCard, env: RecentsEnv, modifier: Modifier,
                 Thumb(env.thumb(task.taskId), card.apps.getOrNull(i), Modifier.weight(1f).fillMaxSize(), RoundedCornerShape(corner), env.glass, iconSize)
             }
         }
+        // How much memory the card's apps use (Settings ▸ Recents ▸ Memory use on cards, root).
+        if (env.memory.isNotEmpty() && !env.selecting) {
+            val kb = card.tasks.map { it.packageName }.distinct().sumOf { env.memory[it] ?: 0L }
+            if (kb > 0) {
+                Text(
+                    text = formatMemory(kb),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+        }
         // A speaker badge for the card's first app that is playing/paused audio (Settings ▸ Recents).
         if (env.speakerBadge && !env.selecting) {
             val pkg = card.tasks.firstOrNull { env.audioActive(it.packageName) }?.packageName
@@ -912,6 +950,12 @@ internal fun CardPicture(card: RecentsCard, env: RecentsEnv, modifier: Modifier,
             }
         }
     }
+}
+
+/** "312 MB" / "1.4 GB" from kilobytes. */
+internal fun formatMemory(kb: Long): String {
+    val mb = kb / 1024.0
+    return if (mb >= 1000) String.format(java.util.Locale.ROOT, "%.1f GB", mb / 1024.0) else "${mb.toInt()} MB"
 }
 
 /** A round speaker button on a Recents card: pulses while the app is playing; a tap pauses/resumes it. */

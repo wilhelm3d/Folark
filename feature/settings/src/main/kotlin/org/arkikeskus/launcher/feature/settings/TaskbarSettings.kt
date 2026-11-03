@@ -200,9 +200,25 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_ANIM_SCALE to stringResource(R.string.settings_taskbar_anim_scale),
                 LauncherSettings.TASKBAR_ANIM_RISE to stringResource(R.string.settings_taskbar_anim_rise),
                 LauncherSettings.TASKBAR_ANIM_BOUNCE to stringResource(R.string.settings_taskbar_anim_bounce),
+                LauncherSettings.TASKBAR_ANIM_FLIP to stringResource(R.string.settings_taskbar_anim_flip),
+                LauncherSettings.TASKBAR_ANIM_UNFOLD to stringResource(R.string.settings_taskbar_anim_unfold),
+                LauncherSettings.TASKBAR_ANIM_POP to stringResource(R.string.settings_taskbar_anim_pop),
             ),
             selected = s.taskbar.taskbarAnim,
             onSelect = viewModel::setTaskbarAnim,
+            icon = null,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_taskbar_launch_glow),
+            options = listOf(
+                LauncherSettings.LAUNCH_GLOW_APP to stringResource(R.string.settings_taskbar_launch_glow_app),
+                LauncherSettings.LAUNCH_GLOW_ACCENT to stringResource(R.string.settings_taskbar_launch_glow_accent),
+                LauncherSettings.LAUNCH_GLOW_WHITE to stringResource(R.string.settings_taskbar_launch_glow_white),
+                LauncherSettings.LAUNCH_GLOW_OFF to stringResource(R.string.settings_taskbar_launch_glow_off),
+            ),
+            selected = s.taskbar.launchGlow,
+            onSelect = viewModel::setTaskbarLaunchGlow,
             icon = null,
         )
         ExpressiveRowDivider()
@@ -397,6 +413,8 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 LauncherSettings.TASKBAR_THEME_LIGHT to stringResource(R.string.settings_taskbar_theme_light),
                 LauncherSettings.TASKBAR_THEME_ACCENT to stringResource(R.string.settings_taskbar_theme_accent),
                 LauncherSettings.TASKBAR_THEME_GLASS to stringResource(R.string.settings_taskbar_theme_glass),
+                LauncherSettings.TASKBAR_THEME_AMOLED to stringResource(R.string.settings_taskbar_theme_amoled),
+                LauncherSettings.TASKBAR_THEME_NEON to stringResource(R.string.settings_taskbar_theme_neon),
             ),
             selected = s.taskbar.theme,
             onSelect = viewModel::setTaskbarTheme,
@@ -562,7 +580,7 @@ private fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
         }
     }
     val spec: AnimationSpec<Float> =
-        if (anim == LauncherSettings.TASKBAR_ANIM_BOUNCE) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)
+        if (anim == LauncherSettings.TASKBAR_ANIM_BOUNCE || anim == LauncherSettings.TASKBAR_ANIM_POP) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)
         else tween(300)
     val p by animateFloatAsState(if (shown) 1f else 0f, spec, label = "tbprev")
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -601,6 +619,13 @@ private fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
                             LauncherSettings.TASKBAR_ANIM_FADE -> alpha = p
                             LauncherSettings.TASKBAR_ANIM_SCALE -> { scaleX = 0.82f + 0.18f * p; scaleY = 0.82f + 0.18f * p; alpha = p }
                             LauncherSettings.TASKBAR_ANIM_RISE -> { translationY = (1f - p) * dist; alpha = p }
+                            LauncherSettings.TASKBAR_ANIM_FLIP -> {
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                                rotationX = (1f - p) * 90f
+                                alpha = p
+                            }
+                            LauncherSettings.TASKBAR_ANIM_UNFOLD -> { scaleX = 0.08f + 0.92f * p; alpha = p }
+                            LauncherSettings.TASKBAR_ANIM_POP -> { scaleX = 0.6f + 0.4f * p; scaleY = 0.6f + 0.4f * p; alpha = p }
                             else -> translationY = (1f - p) * dist // SLIDE, BOUNCE
                         }
                     },

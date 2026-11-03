@@ -19,6 +19,7 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import kotlin.math.pow
+import org.arkikeskus.launcher.model.LauncherSettings
 
 // The glow when an app is started from the taskbar (split out of AppTaskbar.kt; extension
 // functions on [AppTaskbar]).
@@ -34,8 +35,16 @@ private const val GLOW_SPREAD = 2.4f
  * Android's animations are turned off.
  */
 internal fun AppTaskbar.playLaunchGlow(icon: View) {
+    val style = setup?.launchGlow ?: LauncherSettings.LAUNCH_GLOW_APP
+    if (style == LauncherSettings.LAUNCH_GLOW_OFF) return
     if (!animationsOn(context) || !icon.isAttachedToWindow || icon.width == 0) return
-    val color = glowColor(icon)
+    val color = when (style) {
+        LauncherSettings.LAUNCH_GLOW_WHITE -> Color.WHITE
+        LauncherSettings.LAUNCH_GLOW_ACCENT -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            context.getColor(android.R.color.system_accent1_200)
+        } else Color.rgb(160, 190, 255)
+        else -> glowColor(icon)
+    }
     val size = (maxOf(icon.width, icon.height) * GLOW_SPREAD).toInt()
     val at = IntArray(2)
     icon.getLocationOnScreen(at)

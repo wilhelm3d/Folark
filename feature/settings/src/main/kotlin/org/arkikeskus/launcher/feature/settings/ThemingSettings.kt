@@ -614,6 +614,38 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
         shared = true,
     )
     ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_search_settings_pages),
+        subtitle = stringResource(R.string.settings_search_settings_pages_desc),
+        checked = s.search.settingsPages,
+        onCheckedChange = viewModel::setSearchSettingsPages,
+        shared = true,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_search_inline_shortcuts),
+        subtitle = stringResource(R.string.settings_search_inline_shortcuts_desc),
+        checked = s.search.inlineShortcuts,
+        onCheckedChange = viewModel::setSearchInlineShortcuts,
+        shared = true,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_drawer_az_hold_scroll),
+        subtitle = stringResource(R.string.settings_drawer_az_hold_scroll_desc),
+        checked = s.drawer.azHoldScroll,
+        onCheckedChange = viewModel::setDrawerAzHoldScroll,
+        shared = true,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_drawer_two_pane),
+        subtitle = stringResource(R.string.settings_drawer_two_pane_desc),
+        checked = s.drawer.twoPane,
+        onCheckedChange = viewModel::setDrawerTwoPane,
+        shared = true,
+    )
+    ExpressiveRowDivider()
 
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_search_web),
@@ -738,6 +770,8 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
             LauncherSettings.APP_OPEN_ZOOM to stringResource(R.string.settings_anim_zoom),
             LauncherSettings.APP_OPEN_SLIDE to stringResource(R.string.settings_anim_slide),
             LauncherSettings.APP_OPEN_FADE to stringResource(R.string.settings_anim_fade),
+            LauncherSettings.APP_OPEN_POP to stringResource(R.string.settings_anim_pop),
+            LauncherSettings.APP_OPEN_UNFOLD to stringResource(R.string.settings_anim_unfold),
             LauncherSettings.APP_OPEN_NONE to stringResource(R.string.settings_anim_none),
         ),
         selected = s.motion.appOpenAnimation,

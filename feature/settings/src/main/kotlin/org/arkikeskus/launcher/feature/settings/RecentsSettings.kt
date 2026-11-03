@@ -253,6 +253,20 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsSpeakerBadge,
         )
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_group_splits),
+            subtitle = stringResource(R.string.settings_recents_group_splits_desc),
+            checked = s.recents.groupSplits,
+            onCheckedChange = viewModel::setRecentsGroupSplits,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_memory_badge),
+            subtitle = stringResource(R.string.settings_recents_memory_badge_desc),
+            checked = s.recents.memoryBadge,
+            onCheckedChange = viewModel::setRecentsMemoryBadge,
+        )
+        ExpressiveRowDivider()
         ExpressiveSliderRow(
             title = stringResource(R.string.settings_recents_label_size),
             value = s.recents.labelScale,

@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.border
 import android.animation.ValueAnimator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -121,6 +123,12 @@ fun SplitPickerDrawer(
     peek: Boolean? = null,
     onPeekChange: (Boolean) -> Unit = {},
     onAction: ((AppItem, SplitPickAction) -> Unit)? = null,
+    /** The picked app's share of the split in percent (33, 50, 66), shown as a little preview to
+     *  choose from; null hides it (no divider control on this phone). [pickedOnLeft]: which half
+     *  the pick goes to, for the preview. */
+    share: Int? = null,
+    pickedOnLeft: Boolean = false,
+    onShareChange: (Int) -> Unit = {},
 ) {
     val columns = look.columns.coerceIn(SplitPickerLook.MIN_COLUMNS, SplitPickerLook.MAX_COLUMNS)
     val iconSize = look.iconSize.coerceIn(SplitPickerLook.MIN_ICON, SplitPickerLook.MAX_ICON).dp
@@ -162,16 +170,30 @@ fun SplitPickerDrawer(
     var opening by remember { mutableStateOf<Opening?>(null) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val progress = remember { Animatable(0f) }
+    // The glow out of the tapped icon (the same as the taskbar's when an app starts from it).
+    var glowing by remember { mutableStateOf<Opening?>(null) }
+    val glowProgress = remember { Animatable(0f) }
     val zoom = pickCount == 1 && look.openAnim == SplitPickerLook.OPEN_ZOOM && ValueAnimator.areAnimatorsEnabled()
     val pick: (AppItem, Rect?) -> Unit = pick@{ app, from ->
-        if (opening != null) return@pick
+        if (opening != null || glowing != null) return@pick
         if (pickCount > 1) {
             val at = chosen.indexOfFirst { it.key == app.key }
             if (at >= 0) chosen.removeAt(at) else chosen.add(app)
             if (chosen.size >= pickCount) onPickAll(chosen.toList())
             return@pick
         }
-        if (zoom && from != null) opening = Opening(app, from.translate(-origin)) else onPick(app)
+        when {
+            zoom && from != null -> opening = Opening(app, from.translate(-origin))
+            // No zoom: a short glow out of the icon first, then the app opens.
+            from != null && ValueAnimator.areAnimatorsEnabled() -> glowing = Opening(app, from.translate(-origin))
+            else -> onPick(app)
+        }
+    }
+    LaunchedEffect(glowing) {
+        val g = glowing ?: return@LaunchedEffect
+        glowProgress.snapTo(0f)
+        glowProgress.animateTo(1f, tween(GLOW_MS, easing = FastOutSlowInEasing))
+        onPick(g.app)
     }
     LaunchedEffect(opening) {
         val o = opening ?: return@LaunchedEffect
@@ -202,13 +224,17 @@ fun SplitPickerDrawer(
                     alpha = 1f - 0.7f * q
                 },
         ) {
-            if (pickCount > 1 || peek != null) {
+            if (pickCount > 1 || peek != null || share != null) {
                 Header(
                     text = if (pickCount > 1) stringResource(R.string.split_picker_choose_more, chosen.size, pickCount)
                     else stringResource(R.string.split_picker_choose),
                     peek = peek,
                     onPeekChange = onPeekChange,
                 )
+            }
+            // How big the pick will be: ⅓, ½ or ⅔, as small previews of the split (not with peek).
+            if (share != null && pickCount == 1 && peek != true) {
+                SharePicker(share, pickedOnLeft, onShareChange)
             }
             if (look.search && current == null) {
                 SearchField(query = query, onQuery = { query = it })
@@ -251,7 +277,48 @@ fun SplitPickerDrawer(
                 }
             }
         }
-        opening?.let { ZoomOpen(it, progress.value, iconSize) }
+        opening?.let {
+            // The glow blooms out of the icon as the zoom begins.
+            PickGlow(it.from, (progress.value * 1.8f).coerceAtMost(1f))
+            ZoomOpen(it, progress.value, iconSize)
+        }
+        glowing?.let { PickGlow(it.from, glowProgress.value) }
+    }
+}
+
+private const val GLOW_MS = 260
+
+/**
+ * A soft accent glow blooming out of the picked icon at [from] and fading, with a thin ring
+ * spreading past it ([p] 0..1) — the taskbar's launch glow, in the picker.
+ */
+@Composable
+private fun PickGlow(from: Rect, p: Float) {
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        val centre = from.center
+        val base = maxOf(from.width, from.height) / 2f
+        val fade = (1f - p) * (1f - p)
+        val bloom = if (p < 0.2f) p / 0.2f else 1f
+        val halo = base * (1f + 0.8f * p)
+        if (halo > 0f) {
+            drawCircle(
+                brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                    0f to ACCENT.copy(alpha = 0.85f * bloom * fade),
+                    0.55f to ACCENT.copy(alpha = 0.4f * bloom * fade),
+                    1f to Color.Transparent,
+                    center = centre,
+                    radius = halo,
+                ),
+                radius = halo,
+                center = centre,
+            )
+        }
+        drawCircle(
+            color = ACCENT.copy(alpha = 0.75f * fade),
+            radius = base * (1f + 1.1f * p),
+            center = centre,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = base * 0.1f * (1f - p) + 1f),
+        )
     }
 }
 
@@ -333,6 +400,46 @@ private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit
                     selectedLabelColor = Color.White,
                 ),
             )
+        }
+    }
+}
+
+/** The picked app's share of the screen, as three tiny split previews; the chosen one is lit. */
+@Composable
+private fun SharePicker(share: Int, pickedOnLeft: Boolean, onShareChange: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.split_picker_size), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+        listOf(33, 50, 66).forEach { option ->
+            val selected = option == share
+            val border by androidx.compose.animation.animateColorAsState(
+                if (selected) ACCENT else Color.White.copy(alpha = 0.18f), label = "shareBorder",
+            )
+            Row(
+                Modifier
+                    .size(width = 46.dp, height = 28.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .border(1.5.dp, border, RoundedCornerShape(7.dp))
+                    .clickable { onShareChange(option) }
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                val mine = option / 100f
+                val parts = if (pickedOnLeft) listOf(true to mine, false to 1f - mine) else listOf(false to 1f - mine, true to mine)
+                parts.forEach { (isPick, w) ->
+                    Box(
+                        Modifier
+                            .weight(w)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(if (isPick) (if (selected) ACCENT else Color.White.copy(alpha = 0.45f)) else Color.White.copy(alpha = 0.16f)),
+                    )
+                }
+            }
         }
     }
 }
