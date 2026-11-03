@@ -63,14 +63,17 @@ object ShellSplit {
             return RootShell.run("dumpsys activity " + args.joinToString(" "))
         }
         return runCatching {
-            val file = File(context.cacheDir, "shell_split_${Thread.currentThread().id}.txt")
-            val ok = ParcelFileDescriptor.open(
-                file,
-                ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE,
-            ).use { fd -> Debug.dumpService("activity", fd.fileDescriptor, args) }
-            val text = if (ok) file.readText() else null
-            file.delete()
-            text
+            // A file of its own per read: reads run on several threads at once.
+            val file = File.createTempFile("shell_split_", ".txt", context.cacheDir)
+            try {
+                val ok = ParcelFileDescriptor.open(
+                    file,
+                    ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE,
+                ).use { fd -> Debug.dumpService("activity", fd.fileDescriptor, args) }
+                if (ok) file.readText() else null
+            } finally {
+                file.delete()
+            }
         }.getOrNull()
     }
 

@@ -518,11 +518,7 @@ private const val LIVE_CARD_IDLE_MS = 10_000L
 
 private fun openNotificationIntent(context: Context, intent: PendingIntent) {
     runCatching {
-        val options = ActivityOptions.makeBasic()
-        if (Build.VERSION.SDK_INT >= 34) {
-            @Suppress("DEPRECATION")
-            options.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
-        }
+        val options = org.arkikeskus.launcher.data.PendingIntents.foregroundStartOptions()
         intent.send(context, 0, null, null, null, null, options.toBundle())
     }
 }

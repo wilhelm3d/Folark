@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 
-/** Drop on the left half of a card: split view; on the right half: attached view. */
+/** Drop on a card: split view. ([COMBINE_ATTACHED] is no longer produced by a drag; kept for its callers.) */
 internal const val COMBINE_SPLIT = "split"
 internal const val COMBINE_ATTACHED = "attached"
 /** Dropped on a split card: joins it as the third app (Settings ▸ Launch ▸ Real three-app split). */

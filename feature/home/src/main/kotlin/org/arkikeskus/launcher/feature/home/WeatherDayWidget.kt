@@ -211,7 +211,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                     viewModel.refresh(force = true)
                 } else if (!(settings.widgets.motoWeatherTap && MotoLinks.open(context, MotoLinks.WEATHER))) {
                     runCatching {
-                        val query = Uri.encode("weather " + current?.city.orEmpty())
+                        val query = Uri.encode("weather " + current.city.orEmpty())
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$query"))
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

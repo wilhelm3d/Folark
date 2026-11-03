@@ -12,11 +12,6 @@ import android.os.Build
  * (a cancelled PendingIntent, typically).
  */
 internal fun sendNotificationIntent(context: Context, intent: PendingIntent): Boolean = runCatching {
-    val options = ActivityOptions.makeBasic()
-    if (Build.VERSION.SDK_INT >= 34) {
-        options.setPendingIntentBackgroundActivityStartMode(
-            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
-        )
-    }
+    val options = org.arkikeskus.launcher.data.PendingIntents.foregroundStartOptions()
     intent.send(context, 0, null, null, null, null, options.toBundle())
 }.isSuccess

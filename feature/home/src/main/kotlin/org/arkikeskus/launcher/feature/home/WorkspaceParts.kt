@@ -64,7 +64,12 @@ internal fun pushWidgetSize(view: android.appwidget.AppWidgetHostView, wDp: Int,
     sentWidgetSizes[view] = packed
     val opts = widgetSizeOptions(wDp, hDp)
     runCatching {
-        view.updateAppWidgetSize(opts, wDp, hDp, wDp, hDp)
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            view.updateAppWidgetSize(opts, listOf(android.util.SizeF(wDp.toFloat(), hDp.toFloat())))
+        } else {
+            @Suppress("DEPRECATION")
+            view.updateAppWidgetSize(opts, wDp, hDp, wDp, hDp)
+        }
         view.updateAppWidgetOptions(opts)
     }
 }

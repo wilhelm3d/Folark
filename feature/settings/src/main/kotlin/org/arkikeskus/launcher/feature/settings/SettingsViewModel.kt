@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package org.arkikeskus.launcher.feature.settings
 
 import androidx.compose.runtime.setValue

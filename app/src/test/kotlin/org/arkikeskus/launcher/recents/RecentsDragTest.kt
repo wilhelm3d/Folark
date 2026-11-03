@@ -35,13 +35,14 @@ class RecentsDragTest {
         assertThat(drag.target).isNull()
     }
 
-    @Test fun `left half of a card is split view, right half attached view`() {
+    @Test fun `anywhere on a card is split view`() {
+        // Since the card-on-card drop zone (a830c9e) both halves make a split; "attached" is gone.
         drag.start(one, Offset(50f, 100f))
         drag.move(Offset(70f, 0f)) // x = 120: left half of card 2
         assertThat(drag.target).isEqualTo(two.key)
         assertThat(drag.mode).isEqualTo(COMBINE_SPLIT)
         drag.move(Offset(60f, 0f)) // x = 180: right half
-        assertThat(drag.mode).isEqualTo(COMBINE_ATTACHED)
+        assertThat(drag.mode).isEqualTo(COMBINE_SPLIT)
     }
 
     @Test fun `a split card is no target unless three-app split is on`() {
