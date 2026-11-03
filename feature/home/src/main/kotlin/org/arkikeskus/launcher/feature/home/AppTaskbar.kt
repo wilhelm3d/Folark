@@ -1158,6 +1158,7 @@ internal class AppTaskbar(
             }
             setOnClickListener {
                 performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                playLaunchGlow(this)
                 onClick()
             }
         }
@@ -1338,6 +1339,7 @@ internal class AppTaskbar(
                     when (chosen) {
                         ACTION_OPEN -> {
                             LaunchOrigin.view(view)
+                            playLaunchGlow(view)
                             launchApp(app)
                         }
                         ACTION_SPLIT -> openSplit(app)
