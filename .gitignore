@@ -57,3 +57,8 @@ SystemUI_Extracted/
 jadx.zip
 jadx/
 split_debug.log
+
+# Text dumps of the sources made for AI tools: generate them on demand, never commit them
+gemini/
+gemini_txt/
+folark_full_codebase.txt
