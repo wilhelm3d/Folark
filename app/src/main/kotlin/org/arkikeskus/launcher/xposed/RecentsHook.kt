@@ -101,9 +101,34 @@ class RecentsHook : IXposedHookLoadPackage {
                     if (!replaceOn(context)) return
                     val home = target.declaringJavaClass.enumConstants?.firstOrNull { (it as Enum<*>).name == "HOME" } ?: return
                     param.result = home
-                    main.postDelayed({ openFolarkRecents(context, toggle = false) }, afterHomeMs(context))
+                    // Open Folark Recents when the launcher says its swipe-home animation is done
+                    // (below); the timer is only the safety net for launcher builds without those
+                    // methods, so it waits a little longer than the animation.
+                    pendingRecents?.let { main.removeCallbacks(it) }
+                    val open = Runnable {
+                        pendingRecents = null
+                        openFolarkRecents(context, toggle = false)
+                    }
+                    pendingRecents = open
+                    main.postDelayed(open, afterHomeMs(context) + SETTLE_FALLBACK_EXTRA_MS)
                 }
             })
+            // The end of the swipe-home animation, as the launcher itself reports it. Names differ
+            // between Launcher3 versions; whichever exists and comes first opens Recents.
+            var settled = 0
+            for (name in SETTLED_METHODS) {
+                settled += runCatching {
+                    XposedBridge.hookAllMethods(swipe, name, object : XC_MethodHook() {
+                        override fun afterHookedMethod(param: MethodHookParam) {
+                            val open = pendingRecents ?: return
+                            main.removeCallbacks(open)
+                            // After this frame: the launcher finishes its own bookkeeping first.
+                            main.post(open)
+                        }
+                    }).size
+                }.getOrDefault(0)
+            }
+            log(if (settled > 0) "swipe-home end: $settled hook(s)" else "swipe-home end not found; Recents opens on a timer")
         } else {
             log("no AbsSwipeUpHandler in ${lpparam.packageName}; swipe-up to Folark Recents unavailable")
         }
@@ -148,6 +173,9 @@ class RecentsHook : IXposedHookLoadPackage {
      *  [HOOK_SWIPE]. Sent to Folark so Settings can tell "active" from "active, but a gesture isn't
      *  available on this launcher version". 0 until the launcher is hooked. */
     @Volatile private var compat = 0
+
+    /** Folark Recents waiting for the swipe-home animation to end (main thread only). */
+    private var pendingRecents: Runnable? = null
 
     /**
      * Folark is asked on a thread of its own, never on the launcher's main thread: these hooks run
@@ -286,6 +314,15 @@ class RecentsHook : IXposedHookLoadPackage {
         private const val AFTER_HOME_MS = 260L
         /** Even with animations off, a frame or two for the launcher to finish going home. */
         private const val MIN_AFTER_HOME_MS = 32L
+        /** The timer waits this much longer than the animation, so the launcher's own report wins. */
+        private const val SETTLE_FALLBACK_EXTRA_MS = 250L
+
+        /**
+         * AbsSwipeUpHandler methods called once the gesture's end animation has finished:
+         * `onSettledOnEndTarget` (the animation settled on its target) and
+         * `finishCurrentTransitionToHome` (the move to home is being completed).
+         */
+        private val SETTLED_METHODS = listOf("onSettledOnEndTarget", "finishCurrentTransitionToHome")
         /** How old Folark's answer may be before it is asked again (in the background). */
         private const val CACHE_MS = 30_000L
 
