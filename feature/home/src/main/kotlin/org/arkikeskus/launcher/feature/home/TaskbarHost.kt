@@ -130,6 +130,41 @@ object TaskbarHost {
     private var watchHandler: Handler? = null
     private var lastEventAt = 0L
     private var lastForeground: String? = null
+    private var watchTick: Runnable? = null
+
+    /**
+     * Looks right away instead of at the next tick, and restarts the watch after the screen was off
+     * (it stops while the screen is off rather than waking every second for nothing). Called when the
+     * screen comes on and when the bar is opened from a handle.
+     */
+    fun checkNow() {
+        val handler = watchHandler ?: return
+        val tick = watchTick ?: return
+        handler.removeCallbacks(tick)
+        watchTick = tick
+        handler.post(tick)
+    }
+
+    /**
+     * The app most recently brought to the front, read once from usage events (Usage access), for
+     * when no watch is running yet. Not on the main thread. Null if unknown.
+     */
+    fun foregroundNow(context: Context): String? = runCatching {
+        val usage = context.getSystemService(UsageStatsManager::class.java) ?: return null
+        val now = System.currentTimeMillis()
+        val events = usage.queryEvents(now - FOREGROUND_LOOK_BACK_MS, now) ?: return null
+        val event = UsageEvents.Event()
+        var newest: String? = null
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED &&
+                event.packageName != "com.android.systemui" && event.packageName != context.packageName
+            ) {
+                newest = event.packageName
+            }
+        }
+        newest
+    }.getOrNull()
 
     private fun startWatching(app: Context) {
         if (watcher != null) return
@@ -144,7 +179,9 @@ object TaskbarHost {
         val tick = object : Runnable {
             override fun run() {
                 if (watchHandler !== handler) return
-                if (power?.isInteractive != false && usage != null) {
+                // Screen off: stop until checkNow() (screen on) starts it again.
+                if (power?.isInteractive == false) return
+                if (usage != null) {
                     val now = System.currentTimeMillis()
                     var newest: String? = null
                     runCatching {
@@ -173,6 +210,7 @@ object TaskbarHost {
     private fun stopWatching() {
         watchHandler?.removeCallbacksAndMessages(null)
         watchHandler = null
+        watchTick = null
         watcher?.quitSafely()
         watcher = null
         lastForeground = null
@@ -185,4 +223,5 @@ object TaskbarHost {
 
     private const val WATCH_EVERY_MS = 1_000L
     private const val FIRST_LOOK_BACK_MS = 10_000L
+    private const val FOREGROUND_LOOK_BACK_MS = 30 * 60_000L
 }

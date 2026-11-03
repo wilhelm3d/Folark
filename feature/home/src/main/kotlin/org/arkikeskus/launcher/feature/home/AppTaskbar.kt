@@ -58,6 +58,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.DEFAULT_NUDGE_COLOR
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Folark's taskbar on the unfolded display: your pinned apps, a divider, and the apps you used last.
@@ -98,6 +99,44 @@ internal class AppTaskbar(
     internal var setup: TaskbarSetup? = null
     internal var allApps: List<AppItem> = emptyList()
     internal var recents: List<AppItem> = emptyList()
+
+    /** Two apps sharing a split screen, shown as one tile among the recent apps. */
+    internal data class OpenPair(val apps: List<AppItem>, val taskIds: List<Int>)
+    internal var openPair: OpenPair? = null
+    /** [openPair] as the last background read found it (applied with the recent apps). */
+    @Volatile internal var nextOpenPair: OpenPair? = null
+
+    /** Writes the pinned apps (pin, unpin, reorder from the bar or a drop from the drawer). */
+    internal var settingsRepo: org.arkikeskus.launcher.data.SettingsRepository? = null
+
+    /**
+     * Apps the hide button was tapped in: there the bar stays as handles (a handle still opens it),
+     * remembered across restarts until "Show here again" is tapped in that app.
+     */
+    internal var hiddenHere: Set<String> =
+        runCatching { prefs().getStringSet(PREF_HIDDEN_HERE, null)?.toSet() }.getOrNull().orEmpty()
+        private set
+
+    private fun prefs() = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    internal fun setHiddenHere(packageName: String, hidden: Boolean) {
+        val next = if (hidden) hiddenHere + packageName else hiddenHere - packageName
+        if (next == hiddenHere) return
+        hiddenHere = next
+        runCatching { prefs().edit().putStringSet(PREF_HIDDEN_HERE, next).apply() }
+        setup?.let { updateWatching(it) }
+    }
+
+    /** Tells the hosts whether the app in front must be followed (see [TaskbarVisibility.needsForeground]). */
+    private fun updateWatching(s: TaskbarSetup) {
+        val needForeground = TaskbarVisibility.needsForeground(
+            s.hiddenApps, s.alwaysApps, s.autoHideApps, s.miniApps, hiddenHere, s.keepOpen,
+            followsOpenApps = s.recentCount > 0 || s.runningDots,
+        )
+        LockAccessibilityService.watchApps(needForeground || s.replaceRecents)
+        // Without the accessibility service, the app in front comes from the usage history.
+        TaskbarHost.watchApps(context, needForeground && s.enabled)
+    }
     /** Packages open now (Android's task list), for the taskbar's running dots and open-apps mode. */
     @Volatile internal var runningPackages: Set<String> = emptySet()
     /** How many open windows each package has now (split pairs, pop-ups count separately). */
@@ -189,6 +228,7 @@ internal class AppTaskbar(
                 Intent.ACTION_SCREEN_OFF -> { screenOn = false; expanded = false; media.stop() }
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
                     screenOn = true
+                    TaskbarHost.checkNow()
                     setup?.let { if (it.enabled && it.mediaEnabled) media.start() }
                 }
             }
@@ -201,6 +241,9 @@ internal class AppTaskbar(
             EntryPointAccessors.fromApplication(context.applicationContext, AppTaskbarEntryPoint::class.java)
         }.getOrNull() ?: return
         val settingsRepository = entry.settingsRepository()
+        settingsRepo = settingsRepository
+        // A drop from the drawer or home onto the bar pins the app (while the bar stays on home).
+        org.arkikeskus.launcher.ui.TaskbarDropTarget.onPin = { app -> pin(app) }
         val appRepository = entry.appRepository()
         repository = appRepository
         split = entry.splitCoordinator()
@@ -308,10 +351,7 @@ internal class AppTaskbar(
                 // Per-app rules need to know which app is in front: only then is the service told.
                 // ...and so does handing Android's Recents over to Folark Recents.
                 LockAccessibilityService.replaceSystemRecents = next.replaceRecents
-                val perAppRules = next.hiddenApps.isNotEmpty() || next.alwaysApps.isNotEmpty() || next.autoHideApps.isNotEmpty() || next.miniApps.isNotEmpty()
-                LockAccessibilityService.watchApps(perAppRules || next.replaceRecents)
-                // Without the accessibility service, the app in front comes from the usage history.
-                TaskbarHost.watchApps(context, perAppRules && next.enabled)
+                updateWatching(next)
                 // The media session is only followed while the media icon is wanted.
                 if (next.enabled && next.mediaEnabled) media.start() else media.stop()
                 // Only Folark's own launch order moved (every launch): rebuild only if the recent apps changed.
@@ -359,6 +399,7 @@ internal class AppTaskbar(
 
     fun stop() {
         TaskbarSpace.set(0)
+        org.arkikeskus.launcher.ui.TaskbarDropTarget.clear()
         hideUndo()
         hideSuggestion()
         scope.cancel()
@@ -415,32 +456,45 @@ internal class AppTaskbar(
         val s = current()
         // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
         ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty() || s.autoHideApps.isNotEmpty() || s.miniApps.isNotEmpty()) && screenOn)
-        val active = s != null && s.enabled && screenOn && keyguard?.isKeyguardLocked != true &&
-            (s.pinned.isNotEmpty() || s.pairs.isNotEmpty() || recents.isNotEmpty() || mediaShown(s) || (s.liveEnabled && live.isNotEmpty()))
-        if (!active || s == null) {
+        if (s == null) {
             expanded = false
             remove()
             TaskbarSpace.set(0)
             return
         }
-        val mode = when {
-            // Typing on home or in the drawer: the bar would cover the keyboard's bottom row.
-            homeVisible && TaskbarSpace.keyboardOnHome.value -> MODE_NONE
-            // The hide button was tapped: show only the pull handles until a handle swipe reopens it.
-            manuallyHidden && !expanded -> MODE_HANDLES
-            homeVisible && s.onHome -> MODE_BAR_FIXED
-            homeVisible -> MODE_NONE
-            // Settings ▸ Taskbar ▸ per app: never in these; always (not over the keyboard) in those.
-            foreground in s.hiddenApps -> MODE_NONE
-            foreground in s.alwaysApps && !keyboardUp -> MODE_BAR_FIXED
-            // Just opened from a handle or the mini pill: the full bar (it collapses again by itself).
-            expanded -> MODE_BAR
-            // Per app: auto-hide (a corner swipe reveals it), or a small tap-to-open mini pill.
-            foreground in s.autoHideApps -> MODE_HANDLES
-            foreground in s.miniApps && !keyboardUp -> MODE_MINI
-            // Full screen (a video, a game): no bar covering it; a corner swipe still opens it.
-            s.keepOpen && !(s.hideFullScreen && fullScreen) && !keyboardUp -> MODE_BAR_FIXED
-            else -> MODE_HANDLES
+        val facts = TaskbarVisibility.Facts(
+            enabled = s.enabled,
+            screenOn = screenOn,
+            keyguardLocked = keyguard?.isKeyguardLocked == true,
+            hasContent = s.pinned.isNotEmpty() || s.pairs.isNotEmpty() || recents.isNotEmpty() || openPair != null ||
+                mediaShown(s) || (s.liveEnabled && live.isNotEmpty()),
+            homeVisible = homeVisible,
+            keyboardOnHome = TaskbarSpace.keyboardOnHome.value,
+            keyboardUp = keyboardUp,
+            manuallyHidden = manuallyHidden || (!homeVisible && foreground != null && foreground in hiddenHere),
+            expanded = expanded,
+            onHome = s.onHome,
+            keepOpen = s.keepOpen,
+            hideFullScreen = s.hideFullScreen,
+            fullScreen = fullScreen,
+            foreground = foreground,
+            hiddenApps = s.hiddenApps,
+            alwaysApps = s.alwaysApps,
+            autoHideApps = s.autoHideApps,
+            miniApps = s.miniApps,
+        )
+        if (!TaskbarVisibility.active(facts)) {
+            expanded = false
+            remove()
+            TaskbarSpace.set(0)
+            return
+        }
+        val mode = when (TaskbarVisibility.mode(facts)) {
+            TaskbarVisibility.Mode.NONE -> MODE_NONE
+            TaskbarVisibility.Mode.HANDLES -> MODE_HANDLES
+            TaskbarVisibility.Mode.BAR -> MODE_BAR
+            TaskbarVisibility.Mode.BAR_FIXED -> MODE_BAR_FIXED
+            TaskbarVisibility.Mode.MINI -> MODE_MINI
         }
         // Only the bar that stays on home takes room there (home and the drawer step aside).
         if (mode != MODE_BAR_FIXED || !homeVisible) TaskbarSpace.set(0)
@@ -489,17 +543,26 @@ internal class AppTaskbar(
         if (runCatching { windowManager.addView(view, params) }.isSuccess) probe = view
     }
 
-    /** The app in front (only followed while per-app rules exist), null when unknown. */
-    private var foreground: String? = null
+    /** The app in front (followed only while something needs it, see [updateWatching]), null when unknown. */
+    internal var foreground: String? = null
 
-    /** Another app came to the front: re-decides the bar only when a per-app rule is involved. */
+    /**
+     * Another app came to the front: a bar on screen reads its recent apps and running dots again
+     * (rebuilt only if they changed); otherwise the bar is re-decided when a per-app rule or a
+     * "hidden here" is involved.
+     */
     fun onForegroundApp(packageName: String) {
         val s = setup ?: return
         if (packageName == foreground) return
         val before = foreground
         foreground = packageName
-        fun ruled(p: String?) = p != null && (p in s.hiddenApps || p in s.alwaysApps || p in s.autoHideApps || p in s.miniApps)
-        if (ruled(before) || ruled(packageName)) refresh()
+        fun ruled(p: String?) = p != null &&
+            (p in s.hiddenApps || p in s.alwaysApps || p in s.autoHideApps || p in s.miniApps || p in hiddenHere)
+        val barUp = shownMode == MODE_BAR || shownMode == MODE_BAR_FIXED
+        when {
+            barUp && !homeVisible && (s.recentCount > 0 || s.runningDots) -> loadRecents(rebuild = true, force = false)
+            ruled(before) || ruled(packageName) -> refresh()
+        }
     }
 
     /** The home screen came to the front or left it. */
@@ -521,6 +584,7 @@ internal class AppTaskbar(
     }
 
     private fun remove() {
+        org.arkikeskus.launcher.ui.TaskbarDropTarget.bounds = null
         livePill = null
         iconViews.clear()
         shown.forEach { runCatching { windowManager.removeView(it) } }
@@ -567,6 +631,22 @@ internal class AppTaskbar(
     /** How far a bottom-anchored overlay is lifted to clear the system's bottom inset (0 when off). */
     private fun TaskbarSetup.insetLift(): Int = if (clearInset) systemBottomInset() else 0
 
+    /**
+     * How far the pull handles and the mini pill sit above the bottom edge. An ordinary overlay
+     * window cannot take touches where Android's navigation bar / gesture strip is (that window is
+     * above it), so there they always clear it; the accessibility overlay can sit right at the edge.
+     */
+    private fun TaskbarSetup.handleLift(): Int =
+        if (windowType == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) maxOf(insetLift(), systemBottomInset())
+        else insetLift()
+
+    /** Keeps Android's back gesture from taking swipes that start on [view] at a side edge. */
+    private fun excludeFromSystemGestures(view: View) {
+        view.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            v.systemGestureExclusionRects = listOf(android.graphics.Rect(0, 0, v.width, v.height))
+        }
+    }
+
     // ------------------------------------------------------------------ the corner handles
 
     /**
@@ -606,7 +686,8 @@ internal class AppTaskbar(
                 val (hintView, lp) = handleHintView(s.handleStyle)
                 zone.addView(hintView, lp)
             }
-            add(zone, params(Gravity.BOTTOM or side, 0, s.insetLift()))
+            if (side != Gravity.CENTER_HORIZONTAL) excludeFromSystemGestures(zone)
+            add(zone, params(Gravity.BOTTOM or side, 0, s.handleLift()))
         }
     }
 
@@ -712,19 +793,35 @@ internal class AppTaskbar(
                 true
             }
         }
-        add(pill, params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(8) + s.insetLift()))
+        add(pill, params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(8) + s.handleLift()))
     }
 
     private fun open() {
         expanded = true
         manuallyHidden = false
+        // Which app the bar opened over (per-app rules, "hidden here"), right away.
+        TaskbarHost.checkNow()
         loadRecents(rebuild = true, force = false)
     }
 
     /** The hide button: animate the bar away, then leave only the pull handles. */
     private fun hideToHandles() {
-        manuallyHidden = true
         expanded = false
+        if (homeVisible) {
+            manuallyHidden = true
+        } else {
+            // Over an app: remembered for that app. Which app it is is read now (it may not have
+            // been followed until something needed it).
+            val known = foreground
+            if (known != null) setHiddenHere(known, true) else manuallyHidden = true
+            if (known == null) scope.launch {
+                val app = withContext(Dispatchers.IO) { TaskbarHost.foregroundNow(context) } ?: return@launch
+                foreground = app
+                manuallyHidden = false
+                setHiddenHere(app, true)
+                refresh()
+            }
+        }
         handler.removeCallbacks(collapse)
         val view = barColumn
         val anim = setup?.taskbarAnim
@@ -790,8 +887,8 @@ internal class AppTaskbar(
             clipToPadding = false
         }
         val size = dp(s.iconSizeDp)
-        fun addIcon(app: AppItem) {
-            val view = iconView(app, s, size, hint, fixed)
+        fun addIcon(app: AppItem, pinnedIndex: Int = -1) {
+            val view = iconView(app, s, size, hint, fixed, pinnedIndex)
             // An app that is open now: a small dot under its icon (Settings ▸ Recents).
             if (s.runningDots && app.packageName in runningPackages) {
                 val windows = if (s.multiDots) runningCounts[app.packageName] ?: 1 else 1
@@ -851,11 +948,12 @@ internal class AppTaskbar(
             })
         }
         if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_START) addMedia()
-        s.pinned.forEach(::addIcon)
+        s.pinned.forEachIndexed { i, app -> addIcon(app, i) }
         s.pairs.forEach(::addPairIcon)
         if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE) addMedia()
         val recentApps = recents.filter { r -> s.pinned.none { it.key == r.key } }
-        if ((s.pinned.isNotEmpty() || s.pairs.isNotEmpty()) && recentApps.isNotEmpty()) {
+        val livePair = openPair
+        if ((s.pinned.isNotEmpty() || s.pairs.isNotEmpty()) && (recentApps.isNotEmpty() || livePair != null)) {
             val divider = View(context).apply {
                 setBackgroundColor(if (lightTheme) Color.argb(90, 0, 0, 0) else Color.argb(110, 255, 255, 255))
             }
@@ -864,7 +962,28 @@ internal class AppTaskbar(
                 marginEnd = dp(6) + dp(s.spacingDp) / 2
             })
         }
-        recentApps.forEach(::addIcon)
+        // The split screen that is open (or behind home) as one tile: a tap brings it back as a split.
+        if (livePair != null) {
+            val description = context.getString(R.string.taskbar_open_pair, livePair.apps[0].label, livePair.apps[1].label)
+            row.addView(pairTile(livePair.apps.map { it.key }, description, s, size) {
+                val a = livePair.apps[0]
+                val b = livePair.apps[1]
+                scope.launch {
+                    split?.restore(
+                        org.arkikeskus.launcher.data.SplitApp(a.packageName, a, livePair.taskIds[0]),
+                        org.arkikeskus.launcher.data.SplitApp(b.packageName, b, livePair.taskIds[1]),
+                    )
+                }
+                if (!fixed) {
+                    expanded = false
+                    refresh()
+                }
+            }, LinearLayout.LayoutParams(size, size).apply {
+                marginStart = dp(s.spacingDp) / 2
+                marginEnd = dp(s.spacingDp) / 2
+            })
+        }
+        recentApps.forEach { addIcon(it) }
         if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_END) addMedia()
         val withRecents = s.recentsButton != LauncherSettings.TASKBAR_RECENTS_OFF
         if (withRecents || s.splitControls) {
@@ -895,8 +1014,18 @@ internal class AppTaskbar(
             }
             // A small hide button next to Recents: tucks the bar away, leaving just the pull handles.
             if (s.hideButton) {
-                row.addView(barButton(R.drawable.ic_taskbar_hide, R.string.taskbar_hide, s, size, fixed,
-                    onTap = { hideToHandles() }, onHold = null),
+                // In an app it was hidden in before, the same button brings the bar back there.
+                val here = foreground.takeIf { !homeVisible && it != null && it in hiddenHere }
+                row.addView(barButton(R.drawable.ic_taskbar_hide, if (here != null) R.string.taskbar_show_here else R.string.taskbar_hide, s, size, fixed,
+                    onTap = {
+                        if (here != null) {
+                            setHiddenHere(here, false)
+                            expanded = false
+                            refresh(rebuild = true)
+                        } else {
+                            hideToHandles()
+                        }
+                    }, onHold = null).apply { if (here != null) rotation = 180f },
                     LinearLayout.LayoutParams(size, size).apply {
                         marginStart = dp(s.spacingDp) / 2
                         marginEnd = dp(s.spacingDp) / 2
@@ -959,6 +1088,9 @@ internal class AppTaskbar(
         barRow.getLocationOnScreen(location)
         val screenHeight = windowManager.currentWindowMetrics.bounds.height()
         TaskbarSpace.set(screenHeight - location[1] + dp(SPACE_GAP_DP))
+        org.arkikeskus.launcher.ui.TaskbarDropTarget.bounds = android.graphics.Rect(
+            location[0], location[1], location[0] + barRow.width, location[1] + barRow.height,
+        )
     }
 
     /** The bar's backdrop for the chosen theme; null for the see-through one. */
@@ -1010,10 +1142,15 @@ internal class AppTaskbar(
      * opens them in split screen — with a third app as a third pane where Folark's Vector module
      * runs in SystemUI, floating otherwise (see AppRepository.launchAppPair).
      */
-    private fun pairView(pair: AppPair, s: TaskbarSetup, size: Int): View {
-        val keys = listOfNotNull(pair.app1Key, pair.app2Key, pair.app3Key.takeIf { pair.hasThirdApp })
+    private fun pairView(pair: AppPair, s: TaskbarSetup, size: Int): View =
+        pairTile(listOfNotNull(pair.app1Key, pair.app2Key, pair.app3Key.takeIf { pair.hasThirdApp }), pair.name, s, size) {
+            repository?.launchAppPair(pair)
+        }
+
+    /** Two or three apps' icons together on one rounded tile; a tap runs [onClick]. */
+    private fun pairTile(keys: List<String>, description: String, s: TaskbarSetup, size: Int, onClick: () -> Unit): View {
         val frame = FrameLayout(context).apply {
-            contentDescription = pair.name
+            contentDescription = description
             background = GradientDrawable().apply {
                 cornerRadius = size * 0.28f
                 val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
@@ -1021,7 +1158,7 @@ internal class AppTaskbar(
             }
             setOnClickListener {
                 performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-                repository?.launchAppPair(pair)
+                onClick()
             }
         }
         val three = keys.size == 3
@@ -1052,7 +1189,8 @@ internal class AppTaskbar(
         return frame
     }
 
-    private fun iconView(app: AppItem, s: TaskbarSetup, size: Int, hint: TextView, fixed: Boolean): ImageView {
+    /** [pinnedIndex]: the icon's place among the pinned apps (-1: a recent app), for reordering. */
+    private fun iconView(app: AppItem, s: TaskbarSetup, size: Int, hint: TextView, fixed: Boolean, pinnedIndex: Int = -1): ImageView {
         val icon = ImageView(context).apply {
             contentDescription = app.label
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -1092,6 +1230,16 @@ internal class AppTaskbar(
         var handedOver = false
         var triedSystem = false
         var action = ACTION_NONE
+        // A pinned icon dragged along the bar (not up off it) moves among the pinned apps.
+        var reordering = false
+        var reorderSlot = 0
+        val slotWidth = (size + dp(s.spacingDp)).toFloat()
+        addIconAccessibility(
+            icon, app,
+            onSplit = { openSplit(app) },
+            onFloat = { repository?.launchFloating(app) },
+            onShortcuts = { showShortcuts(app, icon, s, fixed) },
+        )
         val hold = Runnable {
             held = true
             icon.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
@@ -1102,6 +1250,8 @@ internal class AppTaskbar(
                 MotionEvent.ACTION_DOWN -> {
                     downX = event.rawX; downY = event.rawY; moved = false; held = false; handedOver = false; triedSystem = false
                     action = ACTION_NONE
+                    reordering = false
+                    reorderSlot = 0
                     handler.removeCallbacks(collapse)
                     handler.postDelayed(hold, ViewConfiguration.getLongPressTimeout().toLong())
                 }
@@ -1109,9 +1259,25 @@ internal class AppTaskbar(
                     if (handedOver || held) return@setOnTouchListener true
                     val dx = event.rawX - downX
                     val up = downY - event.rawY
-                    if (abs(up) > slop || abs(dx) > slop) {
+                    if (!moved && (abs(up) > slop || abs(dx) > slop)) {
                         moved = true
                         handler.removeCallbacks(hold)
+                        reordering = pinnedIndex >= 0 && abs(dx) > abs(up) * 2 && abs(up) < dp(16)
+                    }
+                    if (reordering) {
+                        if (up > armDistance * 0.6f) {
+                            // Lifted off the bar after all: an ordinary drag (split, float) from here.
+                            reordering = false
+                            view.translationX = 0f
+                        } else {
+                            view.translationX = dx
+                            val slot = (dx / slotWidth).roundToInt()
+                            if (slot != reorderSlot) {
+                                reorderSlot = slot
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                            return@setOnTouchListener true
+                        }
                     }
                     if (moved) {
                         ghostStart(view as ImageView, hint)
@@ -1141,7 +1307,7 @@ internal class AppTaskbar(
                         }
                         if (next != action) {
                             // A tick on entering a drop zone (not on leaving one).
-                            if (next != ACTION_NONE && s.edgeSnap && s.zones.haptics) {
+                            if (next != ACTION_NONE && s.zones.haptics) {
                                 view.performHapticFeedback(
                                     if (Build.VERSION.SDK_INT >= 34) android.view.HapticFeedbackConstants.SEGMENT_TICK
                                     else android.view.HapticFeedbackConstants.CLOCK_TICK,
@@ -1159,7 +1325,16 @@ internal class AppTaskbar(
                     handler.removeCallbacks(hold)
                     resetIcon(view, hint)
                     if (handedOver || held) return@setOnTouchListener true
+                    if (reordering) {
+                        reordering = false
+                        if (reorderSlot != 0) movePinned(app, pinnedIndex + reorderSlot)
+                        if (!fixed) handler.postDelayed(collapse, AUTO_COLLAPSE_MS)
+                        return@setOnTouchListener true
+                    }
                     val chosen = if (!moved) ACTION_OPEN else action
+                    if (chosen != ACTION_OPEN && chosen != ACTION_NONE) {
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                    }
                     when (chosen) {
                         ACTION_OPEN -> {
                             LaunchOrigin.view(view)
@@ -1363,7 +1538,9 @@ internal class AppTaskbar(
         internal const val ACTION_PEEK = 7
         internal const val ACTION_THREE = 8
 
-        private const val MAX_PINNED = 10
+        internal const val MAX_PINNED = 10
+        private const val PREFS_NAME = "taskbar"
+        private const val PREF_HIDDEN_HERE = "hidden_here"
         internal const val MAX_SHORTCUTS = 5
 
         // The recents screen of Motorola's desktop taskbar (Ready For), exported without a permission.

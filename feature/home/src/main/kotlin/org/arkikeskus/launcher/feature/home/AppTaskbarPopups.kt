@@ -176,8 +176,12 @@ internal fun AppTaskbar.showShortcuts(app: AppItem, anchor: View, s: TaskbarSetu
         }
         if (!anchor.isAttachedToWindow) return@launch
         if (items.isEmpty()) {
-            Toast.makeText(context, R.string.taskbar_no_shortcuts, Toast.LENGTH_SHORT).show()
-            if (!fixed) handler.postDelayed(collapse, AUTO_COLLAPSE_MS)
+            // No shortcuts: still offer pinning (the menu says there are none).
+            val (pinLabel, pinAction) = pinMenuRow(app)
+            showMenu(anchor, s, fixed, listOf(
+                pinLabel to pinAction,
+                context.getString(R.string.taskbar_no_shortcuts) to null,
+            ))
             return@launch
         }
         val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
@@ -193,6 +197,22 @@ internal fun AppTaskbar.showShortcuts(app: AppItem, anchor: View, s: TaskbarSetu
             elevation = dpf(8f)
         }
         val slop = ViewConfiguration.get(context).scaledTouchSlop
+        // Pin to / unpin from the taskbar, above the app's own shortcuts.
+        val (pinLabel, pinAction) = pinMenuRow(app)
+        panel.addView(TextView(context).apply {
+            text = pinLabel
+            setTextColor(tint)
+            textSize = 14f
+            maxLines = 1
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            background = GradientDrawable().apply { cornerRadius = dpf(16f); setColor(Color.TRANSPARENT) }
+            setOnClickListener {
+                pinAction()
+                hideShortcuts()
+                expanded = false
+                if (!fixed) refresh()
+            }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         items.forEach { (info, drawable) ->
             val label = (info.shortLabel ?: info.longLabel)?.toString().orEmpty()
             val rowView = LinearLayout(context).apply {

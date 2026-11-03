@@ -38,8 +38,11 @@ internal fun AppTaskbar.loadRecents(rebuild: Boolean, force: Boolean = true) {
         val next = withContext(Dispatchers.IO) { recentApps(s) }
         val running = runningPackages
         val counts = runningCounts
-        val changed = next != recents || (s.runningDots && (running != shownRunning || counts != shownCounts))
+        val pair = nextOpenPair
+        val changed = next != recents || pair != openPair ||
+            (s.runningDots && (running != shownRunning || counts != shownCounts))
         recents = next
+        openPair = pair
         shownRunning = running
         shownCounts = counts
         val barUp = shownMode == MODE_BAR || shownMode == MODE_BAR_FIXED
@@ -50,12 +53,16 @@ internal fun AppTaskbar.loadRecents(rebuild: Boolean, force: Boolean = true) {
 }
 
 internal fun AppTaskbar.recentApps(s: TaskbarSetup): List<AppItem> {
-    if (s.recentCount <= 0) return emptyList()
+    if (s.recentCount <= 0) {
+        nextOpenPair = null
+        return emptyList()
+    }
     val pinnedKeys = s.pinned.map { it.key }.toSet()
     val own = context.packageName
     val myUser = Process.myUserHandle()
-    // Open apps from Android's task list (one-time DUMP grant), for the dots and open-apps mode.
-    val open = if (s.runningApps || s.runningDots) OpenTasks.list(context) else null
+    // Open apps from Android's task list (one-time DUMP grant), for the dots, open-apps mode and
+    // the split pair below (read once for all three).
+    val open = OpenTasks.list(context)
     runningPackages = open?.map { it.packageName }?.toSet().orEmpty()
     // Count concurrently-open windows per package: freeform pop-ups and split tasks each count,
     // while any number of plain full-screen recents of one app counts once (not several stale ones).
@@ -64,6 +71,21 @@ internal fun AppTaskbar.recentApps(s: TaskbarSetup): List<AppItem> {
         val fullScreen = if (tasks.any { it.windowingMode == null || it.windowingMode == "fullscreen" }) 1 else 0
         (live + fullScreen).coerceAtLeast(1)
     }.orEmpty()
+    // Two apps sharing a split screen (now or behind home): one tile in the recent apps that brings
+    // the split back, as Android's own taskbar shows it.
+    val splitTasks = open?.filter { it.windowingMode == "multi-window" && it.packageName != own }?.take(2).orEmpty()
+    val pairApps = splitTasks.mapNotNull { t ->
+        allApps.firstOrNull { it.packageName == t.packageName && it.user.hashCode() == t.userId }
+            ?: allApps.firstOrNull { it.packageName == t.packageName }
+    }
+    nextOpenPair = if (splitTasks.size == 2 && pairApps.size == 2 && pairApps[0].key != pairApps[1].key) {
+        AppTaskbar.OpenPair(pairApps, splitTasks.map { it.taskId })
+    } else null
+    val inPair = nextOpenPair?.apps?.map { it.key }?.toSet().orEmpty()
+    if (!(s.runningApps || s.runningDots)) {
+        runningPackages = emptySet()
+        runningCounts = emptyMap()
+    }
     val packages = if (s.runningApps && open != null) open.map { it.packageName }.distinct()
         else if (hasUsageAccess(context)) usageHistory() else null
     val ordered: List<AppItem> = if (packages != null) {
@@ -76,7 +98,7 @@ internal fun AppTaskbar.recentApps(s: TaskbarSetup): List<AppItem> {
         s.launchHistory.mapNotNull { byKey[it] }
     }
     return ordered
-        .filter { it.packageName != own && it.key !in pinnedKeys }
+        .filter { it.packageName != own && it.key !in pinnedKeys && it.key !in inPair }
         .distinctBy { it.key }
         .take(s.recentCount)
 }

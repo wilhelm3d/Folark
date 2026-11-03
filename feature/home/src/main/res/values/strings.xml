@@ -188,6 +188,16 @@
     <string name="taskbar_handle">Open taskbar</string>
     <string name="taskbar_handle_text">Apps</string>
     <string name="taskbar_hide">Hide taskbar</string>
+    <string name="taskbar_show_here">Keep taskbar open in this app again</string>
+    <string name="taskbar_full">The taskbar is full. Unpin an app first.</string>
+    <string name="taskbar_pin">Pin to taskbar</string>
+    <string name="taskbar_unpin">Unpin from taskbar</string>
+    <string name="taskbar_open_pair">%1$s and %2$s in split screen</string>
+    <string name="taskbar_a11y_split">Open in split screen</string>
+    <string name="taskbar_a11y_float">Open in a floating window</string>
+    <string name="taskbar_a11y_shortcuts">Show shortcuts</string>
+    <string name="taskbar_a11y_move_left">Move left</string>
+    <string name="taskbar_a11y_move_right">Move right</string>
     <string name="taskbar_undo_split">↶  Undo split</string>
     <string name="taskbar_split_hint">Release to open in split screen</string>
     <string name="weather_day_widget_name">Weather day</string>

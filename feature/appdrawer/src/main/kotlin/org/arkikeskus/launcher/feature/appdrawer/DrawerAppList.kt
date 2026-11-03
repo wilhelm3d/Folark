@@ -129,6 +129,9 @@ internal fun AppListRow(
                             when {
                                 // The "split" target on home: the partner picker opens.
                                 dragController.dropOnSplit(app, root) -> Unit
+                                // Onto the taskbar (shown on home): pin it there.
+                                org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(root.x, root.y) ->
+                                    org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(app)
                                 dragController.isOverDock(root) && dragController.dockHasSpace ->
                                     onDropOnDock(app)
                                 dragController.isOverGrid(root) -> {
@@ -376,6 +379,9 @@ internal fun LazyGridScope.appCells(
                                 when {
                                     // The "split" target on home: the partner picker opens.
                                     dragController.dropOnSplit(app, root) -> Unit
+                                    // Onto the taskbar (shown on home): pin it there.
+                                    org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(root.x, root.y) ->
+                                        org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(app)
                                     dragController.isOverDock(root) && dragController.dockHasSpace ->
                                         onDropOnDock(app)
                                     dragController.isOverGrid(root) -> {

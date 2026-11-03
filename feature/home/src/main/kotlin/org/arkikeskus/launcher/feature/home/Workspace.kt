@@ -1236,6 +1236,11 @@ fun Workspace(
                                                         dragController.dropOnSplit(d.app, rootPos) -> {
                                                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                                         }
+                                                        // Dropped on the taskbar (shown on home) → pin it there; it stays on home too.
+                                                        org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(rootPos.x, rootPos.y) -> {
+                                                            org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(d.app)
+                                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        }
                                                         // Dropped on the top "remove" zone → take it off home.
                                                         dragController.isOverRemove(rootPos) -> {
                                                             removedKeys = removedKeys + d.app.key
