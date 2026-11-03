@@ -88,14 +88,21 @@ internal class TaskbarLivePill(
         if (desiredWidth() > width) requestLayout()
         val t = (SystemClock.uptimeMillis() - started) / 1000f
         val accent = a.color ?: LivePillPainter.FALLBACK_ACCENT
-        val moves = LivePillPainter.animates(effect)
+        // Over other apps the bar can stay up for hours (navigation, a timer): the effect stands
+        // still in battery saver, as the pill on home does, and after a minute without a touch.
+        val moves = LivePillPainter.animates(effect) && !powerSave() &&
+            SystemClock.uptimeMillis() - lastTouchAt < STILL_AFTER_MS
         painter.draw(canvas, width.toFloat(), height.toFloat(), glowPad, effect, if (moves) t else 0f, accent, a.progress, a.indeterminate, light)
         var x = glowPad + PAD_DP * density
         val cy = height / 2f
         icon?.let { bmp ->
             val s = iconSize()
-            iconPaint.colorFilter = PorterDuffColorFilter(accent, PorterDuff.Mode.SRC_IN)
-            canvas.drawBitmap(bmp, null, android.graphics.RectF(x, cy - s / 2, x + s, cy + s / 2), iconPaint)
+            if (tintFor != accent) {
+                tintFor = accent
+                iconPaint.colorFilter = PorterDuffColorFilter(accent, PorterDuff.Mode.SRC_IN)
+            }
+            iconRect.set(x, cy - s / 2, x + s, cy + s / 2)
+            canvas.drawBitmap(bmp, null, iconRect, iconPaint)
             x += s + GAP_DP * density
         }
         val room = width - x - glowPad - PAD_DP * density
@@ -112,10 +119,29 @@ internal class TaskbarLivePill(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        lastTouchAt = SystemClock.uptimeMillis()
         invalidate()
     }
 
+    /** A touch on the pill (or the bar shown again) wakes the effect for another minute. */
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            lastTouchAt = SystemClock.uptimeMillis()
+            invalidate()
+        }
+        return super.onTouchEvent(event)
+    }
+
+    private var lastTouchAt = SystemClock.uptimeMillis()
+    private var tintFor: Int? = null
+    private val iconRect = android.graphics.RectF()
+    private val power = context.getSystemService(android.os.PowerManager::class.java)
+    private fun powerSave(): Boolean = power?.isPowerSaveMode == true
+
     private companion object {
+        /** The effect moves this long after the pill appears or is touched, then stands still. */
+        const val STILL_AFTER_MS = 60_000L
         const val PAD_DP = 10f
         const val GAP_DP = 7f
         const val MAX_TEXT_DP = 120f

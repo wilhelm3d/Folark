@@ -65,10 +65,13 @@ fun LivePill(
     // The effect's clock: read only while drawing, so a frame redraws the pill and nothing else.
     var t by remember { mutableFloatStateOf(0f) }
     val moving = animate && LivePillPainter.animates(effect)
-    LaunchedEffect(moving) {
+    // The effect moves for [STILL_AFTER_MS] after the pill appears or is touched, then stands still:
+    // a timer or a navigation can stay on home for hours, and a still pill costs no frames.
+    var awakeSince by remember(activity.key) { mutableLongStateOf(android.os.SystemClock.uptimeMillis()) }
+    LaunchedEffect(moving, awakeSince) {
         if (!moving) return@LaunchedEffect
         val start = System.nanoTime() - (t * 1e9f).toLong()
-        while (true) {
+        while (android.os.SystemClock.uptimeMillis() - awakeSince < STILL_AFTER_MS) {
             androidx.compose.runtime.withFrameNanos { now -> t = (now - start) / 1e9f }
             delay(FRAME_MS)
         }
@@ -98,7 +101,10 @@ fun LivePill(
                     )
                 }
             }
-            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
+            .combinedClickable(
+                onClick = { awakeSince = android.os.SystemClock.uptimeMillis(); onClick() },
+                onLongClick = onLongPress?.let { long -> { awakeSince = android.os.SystemClock.uptimeMillis(); long() } },
+            )
             .padding(horizontal = glowPad + 12.dp, vertical = glowPad),
     ) {
         if (icon != null) {
@@ -144,6 +150,9 @@ private fun Icon.bitmap(context: android.content.Context): ImageBitmap? = runCat
 
 /** With the frame wait, about 30 frames a second: plenty for these slow effects. */
 private const val FRAME_MS = 16L
+
+/** How long the effect moves after the pill appears or is touched. */
+private const val STILL_AFTER_MS = 60_000L
 
 /** A drawable drawn into a [size]-pixel square (no androidx.core needed here). */
 internal fun android.graphics.drawable.Drawable.squareBitmap(size: Int): android.graphics.Bitmap {

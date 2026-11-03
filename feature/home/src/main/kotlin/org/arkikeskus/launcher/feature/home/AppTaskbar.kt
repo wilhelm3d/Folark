@@ -1031,7 +1031,12 @@ internal class AppTaskbar(
         val barLayout = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, dp(s.bottomDp) + s.insetLift(), watchOutside = !fixed)
         // Glass theme: real backdrop blur behind the bar window (Android 12+; the system may ignore it
         // when cross-window blur is off, leaving just the translucent fill — no harm either way).
-        if (s.theme == LauncherSettings.TASKBAR_THEME_GLASS && s.glassBlur > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        // Not while the bar is kept open over an app, nor in battery saver: the compositor would
+        // blur what is under it again for every frame that app draws (video, maps, games). The
+        // bar opened for a moment, or over home, keeps the glass.
+        val blurWorthIt = (homeVisible || !fixed) &&
+            context.getSystemService(PowerManager::class.java)?.isPowerSaveMode != true
+        if (blurWorthIt && s.theme == LauncherSettings.TASKBAR_THEME_GLASS && s.glassBlur > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             barLayout.blurBehindRadius = dp(s.glassBlur)
             barLayout.flags = barLayout.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
         }
