@@ -1,5 +1,15 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.border
 import android.animation.ValueAnimator
@@ -212,9 +222,17 @@ fun SplitPickerDrawer(
             .onGloballyPositioned { origin = it.boundsInRoot().topLeft }
             .background(Color(0xFF0A0E12).copy(alpha = look.opacity)),
     ) {
+        // Room the apps keep free at the bottom: Android's navigation bar, or Folark's taskbar
+        // when it lies over this window (it is an overlay, so the window's insets don't know it).
+        val bottomRoom = rememberPickerBottomRoom()
+        CompositionLocalProvider(LocalPickerBottomRoom provides bottomRoom) {
         Column(
             Modifier
                 .fillMaxSize()
+                // The header and Size row start below the status bar (and a camera cutout).
+                .windowInsetsPadding(
+                    WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top),
+                )
                 .graphicsLayer {
                     // The drawer sinks back while the tapped app grows over it.
                     val q = if (opening != null) progress.value else 0f
@@ -277,6 +295,7 @@ fun SplitPickerDrawer(
                 }
             }
         }
+        }
         opening?.let {
             // The glow blooms out of the icon as the zoom begins.
             PickGlow(it.from, (progress.value * 1.8f).coerceAtMost(1f))
@@ -287,6 +306,43 @@ fun SplitPickerDrawer(
 }
 
 private const val GLOW_MS = 260
+
+/** Bottom room for the picker's app grids (see [rememberPickerBottomRoom]). */
+private val LocalPickerBottomRoom = compositionLocalOf { 0.dp }
+
+/**
+ * How much of this window's bottom the apps should keep free: the navigation bar, or Folark's
+ * taskbar where it overlaps the window (whichever is more). The taskbar's place comes from
+ * [org.arkikeskus.launcher.ui.TaskbarDropTarget], published whenever the bar is up.
+ */
+@Composable
+private fun rememberPickerBottomRoom(): Dp {
+    val density = LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val nav = WindowInsets.navigationBars.getBottom(density)
+    var barPx by remember { mutableStateOf(0) }
+    // Read once the window is laid out, and again a moment later (the bar may come up after us).
+    LaunchedEffect(Unit) {
+        repeat(3) {
+            barPx = taskbarOverlap(view)
+            kotlinx.coroutines.delay(400)
+        }
+    }
+    return with(density) { maxOf(nav, barPx).toDp() }
+}
+
+/** How far Folark's taskbar reaches up into [view]'s window from its bottom, in px (0: not over it). */
+private fun taskbarOverlap(view: android.view.View): Int {
+    val bar = org.arkikeskus.launcher.ui.TaskbarDropTarget.bounds ?: return 0
+    val root = view.rootView
+    val at = IntArray(2)
+    root.getLocationOnScreen(at)
+    val left = at[0]
+    val right = at[0] + root.width
+    val bottom = at[1] + root.height
+    if (bar.right <= left || bar.left >= right || bar.top >= bottom) return 0
+    return (bottom - bar.top).coerceAtLeast(0)
+}
 
 /**
  * A soft accent glow blooming out of the picked icon at [from] and fading, with a thin ring
@@ -369,7 +425,8 @@ private fun AppGrid(columns: Int, content: androidx.compose.foundation.lazy.grid
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(10.dp),
+        // The last row can scroll clear of the navigation bar and the taskbar.
+        contentPadding = PaddingValues(start = 10.dp, top = 10.dp, end = 10.dp, bottom = 10.dp + LocalPickerBottomRoom.current),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,
