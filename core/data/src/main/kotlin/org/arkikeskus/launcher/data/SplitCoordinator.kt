@@ -264,6 +264,17 @@ class SplitCoordinator @Inject constructor(
 
     /** Waits until an app of [packageName] and the task [partnerTask] are both in split stages. */
     private suspend fun awaitBeside(packageName: String, partnerTask: Int, root: Boolean): Boolean = withContext(Dispatchers.IO) {
+        // System UI reports split stages itself: find the app's task once, then wait for the
+        // report instead of reading (and parsing) the whole window list every 150 ms.
+        if (SplitEvents.live) {
+            val id = awaitTask(packageName, root)?.first
+            if (id != null) {
+                if (SplitEvents.awaitStaged(listOf(id, partnerTask), EVENT_WAIT_MS)) return@withContext true
+                // No word in time: one read decides.
+                val read = ShellSplit.snapshot(context, root)
+                return@withContext read != null && read.isStaged(id) && read.isStaged(partnerTask)
+            }
+        }
         repeat(VERIFY_TRIES * 2) {
             delay(VERIFY_STEP_MS)
             val read = ShellSplit.snapshot(context, root) ?: return@repeat

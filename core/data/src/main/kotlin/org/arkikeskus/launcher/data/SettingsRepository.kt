@@ -57,7 +57,8 @@ class SettingsRepository @Inject constructor(
     private var storeRepaired = false
     private val repairLock = Mutex()
 
-    fun settings(screenType: ScreenType = ScreenType.OUTER): Flow<LauncherSettings> = dataStore.data.onStart {
+    // No default screen: on a foldable, the wrong profile is an easy, silent mistake.
+    fun settings(screenType: ScreenType): Flow<LauncherSettings> = dataStore.data.onStart {
         // 0.7 imports unknown numeric backup keys as Long. Repair them before the first typed
         // read when a newer backup was restored in 0.7 and the installation then upgraded.
         if (!storeRepaired) repairLock.withLock {

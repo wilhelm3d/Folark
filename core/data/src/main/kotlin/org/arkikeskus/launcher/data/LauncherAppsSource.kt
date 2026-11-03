@@ -437,16 +437,17 @@ class LauncherAppsSource @Inject constructor(
 
     /**
      * Moves [packageName]'s newest task into the right half of a split screen, beside the app
-     * behind it, with Android's split-screen command. Blocking (it waits briefly for the task to
-     * appear): call it off the main thread. False when the task wasn't found or the command refused.
+     * behind it, with Android's split-screen command. Reads the window list (blocking): call it on
+     * an IO dispatcher. False when the task wasn't found or the command refused. Cancellable while
+     * it waits for the task to appear.
      */
-    fun moveIntoSplit(packageName: String): Boolean {
+    suspend fun moveIntoSplit(packageName: String): Boolean {
         repeat(SPLIT_FIND_TRIES) {
             // One read per try: it finds the task and is what the move is checked against.
             val read = ShellSplit.snapshot(context)
             val id = read?.taskOf(packageName)?.id
             if (read != null && id != null) return ShellSplit.moveToSide(context, id, right = true, read = read)
-            Thread.sleep(SPLIT_RETRY_MS)
+            kotlinx.coroutines.delay(SPLIT_RETRY_MS)
         }
         return false
     }

@@ -224,6 +224,19 @@ class WeatherRepository @Inject constructor(
         "Folark/$version"
     }
 
+    /**
+     * The reply's body, or an IOException naming the HTTP status when the server answered with an
+     * error (rate limit, outage): logged as such instead of as a JSON error on an error page.
+     */
+    private fun readBody(connection: HttpURLConnection): String {
+        val code = connection.responseCode
+        if (code !in 200..299) {
+            runCatching { connection.errorStream?.close() }
+            throw java.io.IOException("HTTP $code from ${connection.url.host}")
+        }
+        return connection.inputStream.bufferedReader().use { it.readText() }
+    }
+
     private fun fetch(lat: Double, lon: Double): CurrentWeather? {
         val url = URL(
             // The whole address is formatted, not just its last piece: the brackets matter.
@@ -240,7 +253,7 @@ class WeatherRepository @Inject constructor(
             connection.setRequestProperty("User-Agent", userAgent)
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val body = readBody(connection)
             val root = JSONObject(body)
             val current = root.getJSONObject("current")
             CurrentWeather(
@@ -271,7 +284,7 @@ class WeatherRepository @Inject constructor(
                 connection.setRequestProperty("User-Agent", userAgent)
                 connection.connectTimeout = 10_000
                 connection.readTimeout = 10_000
-                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val body = readBody(connection)
                 val first = JSONObject(body).optJSONArray("results")?.optJSONObject(0) ?: return@runCatching null
                 WeatherPlace(
                     name = first.getString("name").replace('\t', ' '),
@@ -413,7 +426,7 @@ class WeatherRepository @Inject constructor(
             connection.setRequestProperty("User-Agent", userAgent)
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val body = readBody(connection)
             PlaceNameFallback.parseCity(body).also {
                 if (it == null) Log.d(TAG, "Network reverse geocoding found no usable name")
             }

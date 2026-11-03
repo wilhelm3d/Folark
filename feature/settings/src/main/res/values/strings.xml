@@ -397,7 +397,7 @@
     <string name="settings_category_backup_desc">Save everything to a file on your phone, and put it back after a reinstall</string>
     <string name="settings_system_updates">System updates</string>
     <string name="settings_system_updates_on_desc">On. Turn off to block Motorola\'s updates with root and hold the kernel your root method needs — you stay on an older security patch until you turn it back on</string>
-    <string name="settings_system_updates_off_desc">Blocked: Motorola can\'t download or install system updates. Turn on to allow them again — an update may remove root. Needs root</string>
+    <string name="settings_system_updates_off_desc">Blocked: Motorola can\'t download or install system updates, so security patches stop too. Turn on to allow them again — an update may remove root. Needs root</string>
     <string name="settings_system_updates_need_root">Couldn\'t change it — root is needed</string>
     <string name="settings_backup_now">Back up now</string>
     <string name="settings_backup_now_desc">Home screens, dock, folders, widgets and all settings of both displays, in one file you choose where to keep</string>
