@@ -38,6 +38,8 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         appScope.launch {
             settingsRepository.settings(ScreenType.INNER).collect { s ->
                 RootFeatures.update(s)
+                // Settings ▸ Haptics, for every place that plays them (some without a view).
+                org.arkikeskus.launcher.data.Haptics.settings = s.motion
                 RootGrants.restoreIfNeeded(this@LauncherApplication)
             }
         }

@@ -28,6 +28,10 @@ class RecentsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A gentle swell as Recents comes up (not again when only recreated, a fold or rotation).
+        if (savedInstanceState == null) {
+            org.arkikeskus.launcher.data.Haptics.play(this, org.arkikeskus.launcher.data.Haptics.Event.RECENTS)
+        }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),

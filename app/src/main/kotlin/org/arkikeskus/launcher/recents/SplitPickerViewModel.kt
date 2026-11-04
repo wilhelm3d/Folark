@@ -226,6 +226,7 @@ class SplitPickerViewModel @Inject constructor(
     /** [app] was opened in the picker's half: remembered for "Paired before". */
     fun recordPair(firstPackage: String, firstTaskId: Int?, app: AppItem) {
         appScope.launch(Dispatchers.IO) {
+            org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.SPLIT)
             SplitHistory.record(context, firstPackage, app.packageName)
             splitCoordinator.offerUndo(SplitApp(firstPackage, null, firstTaskId))
         }

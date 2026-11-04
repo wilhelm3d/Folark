@@ -236,6 +236,7 @@ class SettingsRepository @Inject constructor(
                     .coerceIn(LauncherSettings.MIN_ICON_SIZE_SCALE, LauncherSettings.MAX_ICON_SIZE_SCALE),
                 shape = (p[Keys.ICON_SHAPE] ?: LauncherSettings.ICON_SHAPE_SYSTEM)
                     .let { if (it in LauncherSettings.ICON_SHAPES) it else LauncherSettings.ICON_SHAPE_SYSTEM },
+                shapeAllIcons = p[Keys.ICON_SHAPE_ALL] ?: true,
                 nudge = p[Keys.ICON_NUDGE] ?: true,
                 nudgeTaskbar = p[Keys.ICON_NUDGE_TASKBAR] ?: true,
                 nudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
@@ -358,6 +359,13 @@ class SettingsRepository @Inject constructor(
                 animationSpeed = (p[Keys.ANIMATION_SPEED] ?: 1f).coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED),
                 appOpenAnimation = (p[Keys.APP_OPEN_ANIMATION] ?: LauncherSettings.APP_OPEN_ICON)
                     .let { if (it in LauncherSettings.APP_OPENS) it else LauncherSettings.APP_OPEN_ICON },
+                hapticsEnabled = p[Keys.HAPTICS_ENABLED] ?: true,
+                hapticsLaunch = p[Keys.HAPTICS_LAUNCH] ?: true,
+                hapticsSplit = p[Keys.HAPTICS_SPLIT] ?: true,
+                hapticsClose = p[Keys.HAPTICS_CLOSE] ?: true,
+                hapticsRecents = p[Keys.HAPTICS_RECENTS] ?: true,
+                hapticsDrag = p[Keys.HAPTICS_DRAG] ?: true,
+                hapticsStrength = (p[Keys.HAPTICS_STRENGTH] ?: LauncherSettings.HAPTICS_MEDIUM).let { if (it in LauncherSettings.HAPTICS_STRENGTHS) it else LauncherSettings.HAPTICS_MEDIUM },
                 unlockTransition = p[Keys.UNLOCK_TRANSITION] ?: true,
                 unlockSystemHook = p[Keys.UNLOCK_SYSTEM_HOOK] ?: true,
                 unlockStyle = (p[Keys.UNLOCK_STYLE] ?: LauncherSettings.UNLOCK_STYLE_DISPLAY)
@@ -678,6 +686,14 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
     suspend fun setRecentsThumbnails(value: Boolean) = edit { it[Keys.RECENTS_THUMBNAILS] = value }
     suspend fun setRecentsSpeakerBadge(value: Boolean) = edit { it[Keys.RECENTS_SPEAKER_BADGE] = value }
+    suspend fun setHapticsStrength(value: String) = edit { it[Keys.HAPTICS_STRENGTH] = value }
+    suspend fun setHapticsDrag(value: Boolean) = edit { it[Keys.HAPTICS_DRAG] = value }
+    suspend fun setHapticsRecents(value: Boolean) = edit { it[Keys.HAPTICS_RECENTS] = value }
+    suspend fun setHapticsClose(value: Boolean) = edit { it[Keys.HAPTICS_CLOSE] = value }
+    suspend fun setHapticsSplit(value: Boolean) = edit { it[Keys.HAPTICS_SPLIT] = value }
+    suspend fun setHapticsLaunch(value: Boolean) = edit { it[Keys.HAPTICS_LAUNCH] = value }
+    suspend fun setHapticsEnabled(value: Boolean) = edit { it[Keys.HAPTICS_ENABLED] = value }
+    suspend fun setShapeAllIcons(value: Boolean) = edit { it[Keys.ICON_SHAPE_ALL] = value }
     suspend fun setTaskbarLaunchGlow(value: String) = edit { it[Keys.TASKBAR_LAUNCH_GLOW] = value }
     suspend fun setDrawerTwoPane(value: Boolean) = edit { it[Keys.DRAWER_TWO_PANE] = value }
     suspend fun setDrawerAzHoldScroll(value: Boolean) = edit { it[Keys.DRAWER_AZ_HOLD_SCROLL] = value }

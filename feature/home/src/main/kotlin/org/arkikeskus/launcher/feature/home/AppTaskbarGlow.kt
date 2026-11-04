@@ -4,7 +4,6 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -89,36 +88,15 @@ private fun animationsOn(context: Context): Boolean =
     Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
 
 /**
- * The icon's main colour, made bright enough to glow: its pixels averaged, weighted towards the
- * colourful ones, then lifted. A grey or missing icon glows soft white.
+ * The icon's own colour (the same one Own colour / Soft colour themed icons use), made bright
+ * enough to glow. A grey or missing icon glows soft white.
  */
 private fun glowColor(icon: View): Int {
     val drawable = (icon as? ImageView)?.drawable ?: return Color.WHITE
-    return runCatching {
-        val side = 12
-        val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val old = drawable.copyBounds()
-        drawable.setBounds(0, 0, side, side)
-        drawable.draw(canvas)
-        drawable.bounds = old
-        val hsv = FloatArray(3)
-        var r = 0f; var g = 0f; var b = 0f; var weight = 0f
-        for (y in 0 until side) for (x in 0 until side) {
-            val p = bitmap.getPixel(x, y)
-            if (Color.alpha(p) < 128) continue
-            Color.colorToHSV(p, hsv)
-            val w = 0.15f + hsv[1] * hsv[2]
-            r += Color.red(p) * w; g += Color.green(p) * w; b += Color.blue(p) * w; weight += w
-        }
-        bitmap.recycle()
-        if (weight == 0f) return Color.WHITE
-        Color.colorToHSV(Color.rgb((r / weight).toInt(), (g / weight).toInt(), (b / weight).toInt()), hsv)
-        if (hsv[1] < 0.12f) return Color.WHITE
-        hsv[1] = hsv[1].coerceIn(0.45f, 0.85f)
-        hsv[2] = 1f
-        Color.HSVToColor(hsv)
-    }.getOrDefault(Color.WHITE)
+    val color = org.arkikeskus.launcher.data.IconColors.dominant(drawable) ?: return Color.WHITE
+    val saturation = org.arkikeskus.launcher.data.IconColors.saturation(color)
+    if (saturation < org.arkikeskus.launcher.data.IconColors.GREY_SATURATION) return Color.WHITE
+    return org.arkikeskus.launcher.data.IconColors.tone(color, saturation.coerceIn(0.45f, 0.85f), 1f)
 }
 
 /** The glow itself: a halo that swells and fades, and a thin ring that spreads past it. */

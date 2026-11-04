@@ -311,6 +311,7 @@ internal class AppTaskbar(
                     iconPack = s.icons.iconPack,
                     customIcons = custom,
                     iconShape = s.icons.shape,
+                    shapeAllIcons = s.icons.shapeAllIcons,
                     // Apps opened through Folark, newest first: the recent apps without Usage access.
                     launchHistory = usage.entries.sortedByDescending { it.value.lastUsed }.map { it.key }.take(24),
                     mediaEnabled = s.taskbar.mediaEnabled,
@@ -357,7 +358,7 @@ internal class AppTaskbar(
                 setup.copy(pairs = setup.pairIds.mapNotNull { id -> saved.firstOrNull { it.id == id } })
             }.distinctUntilChanged().collect { next ->
                 val previous = setup
-                val style = "${next.themedIcons}|${next.iconPack}|${next.customIcons.hashCode()}|${next.iconShape}"
+                val style = "${next.themedIcons}|${next.iconPack}|${next.customIcons.hashCode()}|${next.iconShape}|${next.shapeAllIcons}"
                 if (style != iconStyle) {
                     iconStyle = style
                     iconCache.clear()
@@ -1225,6 +1226,8 @@ internal class AppTaskbar(
      */
     private fun pairView(pair: AppPair, s: TaskbarSetup, size: Int): View =
         pairTile(listOfNotNull(pair.app1Key, pair.app2Key, pair.app3Key.takeIf { pair.hasThirdApp }), pair.name, s, size) {
+            // A saved pair opens as a split: its haptic here (the open split's tile gets it from restore()).
+            org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.SPLIT)
             repository?.launchAppPair(pair)
         }
 
@@ -1238,7 +1241,6 @@ internal class AppTaskbar(
                 setColor(if (light) Color.argb(36, 0, 0, 0) else Color.argb(44, 255, 255, 255))
             }
             setOnClickListener {
-                performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 playLaunchGlow(this)
                 onClick()
             }
@@ -1324,7 +1326,7 @@ internal class AppTaskbar(
         )
         val hold = Runnable {
             held = true
-            icon.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.PICK_UP)
             showShortcuts(app, icon, s, fixed)
         }
         icon.setOnTouchListener { view, event ->
@@ -1356,7 +1358,7 @@ internal class AppTaskbar(
                             val slot = (dx / slotWidth).roundToInt()
                             if (slot != reorderSlot) {
                                 reorderSlot = slot
-                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.ZONE)
                             }
                             return@setOnTouchListener true
                         }
@@ -1389,12 +1391,7 @@ internal class AppTaskbar(
                         }
                         if (next != action) {
                             // A tick on entering a drop zone (not on leaving one).
-                            if (next != ACTION_NONE && s.zones.haptics) {
-                                view.performHapticFeedback(
-                                    if (Build.VERSION.SDK_INT >= 34) android.view.HapticFeedbackConstants.SEGMENT_TICK
-                                    else android.view.HapticFeedbackConstants.CLOCK_TICK,
-                                )
-                            }
+                            if (next != ACTION_NONE && s.zones.haptics) org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.ZONE)
                             action = next
                             val big = action != ACTION_NONE
                             ghostIcon?.animate()?.scaleX(if (big) 1.2f else 1f)?.scaleY(if (big) 1.2f else 1f)?.setDuration(110)?.start()
@@ -1415,7 +1412,7 @@ internal class AppTaskbar(
                     }
                     val chosen = if (!moved) ACTION_OPEN else action
                     if (chosen != ACTION_OPEN && chosen != ACTION_NONE) {
-                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                        org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.DROP)
                     }
                     when (chosen) {
                         ACTION_OPEN -> {
@@ -1573,7 +1570,7 @@ internal class AppTaskbar(
         val icon = runCatching {
             source?.loadIcon(app, s.themedIcons, dark, s.iconPack, s.customIcons[app.key].orEmpty())
         }.getOrNull() ?: runCatching { context.packageManager.getActivityIcon(app.componentName) }.getOrNull()
-        return icon?.let { IconShapes.apply(it, s.iconShape) }
+        return icon?.let { IconShapes.apply(it, s.iconShape, plateOthers = s.shapeAllIcons) }
     }
 
     internal var suggestionWindow: View? = null

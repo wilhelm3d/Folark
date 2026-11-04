@@ -39,6 +39,7 @@ import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import org.arkikeskus.launcher.data.LaunchOrigin
+import org.arkikeskus.launcher.data.Haptics
 
 /** One card in Folark's Recents: an open app, or the apps sharing a split screen. */
 data class RecentsCard(
@@ -257,6 +258,7 @@ class RecentsViewModel @Inject constructor(
         val moved = runCatching {
             context.getSystemService(ActivityManager::class.java).moveTaskToFront(task.taskId, 0, options)
         }.isSuccess
+        if (moved) Haptics.play(context, Haptics.Event.LAUNCH)
         if (!moved && app != null) appRepository.launch(app)
     }
 
@@ -283,6 +285,7 @@ class RecentsViewModel @Inject constructor(
     private fun RecentsCard.splitApp(i: Int) = SplitApp(tasks[i].packageName, apps.getOrNull(i), tasks[i].taskId)
 
     fun close(card: RecentsCard) {
+        Haptics.play(context, Haptics.Event.CLOSE)
         _state.value = _state.value.copy(cards = _state.value.cards - card)
         viewModelScope.launch(Dispatchers.IO) {
             for (task in card.tasks) {
@@ -292,6 +295,7 @@ class RecentsViewModel @Inject constructor(
     }
 
     fun closeAll() {
+        Haptics.play(context, Haptics.Event.CLOSE_ALL)
         val cards = _state.value.cards
         val root = _state.value.root
         val keep = cards.filter { it.pinned }

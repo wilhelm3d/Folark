@@ -21,6 +21,8 @@
 * **App drawer:** two-pane layout when unfolded, shortcuts under the top search result, 27 more Android settings pages in search, hold-to-fine-scroll on the A–Z bar.
 * **Split screen:** the picker opens in the half beside your app (with the Vector module too), lets you choose ⅓, ½ or ⅔, and stays clear of the status bar and taskbar.
 * **App-open animations:** Pop and Unfold.
+* **Icons:** Square, Arch, Hexagon, Diamond and Cookie shapes; themed icons in each app's own colour (Own colour, Soft colour); older icons shaped too.
+* **Haptics:** a natural feel for opening apps, split screen, closing apps, Recents and drag and drop, with Light / Medium / Strong.
 * **Under the hood:** Android 16/17 API updates, zero compiler warnings, removed dead settings and strings. See [CHANGELOG.md](CHANGELOG.md).
 
 ---

@@ -567,6 +567,10 @@ class LauncherAppsSource @Inject constructor(
     @Volatile
     var forceThemedIcons: Boolean = false
 
+    /** Mirrors Settings ▸ Shape every icon (kept current by AppRepository). */
+    @Volatile
+    var shapeAllIcons: Boolean = true
+
     /** Mirrors Settings ▸ Themed icon style, one of LauncherSettings.THEMED_STYLE_* (kept current by AppRepository). */
     @Volatile
     var themedIconStyle: String = LauncherSettings.THEMED_STYLE_CLASSIC
@@ -581,14 +585,15 @@ class LauncherAppsSource @Inject constructor(
     private fun themedIcon(info: LauncherActivityInfo, dark: Boolean): Drawable? {
         val adaptive = info.getIcon(0) as? AdaptiveIconDrawable ?: return null
         val mono = (adaptive.monochrome ?: return null).mutate()
-        mono.setTint(styleForeground(dark))
-        return AdaptiveIconDrawable(styleBackground(dark), mono)
+        val colors = themedColors(dark, adaptive)
+        mono.setTint(styleForeground(colors))
+        return AdaptiveIconDrawable(styleBackground(colors), mono)
     }
 
-    /** The glyph colour of the chosen themed style. */
+    /** The glyph colour of the chosen themed style, from its (plate, glyph) [colors]. */
     @RequiresApi(Build.VERSION_CODES.S)
-    private fun styleForeground(dark: Boolean): Int {
-        val (bg, fg) = themedColors(dark)
+    private fun styleForeground(colors: Pair<Int, Int>): Int {
+        val (bg, fg) = colors
         return when (themedIconStyle) {
             LauncherSettings.THEMED_STYLE_INVERTED -> bg
             LauncherSettings.THEMED_STYLE_GLASS -> Color.argb(242, 255, 255, 255)
@@ -598,8 +603,8 @@ class LauncherAppsSource @Inject constructor(
 
     /** The plate behind the glyph: solid for most styles, a frosted see-through gradient for Glass. */
     @RequiresApi(Build.VERSION_CODES.S)
-    private fun styleBackground(dark: Boolean): Drawable {
-        val (bg, fg) = themedColors(dark)
+    private fun styleBackground(colors: Pair<Int, Int>): Drawable {
+        val (bg, fg) = colors
         return when (themedIconStyle) {
             LauncherSettings.THEMED_STYLE_INVERTED -> ColorDrawable(fg)
             LauncherSettings.THEMED_STYLE_GLASS -> {
@@ -632,7 +637,8 @@ class LauncherAppsSource @Inject constructor(
         val icon = info.getIcon(0) ?: return null
         val adaptive = icon as? AdaptiveIconDrawable
         val edge = FORCED_ICON_EDGE
-        val (themeBg, themeFg) = themedColors(dark)
+        val colors = themedColors(dark, icon)
+        val (themeBg, themeFg) = colors
         fun luminance(c: Int): Int = (Color.red(c) * 299 + Color.green(c) * 587 + Color.blue(c) * 114) / 1000
 
         if (themedIconStyle == LauncherSettings.THEMED_STYLE_DUOTONE) {
@@ -677,8 +683,8 @@ class LauncherAppsSource @Inject constructor(
         var solidLuminance = 0L
         for (c in pixels) if (Color.alpha(c) > 200) { solid++; solidLuminance += luminance(c) }
         val coverage = solid.toFloat() / pixels.size
-        val tint = styleForeground(dark) and 0x00FFFFFF
-        val tintAlpha = Color.alpha(styleForeground(dark))
+        val tint = styleForeground(colors) and 0x00FFFFFF
+        val tintAlpha = Color.alpha(styleForeground(colors))
 
         if (coverage < SILHOUETTE_MAX_COVERAGE) {
             // A small logo on nothing: its own shape is the glyph.
@@ -710,7 +716,34 @@ class LauncherAppsSource @Inject constructor(
         // An adaptive foreground already carries the platform's margins; a plain icon fills its
         // square, so it is inset to sit inside the mask like the others.
         val layer = if (adaptive != null) glyph else InsetDrawable(glyph, 0.26f)
-        return AdaptiveIconDrawable(styleBackground(dark), layer)
+        return AdaptiveIconDrawable(styleBackground(colors), layer)
+    }
+
+    /**
+     * Plate and glyph colours for a themed [icon]: in the app's own colour for the Own colour and
+     * Soft colour styles (a grey app gets greys), else from the system dynamic (Monet) palette.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun themedColors(dark: Boolean, icon: Drawable): Pair<Int, Int> {
+        val own = themedIconStyle == LauncherSettings.THEMED_STYLE_OWN || themedIconStyle == LauncherSettings.THEMED_STYLE_SOFT
+        val appColor = if (own) IconColors.dominant(icon) else null
+        if (appColor == null) return themedColors(dark)
+        val sat = IconColors.saturation(appColor)
+        return if (themedIconStyle == LauncherSettings.THEMED_STYLE_OWN) {
+            // A bold plate in the app's colour, the glyph almost white with a hint of it.
+            if (dark) {
+                IconColors.tone(appColor, sat.coerceIn(0.45f, 0.8f), 0.5f) to IconColors.tone(appColor, 0.12f, 1f)
+            } else {
+                IconColors.tone(appColor, sat.coerceIn(0.5f, 0.85f), 0.78f) to Color.WHITE
+            }
+        } else {
+            // A quiet plate tinted with the app's colour, the glyph in the colour itself.
+            if (dark) {
+                IconColors.tone(appColor, 0.35f, 0.22f) to IconColors.tone(appColor, 0.45f, 1f)
+            } else {
+                IconColors.tone(appColor, 0.16f, 0.97f) to IconColors.tone(appColor, 0.8f, 0.55f)
+            }
+        }
     }
 
     /** Background/foreground colours for themed icons, from the system dynamic (Monet) palette. */

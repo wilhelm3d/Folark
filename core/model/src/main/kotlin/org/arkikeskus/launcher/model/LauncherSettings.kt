@@ -203,6 +203,8 @@ data class LauncherSettings(
         val sizeScale: Float = 1.0f,
         /** Shape of app icons (both displays), one of ICON_SHAPE_*; "system" leaves them as drawn. */
         val shape: String = ICON_SHAPE_SYSTEM,
+        /** Icons that can't take a shape by themselves (older apps) sit on a plate in a pale tone of their own colour, cut to the same shape. */
+        val shapeAllIcons: Boolean = true,
         /** Size multiplier for app icon labels across home/dock/drawer/folders (1.0 = the default 11sp). */
         val labelTextScale: Float = 1.0f,
         /** ARGB color for app icon labels on the home surfaces (home/dock/folders); default white. The
@@ -371,6 +373,20 @@ data class LauncherSettings(
         val animationSpeed: Float = 1f,
         /** How an app opens from the launcher (one of APP_OPEN_*). */
         val appOpenAnimation: String = APP_OPEN_ICON,
+        /** Haptic feedback for Folark's own actions (opening apps, split screen, closing apps, Recents, drag and drop). */
+        val hapticsEnabled: Boolean = true,
+        /** A light click when an app opens. */
+        val hapticsLaunch: Boolean = true,
+        /** A rising double tap when two apps come together in split screen. */
+        val hapticsSplit: Boolean = true,
+        /** A soft thud when an app is closed (a firmer one for Close all). */
+        val hapticsClose: Boolean = true,
+        /** A gentle swell when Recents opens. */
+        val hapticsRecents: Boolean = true,
+        /** Ticks when an icon or card is picked up, crosses into a drop zone and lands. */
+        val hapticsDrag: Boolean = true,
+        /** How strong the haptics are (HAPTICS_*), on top of the phone's own touch-feedback strength. */
+        val hapticsStrength: String = HAPTICS_MEDIUM,
         /** Folark's battery saver (both displays): off, on, or following the system's battery saver. */
         val batterySaverMode: String = BATTERY_SAVER_AUTO,
         /** With "With system": also switch the saver on by itself when the battery is low (below
@@ -809,7 +825,14 @@ data class LauncherSettings(
         const val THEMED_STYLE_INVERTED = "inverted"
         const val THEMED_STYLE_GLASS = "glass"
         const val THEMED_STYLE_DUOTONE = "duotone"
-        val THEMED_STYLES = listOf(THEMED_STYLE_CLASSIC, THEMED_STYLE_INVERTED, THEMED_STYLE_GLASS, THEMED_STYLE_DUOTONE)
+        /** In each app's own colour: a bold plate of it, the glyph almost white. */
+        const val THEMED_STYLE_OWN = "own"
+        /** In each app's own colour, quietly: a pale (or deep, when dark) plate, the glyph in the colour. */
+        const val THEMED_STYLE_SOFT = "soft"
+        val THEMED_STYLES = listOf(
+            THEMED_STYLE_CLASSIC, THEMED_STYLE_INVERTED, THEMED_STYLE_GLASS, THEMED_STYLE_DUOTONE,
+            THEMED_STYLE_OWN, THEMED_STYLE_SOFT,
+        )
         const val BATTERY_SAVER_OFF = "off"
         const val BATTERY_SAVER_AUTO = "auto"
         const val BATTERY_SAVER_ON = "on"
@@ -1008,9 +1031,15 @@ data class LauncherSettings(
         const val ICON_SHAPE_ROUNDED = "rounded"
         const val ICON_SHAPE_TEARDROP = "teardrop"
         const val ICON_SHAPE_PEBBLE = "pebble"
+        const val ICON_SHAPE_SQUARE = "square"
+        const val ICON_SHAPE_ARCH = "arch"
+        const val ICON_SHAPE_HEXAGON = "hexagon"
+        const val ICON_SHAPE_DIAMOND = "diamond"
+        const val ICON_SHAPE_COOKIE = "cookie"
         val ICON_SHAPES = listOf(
             ICON_SHAPE_SYSTEM, ICON_SHAPE_CIRCLE, ICON_SHAPE_SQUIRCLE,
             ICON_SHAPE_ROUNDED, ICON_SHAPE_TEARDROP, ICON_SHAPE_PEBBLE,
+            ICON_SHAPE_SQUARE, ICON_SHAPE_ARCH, ICON_SHAPE_HEXAGON, ICON_SHAPE_DIAMOND, ICON_SHAPE_COOKIE,
         )
         const val TASKBAR_HANDLES_BOTH = "both"
         const val TASKBAR_HANDLES_LEFT = "left"
@@ -1075,6 +1104,10 @@ data class LauncherSettings(
         /** The app's window is revealed from the icon that was tapped (a growing clip). */
         const val APP_OPEN_REVEAL = "reveal"
         /** Springs up from small, a touch past full size and back. */
+        const val HAPTICS_LIGHT = "light"
+        const val HAPTICS_MEDIUM = "medium"
+        const val HAPTICS_STRONG = "strong"
+        val HAPTICS_STRENGTHS = listOf(HAPTICS_LIGHT, HAPTICS_MEDIUM, HAPTICS_STRONG)
         const val APP_OPEN_POP = "pop"
         /** Opens out sideways from the middle, like the phone unfolding. */
         const val APP_OPEN_UNFOLD = "unfold"

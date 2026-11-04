@@ -50,6 +50,8 @@ internal data class TaskbarSetup(
     val iconPack: String,
     val customIcons: Map<String, String>,
     val iconShape: String,
+    /** Settings ▸ Shape every icon: plain icons on a plate of their colour, in the shape. */
+    val shapeAllIcons: Boolean = true,
     val launchHistory: List<String>,
     val mediaEnabled: Boolean,
     val mediaShowPaused: Boolean,

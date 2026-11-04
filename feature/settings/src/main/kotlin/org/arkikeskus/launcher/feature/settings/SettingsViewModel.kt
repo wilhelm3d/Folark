@@ -213,6 +213,14 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsThirdInSplit(value: Boolean) = update { repository.setRecentsThirdInSplit(value) }
     fun setRecentsThumbnails(value: Boolean) = update { repository.setRecentsThumbnails(value) }
     fun setRecentsSpeakerBadge(value: Boolean) = update { repository.setRecentsSpeakerBadge(value) }
+    fun setHapticsStrength(value: String) = update { repository.setHapticsStrength(value) }
+    fun setHapticsDrag(value: Boolean) = update { repository.setHapticsDrag(value) }
+    fun setHapticsRecents(value: Boolean) = update { repository.setHapticsRecents(value) }
+    fun setHapticsClose(value: Boolean) = update { repository.setHapticsClose(value) }
+    fun setHapticsSplit(value: Boolean) = update { repository.setHapticsSplit(value) }
+    fun setHapticsLaunch(value: Boolean) = update { repository.setHapticsLaunch(value) }
+    fun setHapticsEnabled(value: Boolean) = update { repository.setHapticsEnabled(value) }
+    fun setShapeAllIcons(value: Boolean) = update { repository.setShapeAllIcons(value) }
     fun setTaskbarLaunchGlow(value: String) = update { repository.setTaskbarLaunchGlow(value) }
     fun setDrawerTwoPane(value: Boolean) = update { repository.setDrawerTwoPane(value) }
     fun setDrawerAzHoldScroll(value: Boolean) = update { repository.setDrawerAzHoldScroll(value) }

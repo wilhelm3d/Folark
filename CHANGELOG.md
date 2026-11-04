@@ -45,6 +45,16 @@
 ### Animations
 - App-open animations Pop and Unfold.
 
+### Icons
+- Five more icon shapes: Square, Arch, Hexagon, Diamond and Cookie.
+- Themed icons in each app's own colour: **Own colour** (a bold plate of the app's colour, the glyph almost white) and **Soft colour** (a pale or deep plate tinted with it, the glyph in the colour). Apps without a themed icon get one made in their colour too ("Theme all icons").
+- **Shape every icon** (on by default with a shape chosen): older apps' plain icons sit on a plate in a pale tone of their own colour, so they take the shape like the rest.
+- The taskbar's launch glow reads the app's colour the same way as the themed icons.
+
+### Haptics
+- Settings ▸ Appearance ▸ Haptics: one switch, Light / Medium / Strong, and each moment on its own: opening apps (a crisp click), split screen (a rising double tap), closing apps (a soft thud, firmer for Close all), opening Recents (a gentle swell) and dragging (ticks on pick-up, drop zones and landing).
+- Built from the vibration motor's own haptic primitives where supported, Android's standard effects otherwise; follows the phone's touch-feedback setting. A split plays only its own feel, not a launch click as well.
+
 ### Fixes and clean-up
 - Android 16/17 API updates (background activity starts, widget sizes, VPN detection).
 - Zero compiler warnings; deliberate uses of deprecated platform APIs are marked and explained.

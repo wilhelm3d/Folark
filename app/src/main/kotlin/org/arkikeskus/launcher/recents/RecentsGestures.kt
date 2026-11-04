@@ -18,14 +18,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -56,7 +54,7 @@ internal fun RecentsEnv.cardModifier(
     sideSwipes: Boolean = closeAxis == Orientation.Horizontal,
 ): Modifier {
     val scope = rememberCoroutineScope()
-    val haptics = LocalHapticFeedback.current
+    val hapticContext = androidx.compose.ui.platform.LocalContext.current
     val offset = remember(card.key) { Animatable(0f) }
     val offsetX = remember(card.key) { Animatable(0f) }
     val dismissPx = with(LocalDensity.current) { 120.dp.toPx() }
@@ -154,7 +152,7 @@ internal fun RecentsEnv.cardModifier(
 
                 if (decided == null) {
                     // ---------------------------------------------------- long press
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    org.arkikeskus.launcher.data.Haptics.play(hapticContext, org.arkikeskus.launcher.data.Haptics.Event.PICK_UP)
                     // The menu opens at once, under the finger; moving on drags the card instead.
                     val withMenu = longPress == LauncherSettings.RECENTS_ACTION_MENU
                     if (withMenu) env.value.menu.open(card, origin + down.position)
@@ -177,10 +175,10 @@ internal fun RecentsEnv.cardModifier(
                             drag.move(d)
                             // A tick on reaching a card, and again on moving between its two halves.
                             if (drag.target != null && (drag.target != before || drag.mode != beforeMode)) {
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                org.arkikeskus.launcher.data.Haptics.play(hapticContext, org.arkikeskus.launcher.data.Haptics.Event.ZONE)
                             } else if (drag.target == null && drag.edge != EDGE_NONE && drag.edge != beforeEdge && drag.zones.haptics) {
                                 // …and on entering a drop zone at the screen's edge.
-                                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                org.arkikeskus.launcher.data.Haptics.play(hapticContext, org.arkikeskus.launcher.data.Haptics.Event.ZONE)
                             }
                         }
                         if (dragging) change.consume()

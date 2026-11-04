@@ -27,7 +27,7 @@ class AppIconFetcher(
     override suspend fun fetch(): FetchResult? = withContext(Dispatchers.Default) {
         val loaded = source.loadIcon(data.app, data.themed, data.dark, data.iconPack, data.customIcon) ?: return@withContext null
         // Settings ▸ Icon shape: adaptive icons cut to the chosen outline (the system's otherwise).
-        val drawable = IconShapes.apply(loaded, data.shape)
+        val drawable = IconShapes.apply(loaded, data.shape, plateOthers = source.shapeAllIcons)
         // The size the icon is shown at (stepped, see iconRasterSize); the default for callers
         // that do not say.
         val size = if (data.sizePx > 0) data.sizePx else ICON_PX

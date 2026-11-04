@@ -117,6 +117,7 @@ class SplitCoordinator @Inject constructor(
         val formed = (route.native && natively(first, second, firstOnRight, route.root)) ||
             (route.commands && byCommands(first, second, firstOnRight, route.root))
         if (formed) {
+            Haptics.play(context, Haptics.Event.SPLIT)
             SplitHistory.record(context, first.packageName, second.packageName)
             offerUndo(keepOnUndo)
         }
@@ -164,6 +165,7 @@ class SplitCoordinator @Inject constructor(
         val t1 = first.taskId ?: read?.taskOf(first.packageName)?.id
         val t2 = read?.taskOf(second.packageName)?.id
         if (read != null && t1 != null && t2 != null && read.isStaged(t1) && read.isStaged(t2)) {
+            Haptics.play(context, Haptics.Event.SPLIT)
             SplitHistory.record(context, first.packageName, second.packageName)
             offerUndo(first.copy(taskId = t1))
             return true
@@ -179,7 +181,8 @@ class SplitCoordinator @Inject constructor(
         val tb = b.taskId ?: read?.taskOf(b.packageName)?.id
         if (read != null && ta != null && tb != null && read.isStaged(ta) && read.isStaged(tb)) {
             // Still a split behind Recents: bringing one half forward brings the whole split back.
-            return bringToFront(a.copy(taskId = ta), route.root) != null
+            return (bringToFront(a.copy(taskId = ta), route.root) != null)
+                .also { if (it) Haptics.play(context, Haptics.Event.SPLIT) }
         }
         return pair(b.copy(taskId = tb), a.copy(taskId = ta), firstOnRight = true, keepOnUndo = null)
     }
@@ -199,13 +202,16 @@ class SplitCoordinator @Inject constructor(
                 app != null -> SplitThree.addThird(context, component = app.componentName, user = app.user)
                 else -> false
             }
-            if (ok) return true
+            if (ok) {
+                Haptics.play(context, Haptics.Event.SPLIT)
+                return true
+            }
         }
         if (!orSideStage || !route.commands) return false
         val id = (third.taskId ?: withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, third.packageName, route.root) })
             ?: return false
         val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, id, right = true, root = route.root) }
-        return moved && awaitInSplit(listOf(id), route.root)
+        return (moved && awaitInSplit(listOf(id), route.root)).also { if (it) Haptics.play(context, Haptics.Event.SPLIT) }
     }
 
     /**
@@ -233,6 +239,7 @@ class SplitCoordinator @Inject constructor(
         val formed = (route.native && intentNatively(intent, packageName, userId, partner, route.root)) ||
             (route.commands && intentByCommands(intent, packageName, partner, route.root))
         if (formed) {
+            Haptics.play(context, Haptics.Event.SPLIT)
             SplitHistory.record(context, packageName, other.packageName)
             offerUndo(partner)
         }
@@ -478,7 +485,8 @@ class SplitCoordinator @Inject constructor(
     /** Opens [app] and waits for its task (null when it can't be opened or never showed up). */
     private suspend fun open(app: SplitApp, root: Boolean): Pair<Int, Read>? {
         val item = app.app ?: appRepository.apps.first().firstOrNull { it.packageName == app.packageName } ?: return null
-        val launched = withContext(Dispatchers.Main) { appRepository.launch(item) }.isSuccess
+        // No launch click: the split's own haptic follows once the two are side by side.
+        val launched = withContext(Dispatchers.Main) { appRepository.launch(item, haptic = false) }.isSuccess
         return if (launched) awaitTask(app.packageName, root) else null
     }
 

@@ -1,6 +1,8 @@
-- Settings: new Start page, grouped pages, Advanced sections
-- Taskbar: pin/reorder on the bar, drop apps to pin, split tile, launch glow, AMOLED & Neon themes
-- Recents: split pairs as one card, memory use, drag to taskbar, cards grow into apps
-- Drawer: two panes unfolded, shortcut chips, more settings in search
-- Split picker opens beside your app, with ⅓/½/⅔ size
+- Settings: Start page, grouped pages, Advanced sections
+- Taskbar: pin/reorder on the bar, drop to pin, split tile, launch glow, AMOLED & Neon
+- Recents: split pairs as one card, memory use, drag to taskbar
+- Drawer: two panes unfolded, shortcut chips, settings in search
+- Split picker opens beside your app, ⅓/½/⅔ size
+- Icons: 5 new shapes, themed in each app's colour
+- Haptics for opening, split, closing, Recents
 - New animations; Android 17 updates
