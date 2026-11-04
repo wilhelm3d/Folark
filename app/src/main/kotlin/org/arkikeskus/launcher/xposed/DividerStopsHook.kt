@@ -26,8 +26,12 @@ internal object DividerStopsHook {
     const val EXTRA_ON = "on"
     val CHANGED_URI: Uri = Uri.parse("content://${RecentsHook.STATE_AUTHORITY}/divider_stops")
 
-    /** Off until Folark says otherwise (asked once System UI is up, and again when it changes). */
-    @Volatile private var on = false
+    /**
+     * As Folark's setting says (asked when the first split is built, and again when it changes).
+     * Until the answer is in it counts as on, the setting's default, so the first split after a
+     * restart has the stops too.
+     */
+    @Volatile private var on = true
     @Volatile private var asked = false
     private var log: (String) -> Unit = {}
     private val worker by lazy { Handler(HandlerThread("folark-divider-stops").apply { start() }.looper) }
