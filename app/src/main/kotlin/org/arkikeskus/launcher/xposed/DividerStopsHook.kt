@@ -43,6 +43,7 @@ internal object DividerStopsHook {
 
     private const val SNAP_FIRST_THIRD = 0
     private const val SNAP_SECOND_THIRD = 2
+    private val THREE_APP_SNAPS = 5..9
     private const val FIRST = 0.30f
     private const val SECOND = 0.70f
 
@@ -68,6 +69,8 @@ internal object DividerStopsHook {
         @Suppress("UNCHECKED_CAST")
         val targets = field(algorithm, "mTargets") as? MutableList<Any?> ?: error("no mTargets")
         if (targets.size < 3) error("only ${targets.size} targets")
+        // A three-app layout (its stops are SNAP_TO_3_*: 5 to 9) keeps Android's own stops.
+        if (targets.any { (field(it ?: return@any false, "snapPosition") as? Int) in THREE_APP_SNAPS }) return
         val middle = field(algorithm, "mMiddleTarget") ?: targets[targets.size / 2] ?: error("no middle")
         val middleAt = field(middle, "position") as? Int ?: error("no target position")
 

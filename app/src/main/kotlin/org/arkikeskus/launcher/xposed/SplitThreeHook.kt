@@ -211,30 +211,30 @@ internal object SplitThreeHook {
             }
             return
         }
-        val ok = runCatching {
+        val int = Int::class.javaPrimitiveType!!
+        val failure = runCatching {
             if (task > 0) {
-                // startTask(int taskId, int position, Bundle options, WindowContainerToken, int index)
-                val m = c.javaClass.methods.first {
-                    it.name == "startTask" && it.parameterTypes.size == 5 &&
-                        it.parameterTypes[4] == Int::class.javaPrimitiveType
-                }
-                m.invoke(c, task, SPLIT_POSITION_BOTTOM_OR_RIGHT, null, null, THIRD_INDEX)
+                // startTask(int taskId, int position, Bundle options, WindowContainerToken, int index, …)
+                invokeWithIndex(
+                    c, "startTask",
+                    listOf(int to task, int to SPLIT_POSITION_BOTTOM_OR_RIGHT, Bundle::class.java to null),
+                    THIRD_INDEX,
+                )
             } else {
                 // startIntent(PendingIntent, int userId, Intent fillIn, int position, Bundle options,
-                //             WindowContainerToken, int index)
-                val m = c.javaClass.methods.first {
-                    it.name == "startIntent" && it.parameterTypes.size == 7 &&
-                        it.parameterTypes[0] == PendingIntent::class.java &&
-                        it.parameterTypes[6] == Int::class.javaPrimitiveType
-                }
-                m.invoke(c, launch, userId, null, SPLIT_POSITION_BOTTOM_OR_RIGHT, null, null, THIRD_INDEX)
+                //             WindowContainerToken, int index, …)
+                invokeWithIndex(
+                    c, "startIntent",
+                    listOf(
+                        PendingIntent::class.java to launch, int to userId, Intent::class.java to null,
+                        int to SPLIT_POSITION_BOTTOM_OR_RIGHT, Bundle::class.java to null,
+                    ),
+                    THIRD_INDEX,
+                )
             }
-            true
-        }.getOrElse {
-            log("three-app split: start failed: $it")
-            false
-        }
-        reply(context, request, ok)
+        }.exceptionOrNull()
+        if (failure != null) log("three-app split: start failed: ${reason(failure)}")
+        reply(context, request, failure == null, detail = failure?.let { reason(it) })
     }
 
     /**
@@ -429,6 +429,33 @@ internal object SplitThreeHook {
             ?: error("no $name(${leading.joinToString { it.first.simpleName }}, …); found: " +
                 candidates.joinToString(" | ") { method -> method.parameterTypes.joinToString(",") { it.simpleName } }.ifEmpty { "none" })
         val args = m.parameterTypes.mapIndexed { i, type -> if (i < leading.size) leading[i].second else neutral(type) }
+        m.isAccessible = true
+        m.invoke(c, *args.toTypedArray())
+    }
+
+    /**
+     * Like [invokeLeading], with the split index (which pane: 2 = the third) in the first number
+     * after [leading]; newer builds may add parameters after it.
+     */
+    private fun invokeWithIndex(c: Any, name: String, leading: List<Pair<Class<*>, Any?>>, index: Int) {
+        val int = Int::class.javaPrimitiveType
+        val candidates = methods(c.javaClass).filter { it.name == name }
+        val m = candidates.filter { method ->
+            val p = method.parameterTypes
+            p.size > leading.size && leading.indices.all { i -> p[i] == leading[i].first || p[i].isAssignableFrom(leading[i].first) } &&
+                (leading.size until p.size).any { p[it] == int }
+        }.minByOrNull { it.parameterTypes.size }
+            ?: error("no $name(${leading.joinToString { it.first.simpleName }}, …, int index); found: " +
+                candidates.joinToString(" | ") { method -> method.parameterTypes.joinToString(",") { it.simpleName } }.ifEmpty { "none" })
+        val p = m.parameterTypes
+        val indexAt = (leading.size until p.size).first { p[it] == int }
+        val args = p.mapIndexed { i, type ->
+            when {
+                i < leading.size -> leading[i].second
+                i == indexAt -> index
+                else -> neutral(type)
+            }
+        }
         m.isAccessible = true
         m.invoke(c, *args.toTypedArray())
     }

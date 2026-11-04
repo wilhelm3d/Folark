@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Split screen
+- Three-app split: the module finds System UI's startTask / startIntent for the third pane by their leading parameters (the split index in the first number after them) and reports why it failed; the divider stops leave three-app layouts alone.
+- The split drawer's Size row shows whenever Folark's module runs, labelled 30/70, 50/50, 70/30; picking a size turns peek off.
 - The divider stops at 30 %, 50 % and 70 % (Settings ▸ Recents & split screen ▸ Divider stops; Folark's Vector module adds the stops in System UI). Layout choices, saved pairs and the taskbar's split menu use 30 / 70 in place of a third / two thirds.
 - Works on the Razr's Android 17 build again: the module finds System UI's split calls by their leading parameters and passes a real InstanceId; the split drawer docks beside the app with `startTasks` (System UI's `startIntentAndTask` throws there) after waiting for its task to reach WM Shell; the Native engine falls back to the commands when System UI turns a request down. Check split screen shows the reason for a failure.
 
@@ -13,6 +15,7 @@
 - The launch glow reuses one window and caches its colour; the app watcher backs off while nothing changes and restarts properly after the screen was off.
 
 ### Home, drawer and look
+- Opening or closing a folder in the app drawer never brings the keyboard up.
 - Unfolding the phone opens the home pages out from the hinge (Settings ▸ Appearance ▸ Unfold animation).
 - Per-app icon shapes (app menu ▸ Change icon ▸ Shape).
 - A separate heading font, and six more fonts every phone has (Condensed, Light, Medium, Casual, Small caps, Cursive).

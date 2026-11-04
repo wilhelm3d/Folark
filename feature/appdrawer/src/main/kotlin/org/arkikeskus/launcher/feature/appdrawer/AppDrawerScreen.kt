@@ -432,6 +432,14 @@ fun AppDrawerScreen(
     LaunchedEffect(openFolderId, uiState.folders) {
         if (openFolderId != null && uiState.folders.none { it.id == openFolderId }) openFolderId = null
     }
+    // A folder opening or closing never brings the keyboard up: the search field lets go and the
+    // keyboard goes, both when the folder opens and when it closes (focus would otherwise return
+    // to the search field as the folder's sheet window goes, and with it the keyboard).
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    LaunchedEffect(openFolderId) {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
     val openFolder = openFolderId?.let { id -> uiState.folders.firstOrNull { it.id == id } }
     if (openFolder != null) {
         DrawerFolderSheet(

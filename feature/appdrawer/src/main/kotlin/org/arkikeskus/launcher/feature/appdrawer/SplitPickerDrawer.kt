@@ -251,9 +251,9 @@ fun SplitPickerDrawer(
                     onPeekChange = onPeekChange,
                 )
             }
-            // How big the pick will be: ⅓, ½ or ⅔, as small previews of the split (not with peek).
-            if (share != null && pickCount == 1 && peek != true) {
-                SharePicker(share, pickedOnLeft, onShareChange)
+            // How big the pick will be: 30 / 50 / 70 % (picking one turns peek off).
+            if (share != null && pickCount == 1) {
+                SharePicker(share, pickedOnLeft, peek == true, onShareChange)
             }
             if (look.search && current == null) {
                 SearchField(query = query, onQuery = { query = it })
@@ -467,39 +467,54 @@ private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit
 
 /** The picked app's share of the screen, as three tiny split previews; the chosen one is lit. */
 @Composable
-private fun SharePicker(share: Int, pickedOnLeft: Boolean, onShareChange: (Int) -> Unit) {
+private fun SharePicker(share: Int, pickedOnLeft: Boolean, peekOn: Boolean, onShareChange: (Int) -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(stringResource(R.string.split_picker_size), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-        listOf(33, 50, 66).forEach { option ->
-            val selected = option == share
+        listOf(30, 50, 70).forEach { option ->
+            val selected = option == share && !peekOn
             val border by androidx.compose.animation.animateColorAsState(
                 if (selected) ACCENT else Color.White.copy(alpha = 0.18f), label = "shareBorder",
             )
-            Row(
+            Column(
                 Modifier
-                    .size(width = 46.dp, height = 28.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(Color.White.copy(alpha = 0.06f))
-                    .border(1.5.dp, border, RoundedCornerShape(7.dp))
+                    .clip(RoundedCornerShape(9.dp))
                     .clickable { onShareChange(option) }
-                    .padding(3.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    .padding(horizontal = 2.dp, vertical = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val mine = option / 100f
-                val parts = if (pickedOnLeft) listOf(true to mine, false to 1f - mine) else listOf(false to 1f - mine, true to mine)
-                parts.forEach { (isPick, w) ->
-                    Box(
-                        Modifier
-                            .weight(w)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(if (isPick) (if (selected) ACCENT else Color.White.copy(alpha = 0.45f)) else Color.White.copy(alpha = 0.16f)),
-                    )
+                Row(
+                    Modifier
+                        .size(width = 46.dp, height = 28.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .border(1.5.dp, border, RoundedCornerShape(7.dp))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    val mine = option / 100f
+                    val parts = if (pickedOnLeft) listOf(true to mine, false to 1f - mine) else listOf(false to 1f - mine, true to mine)
+                    parts.forEach { (isPick, w) ->
+                        Box(
+                            Modifier
+                                .weight(w)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(if (isPick) (if (selected) ACCENT else Color.White.copy(alpha = 0.45f)) else Color.White.copy(alpha = 0.16f)),
+                        )
+                    }
                 }
+                // Left / right as on screen: "30/70" means the left app gets 30 %.
+                val left = if (pickedOnLeft) option else 100 - option
+                Text(
+                    "$left/${100 - left}",
+                    color = if (selected) ACCENT else Color.White.copy(alpha = 0.7f),
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
         }
     }

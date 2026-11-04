@@ -45,7 +45,7 @@ class SplitPickerActivity : ComponentActivity() {
     private var appPicked = false
     /** Open the pick as peek view (the Peek switch at the top, or how the picker was opened). */
     private var peek by mutableStateOf(false)
-    /** The picked app's share of the split in percent (Size row: 33, 50, 66). */
+    /** The picked app's share of the split in percent (Size row: 30, 50, 70). */
     private var share by mutableStateOf(50)
     private val three get() = intent.getBooleanExtra(SplitPicker.EXTRA_THREE, false)
 
@@ -99,7 +99,8 @@ class SplitPickerActivity : ComponentActivity() {
                             // The divider sizes need Folark's Vector module (as peek does).
                             share = if (!three && viewModel.peekAvailable) share else null,
                             pickedOnLeft = firstOnRight,
-                            onShareChange = { share = it },
+                            // A size is a plain split: it ends peek.
+                            onShareChange = { share = it; peek = false },
                         )
                     }
                 }
