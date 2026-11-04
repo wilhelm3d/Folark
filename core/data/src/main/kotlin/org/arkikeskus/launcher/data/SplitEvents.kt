@@ -51,6 +51,8 @@ object SplitEvents {
     val live: Boolean get() = attachedAt > 0L
 
     fun onEvent(extras: Bundle) {
+        // A split stage changed: a cached window list no longer says what is open.
+        ShellSplit.forget()
         lastEventAt = System.currentTimeMillis()
         when (extras.getInt(EXTRA_KIND)) {
             KIND_STAGE -> {

@@ -135,7 +135,7 @@ class SplitCoordinator @Inject constructor(
     suspend fun pairWithFront(app: AppItem, appOnRight: Boolean, partnerIfHome: AppItem?, peek: Boolean = false): Boolean {
         val route = route()
         if (!route.any) return false
-        val front = withContext(Dispatchers.IO) { ShellSplit.snapshot(context, route.root) }?.frontApp()
+        val front = withContext(Dispatchers.IO) { ShellSplit.recent(context, route.root) }?.frontApp()
         val partner = when {
             front != null && !front.isApp(app.packageName) -> SplitApp(front.packageName, null, front.id)
             partnerIfHome != null -> SplitApp(partnerIfHome)
@@ -176,7 +176,7 @@ class SplitCoordinator @Inject constructor(
     /** Brings back a split from Recents: as it was when it is still staged, else [a] left and [b] right. */
     suspend fun restore(a: SplitApp, b: SplitApp): Boolean {
         val route = route()
-        val read = withContext(Dispatchers.IO) { ShellSplit.snapshot(context, route.root) }
+        val read = withContext(Dispatchers.IO) { ShellSplit.recent(context, route.root) }
         val ta = a.taskId ?: read?.taskOf(a.packageName)?.id
         val tb = b.taskId ?: read?.taskOf(b.packageName)?.id
         if (read != null && ta != null && tb != null && read.isStaged(ta) && read.isStaged(tb)) {
@@ -233,7 +233,7 @@ class SplitCoordinator @Inject constructor(
     suspend fun openBeside(intent: PendingIntent, packageName: String, userId: Int): Boolean {
         val route = route()
         if (!route.any) return false
-        val read = withContext(Dispatchers.IO) { ShellSplit.snapshot(context, route.root) } ?: return false
+        val read = withContext(Dispatchers.IO) { ShellSplit.recent(context, route.root) } ?: return false
         val other = read.lastApp(except = packageName) ?: return false
         val partner = SplitApp(other.packageName, null, other.id)
         val formed = (route.native && intentNatively(intent, packageName, userId, partner, route.root)) ||
@@ -477,7 +477,7 @@ class SplitCoordinator @Inject constructor(
     private suspend fun bringToFront(app: SplitApp, root: Boolean): Pair<Int, Read>? {
         val found = running(app, root)
         val moved = found != null && withContext(Dispatchers.Main) {
-            runCatching { context.getSystemService(ActivityManager::class.java).moveTaskToFront(found.first, 0) }.isSuccess
+            runCatching { context.getSystemService(ActivityManager::class.java).moveTaskToFront(found.first, 0) }.isSuccess.also { ShellSplit.forget() }
         }
         return if (moved) found else open(app, root)
     }
@@ -486,7 +486,7 @@ class SplitCoordinator @Inject constructor(
     private suspend fun open(app: SplitApp, root: Boolean): Pair<Int, Read>? {
         val item = app.app ?: appRepository.apps.first().firstOrNull { it.packageName == app.packageName } ?: return null
         // No launch click: the split's own haptic follows once the two are side by side.
-        val launched = withContext(Dispatchers.Main) { appRepository.launch(item, haptic = false) }.isSuccess
+        val launched = withContext(Dispatchers.Main) { appRepository.launch(item, haptic = false) }.isSuccess.also { ShellSplit.forget() }
         return if (launched) awaitTask(app.packageName, root) else null
     }
 

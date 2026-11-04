@@ -187,9 +187,12 @@ fun Workspace(
     val scope = rememberCoroutineScope()
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
 
-    var gridSize by remember { mutableStateOf(IntSize.Zero) }
-    var dragging by remember { mutableStateOf<PlacedApp?>(null) }
-    var dragPos by remember { mutableStateOf(Offset.Zero) }
+    // The drag and placement state lives in one holder, so the cells and gestures split out into
+    // WorkspaceCells.kt / WorkspaceDrag.kt share it with this function.
+    val ws = remember { WorkspaceDragState() }
+    var gridSize by ws::gridSize
+    var dragging by ws::dragging
+    var dragPos by ws::dragPos
     var editingWidget by remember { mutableStateOf<EditingItem?>(null) }
     // The widget whose "Widget style" dialog is open (row id), and every saved look.
     var lookEditing by remember { mutableStateOf<Long?>(null) }
@@ -211,11 +214,11 @@ fun Workspace(
     // Relocation of a folder or pinned shortcut, kept local: neither travels to the dock/drawer, so
     // they don't use the shared cross-surface controller — Workspace owns the gesture, floating
     // preview and drop, and moves them by their home_items row id (folder.id / shortcut.rowId).
-    var draggingLocal by remember { mutableStateOf<HomeEntry?>(null) }
-    var localMoving by remember { mutableStateOf(false) }
-    var localDragPos by remember { mutableStateOf(Offset.Zero) }
+    var draggingLocal by ws::draggingLocal
+    var localMoving by ws::localMoving
+    var localDragPos by ws::localDragPos
     // The entry being moved, shown optimistically at its new cell (by row id) until the flow catches up.
-    var localOptimistic by remember { mutableStateOf<Pair<Long, Triple<Int, Int, Int>>?>(null) }
+    var localOptimistic by ws::localOptimistic
 
     // The pager ALWAYS carries one extra trailing page (so an icon can be dragged onto a brand new
     // page). The count is kept stable — never toggled by [dragging] — because changing it at pickup
@@ -235,8 +238,10 @@ fun Workspace(
     fun restPage(page: Int): Int = (if (isDualPage) page - page % 2 else page).coerceIn(0, lastLeftPage)
     val pagerState = rememberPagerState(initialPage = restPage(homePage ?: 0), pageCount = { lastPage + 1 })
     /** The page a step forward (+1) or back (-1) lands on; the book layout turns two pages at once. */
-    fun stepPage(direction: Int): Int =
-        (pagerState.currentPage + direction * (if (isDualPage) 2 else 1)).coerceIn(0, lastLeftPage)
+    // Page edge for flipping while dragging: only when the icon is pushed against the screen edge.
+    val edgePx = with(density) { 20.dp.toPx() }
+    val grid = WorkspaceGrid(columns, rows, pageCount, lastPage, lastLeftPage, isDualPage, locked, edgePx, pagerState, ws)
+    fun stepPage(direction: Int): Int = grid.stepPage(direction)
     // For the long-lived swipe detector, which must see the page count of the latest composition.
     val currentStepPage by rememberUpdatedState(::stepPage)
     // Settings arrive a beat after the first frame: open on the home page once they are known.
@@ -256,9 +261,9 @@ fun Workspace(
         pageRequests.collect { page -> pagerState.animateScrollToPage(page.coerceIn(0, pagerState.pageCount - 1)) }
     }
     // The cell the dragged icon would drop into — shown as a placeholder while dragging.
-    var targetCell by remember { mutableStateOf<IntOffset?>(null) }
+    var targetCell by ws::targetCell
     // The page [targetCell] is on (with two pages side by side it is not always the current one).
-    var targetCellPage by remember { mutableIntStateOf(0) }
+    var targetCellPage by ws::targetCellPage
 
     val placedApps = remember(entries) { entries.filterIsInstance<PlacedApp>() }
     val folders = remember(entries) { entries.filterIsInstance<PlacedFolder>() }
@@ -311,10 +316,10 @@ fun Workspace(
 
     // Optimistic placements (key -> page/cellX/cellY) applied on top of [placedApps] until the
     // database flow catches up, so an icon doesn't flash at its old cell for a frame on drop.
-    var optimistic by remember { mutableStateOf(emptyMap<String, Triple<Int, Int, Int>>()) }
+    var optimistic by ws::optimistic
     // Keys optimistically removed from home (dragged into the dock or a folder) — hidden until the
     // flow drops them, so the icon doesn't reappear at its old cell for a frame.
-    var removedKeys by remember { mutableStateOf(emptySet<String>()) }
+    var removedKeys by ws::removedKeys
     // Keyed on the overrides too (see the widget override above): an icon dropped back onto its own
     // cell writes nothing, so without this its override would never be released.
     LaunchedEffect(placedApps, optimistic) {
@@ -365,7 +370,23 @@ fun Workspace(
     }
     // The drag gesture's pointerInput block outlives recomposition (its keys don't include the entry
     // list), so it must read the *latest* placements through this state, not a stale closure capture.
-    val latestEntries by rememberUpdatedState(effectiveEntries)
+    val latestEntriesState = rememberUpdatedState(effectiveEntries)
+    val latestEntries by latestEntriesState
+    val env = WorkspaceEnv(
+        scope = scope,
+        haptics = haptics,
+        dragController = dragController,
+        windowHeightPx = windowHeightPx,
+        latestEntriesState = latestEntriesState,
+        onAppClick = onAppClick,
+        onAppMenu = onAppMenu,
+        onMove = onMove,
+        onMoveFolder = onMoveFolder,
+        onMoveToDock = onMoveToDock,
+        onRemoveFromHome = onRemoveFromHome,
+        onCreateFolder = onCreateFolder,
+        onAddToFolder = onAddToFolder,
+    )
     // The empty-area detector below is a pointerInput(Unit) that lives as long as the page; read the
     // callbacks through rememberUpdatedState so a recomposition with a new lambda (a changed setting)
     // reaches it instead of the lambda captured at first composition.
@@ -380,13 +401,12 @@ fun Workspace(
     // Book layout (inner display): the pager shows two half-width pages side by side, so a page is
     // half the grid wide and a point in the right half belongs to the page after the current one.
     // "Grid x" below is measured from the left edge of the whole pager.
-    fun pageWidthPx(): Float = if (isDualPage) gridSize.width / 2f else gridSize.width.toFloat()
-    fun pageAtX(gridX: Float): Int =
-        if (isDualPage && gridX >= pageWidthPx()) (pagerState.currentPage + 1).coerceAtMost(lastPage) else pagerState.currentPage
-    fun xInPage(gridX: Float): Float = if (isDualPage && gridX >= pageWidthPx()) gridX - pageWidthPx() else gridX
-    fun pageLeft(page: Int): Float = if (isDualPage) (page - pagerState.currentPage) * pageWidthPx() else 0f
-    val cellW = if (columns > 0 && gridSize.width > 0) pageWidthPx() / columns else 1f
-    val cellH = if (rows > 0 && gridSize.height > 0) gridSize.height.toFloat() / rows else 1f
+    fun pageWidthPx(): Float = grid.pageWidthPx()
+    fun pageAtX(gridX: Float): Int = grid.pageAtX(gridX)
+    fun xInPage(gridX: Float): Float = grid.xInPage(gridX)
+    fun pageLeft(page: Int): Float = grid.pageLeft(page)
+    val cellW = grid.cellW
+    val cellH = grid.cellH
     // Icon/folder/shortcut size derived from the cell so 6–7 columns fit a narrow screen (a fixed
     // 52dp icon bled into neighbouring cells there) AND so a whole label line fits under it in a
     // short cell (7–8 rows on an enlarged display size). 52dp until the grid reports its real size.
@@ -403,8 +423,6 @@ fun Workspace(
     } else {
         preferredIconSize
     }
-    // Page flips only when the dragged icon is pushed right against the screen edge.
-    val edgePx = with(density) { 20.dp.toPx() }
 
     // Client-side mirror of rectFitsForRow over the rendered entries, for the live drag placeholder.
     fun rectFreeOnGrid(excludeRowId: Long, page: Int, x: Int, y: Int, spanX: Int, spanY: Int): Boolean {
@@ -624,88 +642,7 @@ fun Workspace(
         onTap: () -> Unit,
         onStillPress: () -> Unit,
         onRemove: () -> Unit,
-    ): Modifier = this.pointerInput(entry, rowId, cellW, cellH, columns, rows, pageCount, lastPage, isDualPage, locked) {
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            down.consume()
-            val slop = viewConfiguration.touchSlop
-            var tapped = false
-            var swiped = false
-            withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                while (true) {
-                    val ev = awaitPointerEvent()
-                    val c = ev.changes.firstOrNull { it.id == down.id }
-                    if (c == null) { swiped = true; return@withTimeoutOrNull }
-                    c.consume()
-                    if (!c.pressed) { tapped = true; return@withTimeoutOrNull }
-                    if ((c.position - down.position).getDistance() > slop) { swiped = true; return@withTimeoutOrNull }
-                }
-            }
-            if (tapped) { onTap(); return@awaitEachGesture }
-            if (swiped) return@awaitEachGesture
-            // Desktop locked: long-press does nothing (no move/remove); tap (above) still opens.
-            if (locked) return@awaitEachGesture
-            // PICK UP
-            draggingLocal = entry
-            localMoving = false
-            // Claim the gesture for this local entry so the root swipe-up detector (which runs in the
-            // Initial pass, before us) won't steal the first movement after this long-press.
-            dragController.localGestureActive = true
-            localDragPos = Offset(pageLeft(entry.page) + entry.cellX * cellW + down.position.x, entry.cellY * cellH + down.position.y)
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            try {
-                val completed = drag(down.id) { change ->
-                    val delta = change.positionChange()
-                    change.consume()
-                    localDragPos += delta
-                    if (!localMoving) {
-                        localMoving = true
-                        if (removable) dragController.localDragging = true
-                    }
-                    // Publish root coords so the remove zone can highlight + hit-test this local drag.
-                    if (removable) dragController.update(dragController.gridBounds.topLeft + localDragPos)
-                    if (!pagerState.isScrollInProgress) {
-                        if (localDragPos.x > gridSize.width - edgePx && stepPage(1) != pagerState.currentPage) {
-                            scope.launch { pagerState.animateScrollToPage(stepPage(1)) }
-                        } else if (localDragPos.x < edgePx && pagerState.currentPage > 0) {
-                            scope.launch { pagerState.animateScrollToPage(stepPage(-1)) }
-                        }
-                    }
-                    val cx = (xInPage(localDragPos.x) / cellW).toInt().coerceIn(0, columns - 1)
-                    val cy = (localDragPos.y / cellH).toInt().coerceIn(0, rows - 1)
-                    val nc = IntOffset(cx, cy)
-                    if (nc != targetCell) targetCell = nc
-                    targetCellPage = pageAtX(localDragPos.x)
-                }
-                targetCell = null
-                val rootPos = dragController.gridBounds.topLeft + localDragPos
-                if (completed && localMoving && removable && dragController.isOverRemove(rootPos)) {
-                    onRemove()
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                } else if (completed && localMoving) {
-                    val tx = (xInPage(localDragPos.x) / cellW).toInt().coerceIn(0, columns - 1)
-                    val ty = (localDragPos.y / cellH).toInt().coerceIn(0, rows - 1)
-                    val targetPage = pageAtX(localDragPos.x)
-                    if (targetPage != entry.page || tx != entry.cellX || ty != entry.cellY) {
-                        localOptimistic = rowId to Triple(targetPage, tx, ty)
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        scope.launch {
-                            if (!onMoveFolder(rowId, targetPage, tx, ty)) localOptimistic = null
-                        }
-                    }
-                } else if (completed) {
-                    onStillPress()
-                }
-            } finally {
-                // Reset even on cancellation (node disposed / pointerInput restarted), so a stuck flag
-                // can never leave the root swipe detector permanently disabled.
-                dragController.localDragging = false
-                dragController.localGestureActive = false
-                draggingLocal = null
-                localMoving = false
-            }
-        }
-    }
+    ): Modifier = workspaceEntryDrag(ws, grid, env, entry, rowId, removable, onTap, onStillPress, onRemove)
 
     androidx.activity.compose.BackHandler(enabled = editingWidget != null || widgetDragController.active != null) {
         widgetDragController.cancel()
@@ -1079,255 +1016,18 @@ fun Workspace(
                                     }
                                 }
                             }
-                            is PlacedApp -> {
-                            val placed = entry
-                            Box(
-                                modifier = Modifier
-                                    .offset {
-                                        // Safety net only: the repository reflows on column shrink,
-                                        // but clamp here too so a stale out-of-range cell can never
-                                        // draw off-screen for a frame before the reflow lands.
-                                        val safeCellX = placed.cellX.coerceIn(0, columns - 1)
-                                        val safeCellY = placed.cellY.coerceIn(0, rows - 1)
-                                        IntOffset(
-                                            (safeCellX * cellW).roundToInt(),
-                                            (safeCellY * cellH).roundToInt(),
-                                        )
-                                    }
-                                    .size(
-                                        with(density) { cellW.toDp() },
-                                        with(density) { cellH.toDp() },
-                                    )
-                                    // Hide (but keep in composition) the icon once it's actually
-                                    // moving — the floating copy is drawn on top. While only lifted
-                                    // (menu showing) it stays visible.
-                                    .graphicsLayer {
-                                        alpha = if (dragging?.app?.key == placed.app.key &&
-                                            dragController.moving
-                                        ) 0f else 1f
-                                    }
-                                    .pointerInput(
-                                        placed.app.key, placed.page, placed.cellX, placed.cellY,
-                                        cellW, cellH, columns, rows, pageCount, lastPage, isDualPage, locked,
-                                    ) {
-                                        awaitEachGesture {
-                                            val down = awaitFirstDown(requireUnconsumed = false)
-                                            // Claim the gesture immediately: an icon touch belongs
-                                            // to the icon, so the pager and the page swipes can
-                                            // never steal it (not even from finger jitter during the
-                                            // long-press hold). Swipes for drawer/notifications start
-                                            // on empty space.
-                                            down.consume()
-                                            val slop = viewConfiguration.touchSlop
-                                            // Quick up = tap; movement = abandon (drag needs a
-                                            // long-press); still hold = pick up to drag.
-                                            var tapped = false
-                                            var swiped = false
-                                            withTimeoutOrNull(
-                                                viewConfiguration.longPressTimeoutMillis,
-                                            ) {
-                                                while (true) {
-                                                    val ev = awaitPointerEvent()
-                                                    val c = ev.changes.firstOrNull { it.id == down.id }
-                                                    if (c == null) {
-                                                        swiped = true
-                                                        return@withTimeoutOrNull
-                                                    }
-                                                    c.consume()
-                                                    if (!c.pressed) {
-                                                        tapped = true
-                                                        return@withTimeoutOrNull
-                                                    }
-                                                    if ((c.position - down.position).getDistance() > slop) {
-                                                        swiped = true
-                                                        return@withTimeoutOrNull
-                                                    }
-                                                }
-                                            }
-                                            if (tapped) {
-                                                onAppClick(placed.app)
-                                                return@awaitEachGesture
-                                            }
-                                            if (swiped) return@awaitEachGesture
-                                            // Desktop locked: long-press does nothing (no menu, no drag); tap still launches.
-                                            if (locked) return@awaitEachGesture
-                                            // PICK UP
-                                            dragging = placed
-                                            dragPos = Offset(
-                                                pageLeft(placed.page) + placed.cellX * cellW + down.position.x,
-                                                placed.cellY * cellH + down.position.y,
-                                            )
-                                            // Lift into the shared controller (not yet "moving").
-                                            dragController.start(
-                                                placed.app,
-                                                DragSource.Home,
-                                                dragController.gridBounds.topLeft + dragPos,
-                                            )
-                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            try {
-                                                // DRAG
-                                                val completed = drag(down.id) { change ->
-                                                    val delta = change.positionChange()
-                                                    change.consume()
-                                                    dragPos += delta
-                                                    // Any movement past the touch slop (drag() already
-                                                    // enforces it) is a drag → start moving immediately so
-                                                    // the floating icon tracks the finger from the start.
-                                                    if (!dragController.moving) dragController.beginMove()
-                                                    dragController.update(
-                                                        dragController.gridBounds.topLeft + dragPos,
-                                                    )
-                                                    if (!pagerState.isScrollInProgress) {
-                                                        if (dragPos.x > gridSize.width - edgePx &&
-                                                            stepPage(1) != pagerState.currentPage
-                                                        ) {
-                                                            scope.launch {
-                                                                pagerState.animateScrollToPage(
-                                                                    stepPage(1),
-                                                                )
-                                                            }
-                                                        } else if (dragPos.x < edgePx &&
-                                                            pagerState.currentPage > 0
-                                                        ) {
-                                                            scope.launch {
-                                                                pagerState.animateScrollToPage(
-                                                                    stepPage(-1),
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                    // Track the cell the icon would land in.
-                                                    val cx = (xInPage(dragPos.x) / cellW).toInt()
-                                                        .coerceIn(0, columns - 1)
-                                                    val cy = (dragPos.y / cellH).toInt()
-                                                        .coerceIn(0, rows - 1)
-                                                    val nc = IntOffset(cx, cy)
-                                                    if (nc != targetCell) targetCell = nc
-                                                    targetCellPage = pageAtX(dragPos.x)
-                                                }
-                                                // DROP — only act on a real finger-up (completed),
-                                                // never on a cancellation, so the menu can't pop up
-                                                // under a still-pressed finger.
-                                                val d = dragging
-                                                if (d != null && completed && !dragController.moving) {
-                                                    // Static long-press → show the menu next to the icon
-                                                    // (after release, so it can't steal the drag). Anchor at
-                                                    // the icon's TOP edge when it's in the lower half (popup
-                                                    // flips above) and its BOTTOM edge otherwise (popup
-                                                    // below) — so the popup never covers the icon.
-                                                    val cellTop = dragController.gridBounds.top + d.cellY * cellH
-                                                    // Bias toward opening upward: only icons in the top
-                                                    // ~45% open downward (room below); the middle and
-                                                    // everything lower open up so a tall popup never
-                                                    // covers the dock.
-                                                    val above = cellTop + cellH / 2f > windowHeightPx * 0.45f
-                                                    val anchorX = dragController.gridBounds.left + pageLeft(d.page) + d.cellX * cellW + cellW / 2f
-                                                    val anchorY = if (above) cellTop else cellTop + cellH
-                                                    onAppMenu(
-                                                        d.app,
-                                                        IntOffset(anchorX.roundToInt(), anchorY.roundToInt()),
-                                                        above,
-                                                    )
-                                                } else if (d != null && completed && dragController.moving) {
-                                                    val rootPos = dragController.gridBounds.topLeft + dragPos
-                                                    when {
-                                                        // Dropped on the "split" target → pick a partner;
-                                                        // the icon itself stays where it was.
-                                                        dragController.dropOnSplit(d.app, rootPos) -> {
-                                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        }
-                                                        // Dropped on the taskbar (shown on home) → pin it there; it stays on home too.
-                                                        org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(rootPos.x, rootPos.y) -> {
-                                                            org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(d.app)
-                                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        }
-                                                        // Dropped on the top "remove" zone → take it off home.
-                                                        dragController.isOverRemove(rootPos) -> {
-                                                            removedKeys = removedKeys + d.app.key
-                                                            onRemoveFromHome(d.app)
-                                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        }
-                                                        // Cross-surface: dropped on the dock.
-                                                        dragController.isOverDock(rootPos) -> {
-                                                            if (dragController.dockHasSpace) {
-                                                                // Hide from home until the flow drops it.
-                                                                removedKeys = removedKeys + d.app.key
-                                                                onMoveToDock(
-                                                                    d.app,
-                                                                    dragController.dockIndexAt(rootPos),
-                                                                )
-                                                                haptics.performHapticFeedback(
-                                                                    HapticFeedbackType.LongPress,
-                                                                )
-                                                            }
-                                                            // Dock full → reject: icon stays on home.
-                                                        }
-
-                                                        else -> {
-                                                            val tx = (xInPage(dragPos.x) / cellW).toInt()
-                                                                .coerceIn(0, columns - 1)
-                                                            val ty = (dragPos.y / cellH).toInt()
-                                                                .coerceIn(0, rows - 1)
-                                                            val targetPage = pageAtX(dragPos.x)
-                                                            val occupant = latestEntries.firstOrNull {
-                                                                it.page == targetPage && it.cellX == tx && it.cellY == ty &&
-                                                                    !(it is PlacedApp && it.app.key == d.app.key)
-                                                            }
-                                                            when (occupant) {
-                                                                // Drop on another app → create a folder.
-                                                                is PlacedApp -> {
-                                                                    removedKeys = removedKeys + d.app.key
-                                                                    onCreateFolder(occupant.app, d.app)
-                                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                                }
-                                                                // Drop on a folder → add the app to it.
-                                                                is PlacedFolder -> {
-                                                                    removedKeys = removedKeys + d.app.key
-                                                                    onAddToFolder(d.app, occupant.id)
-                                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                                }
-                                                                // Free cell → move (optimistic; roll back if rejected).
-                                                                else -> {
-                                                                    optimistic = optimistic + (d.app.key to Triple(targetPage, tx, ty))
-                                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                                    scope.launch {
-                                                                        if (!onMove(d.app, targetPage, tx, ty)) {
-                                                                            optimistic = optimistic - d.app.key
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            } finally {
-                                                // Reset even on cancellation (node disposed / pointerInput
-                                                // restarted), mirroring the local-drag path below, so a dead
-                                                // gesture can't leave the shared controller lifted.
-                                                targetCell = null
-                                                dragController.stop()
-                                                dragging = null
-                                            }
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                WithBadge({ badges[placed.app.badgeKey] ?: 0 }) { badgeCount ->
-                                    AppIcon(
-                                        appItem = placed.app,
-                                        labelColor = labelColor,
-                                        showLabel = showLabels,
-                                        iconSize = cellIconSize,
-                                        // Fixed centred cell: reserve the full label block so a name that
-                                        // wraps does not lift its icon above its neighbours'.
-                                        reserveLabelLines = true,
-                                        badgeCount = badgeCount,
-                                        badgeShowCount = badgeShowCount,
-                                        badgeScale = badgeScale,
-                                    )
-                                }
-                            }
-                            }
+                            is PlacedApp -> WorkspaceAppCell(
+                                placed = entry,
+                                ws = ws,
+                                grid = grid,
+                                env = env,
+                                badges = badges,
+                                badgeShowCount = badgeShowCount,
+                                badgeScale = badgeScale,
+                                showLabels = showLabels,
+                                labelColor = labelColor,
+                                iconSize = cellIconSize,
+                            )
                             is PlacedShortcut -> {
                                 Box(
                                     modifier = Modifier

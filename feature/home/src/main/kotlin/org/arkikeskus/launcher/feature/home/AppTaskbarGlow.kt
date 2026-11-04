@@ -6,6 +6,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RadialGradient
@@ -30,8 +31,9 @@ private const val GLOW_SPREAD = 2.4f
 /**
  * A soft glow in the app's own colour blooms out of [icon] and fades, with a ring spreading from
  * it, while the icon gives a small pulse. The glow has its own little untouchable window, so it
- * plays to the end even when the bar collapses or is rebuilt as the app opens. Nothing plays when
- * Android's animations are turned off.
+ * plays to the end even when the bar collapses or is rebuilt as the app opens. That window is kept
+ * for a few seconds after a glow and moved for the next one (launching several apps in a row adds
+ * one window, not one each). Nothing plays when Android's animations are turned off.
  */
 internal fun AppTaskbar.playLaunchGlow(icon: View) {
     val style = setup?.launchGlow ?: LauncherSettings.LAUNCH_GLOW_APP
@@ -45,7 +47,6 @@ internal fun AppTaskbar.playLaunchGlow(icon: View) {
     val size = (maxOf(icon.width, icon.height) * GLOW_SPREAD).toInt()
     val at = IntArray(2)
     icon.getLocationOnScreen(at)
-    val glow = GlowView(context, color, iconRadius = maxOf(icon.width, icon.height) / 2f)
     val params = WindowManager.LayoutParams(
         size,
         size,
@@ -63,25 +64,53 @@ internal fun AppTaskbar.playLaunchGlow(icon: View) {
         passThroughAlpha?.let { alpha = it }
         title = "FolarkLaunchGlow"
     }
-    if (runCatching { windowManager.addView(glow, params) }.isFailure) return
+    handler.removeCallbacks(glowRelease)
+    glowAnimator?.cancel()
+    val kept = glowView as? GlowView
+    val glow = kept ?: GlowView(context)
+    glow.prepare(color, iconRadius = maxOf(icon.width, icon.height) / 2f)
+    val placed = if (kept != null) runCatching { windowManager.updateViewLayout(glow, params) }.isSuccess
+    else runCatching { windowManager.addView(glow, params) }.isSuccess
+    if (!placed) {
+        releaseGlow()
+        return
+    }
+    glowView = glow
+    glow.visibility = View.VISIBLE
 
     icon.animate().cancel()
     icon.animate().scaleX(1.14f).scaleY(1.14f).setDuration(110).withEndAction {
         icon.animate().scaleX(1f).scaleY(1f).setDuration(260).setInterpolator(OvershootInterpolator(2.5f)).start()
     }.start()
 
-    ValueAnimator.ofFloat(0f, 1f).apply {
+    glowAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = GLOW_MS
         interpolator = DecelerateInterpolator(1.4f)
         addUpdateListener { glow.progress = it.animatedValue as Float }
         addListener(object : AnimatorListenerAdapter() {
+            private var cancelled = false
+            override fun onAnimationCancel(animation: Animator) { cancelled = true }
             override fun onAnimationEnd(animation: Animator) {
-                runCatching { windowManager.removeViewImmediate(glow) }
+                if (cancelled) return
+                glow.visibility = View.INVISIBLE
+                handler.postDelayed(glowRelease, GLOW_KEEP_MS)
             }
         })
         start()
     }
 }
+
+/** Takes the glow's window away (the bar stops, or no glow played for a while). */
+internal fun AppTaskbar.releaseGlow() {
+    handler.removeCallbacks(glowRelease)
+    glowAnimator?.cancel()
+    glowAnimator = null
+    glowView?.let { runCatching { windowManager.removeViewImmediate(it) } }
+    glowView = null
+}
+
+/** How long the glow's window waits for the next launch before it goes. */
+private const val GLOW_KEEP_MS = 4_000L
 
 /** Whether Android's animations are on (Developer options ▸ Animator duration scale, Remove animations). */
 private fun animationsOn(context: Context): Boolean =
@@ -93,6 +122,16 @@ private fun animationsOn(context: Context): Boolean =
  */
 private fun glowColor(icon: View): Int {
     val drawable = (icon as? ImageView)?.drawable ?: return Color.WHITE
+    // The bar keeps its icon drawables cached, so the same drawable comes back launch after launch:
+    // sample it once, not on the main thread at every tap.
+    synchronized(glowColors) { glowColors[drawable] }?.let { return it }
+    return glowColorOf(drawable).also { synchronized(glowColors) { glowColors[drawable] = it } }
+}
+
+/** Glow colours by icon drawable; entries go with their drawable. */
+private val glowColors = java.util.WeakHashMap<android.graphics.drawable.Drawable, Int>()
+
+private fun glowColorOf(drawable: android.graphics.drawable.Drawable): Int {
     val color = org.arkikeskus.launcher.data.IconColors.dominant(drawable) ?: return Color.WHITE
     val saturation = org.arkikeskus.launcher.data.IconColors.saturation(color)
     if (saturation < org.arkikeskus.launcher.data.IconColors.GREY_SATURATION) return Color.WHITE
@@ -100,7 +139,10 @@ private fun glowColor(icon: View): Int {
 }
 
 /** The glow itself: a halo that swells and fades, and a thin ring that spreads past it. */
-private class GlowView(context: Context, private val color: Int, private val iconRadius: Float) : View(context) {
+private class GlowView(context: Context) : View(context) {
+    private var color = Color.WHITE
+    private var iconRadius = 0f
+
     var progress = 0f
         set(value) {
             field = value
@@ -109,6 +151,22 @@ private class GlowView(context: Context, private val color: Int, private val ico
 
     private val halo = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val haloMatrix = Matrix()
+
+    /** A new glow: its colour and the icon's radius. The halo's gradient is made once per glow. */
+    fun prepare(color: Int, iconRadius: Float) {
+        this.color = color
+        this.iconRadius = iconRadius
+        // A unit-radius gradient, scaled and moved per frame with a matrix instead of a new
+        // shader on every frame; its fade goes through the paint's alpha.
+        halo.shader = RadialGradient(
+            0f, 0f, 1f,
+            intArrayOf(color, withAlpha(color, 128), Color.TRANSPARENT),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        progress = 0f
+    }
 
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
@@ -120,12 +178,10 @@ private class GlowView(context: Context, private val color: Int, private val ico
         val haloRadius = iconRadius * (0.95f + 0.75f * p)
         val haloAlpha = (230 * bloom * fade).toInt().coerceIn(0, 255)
         if (haloAlpha > 0 && haloRadius > 0f) {
-            halo.shader = RadialGradient(
-                cx, cy, haloRadius,
-                intArrayOf(withAlpha(color, haloAlpha), withAlpha(color, haloAlpha / 2), Color.TRANSPARENT),
-                floatArrayOf(0f, 0.55f, 1f),
-                Shader.TileMode.CLAMP,
-            )
+            haloMatrix.setScale(haloRadius, haloRadius)
+            haloMatrix.postTranslate(cx, cy)
+            halo.shader?.setLocalMatrix(haloMatrix)
+            halo.alpha = haloAlpha
             canvas.drawCircle(cx, cy, haloRadius, halo)
         }
         // From the icon's edge out to near the window's edge (GLOW_SPREAD icon radii).

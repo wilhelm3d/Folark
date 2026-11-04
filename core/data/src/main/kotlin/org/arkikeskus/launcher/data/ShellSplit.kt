@@ -28,6 +28,7 @@ object ShellSplit {
 
     private const val EXIT_WAIT_MS = 800L
     private const val EXIT_POLL_MS = 80L
+    private const val RECENT_MS = 750L
 
     fun available(context: Context): Boolean =
         context.checkSelfPermission(Manifest.permission.DUMP) == PackageManager.PERMISSION_GRANTED &&
@@ -80,9 +81,33 @@ object ShellSplit {
         }.getOrNull()
     }
 
-    /** One read of what is open (null when Android wouldn't say). */
+    /** One read of what is open (null when Android wouldn't say). Always reads anew. */
     fun snapshot(context: Context, root: Boolean = false): TaskSnapshot? =
         dump(context, arrayOf("activities"), root)?.let { ShellSplitParser.parse(it, context.packageName) }
+            .also { if (it != null) lastRead = CachedRead(it, root, System.currentTimeMillis()) }
+
+    /**
+     * What is open, reusing a read taken in the last [RECENT_MS] (the same gesture: the taskbar
+     * menu, then the split it starts, ask twice within a few hundred ms). The window list is
+     * hundreds of lines; reading and parsing it is the costly part of a split. Only for the first
+     * look at a gesture: code that waits for a change after a command uses [snapshot]. Any WM
+     * Shell command forgets the cached read.
+     */
+    fun recent(context: Context, root: Boolean = false): TaskSnapshot? {
+        val cached = lastRead
+        if (cached != null && cached.root == root && System.currentTimeMillis() - cached.at <= RECENT_MS) return cached.snapshot
+        return snapshot(context, root)
+    }
+
+    /** Forgets the cached read: something was just changed. */
+    fun forget() {
+        lastRead = null
+    }
+
+    private class CachedRead(val snapshot: TaskSnapshot, val root: Boolean, val at: Long)
+
+    @Volatile
+    private var lastRead: CachedRead? = null
 
     /** The front-most running task of [packageName] (the name must match exactly). */
     fun taskIdOf(context: Context, packageName: String, root: Boolean = false, read: TaskSnapshot? = null): Int? =
@@ -94,11 +119,11 @@ object ShellSplit {
 
     /** The two (or three) apps of the split screen showing now; empty when there is none. */
     fun splitTasks(context: Context, root: Boolean = false, read: TaskSnapshot? = null): List<SplitTask> =
-        (read ?: snapshot(context, root))?.splitShowing.orEmpty().map { it.asSplitTask() }
+        (read ?: recent(context, root))?.splitShowing.orEmpty().map { it.asSplitTask() }
 
     /** Like [splitTasks], also while the split is hidden (behind Recents or Home). */
     fun stagedSplitTasks(context: Context, root: Boolean = false, read: TaskSnapshot? = null): List<SplitTask> =
-        (read ?: snapshot(context, root))?.splitStaged.orEmpty().map { it.asSplitTask() }
+        (read ?: recent(context, root))?.splitStaged.orEmpty().map { it.asSplitTask() }
 
     /** Every task in a split stage, any app (Folark's picker included). */
     fun allStagedTaskIds(context: Context, root: Boolean = false, read: TaskSnapshot? = null): Set<Int> =
@@ -151,6 +176,7 @@ object ShellSplit {
      * command…" line when they don't, so that output (not just whether `dumpsys` ran) is the answer.
      */
     private fun wmShell(context: Context, root: Boolean, vararg command: String): Boolean {
+        forget()
         val out = dump(context, arrayOf("service", "SystemUIService", "WMShell", *command), root) ?: return false
         return out.lineSequence().map { it.trim() }.none {
             it.startsWith("Error", ignoreCase = true) ||

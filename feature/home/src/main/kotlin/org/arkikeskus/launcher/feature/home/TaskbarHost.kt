@@ -107,7 +107,8 @@ object TaskbarHost {
     /**
      * Per-app taskbar rules need to know which app is in front. The accessibility service hears it
      * directly when it is on; without it, the overlay host reads Android's usage events (Usage
-     * access) about once a second, and only while there are rules and the screen is on.
+     * access) about once a second after a switch, easing off to every 3 s while nothing changes, and only
+     * while there are rules and the screen is on.
      */
     fun watchApps(context: Context, on: Boolean) {
         val main = Looper.getMainLooper()
@@ -131,6 +132,7 @@ object TaskbarHost {
     private var lastEventAt = 0L
     private var lastForeground: String? = null
     private var watchTick: Runnable? = null
+    @Volatile private var watchDelay = WATCH_FAST_MS
 
     /**
      * Looks right away instead of at the next tick, and restarts the watch after the screen was off
@@ -141,7 +143,7 @@ object TaskbarHost {
         val handler = watchHandler ?: return
         val tick = watchTick ?: return
         handler.removeCallbacks(tick)
-        watchTick = tick
+        watchDelay = WATCH_FAST_MS
         handler.post(tick)
     }
 
@@ -173,6 +175,7 @@ object TaskbarHost {
         watcher = thread
         watchHandler = handler
         lastEventAt = System.currentTimeMillis() - FIRST_LOOK_BACK_MS
+        watchDelay = WATCH_FAST_MS
         val usage = app.getSystemService(UsageStatsManager::class.java)
         val power = app.getSystemService(PowerManager::class.java)
         val main = Handler(Looper.getMainLooper())
@@ -181,6 +184,7 @@ object TaskbarHost {
                 if (watchHandler !== handler) return
                 // Screen off: stop until checkNow() (screen on) starts it again.
                 if (power?.isInteractive == false) return
+                var changed = false
                 if (usage != null) {
                     val now = System.currentTimeMillis()
                     var newest: String? = null
@@ -195,15 +199,24 @@ object TaskbarHost {
                             }
                         }
                     }
+                    // Never ask for more than a short window: after a quiet hour the query would
+                    // otherwise span the whole hour on every tick. The overlap catches late writes.
+                    lastEventAt = maxOf(lastEventAt, now - EVENT_OVERLAP_MS)
                     val pkg = newest
                     if (pkg != null && pkg != lastForeground && pkg != "com.android.systemui") {
                         lastForeground = pkg
+                        changed = true
                         main.post { current?.onForegroundApp(pkg) }
                     }
                 }
-                handler.postDelayed(this, WATCH_EVERY_MS)
+                // Back off while nothing changes (1 s, 1.5 s, 2.25 s … up to 3 s); a switch or
+                // checkNow() brings it back to the fast pace.
+                watchDelay = if (changed) WATCH_FAST_MS
+                else minOf(WATCH_SLOW_MS, watchDelay * 3 / 2)
+                handler.postDelayed(this, watchDelay)
             }
         }
+        watchTick = tick
         handler.post(tick)
     }
 
@@ -221,7 +234,9 @@ object TaskbarHost {
         watchApps(context, wantWatch)
     }
 
-    private const val WATCH_EVERY_MS = 1_000L
+    private const val WATCH_FAST_MS = 1_000L
+    private const val WATCH_SLOW_MS = 3_000L
+    private const val EVENT_OVERLAP_MS = 5_000L
     private const val FIRST_LOOK_BACK_MS = 10_000L
     private const val FOREGROUND_LOOK_BACK_MS = 30 * 60_000L
 }
