@@ -52,6 +52,12 @@ class TaskbarVisibilityTest {
         assertEquals(Mode.BAR, mode(hidden.copy(expanded = true)))
     }
 
+    @Test fun drawerHidesTheBar() {
+        assertEquals(Mode.NONE, mode(onHome.copy(drawerOpen = true)))
+        // Over an app the drawer can't be open; the flag changes nothing there.
+        assertEquals(mode(overApp), mode(overApp.copy(drawerOpen = true)))
+    }
+
     @Test fun perAppRules() {
         val pkg = overApp.foreground!!
         assertEquals(Mode.NONE, mode(overApp.copy(hiddenApps = setOf(pkg), expanded = true)))

@@ -388,6 +388,9 @@ internal class AppTaskbar(
         scope.launch {
             TaskbarSpace.keyboardOnHome.drop(1).collect { refresh() }
         }
+        scope.launch {
+            TaskbarSpace.drawerOpen.drop(1).collect { refresh() }
+        }
         // A new notification: its app's icon on the bar nudges (not in battery saver).
         scope.launch {
             entry.notificationBadgeRepository().nudges.collect { n ->
@@ -498,6 +501,7 @@ internal class AppTaskbar(
                 mediaShown(s) || (s.liveEnabled && live.isNotEmpty()),
             homeVisible = homeVisible,
             keyboardOnHome = TaskbarSpace.keyboardOnHome.value,
+            drawerOpen = TaskbarSpace.drawerOpen.value,
             keyboardUp = keyboardUp,
             manuallyHidden = manuallyHidden || (!homeVisible && foreground != null && foreground in hiddenHere),
             expanded = expanded,

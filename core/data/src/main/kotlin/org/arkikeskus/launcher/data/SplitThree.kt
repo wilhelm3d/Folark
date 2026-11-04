@@ -85,6 +85,8 @@ object SplitThree {
     private const val PAUSED_AT = "split3_paused_at"
     private const val PAUSED_AFTER = "split3_paused_after"
     private const val CRASH_WINDOW_MS = 15_000L
+    /** System UI starting this soon after the phone booted is a restart, not a crash. */
+    private const val BOOT_GRACE_MS = 3L * 60_000L
     private const val LAST_ANSWER = "split3_last_answer"
 
     private val waiting = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
@@ -102,7 +104,10 @@ object SplitThree {
         val p = prefs(context)
         val now = System.currentTimeMillis()
         val lastAt = p.getLong(LAST_REQUEST_AT, 0L)
-        val crashed = lastAt > 0L && now - lastAt in 0..CRASH_WINDOW_MS
+        // A System UI start right after a request means it crashed on it, unless the phone just
+        // booted: a restart (to load a new module, say) is no crash.
+        val booted = android.os.SystemClock.elapsedRealtime() < BOOT_GRACE_MS
+        val crashed = !booted && lastAt > 0L && now - lastAt in 0..CRASH_WINDOW_MS
         val edit = p.edit().putLong(READY_AT, now).remove(LAST_REQUEST_AT)
         if (crashed) edit.putLong(PAUSED_AT, now).putString(PAUSED_AFTER, p.getString(LAST_REQUEST_KIND, null))
         edit.apply()
@@ -140,13 +145,15 @@ object SplitThree {
     fun ready(context: Context): Boolean = running(context) && !paused(context)
 
     /** The module's requests are paused by the crash guard (System UI restarted right after one). */
-    fun paused(context: Context): Boolean = runCatching { prefs(context).getLong(PAUSED_AT, 0L) > 0L }.getOrDefault(false)
+    fun paused(context: Context): Boolean = pausedInfo(context) != null
 
     /** When the crash guard paused them, and after which request (for Settings), or null. */
     fun pausedInfo(context: Context): Pair<Long, String?>? = runCatching {
         val p = prefs(context)
         val at = p.getLong(PAUSED_AT, 0L)
-        if (at > 0L) at to p.getString(PAUSED_AFTER, null) else null
+        // A pause lasts until the phone restarts: one from before this boot no longer counts.
+        val bootedAt = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
+        if (at > bootedAt) at to p.getString(PAUSED_AFTER, null) else null
     }.getOrNull()
 
     /** Lets the module be asked again (Settings ▸ Recents ▸ Split screen). */

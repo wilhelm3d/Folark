@@ -20,6 +20,8 @@ internal object TaskbarVisibility {
         val homeVisible: Boolean,
         /** The keyboard is up over home or the drawer. */
         val keyboardOnHome: Boolean,
+        /** Folark's app drawer is open over home. */
+        val drawerOpen: Boolean = false,
         /** The keyboard is up in the app in front. */
         val keyboardUp: Boolean,
         /** The hide button was tapped on home, or in [foreground] (remembered per app). */
@@ -50,6 +52,8 @@ internal object TaskbarVisibility {
         return when {
             // Typing on home or in the drawer: the bar would cover the keyboard's bottom row.
             f.homeVisible && f.keyboardOnHome -> Mode.NONE
+            // The app drawer is open: its own bottom row (search, dock) is where the bar would sit.
+            f.homeVisible && f.drawerOpen -> Mode.NONE
             // The hide button was tapped: show only the pull handles until a handle swipe reopens it.
             f.manuallyHidden && !f.expanded -> Mode.HANDLES
             f.homeVisible && f.onHome -> Mode.BAR_FIXED

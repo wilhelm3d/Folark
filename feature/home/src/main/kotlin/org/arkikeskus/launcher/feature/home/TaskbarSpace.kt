@@ -26,4 +26,13 @@ object TaskbarSpace {
     fun setKeyboardOnHome(shown: Boolean) {
         _keyboardOnHome.value = shown
     }
+
+    private val _drawerOpen = MutableStateFlow(false)
+
+    /** Folark's app drawer is open (or being pulled up): the bar steps aside until it closes. */
+    val drawerOpen: StateFlow<Boolean> = _drawerOpen.asStateFlow()
+
+    fun setDrawerOpen(open: Boolean) {
+        _drawerOpen.value = open
+    }
 }

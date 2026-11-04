@@ -139,6 +139,8 @@ fun LauncherShell(
     }
 
     val drawerOpen by remember { derivedStateOf { currentProgress > 0.001f } }
+    // The taskbar steps aside while the drawer is open (or being pulled up), and comes back after.
+    LaunchedEffect(drawerOpen) { TaskbarSpace.setDrawerOpen(drawerOpen) }
     // While an app is being dragged out of the drawer, keep the drawer composed even after it has
     // slid shut — otherwise removing it from composition would cancel the in-progress drag gesture.
     // Keyed on [moving] (not [isDragging]): a still long-press only lifts (menu), and must NOT fade
