@@ -981,7 +981,7 @@
     <string name="settings_scene_layout_two_thirds">70 %</string>
     <string name="settings_scene_layout_app_third">%1$s 30 %%</string>
     <string name="settings_scene_layout_app_two_thirds">%1$s 70 %%</string>
-    <string name="settings_scene_layout_needs_module">Needs Folark\'s Vector module in System UI; without it the scene opens half and half. 30 % and 70 % need Divider stops (Settings ▸ Recents &amp; split screen)</string>
+    <string name="settings_scene_layout_needs_module" formatted="false">Needs Folark\'s Vector module in System UI; without it the scene opens half and half. 30 % and 70 % need Divider stops (Settings ▸ Recents &amp; split screen)</string>
     <string name="settings_scene_third">Third app</string>
     <string name="settings_scene_third_auto">As set in Multi-window</string>
     <string name="settings_scene_third_pane">Third pane</string>
@@ -1123,5 +1123,5 @@
     <string name="settings_backup_share_desc">Send your whole setup to another phone (Quick Share, a message, mail); open it there with Restore</string>
     <string name="settings_backup_share_failed">The setup couldn\'t be packed. Try again</string>
     <string name="settings_divider_stops">Divider stops 30 / 50 / 70</string>
-    <string name="settings_divider_stops_desc">The split divider rests at 30 %, 50 % and 70 % (needs Folark\'s Vector module; from the next split)</string>
+    <string name="settings_divider_stops_desc" formatted="false">The split divider rests at 30 %, 50 % and 70 % (needs Folark\'s Vector module; from the next split)</string>
 </resources>

@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -249,11 +250,13 @@ fun SplitPickerDrawer(
                     else stringResource(R.string.split_picker_choose),
                     peek = peek,
                     onPeekChange = onPeekChange,
-                )
-            }
-            // How big the pick will be: 30 / 50 / 70 % (picking one turns peek off).
-            if (share != null && pickCount == 1) {
-                SharePicker(share, pickedOnLeft, peek == true, onShareChange)
+                ) {
+                    // In the corner: how the screen is shared, 70/30 · 50/50 · 30/70 as on screen
+                    // (picking one turns peek off).
+                    if (share != null && pickCount == 1) {
+                        ShareButtons(share, pickedOnLeft, peek == true, onShareChange)
+                    }
+                }
             }
             if (look.search && current == null) {
                 SearchField(query = query, onQuery = { query = it })
@@ -444,13 +447,15 @@ private val ACCENT: Color
 
 /** "Choose an app" / "Choose 2 apps · 1 chosen", with the Peek switch when there is one. */
 @Composable
-private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit) {
+private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit, corner: @Composable () -> Unit = {}) {
     Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        corner()
         if (peek != null) {
+            Spacer(Modifier.width(8.dp))
             FilterChip(
                 selected = peek,
                 onClick = { onPeekChange(!peek) },
@@ -465,55 +470,53 @@ private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit
     }
 }
 
-/** The picked app's share of the screen, as three tiny split previews; the chosen one is lit. */
+/**
+ * The three ways to share the screen, in the header's corner: 70/30, 50/50 and 30/70, read left to
+ * right as on screen, each a tiny preview with its label; the chosen one is lit. [share] is the
+ * picked app's part.
+ */
 @Composable
-private fun SharePicker(share: Int, pickedOnLeft: Boolean, peekOn: Boolean, onShareChange: (Int) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(stringResource(R.string.split_picker_size), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-        listOf(30, 50, 70).forEach { option ->
+private fun ShareButtons(share: Int, pickedOnLeft: Boolean, peekOn: Boolean, onShareChange: (Int) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        listOf(70, 50, 30).forEach { left ->
+            // The picked app's part for this layout.
+            val option = if (pickedOnLeft) left else 100 - left
             val selected = option == share && !peekOn
             val border by androidx.compose.animation.animateColorAsState(
                 if (selected) ACCENT else Color.White.copy(alpha = 0.18f), label = "shareBorder",
             )
             Column(
                 Modifier
-                    .clip(RoundedCornerShape(9.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable { onShareChange(option) }
-                    .padding(horizontal = 2.dp, vertical = 2.dp),
+                    .padding(2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
                     Modifier
-                        .size(width = 46.dp, height = 28.dp)
-                        .clip(RoundedCornerShape(7.dp))
+                        .size(width = 38.dp, height = 22.dp)
+                        .clip(RoundedCornerShape(6.dp))
                         .background(Color.White.copy(alpha = 0.06f))
-                        .border(1.5.dp, border, RoundedCornerShape(7.dp))
-                        .padding(3.dp),
+                        .border(1.5.dp, border, RoundedCornerShape(6.dp))
+                        .padding(2.5.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    val mine = option / 100f
-                    val parts = if (pickedOnLeft) listOf(true to mine, false to 1f - mine) else listOf(false to 1f - mine, true to mine)
-                    parts.forEach { (isPick, w) ->
+                    listOf(true to left, false to 100 - left).forEach { (isLeft, part) ->
+                        val isPick = isLeft == pickedOnLeft
                         Box(
                             Modifier
-                                .weight(w)
+                                .weight(part / 100f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(3.dp))
+                                .clip(RoundedCornerShape(2.5.dp))
                                 .background(if (isPick) (if (selected) ACCENT else Color.White.copy(alpha = 0.45f)) else Color.White.copy(alpha = 0.16f)),
                         )
                     }
                 }
-                // Left / right as on screen: "30/70" means the left app gets 30 %.
-                val left = if (pickedOnLeft) option else 100 - option
                 Text(
                     "$left/${100 - left}",
                     color = if (selected) ACCENT else Color.White.copy(alpha = 0.7f),
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(top = 2.dp),
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 1.dp),
                 )
             }
         }
