@@ -45,6 +45,7 @@ class RecentsHook : IXposedHookLoadPackage {
             UnlockHook.install(loader, ::log)
             SplitThreeHook.install(loader, ::log)
             StatusBarPaddingHook.install(loader, ::log)
+            DividerStopsHook.install(loader, ::log)
             return
         }
         val helper = find("com.android.quickstep.OverviewCommandHelper", loader)

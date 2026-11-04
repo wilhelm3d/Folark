@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Split screen
+- The divider stops at 30 %, 50 % and 70 % (Settings ▸ Recents & split screen ▸ Divider stops; Folark's Vector module adds the stops in System UI). Layout choices, saved pairs and the taskbar's split menu use 30 / 70 in place of a third / two thirds.
 - Works on the Razr's Android 17 build again: the module finds System UI's split calls by their leading parameters and passes a real InstanceId; the split drawer docks beside the app with `startTasks` (System UI's `startIntentAndTask` throws there) after waiting for its task to reach WM Shell; the Native engine falls back to the commands when System UI turns a request down. Check split screen shows the reason for a failure.
 
 ### Taskbar

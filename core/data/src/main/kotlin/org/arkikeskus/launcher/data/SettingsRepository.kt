@@ -851,6 +851,7 @@ class SettingsRepository @Inject constructor(
             z.with(id, p[Keys.dropZone(id)] ?: true)
         },
         splitUndo = p[Keys.SPLIT_UNDO] ?: true,
+        dividerStops = p[Keys.DIVIDER_STOPS] ?: true,
         splitRatioMenu = p[Keys.SPLIT_RATIO_MENU] ?: true,
         openWith = p[Keys.SPLIT_OPEN_WITH] ?: false,
         notificationSplit = p[Keys.NOTIFICATION_SPLIT] ?: true,
@@ -913,6 +914,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setDropZone(zone: String, on: Boolean) = edit { if (zone in DropZones.ALL) it[Keys.dropZone(zone)] = on }
     suspend fun setDropZoneHaptics(value: Boolean) = edit { it[Keys.DROP_ZONE_HAPTICS] = value }
     suspend fun setSplitUndo(value: Boolean) = edit { it[Keys.SPLIT_UNDO] = value }
+    suspend fun setDividerStops(value: Boolean) = edit { it[Keys.DIVIDER_STOPS] = value }
     suspend fun setSplitRatioMenu(value: Boolean) = edit { it[Keys.SPLIT_RATIO_MENU] = value }
     suspend fun setSplitOpenWith(value: Boolean) = edit { it[Keys.SPLIT_OPEN_WITH] = value }
     suspend fun setNotificationSplit(value: Boolean) = edit { it[Keys.NOTIFICATION_SPLIT] = value }

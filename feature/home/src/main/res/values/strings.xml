@@ -267,8 +267,8 @@
     <string name="taskbar_split_peek_left">Left app peeks in</string>
     <string name="taskbar_split_peek_right">Right app peeks in</string>
     <string name="taskbar_split_even">Half and half</string>
-    <string name="taskbar_split_two_thirds">%1$s two thirds</string>
-    <string name="taskbar_split_no_third">This split\'s divider has no stop at two thirds here, or Folark\'s Vector module isn\'t running in System UI</string>
+    <string name="taskbar_split_two_thirds">%1$s 70 %%</string>
+    <string name="taskbar_split_no_third">This split\'s divider has no 70 % stop, or Folark\'s Vector module isn\'t running in System UI</string>
     <string name="taskbar_live_split">Split</string>
     <string name="taskbar_live_split_failed">Couldn\'t put it beside another app, so it opened on its own</string>
     <string name="taskbar_open_with">Open with %1$s</string>

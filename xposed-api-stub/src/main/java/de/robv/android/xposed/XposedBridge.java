@@ -11,6 +11,10 @@ public final class XposedBridge {
         throw new UnsupportedOperationException("stub");
     }
 
+    public static Set<?> hookAllConstructors(Class<?> hookClass, XC_MethodHook callback) {
+        throw new UnsupportedOperationException("stub");
+    }
+
     public static void log(String text) {
         throw new UnsupportedOperationException("stub");
     }

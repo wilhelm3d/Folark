@@ -64,6 +64,16 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                     runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.StatusBarPaddingHook.CHANGED_URI, null) }
                 }
         }
+        // The module's divider stops (Settings ▸ Recents & split screen): tell it when they change.
+        appScope.launch {
+            settingsRepository.settings(ScreenType.INNER)
+                .map { it.recents.dividerStops }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect {
+                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.DividerStopsHook.CHANGED_URI, null) }
+                }
+        }
         // Folark's taskbar in its own overlay windows, when "Display over other apps" is allowed
         // (otherwise the accessibility service hosts it, if enabled).
         runCatching { org.arkikeskus.launcher.feature.home.TaskbarHost.refresh(this) }

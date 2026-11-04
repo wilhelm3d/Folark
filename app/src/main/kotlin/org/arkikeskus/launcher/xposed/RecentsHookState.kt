@@ -55,6 +55,7 @@ class RecentsHookState : ContentProvider() {
             return null
         }
         if (method == StatusBarPaddingHook.METHOD) return statusBarPadding()
+        if (method == DividerStopsHook.METHOD) return dividerStops()
         if (method != "state") return null
         val context = context ?: return null
         // Only the launchers in the module's scope ask this (anyone else could fake "module active").
@@ -99,6 +100,19 @@ class RecentsHookState : ContentProvider() {
             putInt(StatusBarPaddingHook.EXTRA_INNER, s.systemPaddingInner)
             putInt(StatusBarPaddingHook.EXTRA_COVER, s.systemPaddingCover)
         }
+    }
+
+    /** For the module's [DividerStopsHook] (System UI only): whether the divider stops at 30/50/70. */
+    private fun dividerStops(): Bundle? {
+        if (callingPackage != RecentsHook.SYSTEMUI) return null
+        val context = context ?: return null
+        val on = runCatching {
+            runBlocking {
+                EntryPointAccessors.fromApplication(context, Deps::class.java)
+                    .settingsRepository().settings(ScreenType.INNER).first().recents.dividerStops
+            }
+        }.getOrDefault(true)
+        return Bundle().apply { putBoolean(DividerStopsHook.EXTRA_ON, on) }
     }
 
     /** SystemUI (the module's [UnlockHook]) says the lock screen has started to leave. */
