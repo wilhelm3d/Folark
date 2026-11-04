@@ -164,7 +164,6 @@
     <string name="icon_picker_empty">No icons found</string>
     <string name="icon_picker_reset">Use default icon</string>
     <string name="media_widget_name">Now playing</string>
-    <string name="media_widget_nothing">Nothing playing</string>
     <string name="media_widget_play">Play</string>
     <string name="media_widget_pause">Pause</string>
     <string name="media_widget_next">Next</string>
@@ -199,7 +198,6 @@
     <string name="taskbar_a11y_move_left">Move left</string>
     <string name="taskbar_a11y_move_right">Move right</string>
     <string name="taskbar_undo_split">↶  Undo split</string>
-    <string name="taskbar_split_hint">Release to open in split screen</string>
     <string name="weather_day_widget_name">Weather day</string>
     <string name="weather_big_widget_name">Weather day (large)</string>
     <string name="weather_loading">Loading weather…</string>
@@ -219,8 +217,6 @@
     <string name="onboarding_restore_not_a_backup">That file is not a Folark backup. Pick another one.</string>
     <string name="onboarding_restore_too_new">That backup was made by a newer Folark. Update the launcher first.</string>
     <string name="onboarding_restore_failed">The backup could not be restored. Try again.</string>
-    <string name="taskbar_hint_split">Split screen →</string>
-    <string name="taskbar_hint_floating">← Floating window</string>
     <string name="taskbar_recents">Recent apps</string>
     <string name="taskbar_split_menu">Split screen</string>
     <string name="taskbar_split_swap">Swap sides</string>
@@ -228,7 +224,6 @@
     <string name="taskbar_split_none">No split screen open</string>
     <string name="taskbar_desktop_recents_missing">Ready For recents isn\'t available here: showing Motorola\'s recents</string>
     <string name="taskbar_no_shortcuts">No shortcuts for this app</string>
-    <string name="taskbar_hint_choose">← Floating · Split screen →</string>
     <string name="taskbar_drop_float">Floating window</string>
     <string name="taskbar_drop_split">Split screen</string>
     <string name="taskbar_snap_left">Left half</string>

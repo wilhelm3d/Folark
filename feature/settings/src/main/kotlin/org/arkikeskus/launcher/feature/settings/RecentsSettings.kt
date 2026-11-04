@@ -4,6 +4,11 @@ import org.arkikeskus.launcher.data.SplitThree
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.VerticalSplit
+import androidx.compose.material.icons.rounded.Animation
+import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,23 +80,21 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 onSelect = { viewModel.editRecentsCover = it == "cover" },
             )
         }
-        ExpressiveRowDivider()
         // The settings as the screen being edited sees them (only the look differs).
         val s = if (viewModel.editRecentsCover && s.recents.outerLookEnabled) {
             s.copy(recents = s.recents.outerLook ?: s.recents)
         } else {
             s
         }
-
         if (!canList) {
+            ExpressiveRowDivider()
             ExpressiveActionItem(
                 title = stringResource(R.string.settings_recents_grant),
                 description = ShellSplit.grantCommand(context.packageName),
                 onClick = { copyToClipboard(context, ShellSplit.grantCommand(context.packageName)) },
             )
-            ExpressiveRowDivider()
         }
-
+        ExpressiveRowDivider()
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_replace_system),
             subtitle = stringResource(R.string.settings_recents_replace_system_desc),
@@ -105,8 +108,8 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             checked = s.recents.navHandleOpensSearch,
             onCheckedChange = viewModel::setNavHandleOpensSearch,
         )
-        ExpressiveRowDivider()
         if (s.recents.replaceSystem || s.recents.navHandleOpensSearch) {
+            ExpressiveRowDivider()
             // The Vector (LSPosed) module asks Folark each time it acts: seen lately = active. It also
             // reports which launcher internals it could hook (compat), so a gesture the user turned on
             // but this launcher build can't provide is shown as "limited" rather than a plain "active".
@@ -137,9 +140,8 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 description = stringResource(descRes),
                 onClick = { },
             )
-            ExpressiveRowDivider()
         }
-
+        ExpressiveRowDivider()
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_taskbar_button),
             subtitle = stringResource(R.string.settings_recents_taskbar_button_desc),
@@ -148,13 +150,30 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 viewModel.setTaskbarRecentsButton(if (it) LauncherSettings.TASKBAR_RECENTS_FOLARK else LauncherSettings.TASKBAR_RECENTS_SYSTEM)
             },
         )
-        ExpressiveRowDivider()
+    }
+    if (s.recents.enabled) {
+        // The settings as the screen being edited sees them (only the look differs).
+        val edited = if (viewModel.editRecentsCover && s.recents.outerLookEnabled) {
+            s.copy(recents = s.recents.outerLook ?: s.recents)
+        } else {
+            s
+        }
+        RecentsMoreCards(edited, viewModel, root = root, onRootCheck = { rootCheck++ })
+    }
+    // Split screen (drag to an edge, the split picker): used by Recents and the taskbar alike.
+    SplitScreenSection(s, viewModel)
+}
 
-        // ---------------------------------------------------------------- look
+/** Recents' cards below the first: look, the cards' extras, motion, split view, root and open apps. */
+@Composable
+private fun RecentsMoreCards(s: LauncherSettings, viewModel: SettingsViewModel, root: Boolean?, onRootCheck: () -> Unit) {
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_rc_group_look),
+        icon = Icons.Rounded.Palette,
+        sharedByBothDisplays = true,
+    ) {
         RecentsLookRows(s, viewModel)
         ExpressiveRowDivider()
-
-        // ---------------------------------------------------------------- layout
         ExpressiveStepperRow(
             title = stringResource(R.string.settings_recents_columns_inner),
             value = s.recents.columnsInner,
@@ -176,46 +195,6 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onValueChange = viewModel::setRecentsMaxApps,
         )
         ExpressiveRowDivider()
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_recents_card_height),
-            value = s.recents.cardHeight.toFloat(),
-            onValueChange = { viewModel.setRecentsCardHeight(it.roundToInt()) },
-            valueRange = LauncherSettings.MIN_RECENTS_CARD_HEIGHT.toFloat()..LauncherSettings.MAX_RECENTS_CARD_HEIGHT.toFloat(),
-            valueDisplay = "${s.recents.cardHeight} dp",
-        )
-        ExpressiveRowDivider()
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_recents_corners),
-            value = s.recents.cornerDp.toFloat(),
-            onValueChange = { viewModel.setRecentsCornerDp(it.roundToInt()) },
-            valueRange = 0f..LauncherSettings.MAX_RECENTS_CORNER_DP.toFloat(),
-            valueDisplay = "${s.recents.cornerDp} dp",
-        )
-        ExpressiveRowDivider()
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_recents_backdrop),
-            value = s.recents.backdropDim,
-            onValueChange = viewModel::setRecentsBackdropDim,
-            valueRange = 0f..1f,
-            valueDisplay = "${(s.recents.backdropDim * 100).roundToInt()} %",
-        )
-        ExpressiveRowDivider()
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_recents_sort),
-            options = listOf(
-                LauncherSettings.RECENTS_SORT_RECENT to stringResource(R.string.settings_recents_sort_recent),
-                LauncherSettings.RECENTS_SORT_NAME to stringResource(R.string.settings_recents_sort_name),
-            ),
-            selected = s.recents.sort,
-            onSelect = viewModel::setRecentsSort,
-        )
-        ExpressiveRowDivider()
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_recents_show_time),
-            checked = s.recents.showTime,
-            onCheckedChange = viewModel::setRecentsShowTime,
-        )
-        ExpressiveRowDivider()
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_recents_card_layout),
             options = listOf(
@@ -225,8 +204,8 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             selected = s.recents.cardLayout,
             onSelect = viewModel::setRecentsCardLayout,
         )
-        ExpressiveRowDivider()
         if (s.recents.cardLayout == LauncherSettings.RECENTS_CARD_OVERLAY) {
+            ExpressiveRowDivider()
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_recents_overlay_labels),
                 checked = s.recents.overlayLabels,
@@ -238,12 +217,74 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 checked = s.recents.cardIcons,
                 onCheckedChange = viewModel::setRecentsCardIcons,
             )
-            ExpressiveRowDivider()
         }
+        SettingsAdvanced {
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_recents_card_height),
+                value = s.recents.cardHeight.toFloat(),
+                onValueChange = { viewModel.setRecentsCardHeight(it.roundToInt()) },
+                valueRange = LauncherSettings.MIN_RECENTS_CARD_HEIGHT.toFloat()..LauncherSettings.MAX_RECENTS_CARD_HEIGHT.toFloat(),
+                valueDisplay = "${s.recents.cardHeight} dp",
+            )
+                ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_recents_corners),
+                value = s.recents.cornerDp.toFloat(),
+                onValueChange = { viewModel.setRecentsCornerDp(it.roundToInt()) },
+                valueRange = 0f..LauncherSettings.MAX_RECENTS_CORNER_DP.toFloat(),
+                valueDisplay = "${s.recents.cornerDp} dp",
+            )
+                ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_recents_backdrop),
+                value = s.recents.backdropDim,
+                onValueChange = viewModel::setRecentsBackdropDim,
+                valueRange = 0f..1f,
+                valueDisplay = "${(s.recents.backdropDim * 100).roundToInt()} %",
+            )
+                ExpressiveRowDivider()
+            ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_recents_sort),
+                options = listOf(
+                    LauncherSettings.RECENTS_SORT_RECENT to stringResource(R.string.settings_recents_sort_recent),
+                    LauncherSettings.RECENTS_SORT_NAME to stringResource(R.string.settings_recents_sort_name),
+                ),
+                selected = s.recents.sort,
+                onSelect = viewModel::setRecentsSort,
+            )
+                ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_recents_show_time),
+                checked = s.recents.showTime,
+                onCheckedChange = viewModel::setRecentsShowTime,
+            )
+                ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_recents_card_shadow),
+                checked = s.recents.cardShadow,
+                onCheckedChange = viewModel::setRecentsCardShadow,
+            )
+                ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_recents_label_size),
+                value = s.recents.labelScale,
+                onValueChange = viewModel::setRecentsLabelScale,
+                valueRange = LauncherSettings.MIN_RECENTS_LABEL_SCALE..LauncherSettings.MAX_RECENTS_LABEL_SCALE,
+                valueDisplay = "${(s.recents.labelScale * 100).roundToInt()} %",
+            )
+        }
+    }
+
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_rc_group_cards),
+        icon = Icons.Rounded.Style,
+        sharedByBothDisplays = true,
+    ) {
         ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_recents_card_shadow),
-            checked = s.recents.cardShadow,
-            onCheckedChange = viewModel::setRecentsCardShadow,
+            title = stringResource(R.string.settings_recents_group_splits),
+            subtitle = stringResource(R.string.settings_recents_group_splits_desc),
+            checked = s.recents.groupSplits,
+            onCheckedChange = viewModel::setRecentsGroupSplits,
         )
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
@@ -254,29 +295,12 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         )
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_recents_group_splits),
-            subtitle = stringResource(R.string.settings_recents_group_splits_desc),
-            checked = s.recents.groupSplits,
-            onCheckedChange = viewModel::setRecentsGroupSplits,
-        )
-        ExpressiveRowDivider()
-        ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_memory_badge),
             subtitle = stringResource(R.string.settings_recents_memory_badge_desc),
             checked = s.recents.memoryBadge,
             onCheckedChange = viewModel::setRecentsMemoryBadge,
         )
         ExpressiveRowDivider()
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_recents_label_size),
-            value = s.recents.labelScale,
-            onValueChange = viewModel::setRecentsLabelScale,
-            valueRange = LauncherSettings.MIN_RECENTS_LABEL_SCALE..LauncherSettings.MAX_RECENTS_LABEL_SCALE,
-            valueDisplay = "${(s.recents.labelScale * 100).roundToInt()} %",
-        )
-        ExpressiveRowDivider()
-
-        // ---------------------------------------------------------------- buttons and gestures
         RecentsButtonRows(s, viewModel)
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
@@ -284,13 +308,21 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             checked = s.recents.confirmCloseAll,
             onCheckedChange = viewModel::setRecentsConfirmCloseAll,
         )
-        ExpressiveRowDivider()
+    }
 
-        // ---------------------------------------------------------------- animations
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_rc_group_motion),
+        icon = Icons.Rounded.Animation,
+        sharedByBothDisplays = true,
+    ) {
         RecentsMotionRows(s, viewModel)
-        ExpressiveRowDivider()
+    }
 
-        // ---------------------------------------------------------------- split view
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_rc_group_split),
+        icon = Icons.Rounded.VerticalSplit,
+        sharedByBothDisplays = true,
+    ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_third_in_split),
             subtitle = stringResource(R.string.settings_recents_third_in_split_desc),
@@ -322,9 +354,13 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 onCheckedChange = viewModel::setThreeAppNative,
             )
         }
-        ExpressiveRowDivider()
+    }
 
-        // ---------------------------------------------------------------- root
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_rc_group_root),
+        icon = Icons.Rounded.Memory,
+        sharedByBothDisplays = true,
+    ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_thumbnails),
             subtitle = stringResource(R.string.settings_recents_thumbnails_desc),
@@ -346,22 +382,6 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onCheckedChange = viewModel::setRecentsRootClose,
         )
         ExpressiveRowDivider()
-        RecentsCheckRow()
-        ExpressiveRowDivider()
-        ExpressiveActionItem(
-            title = stringResource(
-                when (root) {
-                    true -> R.string.settings_recents_root_yes
-                    false -> R.string.settings_recents_root_no
-                    null -> R.string.settings_recents_root_unknown
-                },
-            ),
-            description = stringResource(R.string.settings_recents_root_check),
-            onClick = { rootCheck++ },
-        )
-        ExpressiveRowDivider()
-
-        // ---------------------------------------------------------------- taskbar
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_taskbar_running_apps),
             subtitle = stringResource(R.string.settings_taskbar_running_apps_desc),
@@ -384,9 +404,22 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 onCheckedChange = viewModel::setTaskbarMultiDots,
             )
         }
+        SettingsAdvanced {
+            RecentsCheckRow()
+                ExpressiveRowDivider()
+            ExpressiveActionItem(
+                title = stringResource(
+                    when (root) {
+                        true -> R.string.settings_recents_root_yes
+                        false -> R.string.settings_recents_root_no
+                        null -> R.string.settings_recents_root_unknown
+                    },
+                ),
+                description = stringResource(R.string.settings_recents_root_check),
+                onClick = onRootCheck,
+            )
+        }
     }
-    // Split screen (drag to an edge, the split picker): used by Recents and the taskbar alike.
-    SplitScreenSection(s, viewModel)
 }
 
 private fun copyToClipboard(context: android.content.Context, text: String) {

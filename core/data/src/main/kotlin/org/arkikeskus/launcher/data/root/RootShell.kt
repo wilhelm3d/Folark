@@ -119,6 +119,8 @@ object RootShell {
     private class Session(private val process: Process) {
         private val input: OutputStream = process.outputStream
         private val buffer = Output()
+        // A plain monitor for wait()/notify(), which Kotlin's Any does not offer.
+        @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
         private val signal = Object()
         @Volatile var alive = true
             private set

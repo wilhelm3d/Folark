@@ -108,7 +108,6 @@ object AppShortcuts {
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return@withContext
         val user = userForSerial(context, userSerial) ?: return@withContext
         runCatching { launcherApps.pinShortcuts(packageName, shortcutIds, user) }
-        Unit
     }
 
     /** Resolves a pinned shortcut's current label + icon (rasterized). Null if it no longer exists. */

@@ -40,9 +40,7 @@ internal fun AppTaskbar.playLaunchGlow(icon: View) {
     if (!animationsOn(context) || !icon.isAttachedToWindow || icon.width == 0) return
     val color = when (style) {
         LauncherSettings.LAUNCH_GLOW_WHITE -> Color.WHITE
-        LauncherSettings.LAUNCH_GLOW_ACCENT -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            context.getColor(android.R.color.system_accent1_200)
-        } else Color.rgb(160, 190, 255)
+        LauncherSettings.LAUNCH_GLOW_ACCENT -> accent(AppTaskbar.ACCENT_LIGHT)
         else -> glowColor(icon)
     }
     val size = (maxOf(icon.width, icon.height) * GLOW_SPREAD).toInt()

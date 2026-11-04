@@ -20,8 +20,8 @@ android {
 
     defaultConfig {
         applicationId = "org.arkikeskus.launcher"
-        versionCode = 200
-        versionName = "2.0.0"
+        versionCode = 210
+        versionName = "2.1.0"
     }
 
     // English only: also drops the translations that come with libraries, so no screen mixes languages.

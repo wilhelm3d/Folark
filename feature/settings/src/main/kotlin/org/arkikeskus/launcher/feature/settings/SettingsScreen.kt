@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Dock
 import androidx.compose.material.icons.rounded.Gesture
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.GridOn
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
@@ -101,78 +102,36 @@ internal enum class ColorTarget(@StringRes val titleRes: Int) {
     APP_LABEL(R.string.settings_label_color),
 }
 
+/** The groups the categories are listed under (the Start page stands above them all). */
+internal enum class SettingsGroup(val titleRes: Int) {
+    LOOK(R.string.settings_group_look),
+    HOME(R.string.settings_group_home),
+    APPS(R.string.settings_group_apps),
+    DEVICE(R.string.settings_group_device),
+}
+
 internal enum class SettingsCategory(
     val titleRes: Int,
     val subtitleRes: Int,
     val icon: ImageVector,
+    /** The group it is listed under; null for the Start page, listed first on its own. */
+    val group: SettingsGroup?,
     /** False for categories whose settings are all shared by both displays. */
     val perDisplay: Boolean = true,
 ) {
-    APPEARANCE(
-        R.string.settings_appearance,
-        R.string.settings_category_appearance_desc,
-        Icons.Rounded.Palette,
-    ),
-    GRID_DPI(
-        R.string.settings_grid_dpi,
-        R.string.settings_category_grid_dpi_desc,
-        Icons.Rounded.GridOn,
-    ),
-    APP_DRAWER(
-        R.string.settings_app_drawer_customization,
-        R.string.settings_category_app_drawer_desc,
-        Icons.Rounded.Apps,
-    ),
-    DOCK_TASKBAR(
-        R.string.settings_dock_taskbar,
-        R.string.settings_category_dock_taskbar_desc,
-        Icons.Rounded.Dock,
-    ),
-    TASKBAR(
-        R.string.settings_taskbar_category,
-        R.string.settings_category_taskbar_desc,
-        Icons.Rounded.CallToAction,
-        perDisplay = false,
-    ),
-    GESTURES(
-        R.string.settings_gestures,
-        R.string.settings_category_gestures_desc,
-        Icons.Rounded.Gesture,
-    ),
-    NOTIFICATIONS(
-        R.string.settings_notifications,
-        R.string.settings_category_notifications_desc,
-        Icons.Rounded.Notifications,
-    ),
-    RECENTS(
-        R.string.settings_recents,
-        R.string.settings_category_recents_desc,
-        Icons.Rounded.GridView,
-        perDisplay = false,
-    ),
-    ROOT(
-        R.string.settings_root,
-        R.string.settings_category_root_desc,
-        Icons.Rounded.AdminPanelSettings,
-        perDisplay = false,
-    ),
-    DISPLAY_PROFILES(
-        R.string.settings_display_screen_profiles,
-        R.string.settings_category_display_profiles_desc,
-        Icons.Rounded.Smartphone,
-    ),
-    PERMISSIONS(
-        R.string.settings_permissions,
-        R.string.settings_category_permissions_desc,
-        Icons.Rounded.Shield,
-        perDisplay = false,
-    ),
-    BACKUP(
-        R.string.settings_backup,
-        R.string.settings_category_backup_desc,
-        Icons.Rounded.SettingsBackupRestore,
-        perDisplay = false,
-    ),
+    START(R.string.settings_start, R.string.settings_category_start_desc, Icons.Rounded.Home, null, perDisplay = false),
+    APPEARANCE(R.string.settings_appearance, R.string.settings_category_appearance_desc, Icons.Rounded.Palette, SettingsGroup.LOOK),
+    GRID_DPI(R.string.settings_grid_dpi, R.string.settings_category_grid_dpi_desc, Icons.Rounded.GridOn, SettingsGroup.LOOK),
+    DOCK_TASKBAR(R.string.settings_dock_taskbar, R.string.settings_category_dock_taskbar_desc, Icons.Rounded.Dock, SettingsGroup.HOME),
+    GESTURES(R.string.settings_gestures, R.string.settings_category_gestures_desc, Icons.Rounded.Gesture, SettingsGroup.HOME),
+    NOTIFICATIONS(R.string.settings_notifications, R.string.settings_category_notifications_desc, Icons.Rounded.Notifications, SettingsGroup.HOME),
+    APP_DRAWER(R.string.settings_app_drawer_customization, R.string.settings_category_app_drawer_desc, Icons.Rounded.Apps, SettingsGroup.APPS),
+    TASKBAR(R.string.settings_taskbar_category, R.string.settings_category_taskbar_desc, Icons.Rounded.CallToAction, SettingsGroup.APPS, perDisplay = false),
+    RECENTS(R.string.settings_recents, R.string.settings_category_recents_desc, Icons.Rounded.GridView, SettingsGroup.APPS, perDisplay = false),
+    DISPLAY_PROFILES(R.string.settings_display_screen_profiles, R.string.settings_category_display_profiles_desc, Icons.Rounded.Smartphone, SettingsGroup.DEVICE),
+    ROOT(R.string.settings_root, R.string.settings_category_root_desc, Icons.Rounded.AdminPanelSettings, SettingsGroup.DEVICE, perDisplay = false),
+    PERMISSIONS(R.string.settings_permissions, R.string.settings_category_permissions_desc, Icons.Rounded.Shield, SettingsGroup.DEVICE, perDisplay = false),
+    BACKUP(R.string.settings_backup, R.string.settings_category_backup_desc, Icons.Rounded.SettingsBackupRestore, SettingsGroup.DEVICE, perDisplay = false),
 }
 
 @Composable
@@ -225,7 +184,7 @@ fun SettingsScreen(
         )
     }
 
-    var selectedTabletCategory by rememberSaveable { mutableStateOf(SettingsCategory.APPEARANCE) }
+    var selectedTabletCategory by rememberSaveable { mutableStateOf(SettingsCategory.START) }
     var selectedOuterCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -246,6 +205,77 @@ fun SettingsScreen(
         notifAccessGranted = isNotificationAccessGranted(context)
         onPauseOrDispose { }
     }
+    // One page's content, the same in the two-pane and the one-column layout.
+    val pageContent: @Composable (SettingsCategory) -> Unit = { category ->
+        when (category) {
+            SettingsCategory.START -> StartSection(
+                s = s,
+                viewModel = viewModel,
+                isDefaultLauncher = isDefaultLauncher,
+                notifAccessGranted = notifAccessGranted,
+                onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
+                onNotifAccess = { openNotificationAccess(context) },
+                onOpen = { target ->
+                    selectedTabletCategory = target
+                    selectedOuterCategory = target
+                },
+            )
+            SettingsCategory.DISPLAY_PROFILES -> DisplayProfilesSection(
+                s = s,
+                viewModel = viewModel,
+                screenType = profile,
+                onFoldAction = { showFoldActionPicker = true },
+                onUnfoldAction = { showUnfoldActionPicker = true },
+                onFoldTransition = { showFoldTransitionPicker = true },
+                onAppPairs = { showAppPairsManager = true },
+                onCopyProfile = { showCopyProfile = true },
+            )
+            SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = profile, onPickColor = { colorTarget = it })
+            SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
+            SettingsCategory.TASKBAR -> TaskbarSection(s = s, viewModel = viewModel)
+            SettingsCategory.RECENTS -> RecentsSection(s = s, viewModel = viewModel)
+            SettingsCategory.ROOT -> RootSection(s = s, viewModel = viewModel)
+            SettingsCategory.APP_DRAWER -> AppDrawerSection(
+                s = s,
+                viewModel = viewModel,
+                screenType = profile,
+                hiddenCount = hiddenKeys.size,
+                onShowHidden = { showHiddenManager = true },
+                onLayoutMode = { showDrawerLayoutPicker = true },
+                onPickColor = { colorTarget = it },
+            )
+            SettingsCategory.GESTURES -> GesturesSection(
+                s = s,
+                viewModel = viewModel,
+                screenType = profile,
+                allApps = allApps,
+                onSwipeUp = { showSwipeUpPicker = true },
+                onSwipeDown = { showSwipeDownPicker = true },
+                onLeftSwipe = { showLeftSwipePicker = true },
+                onRightSwipe = { showRightSwipePicker = true },
+            )
+            SettingsCategory.APPEARANCE -> AppearanceSection(
+                s = s,
+                viewModel = viewModel,
+                screenType = profile,
+                iconPacks = iconPacks,
+                onIconPack = { showIconPackPicker = true },
+                onCountStyle = { showCountStylePicker = true },
+                onPeoplePrivacy = { showPeoplePrivacyPicker = true },
+                onBatchTimes = { showBatchTimesEditor = true },
+                onFoldTransition = { showFoldTransitionPicker = true },
+            )
+            SettingsCategory.NOTIFICATIONS -> NotificationsSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
+            SettingsCategory.PERMISSIONS -> PermissionsSection(
+                isDefaultLauncher = isDefaultLauncher,
+                notifAccessGranted = notifAccessGranted,
+                onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
+                onNotifAccess = { openNotificationAccess(context) },
+            )
+            SettingsCategory.BACKUP -> BackupSection()
+        }
+    }
+
     val studio = s.appearance.settingsStyle == LauncherSettings.SETTINGS_STYLE_STUDIO
     val palette = when {
         studio -> StudioExpressivePalette
@@ -350,6 +380,11 @@ fun SettingsScreen(
                                     )
                                 }
                             } else SettingsCategory.entries.forEach { category ->
+                                // A heading above the first page of each group.
+                                val group = category.group
+                                if (group != null && SettingsCategory.entries.first { it.group == group } == category) {
+                                    CategoryGroupHeading(stringResource(group.titleRes))
+                                }
                                 val isSelected = selectedTabletCategory == category
                                 val categoryTitle = stringResource(category.titleRes)
 
@@ -393,61 +428,7 @@ fun SettingsScreen(
                                 .padding(bottom = 28.dp),
                         ) {
                             if (selectedTabletCategory.perDisplay) profileSwitcher()
-                            when (selectedTabletCategory) {
-                                SettingsCategory.DISPLAY_PROFILES -> DisplayProfilesSection(
-                                    s = s,
-                                    viewModel = viewModel,
-                                    screenType = profile,
-                                    onFoldAction = { showFoldActionPicker = true },
-                                    onUnfoldAction = { showUnfoldActionPicker = true },
-                                    onFoldTransition = { showFoldTransitionPicker = true },
-                                    onAppPairs = { showAppPairsManager = true },
-                                    onCopyProfile = { showCopyProfile = true },
-                                )
-                                SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = profile, onPickColor = { colorTarget = it })
-                                SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
-                                SettingsCategory.TASKBAR -> TaskbarSection(s = s, viewModel = viewModel)
-                                SettingsCategory.RECENTS -> RecentsSection(s = s, viewModel = viewModel)
-                                SettingsCategory.ROOT -> RootSection(s = s, viewModel = viewModel)
-                                SettingsCategory.APP_DRAWER -> AppDrawerSection(
-                                    s = s,
-                                    viewModel = viewModel,
-                                    screenType = profile,
-                                    hiddenCount = hiddenKeys.size,
-                                    onShowHidden = { showHiddenManager = true },
-                                    onLayoutMode = { showDrawerLayoutPicker = true },
-                                    onPickColor = { colorTarget = it },
-                                )
-                                SettingsCategory.GESTURES -> GesturesSection(
-                                    s = s,
-                                    viewModel = viewModel,
-                                    screenType = profile,
-                                    allApps = allApps,
-                                    onSwipeUp = { showSwipeUpPicker = true },
-                                    onSwipeDown = { showSwipeDownPicker = true },
-                                    onLeftSwipe = { showLeftSwipePicker = true },
-                                    onRightSwipe = { showRightSwipePicker = true },
-                                )
-                                SettingsCategory.APPEARANCE -> AppearanceSection(
-                                    s = s,
-                                    viewModel = viewModel,
-                                    screenType = profile,
-                                    iconPacks = iconPacks,
-                                    onIconPack = { showIconPackPicker = true },
-                                    onCountStyle = { showCountStylePicker = true },
-                                    onPeoplePrivacy = { showPeoplePrivacyPicker = true },
-                                    onBatchTimes = { showBatchTimesEditor = true },
-                                    onFoldTransition = { showFoldTransitionPicker = true },
-                                )
-                                SettingsCategory.NOTIFICATIONS -> NotificationsSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
-                                SettingsCategory.PERMISSIONS -> PermissionsSection(
-                                    isDefaultLauncher = isDefaultLauncher,
-                                    notifAccessGranted = notifAccessGranted,
-                                    onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
-                                    onNotifAccess = { openNotificationAccess(context) },
-                                )
-                                SettingsCategory.BACKUP -> BackupSection()
-                            }
+                            pageContent(selectedTabletCategory)
                         }
                     }
                 } else {
@@ -529,6 +510,11 @@ fun SettingsScreen(
                                 }
 
                                 filteredCategories.forEach { category ->
+                                    // Grouped while not searching: a heading above each group's first page.
+                                    val group = category.group
+                                    if (queryLower.isBlank() && group != null && filteredCategories.first { it.group == group } == category) {
+                                        CategoryGroupHeading(stringResource(group.titleRes))
+                                    }
                                     CategoryOverviewCard(
                                         category = category,
                                         onClick = { selectedOuterCategory = category },
@@ -637,61 +623,7 @@ fun SettingsScreen(
                             ) {
                                 // Categories that hold only shared settings don't offer a profile choice.
                                 if (activeCategory.perDisplay) profileSwitcher()
-                                when (activeCategory) {
-                                    SettingsCategory.DISPLAY_PROFILES -> DisplayProfilesSection(
-                                        s = s,
-                                        viewModel = viewModel,
-                                        screenType = profile,
-                                        onFoldAction = { showFoldActionPicker = true },
-                                        onUnfoldAction = { showUnfoldActionPicker = true },
-                                        onFoldTransition = { showFoldTransitionPicker = true },
-                                        onAppPairs = { showAppPairsManager = true },
-                                        onCopyProfile = { showCopyProfile = true },
-                                    )
-                                    SettingsCategory.GRID_DPI -> GridAndDpiSection(s = s, viewModel = viewModel, screenType = profile, onPickColor = { colorTarget = it })
-                                    SettingsCategory.DOCK_TASKBAR -> DockAndTaskbarSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
-                                    SettingsCategory.TASKBAR -> TaskbarSection(s = s, viewModel = viewModel)
-                                    SettingsCategory.RECENTS -> RecentsSection(s = s, viewModel = viewModel)
-                                    SettingsCategory.ROOT -> RootSection(s = s, viewModel = viewModel)
-                                    SettingsCategory.APP_DRAWER -> AppDrawerSection(
-                                        s = s,
-                                        viewModel = viewModel,
-                                        screenType = profile,
-                                        hiddenCount = hiddenKeys.size,
-                                        onShowHidden = { showHiddenManager = true },
-                                        onLayoutMode = { showDrawerLayoutPicker = true },
-                                        onPickColor = { colorTarget = it },
-                                    )
-                                    SettingsCategory.GESTURES -> GesturesSection(
-                                        s = s,
-                                        viewModel = viewModel,
-                                        screenType = profile,
-                                        allApps = allApps,
-                                        onSwipeUp = { showSwipeUpPicker = true },
-                                        onSwipeDown = { showSwipeDownPicker = true },
-                                        onLeftSwipe = { showLeftSwipePicker = true },
-                                        onRightSwipe = { showRightSwipePicker = true },
-                                    )
-                                    SettingsCategory.APPEARANCE -> AppearanceSection(
-                                        s = s,
-                                        viewModel = viewModel,
-                                        screenType = profile,
-                                        iconPacks = iconPacks,
-                                        onIconPack = { showIconPackPicker = true },
-                                        onCountStyle = { showCountStylePicker = true },
-                                        onPeoplePrivacy = { showPeoplePrivacyPicker = true },
-                                        onBatchTimes = { showBatchTimesEditor = true },
-                                        onFoldTransition = { showFoldTransitionPicker = true },
-                                    )
-                                    SettingsCategory.NOTIFICATIONS -> NotificationsSection(s = s, viewModel = viewModel, screenType = profile, previewIcon = previewIcon)
-                                    SettingsCategory.PERMISSIONS -> PermissionsSection(
-                                        isDefaultLauncher = isDefaultLauncher,
-                                        notifAccessGranted = notifAccessGranted,
-                                        onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
-                                        onNotifAccess = { openNotificationAccess(context) },
-                                    )
-                                    SettingsCategory.BACKUP -> BackupSection()
-                                }
+                                pageContent(activeCategory)
                             }
                         }
                     }
@@ -962,6 +894,19 @@ private fun SearchFieldHeader(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp),
+    )
+}
+
+/** The name of a group of settings pages, above its first page in the list. */
+@Composable
+private fun CategoryGroupHeading(text: String) {
+    Text(
+        text = text.uppercase(),
+        color = LocalExpressivePalette.current.dim,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = 6.dp, top = 14.dp, bottom = 2.dp),
     )
 }
 

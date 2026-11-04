@@ -1496,7 +1496,7 @@ fun Workspace(
                                             Spacer(Modifier.height(6.dp))
                                         }
                                         Text(
-                                            visual.first.toString(),
+                                            visual.first,
                                             color = Color.White,
                                             style = MaterialTheme.typography.labelMedium,
                                             textAlign = TextAlign.Center,

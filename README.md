@@ -1,4 +1,4 @@
-# Folark v2.0.0 — Ultimate Dual-Screen Foldable Launcher
+# Folark v2.1.0 — Ultimate Dual-Screen Foldable Launcher
 
 > *A modern, lightweight, ultra-customizable Android launcher based on ARK Launcher, specifically engineered for dual-screen foldables, clamshells, and book-style foldables with Android 17 performance efficiency.*
 
@@ -11,7 +11,17 @@
 
 ## 🚀 Overview
 
-**Folark v2.0.0** is an open-source, ultra-responsive Android home-screen launcher built 100% with **Jetpack Compose** and **Material 3 Expressive Design**. Re-architected from the high-performance foundations of **ARK Launcher**, Folark delivers a native, fluid experience tailored for foldable devices, featuring independent dual-screen profiles, desktop taskbar overlays, LSPosed system hooks, root-powered Recents, and interactive widgets.
+**Folark v2.1.0** is an open-source, ultra-responsive Android home-screen launcher built 100% with **Jetpack Compose** and **Material 3 Expressive Design**. Re-architected from the high-performance foundations of **ARK Launcher**, Folark delivers a native, fluid experience tailored for foldable devices, featuring independent dual-screen profiles, desktop taskbar overlays, LSPosed system hooks, root-powered Recents, and interactive widgets.
+
+## 🆕 What's new in 2.1.0
+
+* **Settings, reorganised:** a new Start page (set-up status, quick switches, what's new), pages listed in four groups, long pages split into clear cards, and rarely used options folded under *Advanced*. Search still finds everything and opens folded sections by itself.
+* **Taskbar:** recent apps and running dots stay current over apps; pin, unpin and reorder right on the bar; drop an app from the drawer, home or Recents onto the bar to pin it; an open split shows as one tile; the hide button remembers each app; handles stay clear of gesture navigation; TalkBack actions and haptics; a glow in the app's colour when it starts; AMOLED and Neon themes; Flip, Unfold and Pop animations.
+* **Recents:** split pairs as one card, a fresh picture of the app you just left, optional memory use per card (root), apps grow out of the card you tap, Wave, Swing and Drop entrances.
+* **App drawer:** two-pane layout when unfolded, shortcuts under the top search result, 27 more Android settings pages in search, hold-to-fine-scroll on the A–Z bar.
+* **Split screen:** the picker opens in the half beside your app (with the Vector module too), lets you choose ⅓, ½ or ⅔, and stays clear of the status bar and taskbar.
+* **App-open animations:** Pop and Unfold.
+* **Under the hood:** Android 16/17 API updates, zero compiler warnings, removed dead settings and strings. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

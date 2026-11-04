@@ -156,6 +156,8 @@ class SignalMonitor @Inject constructor(
     @SuppressLint("MissingPermission") // only reached from the display callback, which is
     // registered when READ_PHONE_STATE is granted; a revocation race lands in the catch below
     private fun generationOf(display: TelephonyDisplayInfo?): String? = try {
+        // NR_NSA_MMWAVE is deprecated but older modems still report it: it is 5G all the same.
+        @Suppress("DEPRECATION")
         when (display?.overrideNetworkType) {
             TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA,
             TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE,

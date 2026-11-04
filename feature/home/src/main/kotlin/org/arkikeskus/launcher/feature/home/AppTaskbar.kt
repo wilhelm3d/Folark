@@ -636,6 +636,28 @@ internal class AppTaskbar(
      * navigation) or its navigation bar (3-button), in px. Read fresh from the display's own insets,
      * not from Folark's tiny overlay windows, so it is right on either screen of the fold. 0 if unknown.
      */
+    /**
+     * The system's accent colour (Material You) in one of three shades, the same everywhere on the
+     * bar: [ACCENT_LIGHT] for highlights and chips, [ACCENT_MID] for rims, [ACCENT_DEEP] for fills.
+     * Before Android 12 (no system palette) a fixed blue of the same lightness.
+     */
+    internal fun accent(shade: Int): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return context.getColor(
+                when (shade) {
+                    ACCENT_DEEP -> android.R.color.system_accent1_800
+                    ACCENT_MID -> android.R.color.system_accent1_300
+                    else -> android.R.color.system_accent1_200
+                },
+            )
+        }
+        return when (shade) {
+            ACCENT_DEEP -> Color.rgb(30, 50, 90)
+            ACCENT_MID -> Color.rgb(90, 160, 255)
+            else -> Color.rgb(180, 200, 255)
+        }
+    }
+
     internal fun systemBottomInset(): Int = runCatching {
         val insets = windowManager.currentWindowMetrics.windowInsets
         maxOf(
@@ -902,9 +924,7 @@ internal class AppTaskbar(
 
     @SuppressLint("ClickableViewAccessibility")
     private fun showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Boolean = false) {
-        val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.getColor(android.R.color.system_accent1_200)
-        } else Color.rgb(180, 200, 255)
+        val accent = accent(ACCENT_LIGHT)
         val lightTheme = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
         val hint = TextView(context).apply {
             setTextColor(Color.BLACK)
@@ -1046,7 +1066,7 @@ internal class AppTaskbar(
             if (withRecents) {
                 row.addView(barButton(R.drawable.ic_taskbar_recents, R.string.taskbar_recents, s, size, fixed,
                     onTap = { openRecents(s) },
-                    onHold = if (s.quickSwitch) ({ LockAccessibilityService.quickSwitch(); Unit }) else null),
+                    onHold = if (s.quickSwitch) ({ LockAccessibilityService.quickSwitch() }) else null),
                     LinearLayout.LayoutParams(size, size).apply {
                         marginStart = dp(s.spacingDp) / 2
                         marginEnd = dp(s.spacingDp) / 2
@@ -1145,9 +1165,7 @@ internal class AppTaskbar(
             LauncherSettings.TASKBAR_THEME_FROSTED -> Color.argb((alpha * 0.55f).toInt(), 40, 42, 48) to Color.argb(70, 255, 255, 255)
             LauncherSettings.TASKBAR_THEME_LIGHT -> Color.argb(alpha, 242, 243, 246) to Color.argb(40, 0, 0, 0)
             LauncherSettings.TASKBAR_THEME_ACCENT -> {
-                val base = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    context.getColor(android.R.color.system_accent1_800)
-                } else Color.rgb(30, 50, 90)
+                val base = accent(ACCENT_DEEP)
                 Color.argb(alpha, Color.red(base), Color.green(base), Color.blue(base)) to Color.argb(50, 255, 255, 255)
             }
             else -> Color.argb(alpha, 24, 24, 28) to Color.argb(45, 255, 255, 255)
@@ -1164,9 +1182,7 @@ internal class AppTaskbar(
      * (two layers: the glow is a wider, fainter stroke under the sharp one).
      */
     private fun neonBackground(alpha: Int): Drawable {
-        val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.getColor(android.R.color.system_accent1_300)
-        } else Color.rgb(90, 160, 255)
+        val accent = accent(ACCENT_MID)
         fun withAlpha(a: Int) = Color.argb(a, Color.red(accent), Color.green(accent), Color.blue(accent))
         val glow = GradientDrawable().apply {
             cornerRadius = dpf(28f)
@@ -1367,7 +1383,7 @@ internal class AppTaskbar(
                                     handedOver = true
                                     return@setOnTouchListener true
                                 }
-                                ghostStart(view as ImageView, hint)
+                                ghostStart(view, hint)
                                 ghostMove(event.rawX, event.rawY, hint)
                             }
                         }
@@ -1635,6 +1651,9 @@ internal class AppTaskbar(
 
         /** InputManager.getMaximumObscuringOpacityForTouch()'s default (Android 12+). */
         private const val MAX_OBSCURING_ALPHA = 0.8f
+        internal const val ACCENT_LIGHT = 200
+        internal const val ACCENT_MID = 300
+        internal const val ACCENT_DEEP = 800
 
         /** Whether Folark's own home screen (or its app drawer) is in front. */
         @Volatile

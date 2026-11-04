@@ -47,21 +47,17 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
             else -> {
                 rows += context.getString(R.string.taskbar_split_swap) to {
                     scope.launch(Dispatchers.IO) { ShellSplit.swapSides(context) }
-                    Unit
                 }
                 // Android's peek view, one tap (Folark's Vector module in SystemUI).
                 if (tasks.size == 2 && SplitThree.ready(context)) {
                     rows += context.getString(R.string.taskbar_split_peek_left) to {
                         scope.launch { SplitThree.snap(context, SplitThree.SNAP_PEEK_LEFT) }
-                        Unit
                     }
                     rows += context.getString(R.string.taskbar_split_peek_right) to {
                         scope.launch { SplitThree.snap(context, SplitThree.SNAP_PEEK_RIGHT) }
-                        Unit
                     }
                     rows += context.getString(R.string.taskbar_split_even) to {
                         scope.launch { SplitThree.snap(context, SplitThree.SNAP_EVEN) }
-                        Unit
                     }
                     // Divider sizes: each app two thirds (Settings ▸ Recents ▸ Split screen).
                     if (s.ratioMenu) {
@@ -72,7 +68,6 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
                                     val ok = split?.snapTo(SplitThree.SNAP_TWO_THIRDS, forTask = task.taskId) == true
                                     if (!ok) Toast.makeText(context, R.string.taskbar_split_no_third, Toast.LENGTH_LONG).show()
                                 }
-                                Unit
                             }
                         }
                     }
@@ -81,7 +76,6 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
                     val label = allApps.firstOrNull { it.packageName == task.packageName }?.label ?: task.packageName
                     rows += context.getString(R.string.taskbar_split_keep, label) to {
                         scope.launch(Dispatchers.IO) { ShellSplit.exitSplit(context, task.taskId) }
-                        Unit
                     }
                 }
             }

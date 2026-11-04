@@ -205,7 +205,6 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsBackdropDim(value: Float) = editRecentsCover.let { cover -> update { repository.setRecentsBackdropDim(value, cover = cover) } }
     fun setRecentsSort(value: String) = update { repository.setRecentsSort(value) }
     fun setRecentsShowTime(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsShowTime(value, cover = cover) } }
-    fun setRecentsShowActions(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsShowActions(value, cover = cover) } }
     fun setRecentsCardLayout(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsCardLayout(value, cover = cover) } }
     fun setRecentsCardIcons(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsCardIcons(value, cover = cover) } }
     fun setRecentsCardShadow(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsCardShadow(value, cover = cover) } }

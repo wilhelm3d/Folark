@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
+import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -350,6 +351,7 @@ private fun taskbarOverlap(view: android.view.View): Int {
  */
 @Composable
 private fun PickGlow(from: Rect, p: Float) {
+    val accent = ACCENT
     androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
         val centre = from.center
         val base = maxOf(from.width, from.height) / 2f
@@ -359,8 +361,8 @@ private fun PickGlow(from: Rect, p: Float) {
         if (halo > 0f) {
             drawCircle(
                 brush = androidx.compose.ui.graphics.Brush.radialGradient(
-                    0f to ACCENT.copy(alpha = 0.85f * bloom * fade),
-                    0.55f to ACCENT.copy(alpha = 0.4f * bloom * fade),
+                    0f to accent.copy(alpha = 0.85f * bloom * fade),
+                    0.55f to accent.copy(alpha = 0.4f * bloom * fade),
                     1f to Color.Transparent,
                     center = centre,
                     radius = halo,
@@ -370,7 +372,7 @@ private fun PickGlow(from: Rect, p: Float) {
             )
         }
         drawCircle(
-            color = ACCENT.copy(alpha = 0.75f * fade),
+            color = accent.copy(alpha = 0.75f * fade),
             radius = base * (1f + 1.1f * p),
             center = centre,
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = base * 0.1f * (1f - p) + 1f),
@@ -436,7 +438,9 @@ private fun AppGrid(columns: Int, content: androidx.compose.foundation.lazy.grid
 /** The picker's long-press menu: what it offers, and where the choice goes. */
 private class TileMenu(val isFavorite: (AppItem) -> Boolean, val onAction: (AppItem, SplitPickAction) -> Unit)
 
-private val ACCENT = Color(0xFF5A9BF2)
+/** The picker's accent: the same as the app drawer's (Folark's accent unless the drawer sets its own). */
+private val ACCENT: Color
+    @Composable get() = LocalAccent.current
 
 /** "Choose an app" / "Choose 2 apps · 1 chosen", with the Peek switch when there is one. */
 @Composable

@@ -494,6 +494,7 @@ class LauncherActivity : ComponentActivity() {
     }
 
     @Deprecated("Required for AppWidgetHost.startAppWidgetConfigureActivityForResult (legacy result API)")
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == WIDGET_CONFIG_REQUEST) {

@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.DropZones
+import org.arkikeskus.launcher.feature.home.AppTaskbar.Companion.ACCENT_LIGHT
 import org.arkikeskus.launcher.feature.home.AppTaskbar.Companion.ACTION_FLOAT
 import org.arkikeskus.launcher.feature.home.AppTaskbar.Companion.ACTION_NONE
 import org.arkikeskus.launcher.feature.home.AppTaskbar.Companion.ACTION_PEEK
@@ -250,9 +251,7 @@ internal fun AppTaskbar.makeDropChip(label: String): TextView = TextView(context
 
 /** Lights up the chip for [action] (ACTION_FLOAT = left, ACTION_SPLIT = right), dims the other. */
 internal fun AppTaskbar.highlightDropChips(action: Int) {
-    val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        context.getColor(android.R.color.system_accent1_200)
-    } else Color.rgb(180, 200, 255)
+    val accent = accent(ACCENT_LIGHT)
     fun style(chip: TextView?, armed: Boolean) {
         chip ?: return
         chip.background = GradientDrawable().apply {
@@ -324,9 +323,7 @@ internal fun AppTaskbar.makeEdgeZone(label: String): FrameLayout = FrameLayout(c
 
 /** Lights the glass zone the finger is over (frosted when idle, accent and grown when armed). */
 internal fun AppTaskbar.highlightEdgeZones(action: Int) {
-    val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        context.getColor(android.R.color.system_accent1_200)
-    } else Color.rgb(180, 200, 255)
+    val accent = accent(ACCENT_LIGHT)
     // Only the region under the finger shows (the rest are hidden), exactly like Recents.
     fun style(zone: FrameLayout?, armed: Boolean) {
         zone ?: return

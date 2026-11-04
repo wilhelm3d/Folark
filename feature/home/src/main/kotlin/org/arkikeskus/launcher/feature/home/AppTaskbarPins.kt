@@ -57,7 +57,7 @@ internal fun AppTaskbar.pinMenuRow(app: AppItem): Pair<String, () -> Unit> =
     if (isPinned(app)) {
         context.getString(R.string.taskbar_unpin) to { unpin(app) }
     } else {
-        context.getString(R.string.taskbar_pin) to { pin(app); Unit }
+        context.getString(R.string.taskbar_pin) to { pin(app) }
     }
 
 /**

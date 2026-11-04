@@ -217,8 +217,6 @@ internal object Keys {
     val RECENTS_SORT = stringPreferencesKey("recents_sort")
     val RECENTS_SHOW_TIME = booleanPreferencesKey("recents_show_time")
     val RECENTS_OUTER_SHOW_TIME = booleanPreferencesKey("recents_outer_show_time")
-    val RECENTS_SHOW_ACTIONS = booleanPreferencesKey("recents_show_actions")
-    val RECENTS_OUTER_SHOW_ACTIONS = booleanPreferencesKey("recents_outer_show_actions")
     val RECENTS_CARD_LAYOUT = stringPreferencesKey("recents_card_layout")
     val RECENTS_OUTER_CARD_LAYOUT = stringPreferencesKey("recents_outer_card_layout")
     val RECENTS_CONFIRM_CLOSE_ALL = booleanPreferencesKey("recents_confirm_close_all")
@@ -300,7 +298,6 @@ internal object Keys {
             RECENTS_CORNER to RECENTS_OUTER_CORNER,
             RECENTS_BACKDROP to RECENTS_OUTER_BACKDROP,
             RECENTS_SHOW_TIME to RECENTS_OUTER_SHOW_TIME,
-            RECENTS_SHOW_ACTIONS to RECENTS_OUTER_SHOW_ACTIONS,
             RECENTS_GLASS to RECENTS_OUTER_GLASS,
             RECENTS_GLASS_BLUR to RECENTS_OUTER_GLASS_BLUR,
             RECENTS_GLASS_TINT to RECENTS_OUTER_GLASS_TINT,

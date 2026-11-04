@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.GridOn
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -176,7 +177,6 @@ internal fun AppDrawerSection(
             onClick = onLayoutMode,
         )
         ExpressiveRowDivider()
-
         ExpressiveStepperRow(
             title = stringResource(R.string.settings_columns),
             value = s.drawer.columns,
@@ -185,7 +185,134 @@ internal fun AppDrawerSection(
             onValueChange = { viewModel.setDrawerColumns(it, screenType) },
         )
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_index_bar),
+            checked = s.drawer.indexBarEnabled,
+            onCheckedChange = { viewModel.setDrawerIndexBarEnabled(it, screenType) },
+        )
+        if (s.drawer.indexBarEnabled) {
+            ExpressiveRowDivider()
+            ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_az_index_position),
+                options = listOf(
+                    LauncherSettings.AZ_POSITION_VERTICAL_RIGHT to stringResource(R.string.settings_az_position_vertical_right),
+                    LauncherSettings.AZ_POSITION_VERTICAL_LEFT to stringResource(R.string.settings_az_position_vertical_left),
+                    LauncherSettings.AZ_POSITION_HORIZONTAL_TOP to stringResource(R.string.settings_az_position_horizontal_top),
+                    LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM to stringResource(R.string.settings_az_position_horizontal_bottom),
+                ),
+                selected = s.drawer.azIndexPosition,
+                onSelect = { viewModel.setAzIndexPosition(it, screenType) },
+            )
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_az_index_size),
+                value = s.drawer.azIndexScale,
+                valueRange = LauncherSettings.MIN_AZ_INDEX_SCALE..LauncherSettings.MAX_AZ_INDEX_SCALE,
+                onValueChange = { viewModel.setAzIndexScale((it * 20f).roundToInt() / 20f, screenType) },
+                valueDisplay = "%d%%".format((s.drawer.azIndexScale * 100).roundToInt()),
+            )
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_drawer_az_hold_scroll),
+                subtitle = stringResource(R.string.settings_drawer_az_hold_scroll_desc),
+                checked = s.drawer.azHoldScroll,
+                onCheckedChange = viewModel::setDrawerAzHoldScroll,
+                shared = true,
+            )
+        }
+        // A sidebar drawer (inner display) is always full height, so the height slider is moot there.
+        val sidebar = screenType == ScreenType.INNER && s.drawer.innerSidebar
+        if (!sidebar) {
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_drawer_height),
+                value = s.drawer.heightFraction,
+                valueRange = 0.4f..1.0f,
+                onValueChange = { viewModel.setDrawerHeightFraction(it, screenType) },
+                valueDisplay = "%d%%".format((s.drawer.heightFraction * 100).roundToInt()),
+            )
+        }
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_letter_headers),
+            checked = s.drawer.letterHeaders,
+            onCheckedChange = { viewModel.setDrawerLetterHeaders(it, screenType) },
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_swipe_tabs),
+            subtitle = stringResource(R.string.settings_drawer_swipe_tabs_desc),
+            checked = s.drawer.swipeTabs,
+            onCheckedChange = { viewModel.setDrawerSwipeTabs(it, screenType) },
+        )
+        SettingsAdvanced {
+            ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_drawer_handle),
+                options = listOf(
+                    LauncherSettings.DRAWER_HANDLE_BAR to stringResource(R.string.settings_drawer_handle_bar),
+                    LauncherSettings.DRAWER_HANDLE_ARROW to stringResource(R.string.settings_drawer_handle_arrow),
+                ),
+                selected = s.drawer.handleStyle,
+                onSelect = { viewModel.setDrawerHandleStyle(it, screenType) },
+            )
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_drawer_bottom_space),
+                subtitle = stringResource(R.string.settings_drawer_bottom_space_desc),
+                value = s.drawer.bottomSpace.toFloat(),
+                valueRange = 0f..LauncherSettings.MAX_DRAWER_BOTTOM_SPACE.toFloat(),
+                onValueChange = { viewModel.setDrawerBottomSpace((it / 4f).roundToInt() * 4, screenType) },
+                valueDisplay = "%d dp".format(s.drawer.bottomSpace),
+            )
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_drawer_letter_popup),
+                subtitle = stringResource(R.string.settings_drawer_letter_popup_desc),
+                checked = s.drawer.largeLetterPopup,
+                onCheckedChange = { viewModel.setDrawerLargeLetterPopup(it, screenType) },
+            )
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_drawer_flick_close),
+                subtitle = stringResource(R.string.settings_drawer_flick_close_desc),
+                checked = s.drawer.flickClose,
+                onCheckedChange = { viewModel.setDrawerFlickClose(it, screenType) },
+            )
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_drawer_corner),
+                value = s.drawer.cornerRadius.toFloat(),
+                valueRange = LauncherSettings.DRAWER_CORNER_AUTO.toFloat()..LauncherSettings.MAX_DRAWER_CORNER_RADIUS.toFloat(),
+                onValueChange = { viewModel.setDrawerCornerRadius(it.roundToInt(), screenType) },
+                valueDisplay = if (s.drawer.cornerRadius < 0) stringResource(R.string.settings_drawer_corner_auto) else "%d dp".format(s.drawer.cornerRadius),
+            )
+            ExpressiveRowDivider()
+            ExpressiveSliderRow(
+                title = stringResource(R.string.settings_drawer_width),
+                value = s.drawer.widthFraction,
+                valueRange = 0.4f..1.0f,
+                onValueChange = { viewModel.setDrawerWidthFraction(it, screenType) },
+                valueDisplay = "%d%%".format((s.drawer.widthFraction * 100).roundToInt()),
+            )
+            ExpressiveRowDivider()
+            ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_drawer_alignment),
+                options = listOf(
+                    LauncherSettings.DRAWER_ALIGNMENT_LEFT to stringResource(R.string.settings_drawer_align_left),
+                    LauncherSettings.DRAWER_ALIGNMENT_CENTER to stringResource(R.string.settings_drawer_align_center),
+                    LauncherSettings.DRAWER_ALIGNMENT_RIGHT to stringResource(R.string.settings_drawer_align_right),
+                ),
+                selected = s.drawer.alignment,
+                onSelect = { viewModel.setDrawerAlignment(it, screenType) },
+            )
+        }
+    }
 
+    // ---- Search ------------------------------------------------------------------------------
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_drawer_search_group),
+        icon = Icons.Rounded.Search,
+    ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_drawer_search),
             checked = s.drawer.showSearch,
@@ -213,130 +340,7 @@ internal fun AppDrawerSection(
                 shared = true,
             )
         }
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_drawer_index_bar),
-            checked = s.drawer.indexBarEnabled,
-            onCheckedChange = { viewModel.setDrawerIndexBarEnabled(it, screenType) },
-        )
-        if (s.drawer.indexBarEnabled) {
-            ExpressiveRowDivider()
-            ExpressiveSegmentedControl(
-                title = stringResource(R.string.settings_az_index_position),
-                options = listOf(
-                    LauncherSettings.AZ_POSITION_VERTICAL_RIGHT to stringResource(R.string.settings_az_position_vertical_right),
-                    LauncherSettings.AZ_POSITION_VERTICAL_LEFT to stringResource(R.string.settings_az_position_vertical_left),
-                    LauncherSettings.AZ_POSITION_HORIZONTAL_TOP to stringResource(R.string.settings_az_position_horizontal_top),
-                    LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM to stringResource(R.string.settings_az_position_horizontal_bottom),
-                ),
-                selected = s.drawer.azIndexPosition,
-                onSelect = { viewModel.setAzIndexPosition(it, screenType) },
-            )
-            ExpressiveRowDivider()
-            ExpressiveSliderRow(
-                title = stringResource(R.string.settings_az_index_size),
-                value = s.drawer.azIndexScale,
-                valueRange = LauncherSettings.MIN_AZ_INDEX_SCALE..LauncherSettings.MAX_AZ_INDEX_SCALE,
-                onValueChange = { viewModel.setAzIndexScale((it * 20f).roundToInt() / 20f, screenType) },
-                valueDisplay = "%d%%".format((s.drawer.azIndexScale * 100).roundToInt()),
-            )
-        }
-        ExpressiveRowDivider()
-
-        // A sidebar drawer (inner display) is always full height, so the height slider is moot there.
-        val sidebar = screenType == ScreenType.INNER && s.drawer.innerSidebar
-        if (!sidebar) {
-            ExpressiveSliderRow(
-                title = stringResource(R.string.settings_drawer_height),
-                value = s.drawer.heightFraction,
-                valueRange = 0.4f..1.0f,
-                onValueChange = { viewModel.setDrawerHeightFraction(it, screenType) },
-                valueDisplay = "%d%%".format((s.drawer.heightFraction * 100).roundToInt()),
-            )
-            ExpressiveRowDivider()
-        }
-
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_drawer_handle),
-            options = listOf(
-                LauncherSettings.DRAWER_HANDLE_BAR to stringResource(R.string.settings_drawer_handle_bar),
-                LauncherSettings.DRAWER_HANDLE_ARROW to stringResource(R.string.settings_drawer_handle_arrow),
-            ),
-            selected = s.drawer.handleStyle,
-            onSelect = { viewModel.setDrawerHandleStyle(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_drawer_bottom_space),
-            subtitle = stringResource(R.string.settings_drawer_bottom_space_desc),
-            value = s.drawer.bottomSpace.toFloat(),
-            valueRange = 0f..LauncherSettings.MAX_DRAWER_BOTTOM_SPACE.toFloat(),
-            onValueChange = { viewModel.setDrawerBottomSpace((it / 4f).roundToInt() * 4, screenType) },
-            valueDisplay = "%d dp".format(s.drawer.bottomSpace),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_drawer_letter_headers),
-            checked = s.drawer.letterHeaders,
-            onCheckedChange = { viewModel.setDrawerLetterHeaders(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_drawer_letter_popup),
-            subtitle = stringResource(R.string.settings_drawer_letter_popup_desc),
-            checked = s.drawer.largeLetterPopup,
-            onCheckedChange = { viewModel.setDrawerLargeLetterPopup(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_drawer_swipe_tabs),
-            subtitle = stringResource(R.string.settings_drawer_swipe_tabs_desc),
-            checked = s.drawer.swipeTabs,
-            onCheckedChange = { viewModel.setDrawerSwipeTabs(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_drawer_flick_close),
-            subtitle = stringResource(R.string.settings_drawer_flick_close_desc),
-            checked = s.drawer.flickClose,
-            onCheckedChange = { viewModel.setDrawerFlickClose(it, screenType) },
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_drawer_corner),
-            value = s.drawer.cornerRadius.toFloat(),
-            valueRange = LauncherSettings.DRAWER_CORNER_AUTO.toFloat()..LauncherSettings.MAX_DRAWER_CORNER_RADIUS.toFloat(),
-            onValueChange = { viewModel.setDrawerCornerRadius(it.roundToInt(), screenType) },
-            valueDisplay = if (s.drawer.cornerRadius < 0) stringResource(R.string.settings_drawer_corner_auto) else "%d dp".format(s.drawer.cornerRadius),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSliderRow(
-            title = stringResource(R.string.settings_drawer_width),
-            value = s.drawer.widthFraction,
-            valueRange = 0.4f..1.0f,
-            onValueChange = { viewModel.setDrawerWidthFraction(it, screenType) },
-            valueDisplay = "%d%%".format((s.drawer.widthFraction * 100).roundToInt()),
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_drawer_alignment),
-            options = listOf(
-                LauncherSettings.DRAWER_ALIGNMENT_LEFT to stringResource(R.string.settings_drawer_align_left),
-                LauncherSettings.DRAWER_ALIGNMENT_CENTER to stringResource(R.string.settings_drawer_align_center),
-                LauncherSettings.DRAWER_ALIGNMENT_RIGHT to stringResource(R.string.settings_drawer_align_right),
-            ),
-            selected = s.drawer.alignment,
-            onSelect = { viewModel.setDrawerAlignment(it, screenType) },
-        )
+        DrawerSearchRows(s, viewModel)
     }
 
     // ---- Content & behaviour -------------------------------------------------------------------

@@ -543,8 +543,6 @@ data class LauncherSettings(
         val sort: String = RECENTS_SORT_RECENT,
         /** When each app was last used, under its name. */
         val showTime: Boolean = true,
-        /** Split / Pop-up buttons on each card. */
-        val showActions: Boolean = true,
         /** Card look: [RECENTS_CARD_HEADER] (app row above the picture) or [RECENTS_CARD_OVERLAY]
          *  (the picture fills the card, the app icon floats on top — a cleaner, borderless look). */
         val cardLayout: String = RECENTS_CARD_OVERLAY,

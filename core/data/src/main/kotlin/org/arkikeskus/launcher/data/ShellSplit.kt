@@ -33,6 +33,9 @@ object ShellSplit {
         context.checkSelfPermission(Manifest.permission.DUMP) == PackageManager.PERMISSION_GRANTED &&
             hasUsageAccess(context)
 
+    // unsafeCheckOpNoThrow is deprecated on new Android, but it is the only call that answers
+    // for another app-op mode than this app's own process state; its replacement needs API 36.
+    @Suppress("DEPRECATION")
     fun hasUsageAccess(context: Context): Boolean = runCatching {
         val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
         when (appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)) {

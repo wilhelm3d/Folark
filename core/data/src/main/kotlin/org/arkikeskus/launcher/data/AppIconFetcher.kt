@@ -34,6 +34,8 @@ class AppIconFetcher(
         
         // VRAM Optimization: If the drawable is completely opaque, we can save 50% of the memory
         // by using RGB_565 instead of ARGB_8888.
+        // Drawable.opacity is deprecated (only a hint), which is all this needs.
+        @Suppress("DEPRECATION")
         val config = if (drawable.opacity == android.graphics.PixelFormat.OPAQUE) {
             Bitmap.Config.RGB_565
         } else {

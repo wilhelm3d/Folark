@@ -248,6 +248,9 @@ fun InteractiveNotificationItem(
     onOpenInSplit: (() -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
+    // The veto callback is deprecated in favour of dynamic anchors; it is still the simplest way to
+    // let a swipe dismiss only past the threshold here.
+    @Suppress("DEPRECATION")
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {

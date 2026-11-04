@@ -673,7 +673,6 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsBackdropDim(value: Float, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BACKDROP else Keys.RECENTS_BACKDROP] = value.coerceIn(0f, 1f) }
     suspend fun setRecentsSort(value: String) = edit { it[Keys.RECENTS_SORT] = value }
     suspend fun setRecentsShowTime(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SHOW_TIME else Keys.RECENTS_SHOW_TIME] = value }
-    suspend fun setRecentsShowActions(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SHOW_ACTIONS else Keys.RECENTS_SHOW_ACTIONS] = value }
     suspend fun setRecentsCardLayout(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_CARD_LAYOUT else Keys.RECENTS_CARD_LAYOUT] = value }
     suspend fun setRecentsConfirmCloseAll(value: Boolean) = edit { it[Keys.RECENTS_CONFIRM_CLOSE_ALL] = value }
     suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
@@ -766,7 +765,6 @@ class SettingsRepository @Inject constructor(
         sort = (p[Keys.RECENTS_SORT] ?: LauncherSettings.RECENTS_SORT_RECENT)
             .let { if (it == LauncherSettings.RECENTS_SORT_NAME) it else LauncherSettings.RECENTS_SORT_RECENT },
         showTime = p[Keys.RECENTS_SHOW_TIME] ?: true,
-        showActions = p[Keys.RECENTS_SHOW_ACTIONS] ?: true,
         cardLayout = if (p[Keys.RECENTS_CARD_LAYOUT] == LauncherSettings.RECENTS_CARD_HEADER)
             LauncherSettings.RECENTS_CARD_HEADER else LauncherSettings.RECENTS_CARD_OVERLAY,
         confirmCloseAll = p[Keys.RECENTS_CONFIRM_CLOSE_ALL] ?: false,
