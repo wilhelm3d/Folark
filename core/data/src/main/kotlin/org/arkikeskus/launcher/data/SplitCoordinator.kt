@@ -359,6 +359,9 @@ class SplitCoordinator @Inject constructor(
             firstKey = first.app?.key, firstTaskId = first.taskId, three = three,
         )
         val route = route()
+        // With Folark's module: one call opens the picker in the half beside the first app (the
+        // module route has no shell commands to move windows, so without this it was full screen).
+        if (!three && route.native && pickerNatively(first, firstOnRight, picker(false), route.root)) return
         // Three apps don't fit a half: that picker opens full screen and builds the split after.
         if (three || !route.commands) {
             withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(false), noAnim) } }
@@ -378,6 +381,22 @@ class SplitCoordinator @Inject constructor(
             delay(FRONT_SETTLE_MS)
             withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(true), noAnim) } }
         }
+    }
+
+    /**
+     * The module's `startIntentAndTask`: the first app running (opened if need be), then the picker
+     * started straight into the other half beside it. False when that can't be done (the caller then
+     * falls back to another way).
+     */
+    private suspend fun pickerNatively(first: SplitApp, firstOnRight: Boolean, pickerIntent: android.content.Intent, root: Boolean): Boolean {
+        val (id, _) = running(first, root) ?: open(first, root) ?: return false
+        exitFirst(id, root)
+        SplitEvents.forget(listOf(id))
+        val pending = PendingIntent.getActivity(
+            context, PICKER_REQUEST, pickerIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val userId = android.os.Process.myUid() / PER_USER_RANGE
+        return SplitThree.startIntentAndTask(context, pending, userId, id, intentOnRight = !firstOnRight)
     }
 
     /** The picker (task [pickerTaskId]) moves itself into the right half, beside the app behind it. */
@@ -508,6 +527,8 @@ class SplitCoordinator @Inject constructor(
     }
 
     private companion object {
+        const val PICKER_REQUEST = 0x5911
+        const val PER_USER_RANGE = 100_000
         /** How long to wait for System UI to report a split change before reading the window list. */
         const val EVENT_WAIT_MS = 900L
         /** A read this old is still good enough to check a task before moving it. */
