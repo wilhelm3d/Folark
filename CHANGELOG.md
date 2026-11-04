@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Split screen
+- Three-app split: a third pane System UI says yes to but doesn't show no longer counts; the third app then floats over the split.
+- Divider sizes: the module checks that the divider stayed at 30 / 70 % after a snap; where System UI moves it straight back (50/50 only), the split drawer and the taskbar's split menu stop offering the sizes until System UI restarts.
 - The crash guard no longer pauses Folark's module after a reboot (System UI starting right after the phone booted is a restart, not a crash), and a pause ends when the phone restarts. A false pause hid the split drawer's size row and blocked three-app split.
 - Three-app split: the module finds System UI's startTask / startIntent for the third pane by their leading parameters (the split index in the first number after them) and reports why it failed; the divider stops leave three-app layouts alone.
 - The split drawer's Size row shows whenever Folark's module runs, labelled 30/70, 50/50, 70/30; picking a size turns peek off.

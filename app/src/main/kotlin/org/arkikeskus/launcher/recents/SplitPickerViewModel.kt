@@ -94,6 +94,9 @@ class SplitPickerViewModel @Inject constructor(
     /** Peek view needs Folark's module in System UI (Android's own peek layout). */
     val peekAvailable: Boolean get() = SplitThree.ready(context)
 
+    /** 30 / 70 % can be offered: the module runs and System UI hasn't moved a size straight back. */
+    val sizesAvailable: Boolean get() = SplitThree.ready(context) && SplitThree.sizesHold(context) != false
+
     /**
      * The row of recent apps: the newest open apps but the first one, as many as set. Screenshots
      * only with previews on and root, and only for the apps shown (each is a root call).

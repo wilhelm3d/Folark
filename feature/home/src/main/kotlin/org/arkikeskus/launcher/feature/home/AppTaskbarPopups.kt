@@ -60,7 +60,8 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
                         scope.launch { SplitThree.snap(context, SplitThree.SNAP_EVEN) }
                     }
                     // Divider sizes: each app two thirds (Settings ▸ Recents ▸ Split screen).
-                    if (s.ratioMenu) {
+                    // The sizes, unless this phone moved one straight back to half and half (50/50 only).
+                    if (s.ratioMenu && org.arkikeskus.launcher.data.SplitThree.sizesHold(context) != false) {
                         tasks.forEach { task ->
                             val label = allApps.firstOrNull { it.packageName == task.packageName }?.label ?: task.packageName
                             rows += context.getString(R.string.taskbar_split_two_thirds, label) to {

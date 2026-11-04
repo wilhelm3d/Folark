@@ -202,7 +202,10 @@ class SplitCoordinator @Inject constructor(
                 app != null -> SplitThree.addThird(context, component = app.componentName, user = app.user)
                 else -> false
             }
-            if (ok) {
+            // System UI can say yes and still not make a third pane (Motorola's split accepts the
+            // call on some builds): only a third app really in a split stage counts, else the
+            // caller floats it over the split.
+            if (ok && thirdLanded(third.copy(taskId = id), route.root)) {
                 Haptics.play(context, Haptics.Event.SPLIT)
                 return true
             }
@@ -524,6 +527,12 @@ class SplitCoordinator @Inject constructor(
             delay(FIND_RETRY_MS)
         }
         null
+    }
+
+    /** [third] (its task if known, else its newest task once it is running) sits in a split stage. */
+    private suspend fun thirdLanded(third: SplitApp, root: Boolean): Boolean {
+        val id = third.taskId ?: awaitTask(third.packageName, root)?.first ?: return false
+        return awaitInSplit(listOf(id), root)
     }
 
     /**

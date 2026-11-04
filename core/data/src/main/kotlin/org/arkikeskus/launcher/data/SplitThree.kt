@@ -88,6 +88,7 @@ object SplitThree {
     /** System UI starting this soon after the phone booted is a restart, not a crash. */
     private const val BOOT_GRACE_MS = 3L * 60_000L
     private const val LAST_ANSWER = "split3_last_answer"
+    private const val SIZES_HOLD = "split3_sizes_hold"
 
     private val waiting = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
     private val values = ConcurrentHashMap<String, Int>()
@@ -108,7 +109,8 @@ object SplitThree {
         // booted: a restart (to load a new module, say) is no crash.
         val booted = android.os.SystemClock.elapsedRealtime() < BOOT_GRACE_MS
         val crashed = !booted && lastAt > 0L && now - lastAt in 0..CRASH_WINDOW_MS
-        val edit = p.edit().putLong(READY_AT, now).remove(LAST_REQUEST_AT)
+        // A System UI start (a new module, say) gives the divider sizes a new chance.
+        val edit = p.edit().putLong(READY_AT, now).remove(LAST_REQUEST_AT).remove(SIZES_HOLD)
         if (crashed) edit.putLong(PAUSED_AT, now).putString(PAUSED_AFTER, p.getString(LAST_REQUEST_KIND, null))
         edit.apply()
         SplitEvents.onSystemUiRestart()
@@ -120,7 +122,13 @@ object SplitThree {
     fun onResult(context: Context, request: String?, ok: Boolean, value: Int? = null, detail: String? = null) {
         request ?: return
         if (value != null) values[request] = value
-        val kind = kinds.remove(request)
+        val kind = kinds[request]
+        // A size that System UI moved straight back: this phone keeps 50/50 only (the split drawer
+        // stops offering the others). A size that held says the opposite.
+        if (kind == "snap" && snapRequests.remove(request) == true) {
+            runCatching { prefs(context).edit().putBoolean(SIZES_HOLD, ok || detail?.contains("went back") != true).apply() }
+        }
+        kinds.remove(request)
         if (kind != null) {
             runCatching {
                 prefs(context).edit()
@@ -140,6 +148,18 @@ object SplitThree {
         val at = prefs(context).getLong(READY_AT, 0L)
         at > 0L && System.currentTimeMillis() - at < READY_FOR_MS
     }.getOrDefault(false)
+
+    /**
+     * Whether the divider stays at 30 / 70 % on this phone: false once System UI moved it straight
+     * back to half and half, true once one held; null until a size was tried.
+     */
+    fun sizesHold(context: Context): Boolean? = runCatching {
+        val p = prefs(context)
+        if (p.contains(SIZES_HOLD)) p.getBoolean(SIZES_HOLD, true) else null
+    }.getOrNull()
+
+    /** Snap requests to a size other than half and half, waiting for their answer. */
+    private val snapRequests = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
     /** The module can be asked: it is [running] and its requests aren't [paused]. */
     fun ready(context: Context): Boolean = running(context) && !paused(context)
@@ -214,7 +234,9 @@ object SplitThree {
      */
     suspend fun snap(context: Context, snap: Int, forTask: Int = -1): Boolean {
         if (Build.VERSION.SDK_INT < 34) return false
-        return send(context, "snap") {
+        return send(context, "snap") { request ->
+            // Not half and half: its answer tells whether sizes hold here.
+            if (snap != SNAP_EVEN) snapRequests[request] = true
             putExtra(EXTRA_SNAP, snap)
             if (forTask > 0) putExtra(EXTRA_SNAP_FOR_TASK, forTask)
         }
@@ -334,6 +356,7 @@ object SplitThree {
         }
         val ok = withTimeoutOrNull(TIMEOUT_MS) { answer.await() }
         waiting.remove(request)
+        snapRequests.remove(request)
         // No answer at all: say so in the split check (line 9), not an old answer.
         if (ok == null && kinds.remove(request) != null) {
             runCatching {

@@ -97,7 +97,7 @@ class SplitPickerActivity : ComponentActivity() {
                             onAction = ::onAction,
                             onPick = { app -> pick(app, peek, look.openAnim) },
                             // The divider sizes need Folark's Vector module (as peek does).
-                            share = if (!three && viewModel.peekAvailable) share else null,
+                            share = if (!three && viewModel.sizesAvailable) share else null,
                             pickedOnLeft = firstOnRight,
                             // A size is a plain split: it ends peek.
                             onShareChange = { share = it; peek = false },

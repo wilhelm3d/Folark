@@ -48,6 +48,9 @@ internal object SplitThreeHook {
     private const val SPLIT_POSITION_BOTTOM_OR_RIGHT = 1
 
     /** The third place of a split (0 and 1 are the two halves). */
+    /** How long after the snap animation the divider is checked, and how far off it may be. */
+    private const val SNAP_SETTLE_MS = 450L
+    private const val SNAP_SLACK_PX = 24
     private const val THIRD_INDEX = 2
 
     private const val WAIT_STEP_MS = 100L
@@ -258,6 +261,7 @@ internal object SplitThreeHook {
             }
             return
         }
+        var check: (() -> Unit)? = null
         val ok = runCatching {
             val wanted = if (forTask > 0 && splitPosition(c, forTask) == SPLIT_POSITION_BOTTOM_OR_RIGHT) mirrored(snap) else snap
             val layout = splitLayout(c)
@@ -281,10 +285,24 @@ internal object SplitThreeHook {
             val method = methods(layout.javaClass).first { it.name == "snapToTarget" && it.parameterTypes.size == 4 }
             method.isAccessible = true
             method.invoke(layout, position, target, SNAP_MS, PathInterpolator(0.2f, 0f, 0f, 1f))
+            // Once the divider has settled: did it stay there? (A system that only keeps 50/50
+            // moves it back.) Answered then, so Folark learns whether sizes hold on this phone.
+            val wantedAt = field(target, "position") as? Int
+            check = {
+                val now = field(layout, "mDividerPosition") as? Int
+                val held = wantedAt == null || now == null || kotlin.math.abs(now - wantedAt) <= SNAP_SLACK_PX
+                if (held) reply(context, request, true)
+                else reply(context, request, false, detail = "the divider went back ($now, sent to $wantedAt)")
+            }
             true
         }.getOrElse {
             log("split layout: can't snap to $snap: $it")
             false
+        }
+        val verify = check
+        if (ok && verify != null) {
+            Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({ runCatching(verify) }, SNAP_MS + SNAP_SETTLE_MS)
+            return
         }
         reply(context, request, ok)
     }
