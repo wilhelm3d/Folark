@@ -200,7 +200,7 @@ class SplitPickerActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val DOCK_WAIT_MS = 1_200L
+        const val DOCK_WAIT_MS = 2_000L
         /** Zoom: how long the picker stays under the opening app (its window is up by then). */
         const val ZOOM_FINISH_MS = 700L
     }

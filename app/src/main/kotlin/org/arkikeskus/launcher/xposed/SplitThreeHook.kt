@@ -51,6 +51,9 @@ internal object SplitThreeHook {
     private const val THIRD_INDEX = 2
 
     private const val WAIT_STEP_MS = 100L
+    /** How long startTasks waits for a just-started task to reach WM Shell (10 x 100 ms). */
+    private const val TASK_WAIT_TRIES = 10
+    private const val TASK_WAIT_STEP_MS = 100L
     private const val WAIT_TRIES = 25
 
     /** How long the divider takes to glide to its new place (as when dropped by a finger). */
@@ -380,12 +383,24 @@ internal object SplitThreeHook {
      * (task 2 = -1) and throws on a task it doesn't know.
      */
     private fun startSplitTasksNative(
-        context: Context, c: Any, request: String, task1: Int, task2: Int, position: Int, snapPosition: Int,
+        context: Context, c: Any, request: String, task1: Int, task2: Int, position: Int, snapPosition: Int, tries: Int = 0,
     ) {
         val int = Int::class.javaPrimitiveType!!
+        // A task started a moment ago (the split picker docking itself) reaches WM Shell's task list
+        // a little later than it exists: wait for it on this thread instead of failing at once.
+        if (task1 > 0 && task2 > 0 && task1 != task2 && tries < TASK_WAIT_TRIES &&
+            (!isRunningTask(c, task1) || !isRunningTask(c, task2))
+        ) {
+            Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed(
+                { startSplitTasksNative(context, c, request, task1, task2, position, snapPosition, tries + 1) }, TASK_WAIT_STEP_MS,
+            )
+            return
+        }
         val failure = runCatching {
             if (task1 <= 0 || task2 <= 0 || task1 == task2) error("two different tasks needed ($task1, $task2)")
-            if (!isRunningTask(c, task1) || !isRunningTask(c, task2)) error("a task isn't running ($task1, $task2)")
+            if (!isRunningTask(c, task1) || !isRunningTask(c, task2)) {
+                error("a task isn't running (${listOf(task1, task2).filterNot { isRunningTask(c, it) }.joinToString()} of $task1, $task2, after ${tries * TASK_WAIT_STEP_MS} ms)")
+            }
             invokeLeading(
                 c, "startTasks",
                 listOf(
