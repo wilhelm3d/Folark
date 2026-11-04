@@ -434,8 +434,13 @@ internal object SplitThreeHook {
     /** What went wrong, without reflection's wrapper. */
     private fun reason(t: Throwable): String {
         val cause = (t as? java.lang.reflect.InvocationTargetException)?.targetException ?: t
-        val at = cause.stackTrace.firstOrNull()?.let { " (${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber})" }.orEmpty()
-        return (cause.javaClass.simpleName + ": " + (cause.message ?: "")).take(300) + at
+        // The first frame is often a JDK check (Preconditions, Objects); WM Shell's own frames say
+        // where it happened, so up to three of those follow it.
+        val frames = cause.stackTrace
+        val shell = frames.filter { it.className.startsWith("com.android.wm.shell") }.take(3)
+        val shown = (listOfNotNull(frames.firstOrNull()) + shell).distinct()
+        val at = shown.joinToString(" < ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+        return (cause.javaClass.simpleName + ": " + (cause.message ?: "")).take(200) + if (at.isEmpty()) "" else " ($at)"
     }
 
     /** WM Shell knows [taskId] as a running task (unknown ones make it throw); true when it can't tell. */
