@@ -8,6 +8,7 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /** A curated, localizable settings page entry. */
 data class SettingItem(
@@ -31,6 +32,7 @@ fun matchSettings(items: List<SettingItem>, query: String): List<SearchResult.Se
  * without system privileges, so this is a hand-maintained list with localized labels + bilingual
  * keyword aliases. No permission; Settings ▸ Search ▸ Settings pages in search turns it off.
  */
+@Singleton
 class SettingsSearchProvider @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,

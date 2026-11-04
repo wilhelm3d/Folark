@@ -148,6 +148,7 @@ class LauncherAppsSource @Inject constructor(
 
     /** Forces global icon epoch bump, clears icon pack and Coil memory caches. */
     fun invalidateCachesAndReload() {
+        appColors.evictAll()
         _iconEpochs.update { it.bumpGlobal() }
         iconPacks.clearCache()
         runCatching { imageLoader.get().memoryCache?.clear() }
@@ -174,6 +175,8 @@ class LauncherAppsSource @Inject constructor(
             // A memory-cache clear alone left those painters showing the OLD icon until process death.
             if (iconsMayHaveChanged) {
                 _iconEpochs.update { it.bump(packageNames.asIterable()) }
+                // Its colour is read again from the new icon.
+                appColors.snapshot().keys.filter { key -> packageNames.any { key.startsWith("$it/") } }.forEach { appColors.remove(it) }
             }
             // A changed icon PACK invalidates every mapped/masked icon, not just its own package:
             // bump the global generation (re-keys all icons) and drop the now-dead cache entries.
@@ -585,7 +588,7 @@ class LauncherAppsSource @Inject constructor(
     private fun themedIcon(info: LauncherActivityInfo, dark: Boolean): Drawable? {
         val adaptive = info.getIcon(0) as? AdaptiveIconDrawable ?: return null
         val mono = (adaptive.monochrome ?: return null).mutate()
-        val colors = themedColors(dark, adaptive)
+        val colors = themedColors(dark, adaptive, colorKey(info))
         mono.setTint(styleForeground(colors))
         return AdaptiveIconDrawable(styleBackground(colors), mono)
     }
@@ -637,7 +640,7 @@ class LauncherAppsSource @Inject constructor(
         val icon = info.getIcon(0) ?: return null
         val adaptive = icon as? AdaptiveIconDrawable
         val edge = FORCED_ICON_EDGE
-        val colors = themedColors(dark, icon)
+        val colors = themedColors(dark, icon, colorKey(info))
         val (themeBg, themeFg) = colors
         fun luminance(c: Int): Int = (Color.red(c) * 299 + Color.green(c) * 587 + Color.blue(c) * 114) / 1000
 
@@ -724,9 +727,9 @@ class LauncherAppsSource @Inject constructor(
      * Soft colour styles (a grey app gets greys), else from the system dynamic (Monet) palette.
      */
     @RequiresApi(Build.VERSION_CODES.S)
-    private fun themedColors(dark: Boolean, icon: Drawable): Pair<Int, Int> {
+    private fun themedColors(dark: Boolean, icon: Drawable, key: String): Pair<Int, Int> {
         val own = themedIconStyle == LauncherSettings.THEMED_STYLE_OWN || themedIconStyle == LauncherSettings.THEMED_STYLE_SOFT
-        val appColor = if (own) IconColors.dominant(icon) else null
+        val appColor = if (own) appColor(key, icon) else null
         if (appColor == null) return themedColors(dark)
         val sat = IconColors.saturation(appColor)
         return if (themedIconStyle == LauncherSettings.THEMED_STYLE_OWN) {
@@ -746,6 +749,21 @@ class LauncherAppsSource @Inject constructor(
         }
     }
 
+    /**
+     * Each app's own colour, read from its icon once and kept until icons are reloaded: an icon
+     * is drawn at several sizes (each a separate fetch), and the colour is the same for all.
+     */
+    private val appColors = android.util.LruCache<String, Int>(APP_COLOR_CACHE)
+
+    private fun colorKey(info: LauncherActivityInfo): String = "${info.componentName.flattenToShortString()}#${info.user.hashCode()}"
+
+    private fun appColor(key: String, icon: Drawable): Int? {
+        appColors.get(key)?.let { return if (it == NO_APP_COLOR) null else it }
+        val color = IconColors.dominant(icon)
+        appColors.put(key, color ?: NO_APP_COLOR)
+        return color
+    }
+
     /** Background/foreground colours for themed icons, from the system dynamic (Monet) palette. */
     @RequiresApi(Build.VERSION_CODES.S)
     private fun themedColors(dark: Boolean): Pair<Int, Int> = if (dark) {
@@ -758,6 +776,10 @@ class LauncherAppsSource @Inject constructor(
 }
 
 private const val SPLIT_FIND_TRIES = 10
+/** Apps whose colour is remembered (a few bytes each). */
+private const val APP_COLOR_CACHE = 512
+/** "This icon has no colour of its own" in the colour cache (a fully transparent black). */
+private const val NO_APP_COLOR = 0
 private const val SPLIT_RETRY_MS = 100L
 
 /** Profile changes that change the app list (Private Space locked or unlocked among them). */

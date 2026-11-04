@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import org.arkikeskus.launcher.model.SearchResult
 import org.arkikeskus.launcher.model.SearchResults
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Runs all enabled [SearchProvider]s concurrently for a query and groups their results into
@@ -24,6 +25,7 @@ import javax.inject.Inject
  * calculator show at once even while a slow one (contacts, through Android's ContentResolver) is
  * still looking. [search] waits for all of them.
  */
+@Singleton
 class SearchAggregator @Inject constructor(
     private val providers: Set<@JvmSuppressWildcards SearchProvider>,
 ) {

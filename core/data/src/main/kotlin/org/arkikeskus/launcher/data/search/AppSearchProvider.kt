@@ -5,12 +5,14 @@ import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Matches launchable apps by (effective) label, excluding hidden apps — preserving the drawer's
  * existing rule that hidden apps stay out of search results. Snapshots the current app + hidden
  * sets per query.
  */
+@Singleton
 class AppSearchProvider @Inject constructor(
     private val appRepository: AppRepository,
     private val settingsRepository: SettingsRepository,

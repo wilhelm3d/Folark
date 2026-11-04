@@ -92,7 +92,10 @@ object Haptics {
     }
 
     private fun composition(vibrator: Vibrator, event: Event, scale: Float): VibrationEffect? {
-        fun supported(vararg ids: Int) = runCatching { vibrator.areAllPrimitivesSupported(*ids) }.getOrDefault(false)
+        fun supported(vararg ids: Int) = ids.all { id ->
+            // Asked once per primitive: the answer can't change while the app runs.
+            primitiveSupport.getOrPut(id) { runCatching { vibrator.areAllPrimitivesSupported(id) }.getOrDefault(false) }
+        }
         val parts: List<Triple<Int, Float, Int>> = when (event) {
             Event.LAUNCH -> listOf(Triple(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.8f, 0))
             Event.SPLIT -> listOf(Triple(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.55f, 0), Triple(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.85f, 40))
@@ -121,7 +124,14 @@ object Haptics {
         },
     )
 
-    private fun vibrator(context: Context): Vibrator? =
+    /** Which haptic primitives the motor plays, asked once each. */
+    private val primitiveSupport = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+
+    @Volatile private var cachedVibrator: Vibrator? = null
+
+    private fun vibrator(context: Context): Vibrator? = cachedVibrator ?: lookUpVibrator(context.applicationContext ?: context).also { cachedVibrator = it }
+
+    private fun lookUpVibrator(context: Context): Vibrator? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(VibratorManager::class.java)?.defaultVibrator
         } else {

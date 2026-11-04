@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import android.content.Intent
 import android.provider.AlarmClock
 import android.text.format.DateFormat
@@ -71,8 +73,11 @@ class NothingClockViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Settings ▸ Folark widgets ▸ clock style and text colour (both displays). */
-    val settings: StateFlow<LauncherSettings> = settingsRepository.settings(ScreenType.OUTER)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings())
+    /** Only the widget settings: a change elsewhere in Settings doesn't redraw this widget. */
+    val widgets: StateFlow<LauncherSettings.Widgets> = settingsRepository.settings(ScreenType.OUTER)
+        .map { it.widgets }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.Widgets())
 }
 
 /** What sets one clock style apart: its type, where the date goes and how things line up. */
@@ -157,9 +162,9 @@ fun NothingClockWidget(
 ) {
     val context = LocalContext.current
     val status by viewModel.status.collectAsStateWithLifecycle()
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val darkText = settings.widgets.clockDarkText
-    val look = remember(settings.widgets.clockStyle) { clockLook(settings.widgets.clockStyle) }
+    val widgets by viewModel.widgets.collectAsStateWithLifecycle()
+    val darkText = widgets.clockDarkText
+    val look = remember(widgets.clockStyle) { clockLook(widgets.clockStyle) }
     val noIndication = remember { MutableInteractionSource() }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -182,7 +187,7 @@ fun NothingClockWidget(
     val timeString = texts[0]
 
     val ink = if (darkText) Color(0xFF16181C) else Color.White
-    val useGlassCard = settings.widgets.clockGlassEffect || look.isGlassPill || look.isNeumorphic
+    val useGlassCard = widgets.clockGlassEffect || look.isGlassPill || look.isNeumorphic
     // Enhanced glass text halo shadow for glass depth
     val halo = Shadow(
         color = (if (darkText) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.5f)),
@@ -191,7 +196,7 @@ fun NothingClockWidget(
     )
     // Settings ▸ Folark widgets ▸ Clock minutes: a fixed shade from white to black, or what the
     // style uses; and how opaque they are.
-    val minuteBase = when (settings.widgets.clockMinuteColor) {
+    val minuteBase = when (widgets.clockMinuteColor) {
         LauncherSettings.CLOCK_MINUTE_WHITE -> Color.White
         LauncherSettings.CLOCK_MINUTE_LIGHT_GREY -> Color(0xFFC4C7CC)
         LauncherSettings.CLOCK_MINUTE_GREY -> Color(0xFF8A8E95)
@@ -199,7 +204,7 @@ fun NothingClockWidget(
         LauncherSettings.CLOCK_MINUTE_BLACK -> Color(0xFF0E0F11)
         else -> if (look.accentMinutes) MaterialTheme.colorScheme.primary else ink
     }
-    val minuteColor = minuteBase.copy(alpha = minuteBase.alpha * settings.widgets.clockMinuteOpacity.coerceIn(0.1f, 1f))
+    val minuteColor = minuteBase.copy(alpha = minuteBase.alpha * widgets.clockMinuteOpacity.coerceIn(0.1f, 1f))
     val density = LocalDensity.current
     val timeText = buildAnnotatedString {
         val parts = timeString.split(':')

@@ -17,6 +17,15 @@ object PendingIntents {
     }.isSuccess
 
     /**
+     * Sends [intent] with [fillIn] (a reply's text, an action's extras) and, like
+     * [sendFromForeground], Folark's right to start an activity passed on: some apps open a
+     * screen after a reply or an action. False when the send failed.
+     */
+    fun sendFillIn(context: Context, intent: PendingIntent, fillIn: android.content.Intent): Boolean = runCatching {
+        intent.send(context, 0, fillIn, null, null, null, foregroundStartOptions().toBundle())
+    }.isSuccess
+
+    /**
      * Options that pass Folark's right to start an activity on to the app it sends for. Android 16
      * deprecated MODE_BACKGROUND_ACTIVITY_START_ALLOWED (it now means "only while the sender has a
      * visible window"); the taskbar sends from overlay windows over another app, so from Android

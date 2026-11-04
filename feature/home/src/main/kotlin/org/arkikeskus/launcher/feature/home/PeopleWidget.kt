@@ -305,7 +305,7 @@ class PeopleWidgetViewModel @Inject constructor(
         val intent = Intent()
         val results = Bundle().apply { putCharSequence(action.remoteInput.resultKey, text) }
         RemoteInput.addResultsToIntent(arrayOf(action.remoteInput), intent, results)
-        return runCatching { action.intent.send(context, 0, intent) }.isSuccess
+        return org.arkikeskus.launcher.data.PendingIntents.sendFillIn(context, action.intent, intent)
     }
 
     fun pin(tile: Tile) = viewModelScope.launch {

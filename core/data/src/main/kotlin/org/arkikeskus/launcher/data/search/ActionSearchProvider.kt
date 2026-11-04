@@ -5,8 +5,10 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /** Quick actions from the search text ([SearchActions]); off with Settings ▸ App drawer ▸ Search. */
+@Singleton
 class ActionSearchProvider @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) : SearchProvider {

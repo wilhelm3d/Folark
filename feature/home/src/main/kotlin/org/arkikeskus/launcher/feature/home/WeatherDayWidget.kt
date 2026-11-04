@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import org.arkikeskus.launcher.data.MotoLinks
 import android.Manifest
 import android.content.Intent
@@ -93,8 +95,11 @@ class WeatherDayViewModel @Inject constructor(
     val weather: StateFlow<CurrentWeather?> = weatherRepository.weather
     val hasPermission = MutableStateFlow(weatherRepository.hasPermission())
     val unavailable: StateFlow<Boolean> = weatherRepository.unavailable
-    val settings: StateFlow<LauncherSettings> = settingsRepository.settings(ScreenType.OUTER)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LauncherSettings())
+    /** Only the widget settings: a change elsewhere in Settings doesn't redraw this widget. */
+    val widgets: StateFlow<LauncherSettings.Widgets> = settingsRepository.settings(ScreenType.OUTER)
+        .map { it.widgets }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LauncherSettings.Widgets())
 
     /** Re-checks the permission and asks for fresh weather (the repository rate-limits itself;
      *  [force] is for a tap, which tries again even right after a failed attempt). */
@@ -151,7 +156,7 @@ private val TextShadow = Shadow(color = Color.Black.copy(alpha = 0.45f), blurRad
 fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val weather by viewModel.weather.collectAsStateWithLifecycle()
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val hasPermission by viewModel.hasPermission.collectAsStateWithLifecycle()
     val unavailable by viewModel.unavailable.collectAsStateWithLifecycle()
     var resumed by remember { mutableStateOf(false) }
@@ -177,7 +182,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
     val time = remember { mutableFloatStateOf(0f) }
     val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
     // Not while the drawer covers the home screen, and not in battery saver (the sky then stands still).
-    val animate = settings.widgets.weatherAnimated && resumed && current != null &&
+    val animate = widgets.weatherAnimated && resumed && current != null &&
         !LocalBatterySaver.current && !LocalHomeCovered.current
     // Rain, snow and storms move fast and get about 30 frames a second; sun, stars, clouds and fog
     // drift slowly and look the same at about 15.
@@ -209,7 +214,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                     runCatching { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }
                 } else if (current == null) {
                     viewModel.refresh(force = true)
-                } else if (!(settings.widgets.motoWeatherTap && MotoLinks.open(context, MotoLinks.WEATHER))) {
+                } else if (!(widgets.motoWeatherTap && MotoLinks.open(context, MotoLinks.WEATHER))) {
                     runCatching {
                         val query = Uri.encode("weather " + current.city.orEmpty())
                         context.startActivity(
@@ -220,7 +225,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                 }
             },
     ) {
-        if (settings.widgets.weatherAnimated && current != null) {
+        if (widgets.weatherAnimated && current != null) {
             Canvas(Modifier.fillMaxSize().graphicsLayer()) { drawSky(sky, isDay, time.floatValue) }
         }
         if (current == null) {

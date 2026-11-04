@@ -14,6 +14,7 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /** A raw contact row, decoupled from Android `Cursor` so the provider stays JVM-testable. */
 data class RawContact(
@@ -39,6 +40,7 @@ fun interface PermissionChecker {
  * runtime permission. Never throws for normal input; a revoked-permission ContentResolver failure is
  * swallowed by the [SearchAggregator]'s runCatching.
  */
+@Singleton
 class ContactSearchProvider @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val permissionChecker: PermissionChecker,
@@ -58,6 +60,7 @@ class ContactSearchProvider @Inject constructor(
 }
 
 /** Real ContentResolver-backed contact search. Verified on-device (not unit-tested). */
+@Singleton
 class ContentResolverContactDataSource @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ContactDataSource {
@@ -105,6 +108,7 @@ class ContentResolverContactDataSource @Inject constructor(
 }
 
 /** Real permission checker. */
+@Singleton
 class AndroidPermissionChecker @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : PermissionChecker {

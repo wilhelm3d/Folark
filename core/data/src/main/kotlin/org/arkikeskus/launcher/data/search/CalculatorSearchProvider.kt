@@ -2,11 +2,13 @@ package org.arkikeskus.launcher.data.search
 
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Local calculator + simple unit conversion. Pure (no Android deps). Returns at most one
  * [SearchResult.Calculation]; returns empty on anything that is not a valid expression.
  */
+@Singleton
 class CalculatorSearchProvider @Inject constructor() : SearchProvider {
 
     override suspend fun isEnabled(): Boolean = true

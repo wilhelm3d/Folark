@@ -13,6 +13,7 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Searches the app shortcuts every installed app publishes ("New tab", "Compose", "Scan code") by
@@ -20,6 +21,7 @@ import javax.inject.Inject
  * until Folark holds the home role. Gated by the search-shortcuts setting; a query needs at least
  * two characters, since one letter matches a large part of every app's shortcut list.
  */
+@Singleton
 class ShortcutSearchProvider @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,

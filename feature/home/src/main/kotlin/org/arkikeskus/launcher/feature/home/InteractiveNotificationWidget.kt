@@ -402,7 +402,7 @@ fun InteractiveNotificationItem(
                                                 android.os.Bundle().apply { putCharSequence(remoteInput.resultKey, choice) }
                                             )
                                         }
-                                        runCatching { action.actionIntent.send(context, 0, intent) }
+                                        org.arkikeskus.launcher.data.PendingIntents.sendFillIn(context, action.actionIntent, intent)
                                     },
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
