@@ -334,6 +334,14 @@ object SplitThree {
         }
         val ok = withTimeoutOrNull(TIMEOUT_MS) { answer.await() }
         waiting.remove(request)
+        // No answer at all: say so in the split check (line 9), not an old answer.
+        if (ok == null && kinds.remove(request) != null) {
+            runCatching {
+                prefs(context).edit()
+                    .putString(LAST_ANSWER, "$kind: no answer from System UI within ${TIMEOUT_MS / 1000.0} s at ${System.currentTimeMillis()}")
+                    .apply()
+            }
+        }
         kinds.remove(request)
         // A number nobody reads (no caller asked) mustn't pile up.
         if (ok != true) values.remove(request)

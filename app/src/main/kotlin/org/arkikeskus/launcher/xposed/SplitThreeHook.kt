@@ -130,13 +130,16 @@ internal object SplitThreeHook {
 
     private fun BroadcastReceiver.handle(context: Context, intent: Intent) {
         val request = intent.getStringExtra(SplitThree.EXTRA_REQUEST) ?: return
-        // Only Folark may ask (Android itself vouches for the sender since Android 14).
-        if (Build.VERSION.SDK_INT < 34 || sentFromPackage != FOLARK) {
-            log("split hook: refused request from ${if (Build.VERSION.SDK_INT >= 34) sentFromPackage else "?"}")
-            return
+        val sender = if (Build.VERSION.SDK_INT >= 34) sentFromPackage else null
+        log("split hook: request ${intent.extras?.keySet()?.filter { it != SplitThree.EXTRA_REQUEST }?.sorted()} from $sender")
+        // Only Folark may ask (Android itself vouches for the sender since Android 14). The answer
+        // goes to Folark's own provider only, so saying why is safe and shows in its split check.
+        if (Build.VERSION.SDK_INT < 34 || sender != FOLARK) {
+            log("split hook: refused request from $sender")
+            return reply(context, request, false, detail = "refused: System UI can't tell the sender (it says $sender)")
         }
-        val c = controller ?: return reply(context, request, false)
-        val executor = mainExecutor(c) ?: return reply(context, request, false)
+        val c = controller ?: return reply(context, request, false, detail = "WM Shell's split controller not caught yet")
+        val executor = mainExecutor(c) ?: return reply(context, request, false, detail = "no WM Shell thread")
 
         // Folark wants the split state now (it started after System UI, or lost track).
         if (intent.getBooleanExtra(SplitThree.EXTRA_EVENTS, false)) {
@@ -615,7 +618,7 @@ internal object SplitThreeHook {
                         if (detail != null) putString(SplitThree.EXTRA_DETAIL, detail)
                     },
                 )
-            }
+            }.onFailure { log("split hook: answer for $request didn't reach Folark: $it") }
         }.start()
     }
 
