@@ -916,7 +916,7 @@
     <string name="settings_split_engine_lsposed">Native</string>
     <string name="settings_split_engine_root">Root</string>
     <string name="settings_split_engine_classic_desc">Android\'s split commands only (needs the one-time ADB grant).</string>
-    <string name="settings_split_engine_lsposed_desc">The Vector module\'s native split only (the commands while the module isn\'t running).</string>
+    <string name="settings_split_engine_lsposed_desc">The Vector module\'s native split first; Android\'s split commands when System UI turns a request down or the module isn\'t running.</string>
     <string name="settings_split_engine_root_desc">Android\'s split commands through root, no ADB grant needed.</string>
     <string name="settings_split_engine_auto_desc">The Vector module when it runs in System UI, else Android\'s split commands (with the ADB grant, or root).</string>
     <string name="settings_split_check">Check split screen</string>

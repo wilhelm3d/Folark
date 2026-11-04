@@ -357,23 +357,19 @@ internal object SplitThreeHook {
     private fun startIntentAndTaskNative(
         context: Context, c: Any, request: String, pending: PendingIntent, userId: Int, taskId: Int, position: Int, snapPosition: Int,
     ) {
-        val ok = runCatching {
+        val int = Int::class.javaPrimitiveType!!
+        val failure = runCatching {
             if (!isRunningTask(c, taskId)) error("task $taskId isn't running")
-            val m = c.javaClass.methods.firstOrNull {
-                it.name == "startIntentAndTask" && it.parameterTypes.size == 9 &&
-                    it.parameterTypes[0] == PendingIntent::class.java &&
-                    it.parameterTypes[1] == Int::class.javaPrimitiveType &&
-                    it.parameterTypes[3] == Int::class.javaPrimitiveType &&
-                    it.parameterTypes[5] == Int::class.javaPrimitiveType &&
-                    it.parameterTypes[6] == Int::class.javaPrimitiveType
-            } ?: error("no startIntentAndTask(PendingIntent, int, Bundle, int, Bundle, int, int, …) here")
-            m.invoke(c, pending, userId, Bundle(), taskId, Bundle(), position, snapPosition, null, null)
-            true
-        }.getOrElse {
-            log("split hook: intent beside task $taskId failed: $it")
-            false
-        }
-        reply(context, request, ok)
+            invokeLeading(
+                c, "startIntentAndTask",
+                listOf(
+                    PendingIntent::class.java to pending, int to userId, Bundle::class.java to Bundle(),
+                    int to taskId, Bundle::class.java to Bundle(), int to position, int to snapPosition,
+                ),
+            )
+        }.exceptionOrNull()
+        if (failure != null) log("split hook: intent beside task $taskId failed: ${reason(failure)}")
+        reply(context, request, failure == null, detail = failure?.let { reason(it) })
     }
 
     /**
@@ -386,23 +382,60 @@ internal object SplitThreeHook {
     private fun startSplitTasksNative(
         context: Context, c: Any, request: String, task1: Int, task2: Int, position: Int, snapPosition: Int,
     ) {
-        val ok = runCatching {
+        val int = Int::class.javaPrimitiveType!!
+        val failure = runCatching {
             if (task1 <= 0 || task2 <= 0 || task1 == task2) error("two different tasks needed ($task1, $task2)")
             if (!isRunningTask(c, task1) || !isRunningTask(c, task2)) error("a task isn't running ($task1, $task2)")
-            val int = Int::class.javaPrimitiveType
-            val m = methods(c.javaClass).firstOrNull {
-                val p = it.parameterTypes
-                it.name == "startTasks" && p.size == 8 && p[0] == int && p[1] == Bundle::class.java &&
-                    p[2] == int && p[3] == Bundle::class.java && p[4] == int && p[5] == int
-            } ?: error("startTasks(int, Bundle, int, Bundle, int, int, …) not found")
-            m.isAccessible = true
-            m.invoke(c, task1, Bundle(), task2, Bundle(), position, snapPosition, null, null)
-            true
-        }.getOrElse {
-            log("split: startTasks failed: $it")
-            false
-        }
-        reply(context, request, ok)
+            invokeLeading(
+                c, "startTasks",
+                listOf(
+                    int to task1, Bundle::class.java to Bundle(), int to task2, Bundle::class.java to Bundle(),
+                    int to position, int to snapPosition,
+                ),
+            )
+        }.exceptionOrNull()
+        if (failure != null) log("split: startTasks failed: ${reason(failure)}")
+        reply(context, request, failure == null, detail = failure?.let { reason(it) })
+    }
+
+    /**
+     * Calls WM Shell's [name] whose parameters START with [leading] (type to value). Android builds
+     * add parameters at the end (a RemoteTransition, an InstanceId, flags for flexible split…), so
+     * an exact count breaks on the next release; the rest are filled with neutral values: null,
+     * 0 / false, and a real InstanceId (the split logger reads it). The shortest match wins. When
+     * none matches, the error lists what the class does have, for Check split screen.
+     */
+    private fun invokeLeading(c: Any, name: String, leading: List<Pair<Class<*>, Any?>>) {
+        val candidates = methods(c.javaClass).filter { it.name == name }
+        val m = candidates.filter { method ->
+            val p = method.parameterTypes
+            p.size >= leading.size && leading.indices.all { i -> p[i] == leading[i].first || p[i].isAssignableFrom(leading[i].first) }
+        }.minByOrNull { it.parameterTypes.size }
+            ?: error("no $name(${leading.joinToString { it.first.simpleName }}, …); found: " +
+                candidates.joinToString(" | ") { method -> method.parameterTypes.joinToString(",") { it.simpleName } }.ifEmpty { "none" })
+        val args = m.parameterTypes.mapIndexed { i, type -> if (i < leading.size) leading[i].second else neutral(type) }
+        m.isAccessible = true
+        m.invoke(c, *args.toTypedArray())
+    }
+
+    /** A harmless value for a trailing parameter of [type]. */
+    private fun neutral(type: Class<*>): Any? = when {
+        type == Int::class.javaPrimitiveType -> 0
+        type == Long::class.javaPrimitiveType -> 0L
+        type == Boolean::class.javaPrimitiveType -> false
+        type == Float::class.javaPrimitiveType -> 0f
+        type.name == "com.android.internal.logging.InstanceId" -> runCatching {
+            type.getDeclaredConstructor(Int::class.javaPrimitiveType).apply { isAccessible = true }
+                .newInstance((System.nanoTime() and 0xFFFFF).toInt())
+        }.getOrNull()
+        else -> null
+    }
+
+    /** What went wrong, without reflection's wrapper. */
+    private fun reason(t: Throwable): String {
+        val cause = (t as? java.lang.reflect.InvocationTargetException)?.targetException ?: t
+        val at = cause.stackTrace.firstOrNull()?.let { " (${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber})" }.orEmpty()
+        return (cause.javaClass.simpleName + ": " + (cause.message ?: "")).take(300) + at
     }
 
     /** WM Shell knows [taskId] as a running task (unknown ones make it throw); true when it can't tell. */
@@ -524,7 +557,7 @@ internal object SplitThreeHook {
     private fun methods(cls: Class<*>): List<java.lang.reflect.Method> = generateSequence(cls) { it.superclass }
         .flatMap { it.declaredMethods.asSequence() }.toList()
 
-    private fun reply(context: Context, request: String, ok: Boolean, value: Int? = null) {
+    private fun reply(context: Context, request: String, ok: Boolean, value: Int? = null, detail: String? = null) {
         Thread {
             runCatching {
                 context.contentResolver.call(
@@ -532,6 +565,7 @@ internal object SplitThreeHook {
                     Bundle().apply {
                         putBoolean(SplitThree.EXTRA_OK, ok)
                         if (value != null) putInt(SplitThree.EXTRA_VALUE, value)
+                        if (detail != null) putString(SplitThree.EXTRA_DETAIL, detail)
                     },
                 )
             }

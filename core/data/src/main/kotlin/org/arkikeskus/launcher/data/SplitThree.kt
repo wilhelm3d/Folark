@@ -27,6 +27,8 @@ object SplitThree {
     const val EXTRA_INTENT = "intent"
     const val EXTRA_USER_ID = "user"
     const val EXTRA_OK = "ok"
+    /** Why System UI turned a request down (the module's error), for the split screen check. */
+    const val EXTRA_DETAIL = "detail"
     /** A split layout to switch to, by WM Shell's snap position (see the SNAP_* values). */
     const val EXTRA_SNAP = "snap"
     /** Native split-select: 1 = two-app picker (startTaskWithSelectRequest), 2 = three-app select. */
@@ -110,7 +112,7 @@ object SplitThree {
     }.getOrDefault(false)
 
     /** System UI's answer to request [request] ([value]: a number it sent back, if any). */
-    fun onResult(context: Context, request: String?, ok: Boolean, value: Int? = null) {
+    fun onResult(context: Context, request: String?, ok: Boolean, value: Int? = null, detail: String? = null) {
         request ?: return
         if (value != null) values[request] = value
         val kind = kinds.remove(request)
@@ -118,7 +120,10 @@ object SplitThree {
             runCatching {
                 prefs(context).edit()
                     // LAST_REQUEST_AT stays: WM Shell can still throw on its own thread after answering.
-                    .putString(LAST_ANSWER, "$kind ${if (ok) "ok" else "failed"} at ${System.currentTimeMillis()}")
+                    .putString(
+                        LAST_ANSWER,
+                        "$kind ${if (ok) "ok" else "failed"}" + (detail?.let { " ($it)" } ?: "") + " at ${System.currentTimeMillis()}",
+                    )
                     .apply()
             }
         }

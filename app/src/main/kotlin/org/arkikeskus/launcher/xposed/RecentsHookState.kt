@@ -48,6 +48,7 @@ class RecentsHookState : ContentProvider() {
                 SplitThree.METHOD_RESULT -> SplitThree.onResult(
                     context, arg, extras?.getBoolean(SplitThree.EXTRA_OK) == true,
                     extras?.takeIf { it.containsKey(SplitThree.EXTRA_VALUE) }?.getInt(SplitThree.EXTRA_VALUE),
+                    extras?.getString(SplitThree.EXTRA_DETAIL),
                 )
                 else -> extras?.let { SplitEvents.onEvent(it) }
             }

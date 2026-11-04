@@ -26,7 +26,9 @@ data class SplitRoute(val native: Boolean, val commands: Boolean, val root: Bool
                     val r = RootShell.available()
                     SplitRoute(native = false, commands = r, root = r)
                 }
-                LauncherSettings.SPLIT_ENGINE_LSPOSED -> SplitRoute(native = module, commands = canRead && !module, root = rootOnly)
+                // The module first; the commands stay as the fallback when System UI turns a request down
+                // (a new Android build can change what the module calls).
+                LauncherSettings.SPLIT_ENGINE_LSPOSED -> SplitRoute(native = module, commands = canRead, root = rootOnly)
                 else -> SplitRoute(native = module, commands = canRead, root = rootOnly)
             }
         }
