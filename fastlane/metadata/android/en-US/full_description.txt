@@ -1,17 +1,16 @@
-ARK-launcher is a modern, lightweight Android home-screen launcher built entirely with Jetpack Compose and Material 3. It is bilingual (Finnish and English) and works as a standalone launcher for anyone.
+Folark is a home-screen launcher for foldable phones, built with Jetpack Compose and Material 3. It keeps a separate layout for the cover screen and the inner screen and works as a plain launcher on any phone.
 
 Features:
 
-* Paged home screen with free icon placement and smooth drag-and-drop — move icons within a page, across pages, and between the home grid and the dock.
-* Dock of favourite apps.
-* App drawer with universal search: apps, system settings pages, contacts (opt-in), and a calculator / unit converter, plus an optional most-used apps row.
-* Home-screen widgets — add, resize, move, reconfigure, and stretch a widget to full width. Collection widgets (chat lists, calendars) scroll in place.
-* Folders on the home screen and inside the app drawer.
-* Third-party icon packs (ADW/Nova appfilter format) and Material You themed icons.
-* Configurable gestures: swipe up for the app drawer, swipe down for notifications, and a configurable left-edge swipe.
-* Notification dots / badges, and an optional themed status bar.
-* Backup and restore your layout and settings to a file. Widgets are included in backups.
-* Double-tap empty home-screen space to lock the screen (opt-in).
-* Lock desktop, hide apps, rename apps with custom labels, and a self-contained settings screen.
+* Home screen with free icon placement, widgets, widget stacks and folders, and drag and drop between pages, the dock and the drawer.
+* App drawer with search for apps, shortcuts, contacts (opt-in), Android settings pages, quick actions and a calculator; tabs, folders, an A–Z bar and a two-pane layout when unfolded.
+* A taskbar on the inner screen: pinned and recent apps, media, split-screen controls, pull handles, themes and animations.
+* Folark's own Recents: open apps as cards, split view for up to three apps, pop-up windows, pinned cards and, with root, screenshots and memory use.
+* Split screen from the taskbar, Recents or home, with a picker beside the first app.
+* Fold and unfold actions, transitions and app pairs.
+* Notification dots and counts, notification previews in long-press menus, people and media widgets.
+* Icon packs, themed icons, Liquid Glass, AMOLED dark and fonts.
+* Optional extras with ADB rights, root or Folark's Vector (LSPosed) module.
+* Backup and restore of layout and settings.
 
 Free and open-source under the Apache-2.0 license.

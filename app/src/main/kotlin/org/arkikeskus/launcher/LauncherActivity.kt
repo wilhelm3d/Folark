@@ -85,6 +85,10 @@ class LauncherActivity : ComponentActivity() {
      *  onPause (the flag stays true until onStop). */
     private var wasForeground = false
 
+    /** Configuration changes (a fold/unfold moves the window to another display): the fold state
+     *  is worked out again on each (see FoldStateMonitor.foldStateFlow). */
+    private val configChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     @Inject lateinit var foldStateMonitor: FoldStateMonitor
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var backupRepository: BackupRepository
@@ -105,7 +109,7 @@ class LauncherActivity : ComponentActivity() {
         requestHighRefreshRate()
         // One fold-state flow for the activity's lifetime. Building it inside setContent created a
         // new shared flow (and a new coroutine in lifecycleScope) on every recomposition.
-        val foldStates = foldStateMonitor.foldStateFlow(this, lifecycleScope)
+        val foldStates = foldStateMonitor.foldStateFlow(this, lifecycleScope, recheck = configChanges)
         registerLockReceiver()
         // The lock screen's exit, reported by SystemUI (Vector module), and the switch for using it.
         lifecycleScope.launch { SystemUnlock.exits.collect { onSystemUnlock(it) } }
@@ -391,6 +395,16 @@ class LauncherActivity : ComponentActivity() {
      */
     private fun applyRefreshRate(idle: Boolean) {
         runCatching {
+            // Android 16+ panels with adaptive refresh rate (LTPO, as on the Razr Fold) pick the rate
+            // per frame themselves, going far below 60 Hz on a still screen and boosting on touch.
+            // A window-level ask would pin them at 60 Hz or more, so there Folark asks nothing.
+            if (hasAdaptiveRefreshRate()) {
+                if (requestedRefreshRate != NO_PREFERENCE) {
+                    requestedRefreshRate = NO_PREFERENCE
+                    window.attributes = window.attributes.apply { preferredRefreshRate = 0f }
+                }
+                return
+            }
             val all = display?.supportedModes?.map { it.refreshRate }?.distinct().orEmpty()
             // Never above Android's own top rate (Settings ▸ Smooth display): such an ask is ignored
             // at best, and each change of ask is a window relayout.
@@ -403,6 +417,16 @@ class LauncherActivity : ComponentActivity() {
             requestedRefreshRate = target
             window.attributes = window.attributes.apply { preferredRefreshRate = target }
         }
+    }
+
+    /**
+     * Whether the display in use has Android 16's adaptive refresh rate (`Display.hasArrSupport()`,
+     * API 36). Looked up by name so the build doesn't depend on the exact SDK stub.
+     */
+    private fun hasAdaptiveRefreshRate(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 36) return false
+        val d = display ?: return false
+        return runCatching { d.javaClass.getMethod("hasArrSupport").invoke(d) as? Boolean }.getOrNull() == true
     }
 
     /** Full rate now (a touch, a fold, coming home), back to the idle rate after a quiet moment. */
@@ -442,6 +466,7 @@ class LauncherActivity : ComponentActivity() {
         // display with other modes: forget what was asked of the old one and ask again.
         requestedRefreshRate = 0f
         requestHighRefreshRate()
+        configChanges.tryEmit(Unit)
     }
 
     /** Pending callback for the in-flight widget configuration activity (see [startWidgetConfig]). */
@@ -469,6 +494,7 @@ class LauncherActivity : ComponentActivity() {
     }
 
     @Deprecated("Required for AppWidgetHost.startAppWidgetConfigureActivityForResult (legacy result API)")
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == WIDGET_CONFIG_REQUEST) {
@@ -483,6 +509,8 @@ class LauncherActivity : ComponentActivity() {
         super.onStart()
         // A launcher is the device HOME — a host hiccup must never crash it.
         runCatching { appWidgetHost.startListening() }
+        // "Display over other apps" may have been given or taken meanwhile: the taskbar's host follows.
+        runCatching { org.arkikeskus.launcher.feature.home.TaskbarHost.refresh(this) }
         LockAccessibilityService.setHomeVisible(true)
         keepAccessibilityServiceOn()
         // Back from Settings after a restore: rebuild the home screen from the restored layout.
@@ -648,6 +676,8 @@ class LauncherActivity : ComponentActivity() {
 
         /** The rate an untouched home screen settles at, and how long after the last touch. */
         const val IDLE_REFRESH_RATE = 60f
+        /** [requestedRefreshRate] when the window asks nothing (adaptive-refresh displays). */
+        const val NO_PREFERENCE = -1f
         const val REFRESH_IDLE_AFTER_MS = 3_000L
 
         /** The size of the spot an app grows out of: about an icon. */

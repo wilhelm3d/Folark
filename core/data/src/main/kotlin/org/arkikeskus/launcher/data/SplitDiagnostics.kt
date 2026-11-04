@@ -48,6 +48,8 @@ object SplitDiagnostics {
             appendLine("8. Window list: can't be read")
         } else {
             appendLine("8. Window list: ${read.tasks.size} app tasks")
+            if (dump) OpenTasks.list(context)
+            OpenTasks.formatProblem?.let { appendLine("   RECENT TASKS NOT UNDERSTOOD: $it (this Android build prints them differently)") }
             read.frontApp()?.let { appendLine("   in front: ${it.packageName} #${it.id}") }
             val split = read.splitShowing.ifEmpty { read.splitStaged }
             appendLine("   split: " + if (split.isEmpty()) "none" else {

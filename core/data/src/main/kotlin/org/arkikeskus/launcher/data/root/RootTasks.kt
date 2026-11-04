@@ -15,7 +15,7 @@ object RootTasks {
      */
     fun snapshot(taskId: Int, userId: Int): ByteArray? {
         if (taskId < 0 || userId < 0) return null
-        return RootShell.runBytes(snapshotCommand(taskId, userId))?.takeIf { it.size > MIN_JPEG_BYTES }
+        return RootShell.runBytes(snapshotCommand(taskId, userId), bulk = true)?.takeIf { it.size > MIN_JPEG_BYTES }
     }
 
     private fun snapshotCommand(taskId: Int, userId: Int): String {
@@ -125,7 +125,7 @@ object RootTasks {
         val script = safe.joinToString("; ") { p ->
             "if ! cmd deviceidle whitelist | grep -q \",$p,\"; then cmd deviceidle whitelist +$p >/dev/null 2>&1 && echo added:$p; fi; " +
                 "am set-standby-bucket $p active >/dev/null 2>&1; " +
-                "for pid in \$(pidof $p); do echo $KEEP_ALIVE_ADJ > /proc/\$pid/oom_score_adj; done"
+                "for pid in \$(pidof $p); do f=/proc/\$pid/oom_score_adj; [ \"\$(cat \$f 2>/dev/null)\" -gt $KEEP_ALIVE_ADJ ] 2>/dev/null && echo $KEEP_ALIVE_ADJ > \$f || true; done"
         }
         val out = RootShell.run(script, PROTECT_TIMEOUT_MS) ?: return emptySet()
         return out.lineSequence().filter { it.startsWith("added:") }.map { it.removePrefix("added:").trim() }.toSet()
@@ -136,9 +136,35 @@ object RootTasks {
         if (!PACKAGE.matches(packageName)) return
         val script = buildString {
             if (exempted) append("cmd deviceidle whitelist -$packageName >/dev/null 2>&1; ")
-            append("for pid in \$(pidof $packageName); do echo 0 > /proc/\$pid/oom_score_adj; done")
+            // The priority itself is not written back: 0 would rank the app as if it were on screen.
+            // Android works it out again at the app's next state change.
+            append("true")
         }
         RootShell.run(script)
+    }
+
+    /**
+     * How much memory (resident, KB) each of [packages] is using, all its processes together
+     * ("pkg" and "pkg:service"), from one `ps` call. Empty without root.
+     */
+    fun memoryKb(packages: Collection<String>): Map<String, Long> {
+        val wanted = packages.filter { PACKAGE.matches(it) }.toSet()
+        if (wanted.isEmpty()) return emptyMap()
+        val out = RootShell.run("ps -A -o RSS,NAME") ?: return emptyMap()
+        return parseMemory(out, wanted)
+    }
+
+    /** [memoryKb]'s parsing: "RSS NAME" lines, summed per package in [wanted]. */
+    internal fun parseMemory(psOutput: String, wanted: Set<String>): Map<String, Long> {
+        val totals = HashMap<String, Long>()
+        for (line in psOutput.lineSequence()) {
+            val parts = line.trim().split(Regex("\\s+"), limit = 2)
+            if (parts.size < 2) continue
+            val kb = parts[0].toLongOrNull() ?: continue
+            val pkg = parts[1].substringBefore(':')
+            if (pkg in wanted) totals[pkg] = (totals[pkg] ?: 0L) + kb
+        }
+        return totals
     }
 
     /** Stops [packageName] completely (its tasks stay listed until Android tidies them up). */
@@ -152,6 +178,11 @@ object RootTasks {
     private const val HELPER_TIMEOUT_MS = 10_000L
     private const val SNAPSHOTS_TIMEOUT_MS = 20_000L
     private const val PROTECT_TIMEOUT_MS = 8_000L
-    /** The priority Android gives its own persistent services: far from the first to be closed. */
-    private const val KEEP_ALIVE_ADJ = -800
+    /**
+     * Android's "perceptible" priority (what a playing music app gets): pinned apps are closed only
+     * after every cached and background app, but never before the app you are using. The old -800
+     * (persistent system services) ranked them above the foreground app, so under memory pressure
+     * Android closed what was on screen first.
+     */
+    private const val KEEP_ALIVE_ADJ = 200
 }

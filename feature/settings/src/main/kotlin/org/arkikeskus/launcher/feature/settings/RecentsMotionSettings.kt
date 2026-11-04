@@ -41,6 +41,9 @@ private val ENTER_LABELS = listOf(
     LauncherSettings.RECENTS_ENTER_FLIP to R.string.settings_recents_enter_flip,
     LauncherSettings.RECENTS_ENTER_FAN to R.string.settings_recents_enter_fan,
     LauncherSettings.RECENTS_ENTER_FOCUS to R.string.settings_recents_enter_focus,
+    LauncherSettings.RECENTS_ENTER_WAVE to R.string.settings_recents_enter_wave,
+    LauncherSettings.RECENTS_ENTER_SWING to R.string.settings_recents_enter_swing,
+    LauncherSettings.RECENTS_ENTER_DROP to R.string.settings_recents_enter_drop,
     LauncherSettings.RECENTS_ENTER_NONE to R.string.settings_recents_anim_none,
 )
 

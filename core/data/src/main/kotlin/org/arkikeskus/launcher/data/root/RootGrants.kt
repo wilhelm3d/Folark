@@ -62,22 +62,35 @@ object RootGrants {
     }
 
     /**
-     * The permissions Android normally asks for in a dialog (calendar, contacts, phone state,
-     * location, nearby devices…): every one Folark declares that isn't granted yet, given with
-     * root. True when all of them are in place afterwards.
+     * The permissions Android normally asks for in a dialog that Folark declares and doesn't have
+     * yet, given with root. True when all of them are in place afterwards. Permissions to personal
+     * data ([PERSONAL_DATA]: contacts, calendar, location, phone state, nearby devices) are left
+     * out unless [includePersonal]: each feature asks for its own when it is switched on, so root
+     * never hands Folark more data than the features in use need.
      */
-    fun grantRuntime(context: Context): Boolean {
+    fun grantRuntime(context: Context, includePersonal: Boolean = false): Boolean {
         val pkg = context.packageName
         if (!SAFE.matches(pkg)) return false
-        val missing = runtimePermissions(context).filter { !has(context, it) }
+        val wanted = runtimePermissions(context).filter { includePersonal || it !in PERSONAL_DATA }
+        val missing = wanted.filter { !has(context, it) }
         if (missing.isEmpty()) return true
         if (!RootShell.available()) return false
         for (perm in missing) {
             if (!SAFE.matches(perm)) continue
             RootShell.run("pm grant $pkg $perm")
         }
-        return runtimePermissions(context).all { has(context, it) }
+        return wanted.all { has(context, it) }
     }
+
+    /** Runtime permissions that reach the user's personal data: never granted in bulk. */
+    val PERSONAL_DATA = setOf(
+        "android.permission.READ_CONTACTS",
+        "android.permission.READ_CALENDAR",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.BLUETOOTH_CONNECT",
+    )
 
     /** Folark's own "dangerous" (asked-for) permissions, as declared in its manifest. */
     private fun runtimePermissions(context: Context): List<String> = runCatching {
@@ -107,8 +120,17 @@ object RootGrants {
             if (g == WIDGETS && ok) widgetsDone = true
         }
         if (!makeDefaultHome(context)) failed += "home"
-        val total = ALL.size + 2
+        if (!allowOverlay(context)) failed += "overlay"
+        val total = ALL.size + 3
         return Outcome(true, total - failed.size, total, failed)
+    }
+
+    /** "Display over other apps", which the taskbar draws with. */
+    fun allowOverlay(context: Context): Boolean {
+        val pkg = context.packageName
+        if (!SAFE.matches(pkg)) return false
+        if (runCatching { android.provider.Settings.canDrawOverlays(context) }.getOrDefault(false)) return true
+        return RootShell.available() && RootShell.run("appops set $pkg SYSTEM_ALERT_WINDOW allow") != null
     }
 
     /** Makes Folark the default home app. */
@@ -118,7 +140,7 @@ object RootGrants {
         return RootShell.available() && RootShell.run("cmd package set-home-activity $pkg/$HOME") != null
     }
 
-    private var lastRestore = 0L
+    @Volatile private var lastRestore = 0L
 
     /**
      * Gives back the grants Settings ▸ Root keeps, if Android took any away (at most once a

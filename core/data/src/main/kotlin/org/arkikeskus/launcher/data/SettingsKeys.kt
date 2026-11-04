@@ -217,14 +217,27 @@ internal object Keys {
     val RECENTS_SORT = stringPreferencesKey("recents_sort")
     val RECENTS_SHOW_TIME = booleanPreferencesKey("recents_show_time")
     val RECENTS_OUTER_SHOW_TIME = booleanPreferencesKey("recents_outer_show_time")
-    val RECENTS_SHOW_ACTIONS = booleanPreferencesKey("recents_show_actions")
-    val RECENTS_OUTER_SHOW_ACTIONS = booleanPreferencesKey("recents_outer_show_actions")
     val RECENTS_CARD_LAYOUT = stringPreferencesKey("recents_card_layout")
     val RECENTS_OUTER_CARD_LAYOUT = stringPreferencesKey("recents_outer_card_layout")
     val RECENTS_CONFIRM_CLOSE_ALL = booleanPreferencesKey("recents_confirm_close_all")
     val RECENTS_THIRD_IN_SPLIT = booleanPreferencesKey("recents_third_in_split")
     val RECENTS_THUMBNAILS = booleanPreferencesKey("recents_thumbnails")
     val RECENTS_SPEAKER_BADGE = booleanPreferencesKey("recents_speaker_badge")
+    val HAPTICS_STRENGTH = stringPreferencesKey("haptics_strength")
+    val HAPTICS_DRAG = booleanPreferencesKey("haptics_drag")
+    val HAPTICS_RECENTS = booleanPreferencesKey("haptics_recents")
+    val HAPTICS_CLOSE = booleanPreferencesKey("haptics_close")
+    val HAPTICS_SPLIT = booleanPreferencesKey("haptics_split")
+    val HAPTICS_LAUNCH = booleanPreferencesKey("haptics_launch")
+    val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+    val ICON_SHAPE_ALL = booleanPreferencesKey("icon_shape_all")
+    val TASKBAR_LAUNCH_GLOW = stringPreferencesKey("taskbar_launch_glow")
+    val DRAWER_TWO_PANE = booleanPreferencesKey("drawer_two_pane")
+    val DRAWER_AZ_HOLD_SCROLL = booleanPreferencesKey("drawer_az_hold_scroll")
+    val SEARCH_INLINE_SHORTCUTS = booleanPreferencesKey("search_inline_shortcuts")
+    val SEARCH_SETTINGS_PAGES = booleanPreferencesKey("search_settings_pages")
+    val RECENTS_MEMORY_BADGE = booleanPreferencesKey("recents_memory_badge")
+    val RECENTS_GROUP_SPLITS = booleanPreferencesKey("recents_group_splits")
     val RECENTS_ROOT_CLOSE = booleanPreferencesKey("recents_root_close")
     val TASKBAR_RUNNING_APPS = booleanPreferencesKey("taskbar_running_apps")
     val TASKBAR_RUNNING_DOTS = booleanPreferencesKey("taskbar_running_dots")
@@ -293,7 +306,6 @@ internal object Keys {
             RECENTS_CORNER to RECENTS_OUTER_CORNER,
             RECENTS_BACKDROP to RECENTS_OUTER_BACKDROP,
             RECENTS_SHOW_TIME to RECENTS_OUTER_SHOW_TIME,
-            RECENTS_SHOW_ACTIONS to RECENTS_OUTER_SHOW_ACTIONS,
             RECENTS_GLASS to RECENTS_OUTER_GLASS,
             RECENTS_GLASS_BLUR to RECENTS_OUTER_GLASS_BLUR,
             RECENTS_GLASS_TINT to RECENTS_OUTER_GLASS_TINT,

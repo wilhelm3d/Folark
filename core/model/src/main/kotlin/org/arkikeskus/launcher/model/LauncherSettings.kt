@@ -163,6 +163,10 @@ data class LauncherSettings(
         /** The drawer's Private Space section (both displays; where the phone has a Private Space). */
         val showPrivateSpace: Boolean = true,
         val innerSidebar: Boolean = false,
+        /** A-Z bar: hold a letter still for a moment, then sliding scrolls smoothly through the apps instead of jumping letter to letter. */
+        val azHoldScroll: Boolean = true,
+        /** Unfolded: the drawer's tabs as a list on the left, their apps on the right. */
+        val twoPane: Boolean = false,
         val layoutMode: String = DRAWER_LAYOUT_GRID,
     )
 
@@ -176,6 +180,10 @@ data class LauncherSettings(
         val web: Boolean = true,
         /** Quick actions in search: timers, alarms, events, directions, email, notes, numbers. */
         val actions: Boolean = true,
+        /** Search finds Android's own settings pages (Wi-Fi, notifications, developer options, …). */
+        val settingsPages: Boolean = true,
+        /** The top app found shows its shortcuts (New message, New tab, …) right under it. */
+        val inlineShortcuts: Boolean = true,
     )
 
     /** App icons and their labels. */
@@ -195,6 +203,8 @@ data class LauncherSettings(
         val sizeScale: Float = 1.0f,
         /** Shape of app icons (both displays), one of ICON_SHAPE_*; "system" leaves them as drawn. */
         val shape: String = ICON_SHAPE_SYSTEM,
+        /** Icons that can't take a shape by themselves (older apps) sit on a plate in a pale tone of their own colour, cut to the same shape. */
+        val shapeAllIcons: Boolean = true,
         /** Size multiplier for app icon labels across home/dock/drawer/folders (1.0 = the default 11sp). */
         val labelTextScale: Float = 1.0f,
         /** ARGB color for app icon labels on the home surfaces (home/dock/folders); default white. The
@@ -363,6 +373,20 @@ data class LauncherSettings(
         val animationSpeed: Float = 1f,
         /** How an app opens from the launcher (one of APP_OPEN_*). */
         val appOpenAnimation: String = APP_OPEN_ICON,
+        /** Haptic feedback for Folark's own actions (opening apps, split screen, closing apps, Recents, drag and drop). */
+        val hapticsEnabled: Boolean = true,
+        /** A light click when an app opens. */
+        val hapticsLaunch: Boolean = true,
+        /** A rising double tap when two apps come together in split screen. */
+        val hapticsSplit: Boolean = true,
+        /** A soft thud when an app is closed (a firmer one for Close all). */
+        val hapticsClose: Boolean = true,
+        /** A gentle swell when Recents opens. */
+        val hapticsRecents: Boolean = true,
+        /** Ticks when an icon or card is picked up, crosses into a drop zone and lands. */
+        val hapticsDrag: Boolean = true,
+        /** How strong the haptics are (HAPTICS_*), on top of the phone's own touch-feedback strength. */
+        val hapticsStrength: String = HAPTICS_MEDIUM,
         /** Folark's battery saver (both displays): off, on, or following the system's battery saver. */
         val batterySaverMode: String = BATTERY_SAVER_AUTO,
         /** With "With system": also switch the saver on by itself when the battery is low (below
@@ -480,6 +504,8 @@ data class LauncherSettings(
         val hideButton: Boolean = true,
         /** How the bar shows and hides: one of TASKBAR_ANIM_*. */
         val taskbarAnim: String = TASKBAR_ANIM_SLIDE,
+        /** The glow when an app is started from the bar: in the app's colour, the accent colour, white, or none (LAUNCH_GLOW_*). */
+        val launchGlow: String = LauncherSettings.LAUNCH_GLOW_APP,
         /** Which taskbar: Folark's own, or Android's (the system launcher's, with its gestures and
          *  quick switch); for Android's, its mode (1 always, 2 by a swipe up, 4 off). */
         val source: String = TASKBAR_SOURCE_FOLARK,
@@ -533,8 +559,6 @@ data class LauncherSettings(
         val sort: String = RECENTS_SORT_RECENT,
         /** When each app was last used, under its name. */
         val showTime: Boolean = true,
-        /** Split / Pop-up buttons on each card. */
-        val showActions: Boolean = true,
         /** Card look: [RECENTS_CARD_HEADER] (app row above the picture) or [RECENTS_CARD_OVERLAY]
          *  (the picture fills the card, the app icon floats on top — a cleaner, borderless look). */
         val cardLayout: String = RECENTS_CARD_OVERLAY,
@@ -559,6 +583,10 @@ data class LauncherSettings(
         /** A speaker badge on a card whose app has a media session; a tap pauses/resumes just that
          *  app (there is no public per-UID stream mute, so this is the per-app audio control). */
         val speakerBadge: Boolean = false,
+        /** Apps that shared a split screen show as one double card (a tap brings the split back); off: a card per app. */
+        val groupSplits: Boolean = true,
+        /** With root: how much memory each card's app is using, as a small label on the card. */
+        val memoryBadge: Boolean = false,
         /** Recents animations: how the cards come in (RECENTS_ENTER_*), how a card picked for split
          *  view answers (RECENTS_SELECT_*), and how fast both play (1 = normal, higher = faster). */
         val enterAnimation: String = RECENTS_ENTER_RISE,
@@ -797,7 +825,14 @@ data class LauncherSettings(
         const val THEMED_STYLE_INVERTED = "inverted"
         const val THEMED_STYLE_GLASS = "glass"
         const val THEMED_STYLE_DUOTONE = "duotone"
-        val THEMED_STYLES = listOf(THEMED_STYLE_CLASSIC, THEMED_STYLE_INVERTED, THEMED_STYLE_GLASS, THEMED_STYLE_DUOTONE)
+        /** In each app's own colour: a bold plate of it, the glyph almost white. */
+        const val THEMED_STYLE_OWN = "own"
+        /** In each app's own colour, quietly: a pale (or deep, when dark) plate, the glyph in the colour. */
+        const val THEMED_STYLE_SOFT = "soft"
+        val THEMED_STYLES = listOf(
+            THEMED_STYLE_CLASSIC, THEMED_STYLE_INVERTED, THEMED_STYLE_GLASS, THEMED_STYLE_DUOTONE,
+            THEMED_STYLE_OWN, THEMED_STYLE_SOFT,
+        )
         const val BATTERY_SAVER_OFF = "off"
         const val BATTERY_SAVER_AUTO = "auto"
         const val BATTERY_SAVER_ON = "on"
@@ -839,9 +874,13 @@ data class LauncherSettings(
         const val TASKBAR_THEME_ACCENT = "accent"
         /** Liquid Glass: see-through with a bright rim and a sheen along the top. */
         const val TASKBAR_THEME_GLASS = "glass"
+        /** Pure black, for OLED screens: the bar disappears into a dark app. */
+        const val TASKBAR_THEME_AMOLED = "amoled"
+        /** Near-black with a glowing accent-coloured rim. */
+        const val TASKBAR_THEME_NEON = "neon"
         val TASKBAR_THEMES = listOf(
             TASKBAR_THEME_CLEAR, TASKBAR_THEME_FROSTED, TASKBAR_THEME_DARK, TASKBAR_THEME_LIGHT, TASKBAR_THEME_ACCENT,
-            TASKBAR_THEME_GLASS,
+            TASKBAR_THEME_GLASS, TASKBAR_THEME_AMOLED, TASKBAR_THEME_NEON,
         )
         const val TASKBAR_MEDIA_POS_START = "start"
         const val TASKBAR_MEDIA_POS_MIDDLE = "middle"
@@ -937,9 +976,16 @@ data class LauncherSettings(
         const val RECENTS_ENTER_FAN = "fan"
         const val RECENTS_ENTER_FOCUS = "focus"
         const val RECENTS_ENTER_NONE = "none"
+        /** A ripple running across the cards: each rises with a little overshoot, left to right. */
+        const val RECENTS_ENTER_WAVE = "wave"
+        /** Each card swings down into place from its top edge, like a sign on a hinge. */
+        const val RECENTS_ENTER_SWING = "swing"
+        /** Cards fall in from above and settle with a bounce. */
+        const val RECENTS_ENTER_DROP = "drop"
         val RECENTS_ENTERS = listOf(
             RECENTS_ENTER_RISE, RECENTS_ENTER_ZOOM, RECENTS_ENTER_CASCADE, RECENTS_ENTER_FLIP,
-            RECENTS_ENTER_FAN, RECENTS_ENTER_FOCUS, RECENTS_ENTER_NONE,
+            RECENTS_ENTER_FAN, RECENTS_ENTER_FOCUS, RECENTS_ENTER_WAVE, RECENTS_ENTER_SWING,
+            RECENTS_ENTER_DROP, RECENTS_ENTER_NONE,
         )
 
         /** A card picked for split view: a hop, a spreading ring, lifted up, leaning to its side,
@@ -985,9 +1031,15 @@ data class LauncherSettings(
         const val ICON_SHAPE_ROUNDED = "rounded"
         const val ICON_SHAPE_TEARDROP = "teardrop"
         const val ICON_SHAPE_PEBBLE = "pebble"
+        const val ICON_SHAPE_SQUARE = "square"
+        const val ICON_SHAPE_ARCH = "arch"
+        const val ICON_SHAPE_HEXAGON = "hexagon"
+        const val ICON_SHAPE_DIAMOND = "diamond"
+        const val ICON_SHAPE_COOKIE = "cookie"
         val ICON_SHAPES = listOf(
             ICON_SHAPE_SYSTEM, ICON_SHAPE_CIRCLE, ICON_SHAPE_SQUIRCLE,
             ICON_SHAPE_ROUNDED, ICON_SHAPE_TEARDROP, ICON_SHAPE_PEBBLE,
+            ICON_SHAPE_SQUARE, ICON_SHAPE_ARCH, ICON_SHAPE_HEXAGON, ICON_SHAPE_DIAMOND, ICON_SHAPE_COOKIE,
         )
         const val TASKBAR_HANDLES_BOTH = "both"
         const val TASKBAR_HANDLES_LEFT = "left"
@@ -1007,6 +1059,18 @@ data class LauncherSettings(
         const val TASKBAR_ANIM_SCALE = "scale"
         const val TASKBAR_ANIM_RISE = "rise"
         const val TASKBAR_ANIM_BOUNCE = "bounce"
+        /** Tips up from the bottom edge like a lid. */
+        const val TASKBAR_ANIM_FLIP = "flip"
+        /** Opens out sideways from the middle, like the phone unfolding. */
+        const val TASKBAR_ANIM_UNFOLD = "unfold"
+        /** Pops up small and springs to size. */
+        const val TASKBAR_ANIM_POP = "pop"
+
+        /** The glow when an app is started from the taskbar (Settings ▸ Taskbar ▸ Launch glow). */
+        const val LAUNCH_GLOW_APP = "app"
+        const val LAUNCH_GLOW_ACCENT = "accent"
+        const val LAUNCH_GLOW_WHITE = "white"
+        const val LAUNCH_GLOW_OFF = "off"
 
         /** Minutes as the clock style colours them (accent or like the hours). */
         const val CLOCK_MINUTE_STYLE = "style"
@@ -1039,7 +1103,18 @@ data class LauncherSettings(
         const val APP_OPEN_NONE = "none"
         /** The app's window is revealed from the icon that was tapped (a growing clip). */
         const val APP_OPEN_REVEAL = "reveal"
-        val APP_OPENS = listOf(APP_OPEN_SYSTEM, APP_OPEN_ICON, APP_OPEN_REVEAL, APP_OPEN_ZOOM, APP_OPEN_SLIDE, APP_OPEN_FADE, APP_OPEN_NONE)
+        /** Springs up from small, a touch past full size and back. */
+        const val HAPTICS_LIGHT = "light"
+        const val HAPTICS_MEDIUM = "medium"
+        const val HAPTICS_STRONG = "strong"
+        val HAPTICS_STRENGTHS = listOf(HAPTICS_LIGHT, HAPTICS_MEDIUM, HAPTICS_STRONG)
+        const val APP_OPEN_POP = "pop"
+        /** Opens out sideways from the middle, like the phone unfolding. */
+        const val APP_OPEN_UNFOLD = "unfold"
+        val APP_OPENS = listOf(
+            APP_OPEN_SYSTEM, APP_OPEN_ICON, APP_OPEN_REVEAL, APP_OPEN_ZOOM, APP_OPEN_SLIDE, APP_OPEN_FADE,
+            APP_OPEN_POP, APP_OPEN_UNFOLD, APP_OPEN_NONE,
+        )
         const val FOLDER_ANIM_SHEET = "sheet"
         const val FOLDER_ANIM_ZOOM = "zoom"
         const val FOLDER_ANIM_FADE = "fade"

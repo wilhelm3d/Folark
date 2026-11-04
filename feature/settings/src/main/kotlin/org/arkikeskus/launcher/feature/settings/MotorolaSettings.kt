@@ -65,6 +65,11 @@ internal fun IconShapeRow(selected: String, onSelect: (String) -> Unit) {
         LauncherSettings.ICON_SHAPE_ROUNDED to R.string.settings_icon_shape_rounded,
         LauncherSettings.ICON_SHAPE_TEARDROP to R.string.settings_icon_shape_teardrop,
         LauncherSettings.ICON_SHAPE_PEBBLE to R.string.settings_icon_shape_pebble,
+        LauncherSettings.ICON_SHAPE_SQUARE to R.string.settings_icon_shape_square,
+        LauncherSettings.ICON_SHAPE_ARCH to R.string.settings_icon_shape_arch,
+        LauncherSettings.ICON_SHAPE_HEXAGON to R.string.settings_icon_shape_hexagon,
+        LauncherSettings.ICON_SHAPE_DIAMOND to R.string.settings_icon_shape_diamond,
+        LauncherSettings.ICON_SHAPE_COOKIE to R.string.settings_icon_shape_cookie,
     )
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(

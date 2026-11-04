@@ -138,6 +138,22 @@ class SplitPickerViewModel @Inject constructor(
     }.getOrNull()
 
     /** Narrows the split showing now so the first app only peeks in (once the picked app is up). */
+    /**
+     * Sets the divider so the picked app (opposite [firstOnRight]) gets [share] percent (33 or 66;
+     * 50 leaves Android's even split alone), once the split is up. [afterFormingSplit]: the split
+     * is still being built, so it waits longer.
+     */
+    fun snapShareLater(firstOnRight: Boolean, share: Int, afterFormingSplit: Boolean = false) {
+        if (share == 50) return
+        appScope.launch {
+            delay(if (afterFormingSplit) SHARE_AFTER_FORM_MS else PEEK_AFTER_MS)
+            // The SNAP_* stops are meant for the left (top) app: the pick is there when the first is on the right.
+            val pickedLeft = firstOnRight
+            val pickedBig = share > 50
+            splitCoordinator.snapTo(if (pickedBig == pickedLeft) SplitThree.SNAP_TWO_THIRDS else SplitThree.SNAP_ONE_THIRD)
+        }
+    }
+
     fun snapPeekLater(firstOnRight: Boolean) {
         appScope.launch {
             delay(PEEK_AFTER_MS)
@@ -210,6 +226,7 @@ class SplitPickerViewModel @Inject constructor(
     /** [app] was opened in the picker's half: remembered for "Paired before". */
     fun recordPair(firstPackage: String, firstTaskId: Int?, app: AppItem) {
         appScope.launch(Dispatchers.IO) {
+            org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.SPLIT)
             SplitHistory.record(context, firstPackage, app.packageName)
             splitCoordinator.offerUndo(SplitApp(firstPackage, null, firstTaskId))
         }
@@ -240,5 +257,7 @@ class SplitPickerViewModel @Inject constructor(
     private companion object {
         const val PICKER_CLOSE_MS = 300L
         const val PEEK_AFTER_MS = 450L
+        /** A split built after the picker closed takes longer to be up before its divider can move. */
+        const val SHARE_AFTER_FORM_MS = 1_400L
     }
 }

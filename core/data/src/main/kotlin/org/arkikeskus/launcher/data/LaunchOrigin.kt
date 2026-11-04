@@ -31,6 +31,31 @@ object LaunchOrigin {
         remember(view)
     }
 
+    /** A tile of [screen] bounds (screen coordinates) on [view]'s window was tapped — a Recents card. */
+    fun rect(view: View, screen: Rect) {
+        bounds.set(screen)
+        remember(view)
+    }
+
+    /**
+     * Launch options that grow the opening app out of the recorded place (once), or null when
+     * nothing was recorded just now. [reveal]: a clip reveal instead of a scale-up.
+     */
+    fun takeOptions(reveal: Boolean = false): android.os.Bundle? {
+        val (view, r) = take() ?: return null
+        return runCatching {
+            val at = IntArray(2)
+            view.getLocationOnScreen(at)
+            val x = r.left - at[0]
+            val y = r.top - at[1]
+            if (reveal) {
+                android.app.ActivityOptions.makeClipRevealAnimation(view, x, y, r.width(), r.height()).toBundle()
+            } else {
+                android.app.ActivityOptions.makeScaleUpAnimation(view, x, y, r.width(), r.height()).toBundle()
+            }
+        }.getOrNull()
+    }
+
     private fun remember(view: View) {
         source = WeakReference(view)
         recordedAt = SystemClock.uptimeMillis()

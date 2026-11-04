@@ -127,6 +127,8 @@ private fun AppearanceSectionContent(
         AnimationStyleRows(s = s, viewModel = viewModel)
     }
 
+    HapticsSection(s = s, viewModel = viewModel)
+
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_appearance),
         icon = Icons.Rounded.Palette,
@@ -166,8 +168,8 @@ private fun AppearanceSectionContent(
             onDragValue = { overrides.glassTint = it },
         )
         GlassBlurPreview(s)
-        ExpressiveRowDivider()
 
+        SettingsGroupHeading(stringResource(R.string.settings_heading_icons))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_themed_icons),
@@ -183,6 +185,8 @@ private fun AppearanceSectionContent(
                         LauncherSettings.THEMED_STYLE_INVERTED to stringResource(R.string.settings_themed_style_inverted),
                         LauncherSettings.THEMED_STYLE_GLASS to stringResource(R.string.settings_themed_style_glass),
                         LauncherSettings.THEMED_STYLE_DUOTONE to stringResource(R.string.settings_themed_style_duotone),
+                        LauncherSettings.THEMED_STYLE_OWN to stringResource(R.string.settings_themed_style_own),
+                        LauncherSettings.THEMED_STYLE_SOFT to stringResource(R.string.settings_themed_style_soft),
                     ),
                     selected = s.icons.themedIconStyle,
                     onSelect = viewModel::setThemedIconStyle,
@@ -209,8 +213,18 @@ private fun AppearanceSectionContent(
         ExpressiveRowDivider()
 
         IconShapeRow(selected = s.icons.shape, onSelect = viewModel::setIconShape)
-        ExpressiveRowDivider()
+        if (s.icons.shape != LauncherSettings.ICON_SHAPE_SYSTEM) {
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_icon_shape_all),
+                subtitle = stringResource(R.string.settings_icon_shape_all_desc),
+                checked = s.icons.shapeAllIcons,
+                onCheckedChange = viewModel::setShapeAllIcons,
+                shared = true,
+            )
+        }
 
+        SettingsGroupHeading(stringResource(R.string.settings_heading_status_bar))
         WeatherToggle(enabled = s.widgets.showWeather, onSetEnabled = { viewModel.setShowWeather(it, screenType) })
         ExpressiveRowDivider()
 
@@ -259,8 +273,8 @@ private fun AppearanceSectionContent(
                 onValueChange = viewModel::setSystemBarPaddingCover,
             )
         }
-        ExpressiveRowDivider()
 
+        SettingsGroupHeading(stringResource(R.string.settings_heading_widgets))
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_tonal),
             checked = s.widgets.tonalBackground,
@@ -328,8 +342,8 @@ private fun AppearanceSectionContent(
                 onClick = onBatchTimes,
             )
         }
-        ExpressiveRowDivider()
 
+        SettingsGroupHeading(stringResource(R.string.settings_heading_home_pages))
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_page_indicator),
             checked = s.home.showPageIndicator,

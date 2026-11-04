@@ -38,6 +38,8 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         appScope.launch {
             settingsRepository.settings(ScreenType.INNER).collect { s ->
                 RootFeatures.update(s)
+                // Settings ▸ Haptics, for every place that plays them (some without a view).
+                org.arkikeskus.launcher.data.Haptics.settings = s.motion
                 RootGrants.restoreIfNeeded(this@LauncherApplication)
             }
         }
@@ -62,5 +64,8 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                     runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.StatusBarPaddingHook.CHANGED_URI, null) }
                 }
         }
+        // Folark's taskbar in its own overlay windows, when "Display over other apps" is allowed
+        // (otherwise the accessibility service hosts it, if enabled).
+        runCatching { org.arkikeskus.launcher.feature.home.TaskbarHost.refresh(this) }
     }
 }

@@ -17,3 +17,9 @@
 # We only silence warnings about them — we must NOT -keep them, or R8 would copy the compile-only
 # stub into the APK, duplicating Vector's framework classes and breaking module loading.
 -dontwarn de.robv.android.xposed.**
+
+# Release builds drop debug and verbose logging (warnings and errors stay).
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+}

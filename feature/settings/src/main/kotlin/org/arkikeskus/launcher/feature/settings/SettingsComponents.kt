@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -43,6 +44,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -586,4 +588,73 @@ fun <T> ExpressiveSegmentedControl(
             }
         }
     }
+}
+
+/**
+ * Rarely changed settings at the end of a card, folded away behind an "Advanced" row so the card
+ * shows the main choices first. It opens by itself when the settings search jumps to this page,
+ * so a found setting is never hidden in it.
+ */
+@Composable
+fun ColumnScope.SettingsAdvanced(content: @Composable ColumnScope.() -> Unit) {
+    val palette = LocalExpressivePalette.current
+    val focus = LocalSettingsFocus.current
+    var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    if (focus?.value != null && !open) open = true
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 90f else 0f, label = "advancedChevron")
+    ExpressiveRowDivider()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { open = !open }
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Tune,
+            contentDescription = null,
+            tint = palette.dim,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = stringResource(if (open) R.string.settings_advanced_hide else R.string.settings_advanced),
+            color = palette.dim,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = palette.dim,
+            modifier = Modifier.size(20.dp).rotate(turn),
+        )
+    }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = open,
+        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+    ) {
+        Column {
+            ExpressiveRowDivider()
+            content()
+        }
+    }
+}
+
+
+/** A small heading between groups of rows inside one card. */
+@Composable
+fun SettingsGroupHeading(text: String) {
+    val studio = LocalSettingsStudio.current
+    Text(
+        text = text.uppercase(),
+        color = Accent,
+        fontSize = 11.5.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = if (studio) 1.4.sp else 1.sp,
+        modifier = Modifier.padding(start = 4.dp, top = 14.dp, bottom = 6.dp),
+    )
 }

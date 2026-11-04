@@ -287,9 +287,10 @@ class BackupRepository @Inject constructor(
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (entry.isDirectory) continue
-                val bytes = zip.readBytes()
+                // Read against what is left of the cap, so one huge (or zip-bomb) entry is refused
+                // as it inflates instead of after it was held whole in memory.
+                val bytes = readCapped(zip, MAX_BACKUP_BYTES - total) ?: return null
                 total += bytes.size
-                if (total > MAX_BACKUP_BYTES) return null
                 val name = entry.name
                 if (name == MANIFEST_ENTRY) {
                     manifest = JSONObject(String(bytes, Charsets.UTF_8))
@@ -303,6 +304,22 @@ class BackupRepository @Inject constructor(
             }
         }
         return manifest?.let { it to files }
+    }
+
+    /** The rest of [input], or null as soon as it runs past [limit] bytes. */
+    internal fun readCapped(input: InputStream, limit: Long): ByteArray? {
+        if (limit < 0) return null
+        val out = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(64 * 1024)
+        var read = 0L
+        while (true) {
+            val n = input.read(chunk)
+            if (n < 0) break
+            read += n
+            if (read > limit) return null
+            out.write(chunk, 0, n)
+        }
+        return out.toByteArray()
     }
 
     private fun restoreFiles(files: Map<String, ByteArray>) {

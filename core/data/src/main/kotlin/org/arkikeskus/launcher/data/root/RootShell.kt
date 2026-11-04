@@ -13,8 +13,9 @@ import java.util.concurrent.TimeUnit
  * do (Settings ▸ Recents and Settings ▸ Root). Root may be there only until the next reboot, so it
  * is checked again from time to time instead of being assumed.
  *
- * One `su` shell is kept open while Folark is using root and commands are written into it, so a
- * command costs a few milliseconds instead of starting `su` again (50–200 ms each). The shell is
+ * Two `su` shells are kept open while Folark is using root and commands are written into them, so
+ * a command costs a few milliseconds instead of starting `su` again (50–200 ms each): one for quick
+ * commands, one for slow jobs, so a 20-second screenshot job never holds up locking the screen. The shell is
  * closed after [IDLE_CLOSE_MS] without commands. Each command runs in its own subshell (so nothing
  * it does can change the next one), with no input, and its output ends at a random marker line
  * carrying its exit code.
@@ -57,53 +58,69 @@ object RootShell {
     /** The last answer of [available] without asking `su` again; null before the first check. */
     val lastKnown: Boolean? get() = known
 
-    /** Runs [command] as root and returns what it printed, or null when root refused, it failed or timed out. */
-    fun run(command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): String? =
-        runBytes(command, timeoutMs)?.toString(Charsets.UTF_8)
+    /**
+     * Runs [command] as root and returns what it printed, or null when root refused, it failed or
+     * timed out. [bulk]: a slow job (screenshots, the task helper, a root prompt) that runs in a
+     * shell of its own, so quick commands (lock, recents, a grant) never queue behind it; by default
+     * every command allowed more than [QUICK_MAX_MS] counts as one.
+     */
+    fun run(command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS, bulk: Boolean = timeoutMs > QUICK_MAX_MS): String? =
+        runBytes(command, timeoutMs, bulk)?.toString(Charsets.UTF_8)
 
     /** Like [run], for binary output (a picture). */
-    fun runBytes(command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): ByteArray? {
+    fun runBytes(command: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS, bulk: Boolean = timeoutMs > QUICK_MAX_MS): ByteArray? {
         if (!enabled) return null
-        synchronized(lock) {
+        return (if (bulk) bulkLane else quickLane).run(command, timeoutMs)
+    }
+
+    /** The shell started for root. Tests on a PC set it to `sh` to run the same code without root. */
+    @Volatile internal var binary: String = "su"
+
+    /** Closes the shells (they are opened again by the next command). */
+    fun close() {
+        quickLane.close()
+        bulkLane.close()
+    }
+
+    private val timer = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "folark-root-idle").apply { isDaemon = true }
+    }
+
+    /** One `su` shell and the commands queued for it, one at a time. */
+    private class Lane {
+        private val lock = Any()
+        private var session: Session? = null
+        private var idleClose: ScheduledFuture<*>? = null
+
+        fun run(command: String, timeoutMs: Long): ByteArray? = synchronized(lock) {
             val shell = session ?: Session.start()?.also { session = it } ?: return null
             val result = shell.exec(command, timeoutMs)
             if (!shell.alive) {
                 shell.destroy()
                 session = null
             }
-            scheduleIdleClose()
-            return result
+            idleClose?.cancel(false)
+            idleClose = timer.schedule({ close() }, IDLE_CLOSE_MS, TimeUnit.MILLISECONDS)
+            result
+        }
+
+        fun close() {
+            synchronized(lock) {
+                session?.destroy()
+                session = null
+            }
         }
     }
 
-    /** The shell started for root. Tests on a PC set it to `sh` to run the same code without root. */
-    @Volatile internal var binary: String = "su"
-
-    /** Closes the shell (it is opened again by the next command). */
-    fun close() {
-        synchronized(lock) {
-            session?.destroy()
-            session = null
-        }
-    }
-
-    private val lock = Any()
-    private var session: Session? = null
-
-    private val timer = Executors.newSingleThreadScheduledExecutor { r ->
-        Thread(r, "folark-root-idle").apply { isDaemon = true }
-    }
-    private var idleClose: ScheduledFuture<*>? = null
-
-    private fun scheduleIdleClose() {
-        idleClose?.cancel(false)
-        idleClose = timer.schedule({ close() }, IDLE_CLOSE_MS, TimeUnit.MILLISECONDS)
-    }
+    private val quickLane = Lane()
+    private val bulkLane = Lane()
 
     /** One open `su` shell: its input, and everything it prints collected by a reader thread. */
     private class Session(private val process: Process) {
         private val input: OutputStream = process.outputStream
         private val buffer = Output()
+        // A plain monitor for wait()/notify(), which Kotlin's Any does not offer.
+        @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
         private val signal = Object()
         @Volatile var alive = true
             private set
@@ -223,4 +240,6 @@ object RootShell {
     private const val PROMPT_TIMEOUT_MS = 60_000L
     private const val DEFAULT_TIMEOUT_MS = 5_000L
     private const val IDLE_CLOSE_MS = 30_000L
+    /** Commands allowed longer than this run in the bulk shell (see [run]). */
+    private const val QUICK_MAX_MS = 8_000L
 }

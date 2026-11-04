@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package org.arkikeskus.launcher.feature.settings
 
 import androidx.compose.runtime.setValue
@@ -203,7 +205,6 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsBackdropDim(value: Float) = editRecentsCover.let { cover -> update { repository.setRecentsBackdropDim(value, cover = cover) } }
     fun setRecentsSort(value: String) = update { repository.setRecentsSort(value) }
     fun setRecentsShowTime(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsShowTime(value, cover = cover) } }
-    fun setRecentsShowActions(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsShowActions(value, cover = cover) } }
     fun setRecentsCardLayout(value: String) = editRecentsCover.let { cover -> update { repository.setRecentsCardLayout(value, cover = cover) } }
     fun setRecentsCardIcons(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsCardIcons(value, cover = cover) } }
     fun setRecentsCardShadow(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsCardShadow(value, cover = cover) } }
@@ -212,6 +213,21 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsThirdInSplit(value: Boolean) = update { repository.setRecentsThirdInSplit(value) }
     fun setRecentsThumbnails(value: Boolean) = update { repository.setRecentsThumbnails(value) }
     fun setRecentsSpeakerBadge(value: Boolean) = update { repository.setRecentsSpeakerBadge(value) }
+    fun setHapticsStrength(value: String) = update { repository.setHapticsStrength(value) }
+    fun setHapticsDrag(value: Boolean) = update { repository.setHapticsDrag(value) }
+    fun setHapticsRecents(value: Boolean) = update { repository.setHapticsRecents(value) }
+    fun setHapticsClose(value: Boolean) = update { repository.setHapticsClose(value) }
+    fun setHapticsSplit(value: Boolean) = update { repository.setHapticsSplit(value) }
+    fun setHapticsLaunch(value: Boolean) = update { repository.setHapticsLaunch(value) }
+    fun setHapticsEnabled(value: Boolean) = update { repository.setHapticsEnabled(value) }
+    fun setShapeAllIcons(value: Boolean) = update { repository.setShapeAllIcons(value) }
+    fun setTaskbarLaunchGlow(value: String) = update { repository.setTaskbarLaunchGlow(value) }
+    fun setDrawerTwoPane(value: Boolean) = update { repository.setDrawerTwoPane(value) }
+    fun setDrawerAzHoldScroll(value: Boolean) = update { repository.setDrawerAzHoldScroll(value) }
+    fun setSearchInlineShortcuts(value: Boolean) = update { repository.setSearchInlineShortcuts(value) }
+    fun setSearchSettingsPages(value: Boolean) = update { repository.setSearchSettingsPages(value) }
+    fun setRecentsMemoryBadge(value: Boolean) = update { repository.setRecentsMemoryBadge(value) }
+    fun setRecentsGroupSplits(value: Boolean) = update { repository.setRecentsGroupSplits(value) }
     fun setRecentsRootClose(value: Boolean) = update { repository.setRecentsRootClose(value) }
     fun setTaskbarRunningApps(value: Boolean) = update { repository.setTaskbarRunningApps(value) }
     fun setTaskbarRunningDots(value: Boolean) = update { repository.setTaskbarRunningDots(value) }

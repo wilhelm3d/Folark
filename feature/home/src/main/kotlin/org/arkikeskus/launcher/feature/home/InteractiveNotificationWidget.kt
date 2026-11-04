@@ -123,7 +123,7 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
                 context.startActivity(intent)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("NotificationWidget", "can't open $packageName", e)
         }
     }
 }
@@ -248,6 +248,9 @@ fun InteractiveNotificationItem(
     onOpenInSplit: (() -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
+    // The veto callback is deprecated in favour of dynamic anchors; it is still the simplest way to
+    // let a swipe dismiss only past the threshold here.
+    @Suppress("DEPRECATION")
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {

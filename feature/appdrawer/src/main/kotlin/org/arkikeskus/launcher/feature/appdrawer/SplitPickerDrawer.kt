@@ -1,5 +1,18 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
+import org.arkikeskus.launcher.ui.expressive.LocalAccent
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.border
 import android.animation.ValueAnimator
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -121,6 +134,12 @@ fun SplitPickerDrawer(
     peek: Boolean? = null,
     onPeekChange: (Boolean) -> Unit = {},
     onAction: ((AppItem, SplitPickAction) -> Unit)? = null,
+    /** The picked app's share of the split in percent (33, 50, 66), shown as a little preview to
+     *  choose from; null hides it (no divider control on this phone). [pickedOnLeft]: which half
+     *  the pick goes to, for the preview. */
+    share: Int? = null,
+    pickedOnLeft: Boolean = false,
+    onShareChange: (Int) -> Unit = {},
 ) {
     val columns = look.columns.coerceIn(SplitPickerLook.MIN_COLUMNS, SplitPickerLook.MAX_COLUMNS)
     val iconSize = look.iconSize.coerceIn(SplitPickerLook.MIN_ICON, SplitPickerLook.MAX_ICON).dp
@@ -162,16 +181,30 @@ fun SplitPickerDrawer(
     var opening by remember { mutableStateOf<Opening?>(null) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val progress = remember { Animatable(0f) }
+    // The glow out of the tapped icon (the same as the taskbar's when an app starts from it).
+    var glowing by remember { mutableStateOf<Opening?>(null) }
+    val glowProgress = remember { Animatable(0f) }
     val zoom = pickCount == 1 && look.openAnim == SplitPickerLook.OPEN_ZOOM && ValueAnimator.areAnimatorsEnabled()
     val pick: (AppItem, Rect?) -> Unit = pick@{ app, from ->
-        if (opening != null) return@pick
+        if (opening != null || glowing != null) return@pick
         if (pickCount > 1) {
             val at = chosen.indexOfFirst { it.key == app.key }
             if (at >= 0) chosen.removeAt(at) else chosen.add(app)
             if (chosen.size >= pickCount) onPickAll(chosen.toList())
             return@pick
         }
-        if (zoom && from != null) opening = Opening(app, from.translate(-origin)) else onPick(app)
+        when {
+            zoom && from != null -> opening = Opening(app, from.translate(-origin))
+            // No zoom: a short glow out of the icon first, then the app opens.
+            from != null && ValueAnimator.areAnimatorsEnabled() -> glowing = Opening(app, from.translate(-origin))
+            else -> onPick(app)
+        }
+    }
+    LaunchedEffect(glowing) {
+        val g = glowing ?: return@LaunchedEffect
+        glowProgress.snapTo(0f)
+        glowProgress.animateTo(1f, tween(GLOW_MS, easing = FastOutSlowInEasing))
+        onPick(g.app)
     }
     LaunchedEffect(opening) {
         val o = opening ?: return@LaunchedEffect
@@ -190,9 +223,17 @@ fun SplitPickerDrawer(
             .onGloballyPositioned { origin = it.boundsInRoot().topLeft }
             .background(Color(0xFF0A0E12).copy(alpha = look.opacity)),
     ) {
+        // Room the apps keep free at the bottom: Android's navigation bar, or Folark's taskbar
+        // when it lies over this window (it is an overlay, so the window's insets don't know it).
+        val bottomRoom = rememberPickerBottomRoom()
+        CompositionLocalProvider(LocalPickerBottomRoom provides bottomRoom) {
         Column(
             Modifier
                 .fillMaxSize()
+                // The header and Size row start below the status bar (and a camera cutout).
+                .windowInsetsPadding(
+                    WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top),
+                )
                 .graphicsLayer {
                     // The drawer sinks back while the tapped app grows over it.
                     val q = if (opening != null) progress.value else 0f
@@ -202,13 +243,17 @@ fun SplitPickerDrawer(
                     alpha = 1f - 0.7f * q
                 },
         ) {
-            if (pickCount > 1 || peek != null) {
+            if (pickCount > 1 || peek != null || share != null) {
                 Header(
                     text = if (pickCount > 1) stringResource(R.string.split_picker_choose_more, chosen.size, pickCount)
                     else stringResource(R.string.split_picker_choose),
                     peek = peek,
                     onPeekChange = onPeekChange,
                 )
+            }
+            // How big the pick will be: ⅓, ½ or ⅔, as small previews of the split (not with peek).
+            if (share != null && pickCount == 1 && peek != true) {
+                SharePicker(share, pickedOnLeft, onShareChange)
             }
             if (look.search && current == null) {
                 SearchField(query = query, onQuery = { query = it })
@@ -251,7 +296,87 @@ fun SplitPickerDrawer(
                 }
             }
         }
-        opening?.let { ZoomOpen(it, progress.value, iconSize) }
+        }
+        opening?.let {
+            // The glow blooms out of the icon as the zoom begins.
+            PickGlow(it.from, (progress.value * 1.8f).coerceAtMost(1f))
+            ZoomOpen(it, progress.value, iconSize)
+        }
+        glowing?.let { PickGlow(it.from, glowProgress.value) }
+    }
+}
+
+private const val GLOW_MS = 260
+
+/** Bottom room for the picker's app grids (see [rememberPickerBottomRoom]). */
+private val LocalPickerBottomRoom = compositionLocalOf { 0.dp }
+
+/**
+ * How much of this window's bottom the apps should keep free: the navigation bar, or Folark's
+ * taskbar where it overlaps the window (whichever is more). The taskbar's place comes from
+ * [org.arkikeskus.launcher.ui.TaskbarDropTarget], published whenever the bar is up.
+ */
+@Composable
+private fun rememberPickerBottomRoom(): Dp {
+    val density = LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val nav = WindowInsets.navigationBars.getBottom(density)
+    var barPx by remember { mutableStateOf(0) }
+    // Read once the window is laid out, and again a moment later (the bar may come up after us).
+    LaunchedEffect(Unit) {
+        repeat(3) {
+            barPx = taskbarOverlap(view)
+            kotlinx.coroutines.delay(400)
+        }
+    }
+    return with(density) { maxOf(nav, barPx).toDp() }
+}
+
+/** How far Folark's taskbar reaches up into [view]'s window from its bottom, in px (0: not over it). */
+private fun taskbarOverlap(view: android.view.View): Int {
+    val bar = org.arkikeskus.launcher.ui.TaskbarDropTarget.bounds ?: return 0
+    val root = view.rootView
+    val at = IntArray(2)
+    root.getLocationOnScreen(at)
+    val left = at[0]
+    val right = at[0] + root.width
+    val bottom = at[1] + root.height
+    if (bar.right <= left || bar.left >= right || bar.top >= bottom) return 0
+    return (bottom - bar.top).coerceAtLeast(0)
+}
+
+/**
+ * A soft accent glow blooming out of the picked icon at [from] and fading, with a thin ring
+ * spreading past it ([p] 0..1) — the taskbar's launch glow, in the picker.
+ */
+@Composable
+private fun PickGlow(from: Rect, p: Float) {
+    val accent = ACCENT
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        val centre = from.center
+        val base = maxOf(from.width, from.height) / 2f
+        val fade = (1f - p) * (1f - p)
+        val bloom = if (p < 0.2f) p / 0.2f else 1f
+        val halo = base * (1f + 0.8f * p)
+        if (halo > 0f) {
+            drawCircle(
+                brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                    0f to accent.copy(alpha = 0.85f * bloom * fade),
+                    0.55f to accent.copy(alpha = 0.4f * bloom * fade),
+                    1f to Color.Transparent,
+                    center = centre,
+                    radius = halo,
+                ),
+                radius = halo,
+                center = centre,
+            )
+        }
+        drawCircle(
+            color = accent.copy(alpha = 0.75f * fade),
+            radius = base * (1f + 1.1f * p),
+            center = centre,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = base * 0.1f * (1f - p) + 1f),
+        )
     }
 }
 
@@ -302,7 +427,8 @@ private fun AppGrid(columns: Int, content: androidx.compose.foundation.lazy.grid
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(10.dp),
+        // The last row can scroll clear of the navigation bar and the taskbar.
+        contentPadding = PaddingValues(start = 10.dp, top = 10.dp, end = 10.dp, bottom = 10.dp + LocalPickerBottomRoom.current),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,
@@ -312,7 +438,9 @@ private fun AppGrid(columns: Int, content: androidx.compose.foundation.lazy.grid
 /** The picker's long-press menu: what it offers, and where the choice goes. */
 private class TileMenu(val isFavorite: (AppItem) -> Boolean, val onAction: (AppItem, SplitPickAction) -> Unit)
 
-private val ACCENT = Color(0xFF5A9BF2)
+/** The picker's accent: the same as the app drawer's (Folark's accent unless the drawer sets its own). */
+private val ACCENT: Color
+    @Composable get() = LocalAccent.current
 
 /** "Choose an app" / "Choose 2 apps · 1 chosen", with the Peek switch when there is one. */
 @Composable
@@ -333,6 +461,46 @@ private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit
                     selectedLabelColor = Color.White,
                 ),
             )
+        }
+    }
+}
+
+/** The picked app's share of the screen, as three tiny split previews; the chosen one is lit. */
+@Composable
+private fun SharePicker(share: Int, pickedOnLeft: Boolean, onShareChange: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.split_picker_size), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+        listOf(33, 50, 66).forEach { option ->
+            val selected = option == share
+            val border by androidx.compose.animation.animateColorAsState(
+                if (selected) ACCENT else Color.White.copy(alpha = 0.18f), label = "shareBorder",
+            )
+            Row(
+                Modifier
+                    .size(width = 46.dp, height = 28.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(Color.White.copy(alpha = 0.06f))
+                    .border(1.5.dp, border, RoundedCornerShape(7.dp))
+                    .clickable { onShareChange(option) }
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                val mine = option / 100f
+                val parts = if (pickedOnLeft) listOf(true to mine, false to 1f - mine) else listOf(false to 1f - mine, true to mine)
+                parts.forEach { (isPick, w) ->
+                    Box(
+                        Modifier
+                            .weight(w)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(if (isPick) (if (selected) ACCENT else Color.White.copy(alpha = 0.45f)) else Color.White.copy(alpha = 0.16f)),
+                    )
+                }
+            }
         }
     }
 }

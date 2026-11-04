@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Unfold: the app opens out sideways from the middle, like the phone unfolding. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android" android:interpolator="@android:interpolator/decelerate_cubic" android:shareInterpolator="true">
+    <scale android:fromXScale="0.12" android:toXScale="1" android:fromYScale="0.96" android:toYScale="1" android:pivotX="50%" android:pivotY="50%" android:duration="360" />
+    <alpha android:fromAlpha="0" android:toAlpha="1" android:duration="180" />
+</set>

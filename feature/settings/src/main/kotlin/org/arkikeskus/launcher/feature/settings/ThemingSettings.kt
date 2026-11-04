@@ -585,7 +585,7 @@ internal fun AutoRemovePagesRow(s: LauncherSettings, viewModel: SettingsViewMode
     )
 }
 
-/** App drawer page: folders as tabs, and what search offers besides apps. */
+/** App drawer page: folders as tabs, the two-pane drawer, and Private Space. */
 @Composable
 internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel, screenType: ScreenType) {
     ExpressiveSwitchRow(
@@ -594,8 +594,8 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
         checked = s.drawer.folderTabs,
         onCheckedChange = { viewModel.setDrawerFolderTabs(it, screenType) },
     )
-    ExpressiveRowDivider()
     if (s.drawer.folderTabs) {
+        ExpressiveRowDivider()
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_drawer_tabs_exclusive),
             subtitle = stringResource(R.string.settings_drawer_tabs_exclusive_desc),
@@ -604,23 +604,14 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
             shared = true,
         )
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_two_pane),
+            subtitle = stringResource(R.string.settings_drawer_two_pane_desc),
+            checked = s.drawer.twoPane,
+            onCheckedChange = viewModel::setDrawerTwoPane,
+            shared = true,
+        )
     }
-
-    ExpressiveSwitchRow(
-        title = stringResource(R.string.settings_search_shortcuts),
-        subtitle = stringResource(R.string.settings_search_shortcuts_desc),
-        checked = s.search.shortcuts,
-        onCheckedChange = viewModel::setSearchShortcuts,
-        shared = true,
-    )
-    ExpressiveRowDivider()
-
-    ExpressiveSwitchRow(
-        title = stringResource(R.string.settings_search_web),
-        checked = s.search.web,
-        onCheckedChange = viewModel::setSearchWeb,
-        shared = true,
-    )
 
     // Private Space exists from Android 15 on.
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.VANILLA_ICE_CREAM) {
@@ -633,6 +624,42 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
             shared = true,
         )
     }
+}
+
+/** App drawer page ▸ Search: what search finds besides apps (both displays). */
+@Composable
+internal fun DrawerSearchRows(s: LauncherSettings, viewModel: SettingsViewModel) {
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_search_shortcuts),
+        subtitle = stringResource(R.string.settings_search_shortcuts_desc),
+        checked = s.search.shortcuts,
+        onCheckedChange = viewModel::setSearchShortcuts,
+        shared = true,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_search_inline_shortcuts),
+        subtitle = stringResource(R.string.settings_search_inline_shortcuts_desc),
+        checked = s.search.inlineShortcuts,
+        onCheckedChange = viewModel::setSearchInlineShortcuts,
+        shared = true,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_search_settings_pages),
+        subtitle = stringResource(R.string.settings_search_settings_pages_desc),
+        checked = s.search.settingsPages,
+        onCheckedChange = viewModel::setSearchSettingsPages,
+        shared = true,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_search_web),
+        checked = s.search.web,
+        onCheckedChange = viewModel::setSearchWeb,
+        shared = true,
+    )
 }
 
 /** Foldable page (shared card): the size a floating window opens at. */
@@ -738,6 +765,8 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
             LauncherSettings.APP_OPEN_ZOOM to stringResource(R.string.settings_anim_zoom),
             LauncherSettings.APP_OPEN_SLIDE to stringResource(R.string.settings_anim_slide),
             LauncherSettings.APP_OPEN_FADE to stringResource(R.string.settings_anim_fade),
+            LauncherSettings.APP_OPEN_POP to stringResource(R.string.settings_anim_pop),
+            LauncherSettings.APP_OPEN_UNFOLD to stringResource(R.string.settings_anim_unfold),
             LauncherSettings.APP_OPEN_NONE to stringResource(R.string.settings_anim_none),
         ),
         selected = s.motion.appOpenAnimation,

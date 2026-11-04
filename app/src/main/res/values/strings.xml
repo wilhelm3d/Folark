@@ -6,9 +6,8 @@
     <string name="recents_loading">reading…</string>
     <string name="recents_nothing_open">nothing open</string>
     <string name="recents_nothing_open_long">No apps open</string>
+    <string name="recents_unreadable">Can\'t read the open apps on this Android version. Settings ▸ Recents ▸ Split screen ▸ Check split screen shows details.</string>
     <string name="recents_count">%1$d open</string>
-    <string name="recents_root_on">Root on</string>
-    <string name="recents_root_off">No root</string>
     <string name="recents_split_view">Split view</string>
     <string name="recents_cancel">Cancel</string>
     <string name="recents_close_all">Close all</string>

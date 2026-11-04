@@ -27,13 +27,15 @@ class AppIconFetcher(
     override suspend fun fetch(): FetchResult? = withContext(Dispatchers.Default) {
         val loaded = source.loadIcon(data.app, data.themed, data.dark, data.iconPack, data.customIcon) ?: return@withContext null
         // Settings ▸ Icon shape: adaptive icons cut to the chosen outline (the system's otherwise).
-        val drawable = IconShapes.apply(loaded, data.shape)
+        val drawable = IconShapes.apply(loaded, data.shape, plateOthers = source.shapeAllIcons)
         // The size the icon is shown at (stepped, see iconRasterSize); the default for callers
         // that do not say.
         val size = if (data.sizePx > 0) data.sizePx else ICON_PX
         
         // VRAM Optimization: If the drawable is completely opaque, we can save 50% of the memory
         // by using RGB_565 instead of ARGB_8888.
+        // Drawable.opacity is deprecated (only a hint), which is all this needs.
+        @Suppress("DEPRECATION")
         val config = if (drawable.opacity == android.graphics.PixelFormat.OPAQUE) {
             Bitmap.Config.RGB_565
         } else {

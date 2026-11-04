@@ -38,6 +38,8 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
+import org.arkikeskus.launcher.data.LaunchOrigin
+import org.arkikeskus.launcher.data.Haptics
 
 /** One card in Folark's Recents: an open app, or the apps sharing a split screen. */
 data class RecentsCard(
@@ -62,6 +64,9 @@ data class RecentsState(
     val canList: Boolean = true,
     val root: Boolean = false,
     val cards: List<RecentsCard> = emptyList(),
+    /** Android listed tasks in a form Folark can't read (see OpenTasks.formatProblem): an empty
+     *  list then means "can't tell", not "nothing open". */
+    val unreadable: Boolean = false,
 )
 
 @HiltViewModel
@@ -90,6 +95,10 @@ class RecentsViewModel @Inject constructor(
 
     private var loadJob: Job? = null
 
+    /** Memory in use per package (KB), with root and Settings ▸ Recents ▸ Memory use on cards. */
+    private val _memory = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val memory: StateFlow<Map<String, Long>> = _memory.asStateFlow()
+
     fun refresh() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -98,22 +107,53 @@ class RecentsViewModel @Inject constructor(
             _state.value = result
             val ids = result.cards.flatMap { c -> c.tasks.map { it.taskId } }.toSet()
             cache.snapshot().keys.filterNot { it in ids }.forEach { cache.remove(it) }
+            // The app just left (the newest card) has changed since its picture was taken: its
+            // stale picture stays up until the fresh one is in, then is replaced.
+            val newest = result.cards.minByOrNull { it.inactiveMs ?: Long.MAX_VALUE }?.tasks?.map { it.taskId }.orEmpty()
             publish()
-            if (s.recents.thumbnails && result.root) loadThumbnails(result.cards)
+            if (s.recents.thumbnails && result.root) loadThumbnails(result.cards, refresh = newest.toSet())
+            if (s.recents.memoryBadge && result.root) {
+                val packages = result.cards.flatMap { c -> c.tasks.map { it.packageName } }
+                _memory.value = withContext(Dispatchers.IO) { RootTasks.memoryKb(packages) }
+            } else {
+                _memory.value = emptyMap()
+            }
         }
     }
 
     private suspend fun load(s: LauncherSettings): RecentsState {
         val tasks = OpenTasks.list(context) ?: return RecentsState(loading = false, canList = false)
-        val needRoot = s.recents.thumbnails || s.recents.rootClose || (s.recents.pinned.isNotEmpty() && (s.recents.pinKeepAlive || s.recents.btnCloseAll))
+        if (tasks.isEmpty() && OpenTasks.formatProblem != null) {
+            return RecentsState(loading = false, canList = true, unreadable = true)
+        }
+        val needRoot = s.recents.thumbnails || s.recents.rootClose || s.recents.memoryBadge || (s.recents.pinned.isNotEmpty() && (s.recents.pinKeepAlive || s.recents.btnCloseAll))
         val root = needRoot && RootShell.available()
         val apps = appRepository.apps.first()
         // Use stagedSplitTasks so active split pairs stay grouped on one card even when Recents is covering them.
-        val inSplit = ShellSplit.stagedSplitTasks(context).map { it.taskId }.toSet()
+        val inSplit = if (s.recents.groupSplits) ShellSplit.stagedSplitTasks(context).map { it.taskId }.toSet() else emptySet()
         val splitGroup = tasks.filter { it.taskId in inSplit }
+        // Older split pairs (not the one on screen) are still listed as two split-screen tasks next
+        // to each other: each such pair becomes one double card too.
+        val olderPairs = if (s.recents.groupSplits) pairOlderSplits(tasks.filter { it.taskId !in inSplit }) else emptyMap()
         val cards = ArrayList<RecentsCard>()
         var splitAdded = false
         for (task in tasks) {
+            val partner = olderPairs[task.taskId]
+            if (partner != null) {
+                if (partner.taskId in cards.flatMap { c -> c.tasks.map { it.taskId } }) continue
+                val pair = listOf(task, partner)
+                val pairApps = pair.map { appFor(it, apps) }
+                if (pairApps.all { it != null }) {
+                    cards += RecentsCard(
+                        tasks = pair,
+                        apps = pairApps,
+                        label = pairApps.joinToString(" + ") { it!!.label },
+                        inactiveMs = pair.mapNotNull { it.inactiveMs }.minOrNull(),
+                        pinned = pair.all { pinKey(it) in s.recents.pinned },
+                    )
+                    continue
+                }
+            }
             if (task.taskId in inSplit && splitGroup.size > 1) {
                 if (splitAdded) continue
                 splitAdded = true
@@ -141,15 +181,37 @@ class RecentsViewModel @Inject constructor(
         return RecentsState(loading = false, canList = true, root = root, cards = shown)
     }
 
+    /**
+     * Pairs of neighbouring split-screen tasks (Android keeps a split's two tasks together in its
+     * list), each task mapped to its partner. A third split task in a row starts a new pair.
+     */
+    private fun pairOlderSplits(tasks: List<OpenTask>): Map<Int, OpenTask> {
+        val pairs = HashMap<Int, OpenTask>()
+        var i = 0
+        while (i < tasks.size - 1) {
+            val a = tasks[i]
+            val b = tasks[i + 1]
+            if (a.windowingMode == "multi-window" && b.windowingMode == "multi-window" && a.packageName != b.packageName) {
+                pairs[a.taskId] = b
+                pairs[b.taskId] = a
+                i += 2
+            } else {
+                i++
+            }
+        }
+        return pairs
+    }
+
     private fun appFor(task: OpenTask, apps: List<AppItem>): AppItem? =
         apps.firstOrNull { it.packageName == task.packageName && it.user.hashCode() == task.userId }
             ?: apps.firstOrNull { it.packageName == task.packageName }
 
-    private fun loadThumbnails(cards: List<RecentsCard>) {
+    /** [refresh]: tasks whose cached picture is taken again anyway (the app just left). */
+    private fun loadThumbnails(cards: List<RecentsCard>, refresh: Set<Int> = emptySet()) {
         viewModelScope.launch(Dispatchers.IO) {
             val missing = ArrayList<Int>()
             for (task in cards.flatMap { it.tasks }) {
-                if (cache.get(task.taskId) != null) continue
+                if (task.taskId !in refresh && cache.get(task.taskId) != null) continue
                 val bitmap = RootTasks.snapshot(task.taskId, task.userId)?.let(::decode)
                 if (bitmap != null) {
                     cache.put(task.taskId, bitmap)
@@ -191,9 +253,12 @@ class RecentsViewModel @Inject constructor(
     // ------------------------------------------------------------------ actions
 
     private fun openSingleTask(task: OpenTask, app: AppItem?) {
+        // The app grows out of its card (when the card's place was recorded on the tap).
+        val options = LaunchOrigin.takeOptions()
         val moved = runCatching {
-            context.getSystemService(ActivityManager::class.java).moveTaskToFront(task.taskId, 0)
+            context.getSystemService(ActivityManager::class.java).moveTaskToFront(task.taskId, 0, options)
         }.isSuccess
+        if (moved) Haptics.play(context, Haptics.Event.LAUNCH)
         if (!moved && app != null) appRepository.launch(app)
     }
 
@@ -220,6 +285,7 @@ class RecentsViewModel @Inject constructor(
     private fun RecentsCard.splitApp(i: Int) = SplitApp(tasks[i].packageName, apps.getOrNull(i), tasks[i].taskId)
 
     fun close(card: RecentsCard) {
+        Haptics.play(context, Haptics.Event.CLOSE)
         _state.value = _state.value.copy(cards = _state.value.cards - card)
         viewModelScope.launch(Dispatchers.IO) {
             for (task in card.tasks) {
@@ -229,6 +295,7 @@ class RecentsViewModel @Inject constructor(
     }
 
     fun closeAll() {
+        Haptics.play(context, Haptics.Event.CLOSE_ALL)
         val cards = _state.value.cards
         val root = _state.value.root
         val keep = cards.filter { it.pinned }

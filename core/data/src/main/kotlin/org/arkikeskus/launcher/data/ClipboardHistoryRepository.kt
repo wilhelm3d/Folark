@@ -93,7 +93,7 @@ class ClipboardHistoryRepository @Inject constructor(
     private val _clips = MutableStateFlow<List<ClipEntry>>(emptyList())
     val clips: StateFlow<List<ClipEntry>> = _clips
 
-    private var widgets = 0
+    @Volatile private var widgets = 0
     private var loaded = false
     /** Timestamp of the clip last looked at: the same clip is not read twice (each read of another
      *  app's clip shows Android's "pasted from your clipboard" notice). */
@@ -102,6 +102,7 @@ class ClipboardHistoryRepository @Inject constructor(
     private val listener = ClipboardManager.OnPrimaryClipChangedListener { capture() }
 
     /** A clipboard widget appeared: load the history, start following the clipboard, look once. */
+    @Synchronized
     fun attach() {
         widgets++
         if (widgets == 1) {
@@ -112,6 +113,7 @@ class ClipboardHistoryRepository @Inject constructor(
     }
 
     /** A clipboard widget went away; with none left, the clipboard is no longer looked at. */
+    @Synchronized
     fun detach() {
         widgets = (widgets - 1).coerceAtLeast(0)
         if (widgets == 0) runCatching { clipboard?.removePrimaryClipChangedListener(listener) }

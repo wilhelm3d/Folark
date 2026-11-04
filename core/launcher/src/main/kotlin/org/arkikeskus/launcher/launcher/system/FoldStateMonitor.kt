@@ -11,7 +11,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -39,16 +43,21 @@ class FoldStateMonitor @Inject constructor() {
      * Physical display switches (OUTER <-> INNER) emit immediately without delay.
      * Transient posture micro-vibrations on the same physical display (e.g. OPENED <-> HALF_OPENED) are debounced.
      */
-    fun foldStateFlow(activity: Activity, scope: CoroutineScope): StateFlow<FoldState> {
+    fun foldStateFlow(
+        activity: Activity,
+        scope: CoroutineScope,
+        /** Emits when the activity's configuration changed (it moved display, resized): the state is
+         *  worked out again from the last folding feature, so a held OPENED (see computeFoldState,
+         *  step 2) is let go as soon as the window really is on the cover screen. */
+        recheck: Flow<Unit> = emptyFlow(),
+    ): StateFlow<FoldState> {
         val initialFoldState = computeFoldState(activity, null)
 
-        return WindowInfoTracker.getOrCreate(activity)
+        val features = WindowInfoTracker.getOrCreate(activity)
             .windowLayoutInfo(activity)
-            .scan(initialFoldState) { previousFoldState, layoutInfo ->
-                val foldingFeature = layoutInfo.displayFeatures
-                    .filterIsInstance<FoldingFeature>()
-                    .firstOrNull()
-
+            .map { layoutInfo -> layoutInfo.displayFeatures.filterIsInstance<FoldingFeature>().firstOrNull() }
+        return combine(features, recheck.onStart { emit(Unit) }) { foldingFeature, _ -> foldingFeature }
+            .scan(initialFoldState) { previousFoldState, foldingFeature ->
                 computeFoldState(foldingFeature, previousFoldState, activity)
             }
             .distinctUntilChanged()
@@ -113,6 +122,9 @@ class FoldStateMonitor @Inject constructor() {
             if (activity != null) {
                 val bounds = activity.windowManager.currentWindowMetrics.bounds
                 rememberInnerSize(bounds.width(), bounds.height())
+                // The whole panel too, so isOnInnerPanel knows it while Folark's own window is smaller.
+                val panel = activity.windowManager.maximumWindowMetrics.bounds
+                rememberInnerSize(panel.width(), panel.height())
             }
             return when (foldingState) {
                 FoldingFeature.State.HALF_OPENED -> FoldState.HALF_OPENED
@@ -121,9 +133,12 @@ class FoldStateMonitor @Inject constructor() {
             }
         }
 
-        // 2. If foldingFeature becomes null when previously OPENED/HALF_OPENED -> device was CLOSED!
+        // 2. The folding feature went away after OPENED/HALF_OPENED. Usually the phone was folded, but
+        //    WindowInfoTracker also drops the feature when the window stops spanning the hinge (Folark
+        //    in multi-window, or a transient empty emission during a configuration change). Only call
+        //    it CLOSED when the display itself no longer looks like the inner panel.
         if (previousFoldState == FoldState.OPENED || previousFoldState == FoldState.HALF_OPENED) {
-            return FoldState.CLOSED
+            return if (activity != null && isOnInnerPanel(activity)) previousFoldState else FoldState.CLOSED
         }
 
         // 3. Fallback for static displays (tablets vs phone outer screens) when no folding feature exists
@@ -161,6 +176,22 @@ class FoldStateMonitor @Inject constructor() {
         }
         return false
     }
+
+    /**
+     * Whether the DISPLAY [activity] is on is the inner panel, whatever size its own window has:
+     * judged by the largest window the display allows (the whole panel, also while Folark is in
+     * split screen), against the panel sizes seen with a folding feature and the large-screen
+     * breakpoint.
+     */
+    internal fun isOnInnerPanel(activity: Activity): Boolean = runCatching {
+        val bounds = activity.windowManager.maximumWindowMetrics.bounds
+        val width = bounds.width()
+        val height = bounds.height()
+        if (width <= 0 || height <= 0) return@runCatching false
+        if (sizeKey(width, height) in knownInnerSizes) return@runCatching true
+        val density = activity.resources.displayMetrics.density
+        density > 0f && minOf(width, height) / density >= INNER_MIN_SHORT_SIDE_DP
+    }.getOrDefault(false)
 
     /** Window sizes (orientation-independent) that were seen with a folding feature, so the next
      *  cold start on that panel picks the inner profile on its very first frame. */

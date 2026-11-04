@@ -63,6 +63,9 @@ fun Modifier.recentsEnter(effect: String, index: Int, columns: Int, speed: Float
         progress.snapTo(0f)
         val order = when (effect) {
             LauncherSettings.RECENTS_ENTER_CASCADE -> row + col
+            // Across the screen, column by column (a wave), row by row (a drop).
+            LauncherSettings.RECENTS_ENTER_WAVE -> col * 2 + row
+            LauncherSettings.RECENTS_ENTER_DROP -> row * 2 + col
             LauncherSettings.RECENTS_ENTER_ZOOM -> 0
             else -> index
         }
@@ -71,6 +74,10 @@ fun Modifier.recentsEnter(effect: String, index: Int, columns: Int, speed: Float
         when (effect) {
             LauncherSettings.RECENTS_ENTER_FAN, LauncherSettings.RECENTS_ENTER_CASCADE ->
                 progress.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow * speed.coerceIn(0.4f, 3f)))
+            LauncherSettings.RECENTS_ENTER_WAVE, LauncherSettings.RECENTS_ENTER_SWING ->
+                progress.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow * speed.coerceIn(0.4f, 3f)))
+            LauncherSettings.RECENTS_ENTER_DROP ->
+                progress.animateTo(1f, spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessLow * speed.coerceIn(0.4f, 3f)))
             else -> progress.animateTo(1f, tween(ms, easing = FastOutSlowInEasing))
         }
     }
@@ -107,6 +114,22 @@ fun Modifier.recentsEnter(effect: String, index: Int, columns: Int, speed: Float
                 val s = 0.6f + 0.4f * p
                 scaleX = s; scaleY = s
                 alpha = (p * 1.6f).coerceIn(0f, 1f)
+            }
+            LauncherSettings.RECENTS_ENTER_WAVE -> {
+                translationY = q * 46.dp.toPx()
+                val s = 0.9f + 0.1f * p
+                scaleX = s; scaleY = s
+                alpha = (p * 2f).coerceIn(0f, 1f)
+            }
+            LauncherSettings.RECENTS_ENTER_SWING -> {
+                transformOrigin = TransformOrigin(0.5f, 0f)
+                rotationX = -q * 80f
+                cameraDistance = 14f * density
+                alpha = (p * 2.5f).coerceIn(0f, 1f)
+            }
+            LauncherSettings.RECENTS_ENTER_DROP -> {
+                translationY = -q * 160.dp.toPx()
+                alpha = (p * 3f).coerceIn(0f, 1f)
             }
             LauncherSettings.RECENTS_ENTER_FOCUS -> {
                 val r = q * 26.dp.toPx()

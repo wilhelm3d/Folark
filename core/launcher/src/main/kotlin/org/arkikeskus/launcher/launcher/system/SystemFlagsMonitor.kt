@@ -113,9 +113,9 @@ class SystemFlagsMonitor @Inject constructor(
 
     private fun hasVpn(): Boolean {
         val cm = connectivityManager ?: return false
-        return cm.allNetworks.any { network ->
-            cm.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-        }
+        // A running VPN carries the default network, so the active network tells (allNetworks is
+        // deprecated and lists every network the phone knows).
+        return cm.getNetworkCapabilities(cm.activeNetwork)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
     }
 
     private inline fun readBool(block: () -> Boolean): Boolean = try {

@@ -33,6 +33,9 @@ object ShellSplit {
         context.checkSelfPermission(Manifest.permission.DUMP) == PackageManager.PERMISSION_GRANTED &&
             hasUsageAccess(context)
 
+    // unsafeCheckOpNoThrow is deprecated on new Android, but it is the only call that answers
+    // for another app-op mode than this app's own process state; its replacement needs API 36.
+    @Suppress("DEPRECATION")
     fun hasUsageAccess(context: Context): Boolean = runCatching {
         val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
         when (appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)) {
@@ -63,14 +66,17 @@ object ShellSplit {
             return RootShell.run("dumpsys activity " + args.joinToString(" "))
         }
         return runCatching {
-            val file = File(context.cacheDir, "shell_split_${Thread.currentThread().id}.txt")
-            val ok = ParcelFileDescriptor.open(
-                file,
-                ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE,
-            ).use { fd -> Debug.dumpService("activity", fd.fileDescriptor, args) }
-            val text = if (ok) file.readText() else null
-            file.delete()
-            text
+            // A file of its own per read: reads run on several threads at once.
+            val file = File.createTempFile("shell_split_", ".txt", context.cacheDir)
+            try {
+                val ok = ParcelFileDescriptor.open(
+                    file,
+                    ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE,
+                ).use { fd -> Debug.dumpService("activity", fd.fileDescriptor, args) }
+                if (ok) file.readText() else null
+            } finally {
+                file.delete()
+            }
         }.getOrNull()
     }
 

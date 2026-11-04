@@ -33,7 +33,7 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.TextFields
@@ -65,7 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -185,7 +185,7 @@ private fun ClipCard(clip: ClipEntry, repository: ClipboardHistoryRepository) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ClipAction(if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy, R.string.drawer_clip_copy, accent, onClick = copy)
                 when (kind) {
-                    ClipKind.LINK -> ClipAction(Icons.Rounded.OpenInNew, R.string.drawer_clip_open, p.text) {
+                    ClipKind.LINK -> ClipAction(Icons.AutoMirrored.Rounded.OpenInNew, R.string.drawer_clip_open, p.text) {
                         start(context, Intent(Intent.ACTION_VIEW, Uri.parse(ClipKind.url(clip.text))))
                     }
                     ClipKind.PHONE -> ClipAction(Icons.Rounded.Call, R.string.drawer_clip_call, p.text) {

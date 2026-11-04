@@ -211,7 +211,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                     viewModel.refresh(force = true)
                 } else if (!(settings.widgets.motoWeatherTap && MotoLinks.open(context, MotoLinks.WEATHER))) {
                     runCatching {
-                        val query = Uri.encode("weather " + current?.city.orEmpty())
+                        val query = Uri.encode("weather " + current.city.orEmpty())
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$query"))
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -279,7 +279,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                     }
                 }
                 // --- Detail chips (big) ----------------------------------------------------------
-                if (big && forecast != null) {
+                if (big) {
                     val chips = buildList {
                         forecast.feelsLikeC?.let { add(stringResource(R.string.weather_feels) + " " + deg(it)) }
                         forecast.rainChance?.let { add(stringResource(R.string.weather_rain) + " $it%") }
@@ -306,7 +306,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                     }
                 }
                 // --- Hours ahead -----------------------------------------------------------------
-                if (showHours && forecast != null) {
+                if (showHours) {
                     val count = (this@BoxWithConstraints.maxWidth / 46.dp).toInt().coerceIn(3, 12)
                     val hours = forecast.hours.take(count)
                     Column(Modifier.fillMaxWidth()) {
@@ -319,7 +319,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                     }
                 }
                 // --- Days ahead (big) ------------------------------------------------------------
-                if (big && forecast != null) {
+                if (big) {
                     val rows = ((this@BoxWithConstraints.maxHeight - 230.dp) / 26.dp).toInt().coerceIn(0, 5)
                     val days = forecast.days.take(rows)
                     if (days.isNotEmpty()) {

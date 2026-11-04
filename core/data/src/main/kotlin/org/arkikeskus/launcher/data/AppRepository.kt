@@ -102,9 +102,13 @@ open class AppRepository @Inject constructor(
     /** See [LauncherAppsSource.launchClassName]. */
     fun launchClassName(packageName: String, user: UserHandle): String? = source.launchClassName(packageName, user)
 
-    fun launch(appItem: AppItem): Result<Unit> {
+    /** Opens [appItem]; [haptic]: with the launch click (off where another haptic follows, a split). */
+    fun launch(appItem: AppItem, haptic: Boolean = true): Result<Unit> {
         val result = source.launch(appItem, cachedOpenAnimation, cachedAnimationSpeed)
-        if (result.isSuccess) scope.launch { appUsageRepository.recordLaunch(appItem.key) }
+        if (result.isSuccess) {
+            if (haptic) Haptics.play(context, Haptics.Event.LAUNCH)
+            scope.launch { appUsageRepository.recordLaunch(appItem.key) }
+        }
         return result
     }
 
@@ -244,9 +248,13 @@ open class AppRepository @Inject constructor(
                     cachedOpenAnimation = it.motion.appOpenAnimation
                     cachedAnimationSpeed = it.motion.animationSpeed
                     // "Theme all icons" changes how icons are drawn: re-render them when it flips.
-                    if (source.forceThemedIcons != it.icons.forceThemedIcons || source.themedIconStyle != it.icons.themedIconStyle) {
+                    if (source.forceThemedIcons != it.icons.forceThemedIcons ||
+                        source.themedIconStyle != it.icons.themedIconStyle ||
+                        source.shapeAllIcons != it.icons.shapeAllIcons
+                    ) {
                         source.forceThemedIcons = it.icons.forceThemedIcons
                         source.themedIconStyle = it.icons.themedIconStyle
+                        source.shapeAllIcons = it.icons.shapeAllIcons
                         source.invalidateCachesAndReload()
                     }
                 }

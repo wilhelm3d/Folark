@@ -57,7 +57,8 @@ class SettingsRepository @Inject constructor(
     private var storeRepaired = false
     private val repairLock = Mutex()
 
-    fun settings(screenType: ScreenType = ScreenType.OUTER): Flow<LauncherSettings> = dataStore.data.onStart {
+    // No default screen: on a foldable, the wrong profile is an easy, silent mistake.
+    fun settings(screenType: ScreenType): Flow<LauncherSettings> = dataStore.data.onStart {
         // 0.7 imports unknown numeric backup keys as Long. Repair them before the first typed
         // read when a newer backup was restored in 0.7 and the installation then upgraded.
         if (!storeRepaired) repairLock.withLock {
@@ -212,12 +213,16 @@ class SettingsRepository @Inject constructor(
                 tabsExclusive = p[Keys.DRAWER_TABS_EXCLUSIVE] ?: true,
                 showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
                 innerSidebar = p[Keys.innerSidebarAppDrawer(screenType)] ?: false,
+                azHoldScroll = p[Keys.DRAWER_AZ_HOLD_SCROLL] ?: true,
+                twoPane = p[Keys.DRAWER_TWO_PANE] ?: false,
             ),
             search = LauncherSettings.Search(
                 contacts = p[Keys.SEARCH_CONTACTS] ?: false,
                 shortcuts = p[Keys.SEARCH_SHORTCUTS] ?: true,
                 web = p[Keys.SEARCH_WEB] ?: true,
                 actions = p[Keys.SEARCH_ACTIONS] ?: true,
+                settingsPages = p[Keys.SEARCH_SETTINGS_PAGES] ?: true,
+                inlineShortcuts = p[Keys.SEARCH_INLINE_SHORTCUTS] ?: true,
             ),
             icons = LauncherSettings.Icons(
                 forceThemedIcons = p[Keys.FORCE_THEMED_ICONS] ?: false,
@@ -231,6 +236,7 @@ class SettingsRepository @Inject constructor(
                     .coerceIn(LauncherSettings.MIN_ICON_SIZE_SCALE, LauncherSettings.MAX_ICON_SIZE_SCALE),
                 shape = (p[Keys.ICON_SHAPE] ?: LauncherSettings.ICON_SHAPE_SYSTEM)
                     .let { if (it in LauncherSettings.ICON_SHAPES) it else LauncherSettings.ICON_SHAPE_SYSTEM },
+                shapeAllIcons = p[Keys.ICON_SHAPE_ALL] ?: true,
                 nudge = p[Keys.ICON_NUDGE] ?: true,
                 nudgeTaskbar = p[Keys.ICON_NUDGE_TASKBAR] ?: true,
                 nudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
@@ -353,6 +359,13 @@ class SettingsRepository @Inject constructor(
                 animationSpeed = (p[Keys.ANIMATION_SPEED] ?: 1f).coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED),
                 appOpenAnimation = (p[Keys.APP_OPEN_ANIMATION] ?: LauncherSettings.APP_OPEN_ICON)
                     .let { if (it in LauncherSettings.APP_OPENS) it else LauncherSettings.APP_OPEN_ICON },
+                hapticsEnabled = p[Keys.HAPTICS_ENABLED] ?: true,
+                hapticsLaunch = p[Keys.HAPTICS_LAUNCH] ?: true,
+                hapticsSplit = p[Keys.HAPTICS_SPLIT] ?: true,
+                hapticsClose = p[Keys.HAPTICS_CLOSE] ?: true,
+                hapticsRecents = p[Keys.HAPTICS_RECENTS] ?: true,
+                hapticsDrag = p[Keys.HAPTICS_DRAG] ?: true,
+                hapticsStrength = (p[Keys.HAPTICS_STRENGTH] ?: LauncherSettings.HAPTICS_MEDIUM).let { if (it in LauncherSettings.HAPTICS_STRENGTHS) it else LauncherSettings.HAPTICS_MEDIUM },
                 unlockTransition = p[Keys.UNLOCK_TRANSITION] ?: true,
                 unlockSystemHook = p[Keys.UNLOCK_SYSTEM_HOOK] ?: true,
                 unlockStyle = (p[Keys.UNLOCK_STYLE] ?: LauncherSettings.UNLOCK_STYLE_DISPLAY)
@@ -422,6 +435,7 @@ class SettingsRepository @Inject constructor(
                 taskbarHandleStyle = p[Keys.TASKBAR_HANDLE_STYLE] ?: LauncherSettings.TASKBAR_HANDLE_LINE,
                 hideButton = p[Keys.TASKBAR_HIDE_BUTTON] ?: true,
                 taskbarAnim = p[Keys.TASKBAR_ANIM] ?: LauncherSettings.TASKBAR_ANIM_SLIDE,
+                launchGlow = (p[Keys.TASKBAR_LAUNCH_GLOW] ?: LauncherSettings.LAUNCH_GLOW_APP),
                 source = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
                     LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
                 systemMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
@@ -667,12 +681,26 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsBackdropDim(value: Float, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_BACKDROP else Keys.RECENTS_BACKDROP] = value.coerceIn(0f, 1f) }
     suspend fun setRecentsSort(value: String) = edit { it[Keys.RECENTS_SORT] = value }
     suspend fun setRecentsShowTime(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SHOW_TIME else Keys.RECENTS_SHOW_TIME] = value }
-    suspend fun setRecentsShowActions(value: Boolean, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_SHOW_ACTIONS else Keys.RECENTS_SHOW_ACTIONS] = value }
     suspend fun setRecentsCardLayout(value: String, cover: Boolean = false) = edit { it[if (cover) Keys.RECENTS_OUTER_CARD_LAYOUT else Keys.RECENTS_CARD_LAYOUT] = value }
     suspend fun setRecentsConfirmCloseAll(value: Boolean) = edit { it[Keys.RECENTS_CONFIRM_CLOSE_ALL] = value }
     suspend fun setRecentsThirdInSplit(value: Boolean) = edit { it[Keys.RECENTS_THIRD_IN_SPLIT] = value }
     suspend fun setRecentsThumbnails(value: Boolean) = edit { it[Keys.RECENTS_THUMBNAILS] = value }
     suspend fun setRecentsSpeakerBadge(value: Boolean) = edit { it[Keys.RECENTS_SPEAKER_BADGE] = value }
+    suspend fun setHapticsStrength(value: String) = edit { it[Keys.HAPTICS_STRENGTH] = value }
+    suspend fun setHapticsDrag(value: Boolean) = edit { it[Keys.HAPTICS_DRAG] = value }
+    suspend fun setHapticsRecents(value: Boolean) = edit { it[Keys.HAPTICS_RECENTS] = value }
+    suspend fun setHapticsClose(value: Boolean) = edit { it[Keys.HAPTICS_CLOSE] = value }
+    suspend fun setHapticsSplit(value: Boolean) = edit { it[Keys.HAPTICS_SPLIT] = value }
+    suspend fun setHapticsLaunch(value: Boolean) = edit { it[Keys.HAPTICS_LAUNCH] = value }
+    suspend fun setHapticsEnabled(value: Boolean) = edit { it[Keys.HAPTICS_ENABLED] = value }
+    suspend fun setShapeAllIcons(value: Boolean) = edit { it[Keys.ICON_SHAPE_ALL] = value }
+    suspend fun setTaskbarLaunchGlow(value: String) = edit { it[Keys.TASKBAR_LAUNCH_GLOW] = value }
+    suspend fun setDrawerTwoPane(value: Boolean) = edit { it[Keys.DRAWER_TWO_PANE] = value }
+    suspend fun setDrawerAzHoldScroll(value: Boolean) = edit { it[Keys.DRAWER_AZ_HOLD_SCROLL] = value }
+    suspend fun setSearchInlineShortcuts(value: Boolean) = edit { it[Keys.SEARCH_INLINE_SHORTCUTS] = value }
+    suspend fun setSearchSettingsPages(value: Boolean) = edit { it[Keys.SEARCH_SETTINGS_PAGES] = value }
+    suspend fun setRecentsMemoryBadge(value: Boolean) = edit { it[Keys.RECENTS_MEMORY_BADGE] = value }
+    suspend fun setRecentsGroupSplits(value: Boolean) = edit { it[Keys.RECENTS_GROUP_SPLITS] = value }
     suspend fun setRecentsRootClose(value: Boolean) = edit { it[Keys.RECENTS_ROOT_CLOSE] = value }
     suspend fun setTaskbarRunningApps(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_APPS] = value }
     suspend fun setTaskbarRunningDots(value: Boolean) = edit { it[Keys.TASKBAR_RUNNING_DOTS] = value }
@@ -753,13 +781,14 @@ class SettingsRepository @Inject constructor(
         sort = (p[Keys.RECENTS_SORT] ?: LauncherSettings.RECENTS_SORT_RECENT)
             .let { if (it == LauncherSettings.RECENTS_SORT_NAME) it else LauncherSettings.RECENTS_SORT_RECENT },
         showTime = p[Keys.RECENTS_SHOW_TIME] ?: true,
-        showActions = p[Keys.RECENTS_SHOW_ACTIONS] ?: true,
         cardLayout = if (p[Keys.RECENTS_CARD_LAYOUT] == LauncherSettings.RECENTS_CARD_HEADER)
             LauncherSettings.RECENTS_CARD_HEADER else LauncherSettings.RECENTS_CARD_OVERLAY,
         confirmCloseAll = p[Keys.RECENTS_CONFIRM_CLOSE_ALL] ?: false,
         thirdInSplit = p[Keys.RECENTS_THIRD_IN_SPLIT] ?: true,
         thumbnails = p[Keys.RECENTS_THUMBNAILS] ?: true,
         speakerBadge = p[Keys.RECENTS_SPEAKER_BADGE] ?: false,
+        groupSplits = p[Keys.RECENTS_GROUP_SPLITS] ?: true,
+        memoryBadge = p[Keys.RECENTS_MEMORY_BADGE] ?: false,
         rootClose = p[Keys.RECENTS_ROOT_CLOSE] ?: true,
         enterAnimation = (p[Keys.RECENTS_ENTER] ?: LauncherSettings.RECENTS_ENTER_RISE)
             .let { if (it in LauncherSettings.RECENTS_ENTERS) it else LauncherSettings.RECENTS_ENTER_RISE },

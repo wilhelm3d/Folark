@@ -1,4 +1,4 @@
-# Folark v2.0.0 — Ultimate Dual-Screen Foldable Launcher
+# Folark v2.1.0 — Ultimate Dual-Screen Foldable Launcher
 
 > *A modern, lightweight, ultra-customizable Android launcher based on ARK Launcher, specifically engineered for dual-screen foldables, clamshells, and book-style foldables with Android 17 performance efficiency.*
 
@@ -11,7 +11,19 @@
 
 ## 🚀 Overview
 
-**Folark v2.0.0** is an open-source, ultra-responsive Android home-screen launcher built 100% with **Jetpack Compose** and **Material 3 Expressive Design**. Re-architected from the high-performance foundations of **ARK Launcher**, Folark delivers a native, fluid experience tailored for foldable devices, featuring independent dual-screen profiles, desktop taskbar overlays, LSPosed system hooks, root-powered Recents, and interactive widgets.
+**Folark v2.1.0** is an open-source, ultra-responsive Android home-screen launcher built 100% with **Jetpack Compose** and **Material 3 Expressive Design**. Re-architected from the high-performance foundations of **ARK Launcher**, Folark delivers a native, fluid experience tailored for foldable devices, featuring independent dual-screen profiles, desktop taskbar overlays, LSPosed system hooks, root-powered Recents, and interactive widgets.
+
+## 🆕 What's new in 2.1.0
+
+* **Settings, reorganised:** a new Start page (set-up status, quick switches, what's new), pages listed in four groups, long pages split into clear cards, and rarely used options folded under *Advanced*. Search still finds everything and opens folded sections by itself.
+* **Taskbar:** recent apps and running dots stay current over apps; pin, unpin and reorder right on the bar; drop an app from the drawer, home or Recents onto the bar to pin it; an open split shows as one tile; the hide button remembers each app; handles stay clear of gesture navigation; TalkBack actions and haptics; a glow in the app's colour when it starts; AMOLED and Neon themes; Flip, Unfold and Pop animations.
+* **Recents:** split pairs as one card, a fresh picture of the app you just left, optional memory use per card (root), apps grow out of the card you tap, Wave, Swing and Drop entrances.
+* **App drawer:** two-pane layout when unfolded, shortcuts under the top search result, 27 more Android settings pages in search, hold-to-fine-scroll on the A–Z bar.
+* **Split screen:** the picker opens in the half beside your app (with the Vector module too), lets you choose ⅓, ½ or ⅔, and stays clear of the status bar and taskbar.
+* **App-open animations:** Pop and Unfold.
+* **Icons:** Square, Arch, Hexagon, Diamond and Cookie shapes; themed icons in each app's own colour (Own colour, Soft colour); older icons shaped too.
+* **Haptics:** a natural feel for opening apps, split screen, closing apps, Recents and drag and drop, with Light / Medium / Strong.
+* **Under the hood:** Android 16/17 API updates, zero compiler warnings, removed dead settings and strings. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -21,8 +33,8 @@
 - **Independent Screen Profiles**: Maintain separate workspace grid configurations (up to 8x8), icon sizes, dock items, wallpapers, and background themes for the outer cover display vs. inner main display.
 - **Hardware-Accurate Posture Detection**: Real-time posture tracking using Android `WindowInfoTracker` supporting Closed, Flat (Unfolded), and Half-Opened / Flex Tabletop postures.
 - **Live Hinge Unfold Animations**: Spatial 3D book-sweep, portal, drop, water-ripple, and doors unfold transitions tied directly to physical hinge angle sensors.
-- **Hinge-Aware Parallax Wallpapers**: Gyroscope/accelerometer motion-sensor driven wallpaper depth shift across the fold crease.
-- **LTPO Dynamic Refresh Rate Throttling**: Ramps refresh rate up to 120Hz/144Hz during touch gestures, automatically stepping down to 60Hz after 3 seconds of inactivity to preserve battery life.
+- **Hinge-Aware Parallax Wallpapers**: Rotation-vector (gyroscope fallback) driven wallpaper depth shift across the fold crease.
+- **Adaptive Refresh Rate**: On Android 16+ displays with adaptive refresh rate (LTPO), Folark leaves the rate to the system so a still home screen can drop below 60 Hz. On other displays it asks for the panel's top mode (capped by Smooth display) while touched and settles at 60 Hz about 3 seconds after the last touch.
 - **Fold-Aware Orientation Lock**: Respects separate orientation preferences for closed vs opened fold states.
 
 ---
@@ -41,7 +53,7 @@
 - **Live Task Screenshots (`LruCache`)**: High-resolution task screenshots decoded on-demand via a daemonized root shell (`RootTasks.snapshot`) with 720px `RGB_565` downsampling to keep RAM under 48MB.
 - **Individual & Batch App Termination**: Force-stop specific background apps or execute "Close All" while protecting pinned apps.
 - **Process Memory Protection (Pin Keep-Alive)**: Pin critical apps to the top of Recents and use root process protection (`RootTasks.protect`) to prevent Android's OOM killer from terminating them.
-- **Daemonized `su` Shell Architecture**: High-performance persistent root shell session (`RootShell`) with automatic 30s idle timeout and fast IPC execution (~1-5ms response).
+- **Daemonized `su` Shell Architecture**: Persistent root shells (`RootShell`), one for quick commands and one for slow jobs such as screenshots, each closed after 30 s idle; a command costs milliseconds instead of a new `su` start.
 
 ---
 
@@ -65,16 +77,16 @@
 ---
 
 ### 🪟 6. Multitasking, Gestures & Taskbar
-- **Accessibility Taskbar Overlay**: A pull-up taskbar for unfolded displays that works above all apps without requiring system overlay permissions.
+- **Taskbar Overlay**: A pull-up taskbar for unfolded displays that works above all apps, drawn in Folark's own windows with "Display over other apps" (falls back to the accessibility service only without that permission).
 - **App Pair & Triple-App Creator**: Group up to 3 apps into single-tap split-screen / floating window shortcuts with deep intent support.
-- **Double-Tap To Lock (`LockAccessibilityService`)**: Instant screen locking via Accessibility Service or root.
+- **Double-Tap To Lock (`LockAccessibilityService`)**: Instant screen locking via Accessibility Service or root. The service never reads screen content; it follows the app in front only while taskbar per-app rules or Replace Android's Recents need it.
 - **Morphing App Transitions**: Smooth `makeClipRevealAnimation` transitions connecting app icons to launching activities.
 - **Tactile Bouncy Scale Feedback**: Spring-based touch scale feedback on icon presses and card taps.
 
 ---
 
 ### ⚡ 7. Android 17 & Architecture Efficiency
-- **AppFunctions Search Integration**: On-device natural language and quick-action search indexing powered by Android 16/17 AppFunctions APIs.
+- **On-Device Search Actions**: Quick actions typed into search ("timer 10 min", "alarm 7:30"), calculator and unit conversion, contacts, app shortcuts and settings, all on the device.
 - **Zero-Wakeup Minute Ticker**: Syncs UI clock elements precisely at minute boundaries without continuous CPU wakeups.
 - **100% Lifecycle-Aware Flow Collection**: Every state subscription uses `collectAsStateWithLifecycle()`, automatically pausing flow collection when screens are covered or off.
 - **Eager App Caching**: Background package events and Binder IPC callback scans are shared eagerly across all ViewModels to eliminate duplicate system scans.

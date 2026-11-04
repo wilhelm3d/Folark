@@ -225,7 +225,7 @@ fun NowPlayingWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
         val ink = if (artBackground) Color.White else themeInk
         if (artBackground) {
             Image(
-                bitmap = playing!!.art!!,
+                bitmap = playing.art,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package org.arkikeskus.launcher.ui
 
 import androidx.lifecycle.ViewModel

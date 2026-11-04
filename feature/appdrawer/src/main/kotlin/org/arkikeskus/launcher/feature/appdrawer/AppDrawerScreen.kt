@@ -33,6 +33,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -63,6 +64,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -89,7 +91,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -306,6 +308,9 @@ fun AppDrawerScreen(
         shortcutResults = uiState.shortcutResults,
         actionResults = uiState.actionResults,
         searchWeb = uiState.searchWeb,
+        searchInlineShortcuts = uiState.searchInlineShortcuts,
+        azHoldScroll = uiState.azHoldScroll,
+        twoPane = uiState.twoPane,
         tabs = uiState.tabs,
         selectedTab = uiState.selectedTab,
         onSelectTab = viewModel::selectTab,
@@ -492,6 +497,9 @@ private fun AppDrawerContent(
     shortcutResults: List<SearchResult.Shortcut> = emptyList(),
     actionResults: List<SearchResult.Action> = emptyList(),
     searchWeb: Boolean = false,
+    searchInlineShortcuts: Boolean = false,
+    azHoldScroll: Boolean = false,
+    twoPane: Boolean = false,
     // Drawer folders shown as tabs (id to name); empty = the feature is off or there are none.
     tabs: List<Pair<Long, String>> = emptyList(),
     selectedTab: Long? = null,
@@ -647,7 +655,7 @@ private fun AppDrawerContent(
             if (showSearch && !searchAtBottom) {
                 DrawerSearchField(query = query, onQueryChange = onQueryChange, colors = colors, style = style)
             }
-            if (tabs.isNotEmpty() && query.isBlank()) {
+            if (tabs.isNotEmpty() && query.isBlank() && !(twoPane && LocalScreenType.current == ScreenType.INNER)) {
                 DrawerTabRow(tabs = tabs, selected = selectedTab, onSelect = onSelectTab)
             }
             val context = LocalContext.current
@@ -689,10 +697,14 @@ private fun AppDrawerContent(
             var activeLetter by remember { mutableStateOf<Char?>(null) }
             val currentSelectedTab by rememberUpdatedState(selectedTab)
             val currentSelectTab by rememberUpdatedState(onSelectTab)
+            // Settings ▸ App drawer ▸ two-pane (unfolded): the tabs as a list on the left.
+            val railTabs = twoPane && LocalScreenType.current == ScreenType.INNER && tabs.isNotEmpty() && !searching
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+            if (railTabs) DrawerTabRail(tabs = tabs, selected = selectedTab, onSelect = onSelectTab)
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxHeight()
                     // Settings ▸ App drawer ▸ swipe sideways to change tab. Watched on the way down
                     // to the icons; a drag that starts on a horizontal A-Z bar, or while an icon is
                     // being dragged out, is left alone.
@@ -824,6 +836,10 @@ private fun AppDrawerContent(
                                         haptics = haptics,
                                         locked = locked,
                                     )
+                                    // The best match's shortcuts, right under it.
+                                    if (searchInlineShortcuts && app.key == apps.first().key) {
+                                        TopAppShortcutChips(app, onOpened = onClose)
+                                    }
                                 }
                             }
                             if (settingResults.isNotEmpty()) {
@@ -962,6 +978,12 @@ private fun AppDrawerContent(
                                 item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
                                     ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
                                 }
+                                // The best match's shortcuts first, as chips above the app grid.
+                                if (searchInlineShortcuts) {
+                                    item(key = "top-shortcuts", span = { GridItemSpan(maxLineSpan) }, contentType = "shortcut-chips") {
+                                        TopAppShortcutChips(apps.first(), onOpened = onClose)
+                                    }
+                                }
                                 appCells(apps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
                                     onAppLongClick, dragController, onDragOutStart, onDropOnHome, onDropOnDock, haptics, locked)
                             }
@@ -1074,6 +1096,12 @@ private fun AppDrawerContent(
                         },
                         modifier = alignModifier,
                         onActiveLetter = if (drawerLargeLetterPopup) ({ letter: Char? -> activeLetter = letter }) else null,
+                        // Held, then slid: a smooth scroll through the apps instead of letter jumps.
+                        onFineScroll = if (azHoldScroll) ({ by: Float ->
+                            coroutineScope.launch {
+                                if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) listState.scrollBy(by) else gridState.scrollBy(by)
+                            }
+                        }) else null,
                     )
                     activeLetter?.let { letter ->
                         Surface(
@@ -1089,6 +1117,7 @@ private fun AppDrawerContent(
                         }
                     }
                 }
+            }
             }
             if (showSearch && searchAtBottom) {
                 DrawerSearchField(query = query, onQueryChange = onQueryChange, colors = colors, style = style)

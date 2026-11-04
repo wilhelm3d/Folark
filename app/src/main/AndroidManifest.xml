@@ -65,6 +65,8 @@
 
     <!-- Folark Recents: bring an open app back to the front. -->
     <uses-permission android:name="android.permission.REORDER_TASKS" />
+    <!-- Haptic feedback for Folark's own actions (Settings ▸ Appearance ▸ Haptics). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- See which apps expose a launcher activity (for the app drawer). -->
     <queries>

@@ -117,6 +117,7 @@ class SplitCoordinator @Inject constructor(
         val formed = (route.native && natively(first, second, firstOnRight, route.root)) ||
             (route.commands && byCommands(first, second, firstOnRight, route.root))
         if (formed) {
+            Haptics.play(context, Haptics.Event.SPLIT)
             SplitHistory.record(context, first.packageName, second.packageName)
             offerUndo(keepOnUndo)
         }
@@ -164,6 +165,7 @@ class SplitCoordinator @Inject constructor(
         val t1 = first.taskId ?: read?.taskOf(first.packageName)?.id
         val t2 = read?.taskOf(second.packageName)?.id
         if (read != null && t1 != null && t2 != null && read.isStaged(t1) && read.isStaged(t2)) {
+            Haptics.play(context, Haptics.Event.SPLIT)
             SplitHistory.record(context, first.packageName, second.packageName)
             offerUndo(first.copy(taskId = t1))
             return true
@@ -179,7 +181,8 @@ class SplitCoordinator @Inject constructor(
         val tb = b.taskId ?: read?.taskOf(b.packageName)?.id
         if (read != null && ta != null && tb != null && read.isStaged(ta) && read.isStaged(tb)) {
             // Still a split behind Recents: bringing one half forward brings the whole split back.
-            return bringToFront(a.copy(taskId = ta), route.root) != null
+            return (bringToFront(a.copy(taskId = ta), route.root) != null)
+                .also { if (it) Haptics.play(context, Haptics.Event.SPLIT) }
         }
         return pair(b.copy(taskId = tb), a.copy(taskId = ta), firstOnRight = true, keepOnUndo = null)
     }
@@ -199,13 +202,16 @@ class SplitCoordinator @Inject constructor(
                 app != null -> SplitThree.addThird(context, component = app.componentName, user = app.user)
                 else -> false
             }
-            if (ok) return true
+            if (ok) {
+                Haptics.play(context, Haptics.Event.SPLIT)
+                return true
+            }
         }
         if (!orSideStage || !route.commands) return false
         val id = (third.taskId ?: withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, third.packageName, route.root) })
             ?: return false
         val moved = withContext(Dispatchers.IO) { ShellSplit.moveToSide(context, id, right = true, root = route.root) }
-        return moved && awaitInSplit(listOf(id), route.root)
+        return (moved && awaitInSplit(listOf(id), route.root)).also { if (it) Haptics.play(context, Haptics.Event.SPLIT) }
     }
 
     /**
@@ -233,6 +239,7 @@ class SplitCoordinator @Inject constructor(
         val formed = (route.native && intentNatively(intent, packageName, userId, partner, route.root)) ||
             (route.commands && intentByCommands(intent, packageName, partner, route.root))
         if (formed) {
+            Haptics.play(context, Haptics.Event.SPLIT)
             SplitHistory.record(context, packageName, other.packageName)
             offerUndo(partner)
         }
@@ -264,6 +271,17 @@ class SplitCoordinator @Inject constructor(
 
     /** Waits until an app of [packageName] and the task [partnerTask] are both in split stages. */
     private suspend fun awaitBeside(packageName: String, partnerTask: Int, root: Boolean): Boolean = withContext(Dispatchers.IO) {
+        // System UI reports split stages itself: find the app's task once, then wait for the
+        // report instead of reading (and parsing) the whole window list every 150 ms.
+        if (SplitEvents.live) {
+            val id = awaitTask(packageName, root)?.first
+            if (id != null) {
+                if (SplitEvents.awaitStaged(listOf(id, partnerTask), EVENT_WAIT_MS)) return@withContext true
+                // No word in time: one read decides.
+                val read = ShellSplit.snapshot(context, root)
+                return@withContext read != null && read.isStaged(id) && read.isStaged(partnerTask)
+            }
+        }
         repeat(VERIFY_TRIES * 2) {
             delay(VERIFY_STEP_MS)
             val read = ShellSplit.snapshot(context, root) ?: return@repeat
@@ -348,6 +366,9 @@ class SplitCoordinator @Inject constructor(
             firstKey = first.app?.key, firstTaskId = first.taskId, three = three,
         )
         val route = route()
+        // With Folark's module: one call opens the picker in the half beside the first app (the
+        // module route has no shell commands to move windows, so without this it was full screen).
+        if (!three && route.native && pickerNatively(first, firstOnRight, picker(false), route.root)) return
         // Three apps don't fit a half: that picker opens full screen and builds the split after.
         if (three || !route.commands) {
             withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(false), noAnim) } }
@@ -367,6 +388,22 @@ class SplitCoordinator @Inject constructor(
             delay(FRONT_SETTLE_MS)
             withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(true), noAnim) } }
         }
+    }
+
+    /**
+     * The module's `startIntentAndTask`: the first app running (opened if need be), then the picker
+     * started straight into the other half beside it. False when that can't be done (the caller then
+     * falls back to another way).
+     */
+    private suspend fun pickerNatively(first: SplitApp, firstOnRight: Boolean, pickerIntent: android.content.Intent, root: Boolean): Boolean {
+        val (id, _) = running(first, root) ?: open(first, root) ?: return false
+        exitFirst(id, root)
+        SplitEvents.forget(listOf(id))
+        val pending = PendingIntent.getActivity(
+            context, PICKER_REQUEST, pickerIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val userId = android.os.Process.myUid() / PER_USER_RANGE
+        return SplitThree.startIntentAndTask(context, pending, userId, id, intentOnRight = !firstOnRight)
     }
 
     /** The picker (task [pickerTaskId]) moves itself into the right half, beside the app behind it. */
@@ -448,7 +485,8 @@ class SplitCoordinator @Inject constructor(
     /** Opens [app] and waits for its task (null when it can't be opened or never showed up). */
     private suspend fun open(app: SplitApp, root: Boolean): Pair<Int, Read>? {
         val item = app.app ?: appRepository.apps.first().firstOrNull { it.packageName == app.packageName } ?: return null
-        val launched = withContext(Dispatchers.Main) { appRepository.launch(item) }.isSuccess
+        // No launch click: the split's own haptic follows once the two are side by side.
+        val launched = withContext(Dispatchers.Main) { appRepository.launch(item, haptic = false) }.isSuccess
         return if (launched) awaitTask(app.packageName, root) else null
     }
 
@@ -497,6 +535,8 @@ class SplitCoordinator @Inject constructor(
     }
 
     private companion object {
+        const val PICKER_REQUEST = 0x5911
+        const val PER_USER_RANGE = 100_000
         /** How long to wait for System UI to report a split change before reading the window list. */
         const val EVENT_WAIT_MS = 900L
         /** A read this old is still good enough to check a task before moving it. */
