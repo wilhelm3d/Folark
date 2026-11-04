@@ -146,6 +146,7 @@ class SettingsViewModel @Inject constructor(
     fun setAppOpenAnimation(value: String) = update { repository.setAppOpenAnimation(value) }
     fun setFolderOpenAnimation(value: String) = update { repository.setFolderOpenAnimation(value) }
     fun setPageScrollEffect(value: String) = update { repository.setPageScrollEffect(value) }
+    fun setUnfoldAnimation(value: Boolean) = update { repository.setUnfoldAnimation(value) }
     fun setWidgetBackgroundOpacity(value: Float) = update { repository.setWidgetBackgroundOpacity(value) }
     fun setBatterySaverMode(value: String) = update { repository.setBatterySaverMode(value) }
     fun setBatterySaverLowBattery(value: Boolean) = update { repository.setBatterySaverLowBattery(value) }
@@ -358,6 +359,7 @@ class SettingsViewModel @Inject constructor(
     fun setDpiAppDrawer(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setDpiAppDrawer(value, screenType) }
     fun setDpiSettings(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setDpiSettings(value, screenType) }
     fun setAppFontFamily(value: String, screenType: ScreenType = _screenType.value) = update { repository.setAppFontFamily(value, screenType) }
+    fun setAppHeadingFont(value: String, screenType: ScreenType = _screenType.value) = update { repository.setAppHeadingFont(value, screenType) }
     fun setAppFontBold(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setAppFontBold(value, screenType) }
     fun setAppFontSizeScale(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setAppFontSizeScale(value, screenType) }
     fun setInnerDualPageWorkspace(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setInnerDualPageWorkspace(value, screenType) }

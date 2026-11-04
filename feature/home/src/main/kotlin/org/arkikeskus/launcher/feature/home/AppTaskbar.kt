@@ -156,6 +156,8 @@ internal class AppTaskbar(
      *  full screen (video, games) they are hidden, and the kept-open bar steps aside. */
     internal var probe: View? = null
     internal var fullScreen = false
+    /** Whether the handles shown now are the slim ones (over a full-screen video). */
+    private var shownSlim = false
     /** The keyboard is up in the app in front (as far as Android tells this window). */
     internal var keyboardUp = false
     internal var expanded = false
@@ -287,9 +289,9 @@ internal class AppTaskbar(
                 settingsRepository.settings(ScreenType.INNER),
                 settingsRepository.dockFavorites(ScreenType.INNER),
                 appRepository.apps,
-                settingsRepository.customIcons,
+                combine(settingsRepository.customIcons, settingsRepository.iconShapes) { c, sh -> c to sh },
                 entry.appUsageRepository().usage,
-            ) { s, favorites, all, custom, usage ->
+            ) { s, favorites, all, (custom, shapes), usage ->
                 val byKey = all.associateBy { it.key }
                 allApps = all
                 TaskbarSetup(
@@ -315,6 +317,7 @@ internal class AppTaskbar(
                     themedIcons = s.icons.useThemedIcons,
                     iconPack = s.icons.iconPack,
                     customIcons = custom,
+                    iconShapes = shapes,
                     iconShape = s.icons.shape,
                     shapeAllIcons = s.icons.shapeAllIcons,
                     // Apps opened through Folark, newest first: the recent apps without Usage access.
@@ -363,7 +366,7 @@ internal class AppTaskbar(
                 setup.copy(pairs = setup.pairIds.mapNotNull { id -> saved.firstOrNull { it.id == id } })
             }.distinctUntilChanged().collect { next ->
                 val previous = setup
-                val style = "${next.themedIcons}|${next.iconPack}|${next.customIcons.hashCode()}|${next.iconShape}|${next.shapeAllIcons}"
+                val style = "${next.themedIcons}|${next.iconPack}|${next.customIcons.hashCode()}|${next.iconShape}|${next.iconShapes.hashCode()}|${next.shapeAllIcons}"
                 if (style != iconStyle) {
                     iconStyle = style
                     iconCache.clear()
@@ -478,7 +481,9 @@ internal class AppTaskbar(
         // Null on the cover screen unless its slim bar is on (see [current]).
         val s = current()
         // The probe also hears the keyboard, so a kept-open bar never sits on top of it.
-        ensureProbe(s != null && s.enabled && (s.keepOpen || s.alwaysApps.isNotEmpty() || s.autoHideApps.isNotEmpty() || s.miniApps.isNotEmpty()) && screenOn)
+        // The probe (a 1 px window) tells full screen and the keyboard apart: the kept-open bar and
+        // per-app rules need both, and plain handles slim down over a full-screen video.
+        ensureProbe(s != null && s.enabled && (s.keepOpen || s.hideFullScreen || s.alwaysApps.isNotEmpty() || s.autoHideApps.isNotEmpty() || s.miniApps.isNotEmpty()) && screenOn)
         if (s == null) {
             expanded = false
             remove()
@@ -521,7 +526,10 @@ internal class AppTaskbar(
         }
         // Only the bar that stays on home takes room there (home and the drawer step aside).
         if (mode != MODE_BAR_FIXED || !homeVisible) TaskbarSpace.set(0)
-        if (mode == shownMode && !rebuild) return
+        // The handles are drawn slim over a full-screen video: redraw them when that changes.
+        val slimHandles = mode == MODE_HANDLES && s.hideFullScreen && fullScreen && !homeVisible
+        if (mode == shownMode && !rebuild && slimHandles == shownSlim) return
+        shownSlim = slimHandles
         remove()
         when (mode) {
             MODE_BAR, MODE_BAR_FIXED -> showBar(s, fixed = mode == MODE_BAR_FIXED, animateIn = shownMode != MODE_BAR && shownMode != MODE_BAR_FIXED)
@@ -773,7 +781,7 @@ internal class AppTaskbar(
         val icon = runCatching {
             source?.loadIcon(app, s.themedIcons, dark, s.iconPack, s.customIcons[app.key].orEmpty())
         }.getOrNull() ?: runCatching { context.packageManager.getActivityIcon(app.componentName) }.getOrNull()
-        return icon?.let { IconShapes.apply(it, s.iconShape, plateOthers = s.shapeAllIcons) }
+        return icon?.let { IconShapes.apply(it, s.iconShapes[app.key] ?: s.iconShape, plateOthers = s.shapeAllIcons) }
     }
 
     internal var suggestionWindow: View? = null

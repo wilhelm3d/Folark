@@ -199,6 +199,17 @@ internal fun AppTaskbar.mediaControlsView(s: TaskbarSetup): View {
                 maxWidth = dp(200)
             })
         }
+        // Where the track is (when the player says how long it is); a drag seeks.
+        if (media.progress() != null) {
+            texts.addView(
+                TaskbarMediaProgress(context, media, tint) {
+                    // Seeking counts as using the controls: they stay open.
+                    handler.removeCallbacks(closeMediaControls)
+                    handler.postDelayed(closeMediaControls, MEDIA_CONTROLS_MS)
+                },
+                LinearLayout.LayoutParams(dp(200), dp(18)).apply { topMargin = dp(4) },
+            )
+        }
         panel.addView(texts, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
     fun button(icon: Int, description: Int, action: () -> Unit) {

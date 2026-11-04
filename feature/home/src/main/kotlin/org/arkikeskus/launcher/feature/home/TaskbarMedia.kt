@@ -32,10 +32,37 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
     private var controller: MediaController? = null
     private var listening = false
 
+    /** The last playback state and track length the session sent (callbacks, not queries). */
+    private var lastPlayback: PlaybackState? = null
+    private var duration = 0L
+
+    /**
+     * Where playback is now and the track's length, in ms, worked out from the last state the
+     * player sent (position + time since then x speed); null when the player gives no length.
+     */
+    fun progress(): Pair<Long, Long>? {
+        val total = duration.takeIf { it > 0L } ?: return null
+        val p = lastPlayback ?: return 0L to total
+        var at = p.position
+        if (p.state == PlaybackState.STATE_PLAYING && p.lastPositionUpdateTime > 0L) {
+            at += ((android.os.SystemClock.elapsedRealtime() - p.lastPositionUpdateTime) * p.playbackSpeed).toLong()
+        }
+        return at.coerceIn(0L, total) to total
+    }
+
+    /** Whether the player lets its position be set (a drag on the progress bar). */
+    val canSeek: Boolean get() = (lastPlayback?.actions ?: 0L) and PlaybackState.ACTION_SEEK_TO != 0L
+
+    fun seekTo(positionMs: Long) {
+        runCatching { controller?.transportControls?.seekTo(positionMs) }
+    }
+
     private val callback = object : MediaController.Callback() {
         // Position updates arrive about once a second: only the play/pause flag matters here, so the
         // title and cover are not fetched again (each fetch is a fresh copy of the cover).
         override fun onPlaybackStateChanged(playbackState: PlaybackState?) {
+            // Kept for the progress bar, which works the position out from it (no polling).
+            lastPlayback = playbackState
             val shown = state ?: return publish()
             val playing = playbackState?.state == PlaybackState.STATE_PLAYING
             if (shown.playing != playing) {
@@ -43,7 +70,10 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
                 onChange()
             }
         }
-        override fun onMetadataChanged(metadata: MediaMetadata?) = publish(metadata)
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
+            duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+            publish(metadata)
+        }
         override fun onSessionDestroyed() = attach(null)
     }
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
@@ -115,6 +145,9 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
             runCatching { controller?.unregisterCallback(callback) }
             controller = next
             runCatching { next?.registerCallback(callback) }
+            // One read when a session is taken up; the callbacks keep both current after that.
+            lastPlayback = runCatching { next?.playbackState }.getOrNull()
+            duration = runCatching { next?.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) }.getOrNull() ?: 0L
         }
         publish()
     }

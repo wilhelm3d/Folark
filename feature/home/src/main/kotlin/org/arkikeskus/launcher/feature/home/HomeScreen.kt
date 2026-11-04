@@ -667,7 +667,22 @@ fun HomeScreen(
             }
             // Book half-fold: one page per half, nothing on the crease.
             val isDualPage = screenType == ScreenType.INNER && (settings.home.innerDualPage || bookFold)
+            // Unfolded just now (outer screen → inner): the pages open out from the hinge. The
+            // system's animation scale applies (none when animations are off).
+            val unfold = remember { androidx.compose.animation.core.Animatable(1f) }
+            var lastScreen by remember { mutableStateOf(screenType) }
+            LaunchedEffect(screenType) {
+                val unfolded = lastScreen == ScreenType.OUTER && screenType == ScreenType.INNER
+                lastScreen = screenType
+                if (unfolded && settings.home.unfoldAnimation) {
+                    unfold.snapTo(0f)
+                    unfold.animateTo(1f, androidx.compose.animation.core.tween(UNFOLD_MS, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                } else {
+                    unfold.snapTo(1f)
+                }
+            }
             Workspace(
+                unfoldProgress = { unfold.value },
                 pageCount = uiState.pageCount,
                 columns = settings.home.columns,
                 rows = settings.home.rows,
@@ -1020,8 +1035,11 @@ fun HomeScreen(
     dragController.iconPickRequest?.let { app ->
         val iconPacks by viewModel.iconPacks.collectAsStateWithLifecycle()
         val customIcons by viewModel.customIcons.collectAsStateWithLifecycle()
+        val iconShapes by viewModel.iconShapes.collectAsStateWithLifecycle()
         IconPickerDialog(
             app = app,
+            shape = iconShapes[app.key],
+            onShape = { viewModel.setIconShape(app, it) },
             packs = iconPacks.map { it.packageName to it.label },
             hasCustomIcon = app.key in customIcons,
             loadNames = viewModel::iconPackDrawableNames,
@@ -1219,3 +1237,6 @@ private data class AppMenuTarget(
 )
 
 /** The long-press menu is the shared [org.arkikeskus.launcher.ui.AppActionPopup] (core/ui). */
+
+/** How long the home pages take to open out after unfolding. */
+private const val UNFOLD_MS = 520

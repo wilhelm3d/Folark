@@ -61,7 +61,8 @@ internal object TaskbarVisibility {
             f.expanded -> Mode.BAR
             // Per app: auto-hide (a corner swipe reveals it), or a small tap-to-open mini pill.
             f.foreground in f.autoHideApps -> Mode.HANDLES
-            f.foreground in f.miniApps && !f.keyboardUp -> Mode.MINI
+            // The mini pill steps aside over a full-screen video too (a corner swipe still opens the bar).
+            f.foreground in f.miniApps && !f.keyboardUp && !(f.hideFullScreen && f.fullScreen) -> Mode.MINI
             // Full screen (a video, a game): no bar covering it; a corner swipe still opens it.
             f.keepOpen && !(f.hideFullScreen && f.fullScreen) && !f.keyboardUp -> Mode.BAR_FIXED
             else -> Mode.HANDLES

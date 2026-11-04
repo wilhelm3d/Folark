@@ -43,8 +43,27 @@ object LauncherFontFamily {
         "space_grotesk", "grotesk" -> SpaceGrotesk
         "serif" -> Serif
         "monospace", "mono" -> Monospace
+        LauncherSettings.FONT_FAMILY_CONDENSED -> system("sans-serif-condensed")
+        LauncherSettings.FONT_FAMILY_LIGHT -> system("sans-serif-light")
+        LauncherSettings.FONT_FAMILY_MEDIUM -> system("sans-serif-medium")
+        LauncherSettings.FONT_FAMILY_CASUAL -> system("casual")
+        LauncherSettings.FONT_FAMILY_SMALLCAPS -> system("sans-serif-smallcaps")
+        LauncherSettings.FONT_FAMILY_CURSIVE -> system("cursive")
         else -> phoneFamily(key) ?: Default
     }
+
+    /**
+     * The font for the setting [key], or null for the system font (the default) and, for the
+     * heading font, "the same as the text".
+     */
+    fun resolveOrNull(key: String): FontFamily? =
+        key.takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT && it != LauncherSettings.FONT_FAMILY_SAME }?.let(::resolve)
+
+    /** One of Android's own named families (always there; the system falls back if not). */
+    private fun system(name: String): FontFamily =
+        systemFamilies.getOrPut(name) { FontFamily(Typeface.create(name, Typeface.NORMAL)) }
+
+    private val systemFamilies = ConcurrentHashMap<String, FontFamily>()
 
     /** Fonts that ship on Motorola phones: file and weight per style. */
     private val PHONE_FONTS: Map<String, List<Pair<String, Int>>> = mapOf(

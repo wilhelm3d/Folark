@@ -28,6 +28,8 @@ fun LauncherTheme(
     amoledDark: Boolean = false,
     /** Settings ▸ Appearance ▸ Typography: the font every text uses unless it picks its own. Null keeps the system font. */
     fontFamily: FontFamily? = null,
+    /** Headings and titles only (display, headline, title styles); null: [fontFamily]. */
+    headingFontFamily: FontFamily? = null,
     /** Bold for every text that doesn't pick its own weight. */
     boldText: Boolean = false,
     /** Multiplies the text size on top of the system's font size. */
@@ -59,8 +61,8 @@ fun LauncherTheme(
     }
     val launcherColors = if (darkTheme) DarkLauncherColors else LightLauncherColors
 
-    val typography = remember(fontFamily, boldText) {
-        LauncherTypography.withFont(fontFamily, if (boldText) FontWeight.Bold else null)
+    val typography = remember(fontFamily, headingFontFamily, boldText) {
+        LauncherTypography.withFont(fontFamily, headingFontFamily, if (boldText) FontWeight.Bold else null)
     }
     val density = LocalDensity.current
     val scaledDensity = remember(density, fontScale) {
@@ -81,19 +83,21 @@ fun LauncherTheme(
 }
 
 /** Every text style with [family] and [weight] in place of its own (null keeps the style's). */
-private fun Typography.withFont(family: FontFamily?, weight: FontWeight?): Typography {
-    if (family == null && weight == null) return this
+private fun Typography.withFont(family: FontFamily?, heading: FontFamily?, weight: FontWeight?): Typography {
+    if (family == null && heading == null && weight == null) return this
     fun TextStyle.withFont() = copy(fontFamily = family ?: fontFamily, fontWeight = weight ?: fontWeight)
+    // Headings take their own font when one is chosen (e.g. pixel titles over plain text).
+    fun TextStyle.asHeading() = copy(fontFamily = heading ?: family ?: fontFamily, fontWeight = weight ?: fontWeight)
     return copy(
-        displayLarge = displayLarge.withFont(),
-        displayMedium = displayMedium.withFont(),
-        displaySmall = displaySmall.withFont(),
-        headlineLarge = headlineLarge.withFont(),
-        headlineMedium = headlineMedium.withFont(),
-        headlineSmall = headlineSmall.withFont(),
-        titleLarge = titleLarge.withFont(),
-        titleMedium = titleMedium.withFont(),
-        titleSmall = titleSmall.withFont(),
+        displayLarge = displayLarge.asHeading(),
+        displayMedium = displayMedium.asHeading(),
+        displaySmall = displaySmall.asHeading(),
+        headlineLarge = headlineLarge.asHeading(),
+        headlineMedium = headlineMedium.asHeading(),
+        headlineSmall = headlineSmall.asHeading(),
+        titleLarge = titleLarge.asHeading(),
+        titleMedium = titleMedium.asHeading(),
+        titleSmall = titleSmall.asHeading(),
         bodyLarge = bodyLarge.withFont(),
         bodyMedium = bodyMedium.withFont(),
         bodySmall = bodySmall.withFont(),

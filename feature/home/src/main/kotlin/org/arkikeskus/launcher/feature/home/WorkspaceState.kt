@@ -46,6 +46,15 @@ internal class WorkspaceDragState {
 
     /** Apps taken off home (to the dock or a folder), hidden until the database drops them. */
     var removedKeys by mutableStateOf(emptySet<String>())
+
+    /** The widget whose edit frame is open (resize, move, style, remove), if any. */
+    var editingWidget by mutableStateOf<EditingItem?>(null)
+
+    /** The widget (row id) whose "Widget style" dialog is open. */
+    var lookEditing by mutableStateOf<Long?>(null)
+
+    /** A widget shown at new bounds (row id to bounds) until the database catches up. */
+    var widgetOptimistic by mutableStateOf<Pair<Long, WidgetBounds>?>(null)
 }
 
 /**

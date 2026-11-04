@@ -94,6 +94,13 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
         clipChildren = false
         clipToPadding = false
     }
+    // More than fits (many recents, pairs…): the row scrolls sideways inside the bar's backdrop.
+    val scroller = TaskbarScroller(context) {
+        windowManager.currentWindowMetrics.bounds.width() - dp(SCROLL_SIDE_MARGIN_DP) * 2
+    }.apply {
+        background = row.background
+        row.background = null
+    }
     val size = dp(s.iconSizeDp)
     fun addIcon(app: AppItem, pinnedIndex: Int = -1) {
         val view = iconView(app, s, size, hint, fixed, pinnedIndex)
@@ -103,6 +110,7 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
             view.foreground = RunningDot(lightTheme, windows)
         }
         iconViews[app.badgeKey] = view
+        if (pinnedIndex >= 0) scroller.ownDrags += view
         row.addView(view, LinearLayout.LayoutParams(size, size).apply {
             marginStart = dp(s.spacingDp) / 2
             marginEnd = dp(s.spacingDp) / 2
@@ -249,7 +257,10 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
         if (controls != null) {
             addView(controls, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(10) })
         }
-        addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        scroller.addView(row, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+        ))
+        addView(scroller, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         if (!fixed) {
             // A touch anywhere else on the screen puts the opened bar away again.
             setOnTouchListener { _, event ->
@@ -458,3 +469,6 @@ internal fun AppTaskbar.barButton(
     }
     return view
 }
+
+/** The bar keeps this far from each screen edge before its row scrolls. */
+private const val SCROLL_SIDE_MARGIN_DP = 16

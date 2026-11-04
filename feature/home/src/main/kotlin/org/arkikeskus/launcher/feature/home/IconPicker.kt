@@ -44,6 +44,9 @@ import org.arkikeskus.launcher.model.AppItem
 @Composable
 internal fun IconPickerDialog(
     app: AppItem,
+    /** This app's own shape (null: it follows the global one), and setting it (null: follow again). */
+    shape: String?,
+    onShape: (String?) -> Unit,
     packs: List<Pair<String, String>>,
     hasCustomIcon: Boolean,
     loadNames: suspend (pack: String) -> List<String>,
@@ -66,6 +69,25 @@ internal fun IconPickerDialog(
         title = { Text(stringResource(R.string.icon_picker_title, app.label)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Its shape, for this app alone (works without an icon pack too).
+                Text(stringResource(R.string.icon_picker_shape), style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = shape == null,
+                        onClick = { onShape(null) },
+                        label = { Text(stringResource(R.string.icon_shape_follow), maxLines = 1) },
+                    )
+                    APP_SHAPES.forEach { (value, label) ->
+                        FilterChip(
+                            selected = shape == value,
+                            onClick = { onShape(value) },
+                            label = { Text(stringResource(label), maxLines = 1) },
+                        )
+                    }
+                }
                 if (pack == null) {
                     Text(
                         text = stringResource(R.string.icon_picker_no_packs),
@@ -139,3 +161,18 @@ internal fun IconPickerDialog(
         },
     )
 }
+
+/** The shapes an app can have of its own, with their names. */
+private val APP_SHAPES = listOf(
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_SYSTEM to R.string.icon_shape_system,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_CIRCLE to R.string.icon_shape_circle,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_SQUIRCLE to R.string.icon_shape_squircle,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_ROUNDED to R.string.icon_shape_rounded,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_SQUARE to R.string.icon_shape_square,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_TEARDROP to R.string.icon_shape_teardrop,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_PEBBLE to R.string.icon_shape_pebble,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_ARCH to R.string.icon_shape_arch,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_HEXAGON to R.string.icon_shape_hexagon,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_DIAMOND to R.string.icon_shape_diamond,
+    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_COOKIE to R.string.icon_shape_cookie,
+)

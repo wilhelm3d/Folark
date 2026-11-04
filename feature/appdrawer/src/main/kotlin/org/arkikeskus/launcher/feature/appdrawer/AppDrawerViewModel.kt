@@ -285,7 +285,7 @@ class AppDrawerViewModel @Inject constructor(
             // The real search is still on its way for this text (it waits for typing to pause):
             // show a plain name match meanwhile instead of an empty list.
             val typed = state.query.trim()
-            state.copy(apps = state.apps.filter { it.label.contains(typed, ignoreCase = true) }, folders = emptyList())
+            state.copy(apps = org.arkikeskus.launcher.data.search.AppMatcher.rank(state.apps, typed) { it.label }, folders = emptyList())
         } else {
             state.copy(
                 apps = results.apps,          // hidden-aware app matches from AppSearchProvider

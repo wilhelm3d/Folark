@@ -64,8 +64,9 @@ enum class RestoreResult {
 /**
  * Backs up and restores everything the launcher keeps: every setting of both displays (folders in
  * the drawer, hidden apps, renamed apps, picked icons, widget looks, people pins…), the home screens
- * and dock of both displays with their folders, stacks and widgets, and the home background
- * pictures. A backup is one zip file the user keeps on the phone (or anywhere the system file
+ * and dock of both displays with their folders, stacks and widgets, the home background pictures,
+ * and the small stores beside the settings (apps the taskbar hides in, the split pairs used most,
+ * system-control choices). A backup is one zip file the user keeps on the phone (or anywhere the system file
  * picker reaches), so it survives uninstalling the launcher.
  *
  * Kept out of a backup: what only means something on this install — notifications being held for
@@ -104,6 +105,23 @@ class BackupRepository @Inject constructor(
         }
     }
 
+    /**
+     * The whole setup as a file to send to another phone (the share sheet: Quick Share, a message,
+     * mail), as a read-only content link; null if it failed. Only the latest one is kept.
+     */
+    suspend fun shareableBackup(): Uri? = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            runCatching {
+                val dir = File(context.cacheDir, SHARE_DIR).apply { mkdirs() }
+                dir.listFiles().orEmpty().forEach { it.delete() }
+                val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(java.util.Date())
+                val file = File(dir, "Folark-setup-$day.zip")
+                file.writeBytes(buildBackup())
+                androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}$SHARE_AUTHORITY_SUFFIX", file)
+            }.getOrNull()
+        }
+    }
+
     /** Builds the whole backup in memory first, so a failure never leaves half a file behind. */
     private suspend fun buildBackup(): ByteArray {
         val manifest = JSONObject()
@@ -113,6 +131,7 @@ class BackupRepository @Inject constructor(
         manifest.put("filesDir", context.filesDir.absolutePath)
         manifest.put("settings", settingsToJson(dataStore.data.first()))
         manifest.put("homeItems", homeItemsToJson())
+        manifest.put("sharedPrefs", sharedPrefsToJson())
 
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
@@ -147,6 +166,57 @@ class BackupRepository @Inject constructor(
             list.put(entry)
         }
         return list
+    }
+
+    /**
+     * The small stores kept apart from the settings: the apps the taskbar was hidden in, the split
+     * pairs used most (the "often paired" suggestions), and the system-control choices. Same entry
+     * format as [settingsToJson], one array per store.
+     */
+    private fun sharedPrefsToJson(): JSONObject {
+        val all = JSONObject()
+        for (name in SHARED_PREFS) {
+            val list = JSONArray()
+            for ((key, value) in context.getSharedPreferences(name, Context.MODE_PRIVATE).all) {
+                val entry = JSONObject().put("k", key)
+                when (value) {
+                    is Boolean -> entry.put("t", "b").put("v", value)
+                    is Int -> entry.put("t", "i").put("v", value)
+                    is Long -> entry.put("t", "l").put("v", value)
+                    is Float -> entry.put("t", "f").put("v", value.toDouble())
+                    is String -> entry.put("t", "s").put("v", value)
+                    is Set<*> -> entry.put("t", "ss").put("v", JSONArray(value.map { it.toString() }))
+                    else -> continue
+                }
+                list.put(entry)
+            }
+            all.put(name, list)
+        }
+        return all
+    }
+
+    /** Puts the stores of [sharedPrefsToJson] back, each replacing what this install had. */
+    private fun restoreSharedPrefs(all: JSONObject) {
+        for (name in SHARED_PREFS) {
+            val list = all.optJSONArray(name) ?: continue
+            val edit = context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear()
+            for (i in 0 until list.length()) {
+                val e = list.optJSONObject(i) ?: continue
+                val key = e.optString("k").takeIf { it.isNotEmpty() } ?: continue
+                when (e.optString("t")) {
+                    "b" -> edit.putBoolean(key, e.optBoolean("v"))
+                    "i" -> edit.putInt(key, e.optInt("v"))
+                    "l" -> edit.putLong(key, e.optLong("v"))
+                    "f" -> edit.putFloat(key, e.optDouble("v").toFloat())
+                    "s" -> edit.putString(key, e.optString("v"))
+                    "ss" -> {
+                        val arr = e.optJSONArray("v") ?: JSONArray()
+                        edit.putStringSet(key, (0 until arr.length()).map { arr.optString(it) }.toSet())
+                    }
+                }
+            }
+            edit.commit()
+        }
     }
 
     private fun homeItemsToJson(): JSONArray {
@@ -268,6 +338,8 @@ class BackupRepository @Inject constructor(
                 restoreFiles(backup.second)
                 restoreSettings(manifest)
                 restoreHomeItems(manifest.optJSONArray("homeItems") ?: JSONArray())
+                // Older backups have none: what is set here stays as it is then.
+                manifest.optJSONObject("sharedPrefs")?.let(::restoreSharedPrefs)
             }.isSuccess
             if (restored) {
                 _restoreGeneration.value++
@@ -422,6 +494,12 @@ class BackupRepository @Inject constructor(
 
         private const val FORMAT = "folark-backup"
         private const val VERSION = 1
+        /** Where a shared setup is written (cache/setup/), and the file provider that hands it out. */
+        private const val SHARE_DIR = "setup"
+        private const val SHARE_AUTHORITY_SUFFIX = ".clips"
+
+        /** SharedPreferences stores that belong to a setup (see sharedPrefsToJson). */
+        private val SHARED_PREFS = listOf("taskbar", "folark_split_history", "system_controls")
         private const val MANIFEST_ENTRY = "folark.json"
         private const val FILES_DIR_ENTRY = "files/"
         private const val HOME_TABLE = "home_items"

@@ -278,20 +278,21 @@ class LauncherActivity : ComponentActivity() {
 
             LauncherTheme(
                 amoledDark = settings.appearance.amoledDark,
-                fontFamily = settings.appearance.fontFamily
-                    .takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT }
-                    ?.let { LauncherFontFamily.resolve(it) },
+                fontFamily = LauncherFontFamily.resolveOrNull(settings.appearance.fontFamily),
+                headingFontFamily = LauncherFontFamily.resolveOrNull(settings.appearance.headingFont),
                 boldText = settings.appearance.fontBold,
                 fontScale = settings.appearance.fontSizeScale,
             ) {
                 val iconEpochs by hiltViewModel<LauncherShellViewModel>().iconEpochs.collectAsStateWithLifecycle()
                 val customIcons by hiltViewModel<LauncherShellViewModel>().customIcons.collectAsStateWithLifecycle()
+                val iconShapes by hiltViewModel<LauncherShellViewModel>().iconShapes.collectAsStateWithLifecycle()
                 CompositionLocalProvider(
                     LocalAppWidgetHost provides appWidgetHost,
                     LocalWidgetConfigLauncher provides ::startWidgetConfig,
                     LocalOrphanWidgetConfigResult provides orphanConfigResult,
                     LocalIconEpochs provides iconEpochs,
                     LocalCustomIcons provides customIcons,
+                    org.arkikeskus.launcher.ui.component.LocalIconShapes provides iconShapes,
                     LocalPopupTheme provides settings.appearance.popupTheme,
                     org.arkikeskus.launcher.ui.component.LocalGlassLevel provides settings.appearance.liquidGlassLevel,
                     LocalBadgeStyle provides BadgeStyle(settings.dots.shape, settings.dots.color, settings.dots.position),

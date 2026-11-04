@@ -38,7 +38,7 @@ import java.util.Date
 import javax.inject.Inject
 
 /** What the backup card says under its rows after the last action. */
-enum class BackupMessage { WORKING, SAVED, SAVE_FAILED, AUTO_ON, AUTO_FAILED, RESTORED, NOT_A_BACKUP, TOO_NEW, RESTORE_FAILED }
+enum class BackupMessage { WORKING, SAVED, SAVE_FAILED, SHARE_FAILED, AUTO_ON, AUTO_FAILED, RESTORED, NOT_A_BACKUP, TOO_NEW, RESTORE_FAILED }
 
 /** Settings ▸ Backup & restore. */
 @HiltViewModel
@@ -56,6 +56,18 @@ class BackupSettingsViewModel @Inject constructor(
     fun backupTo(uri: Uri) = viewModelScope.launch {
         _message.value = BackupMessage.WORKING
         _message.value = if (backup.backupTo(uri)) BackupMessage.SAVED else BackupMessage.SAVE_FAILED
+    }
+
+    /** Builds the setup file and hands its link to [onReady] (the share sheet), or says it failed. */
+    fun share(onReady: (Uri) -> Unit) = viewModelScope.launch {
+        _message.value = BackupMessage.WORKING
+        val uri = backup.shareableBackup()
+        if (uri == null) {
+            _message.value = BackupMessage.SHARE_FAILED
+        } else {
+            _message.value = null
+            onReady(uri)
+        }
     }
 
     fun setAutoFolder(uri: Uri) = viewModelScope.launch {
@@ -119,6 +131,26 @@ internal fun BackupSection(viewModel: BackupSettingsViewModel = hiltViewModel())
         )
         ExpressiveRowDivider()
 
+        // To another phone in one go: the same file, handed to the share sheet.
+        ExpressiveActionItem(
+            title = stringResource(R.string.settings_backup_share),
+            description = stringResource(R.string.settings_backup_share_desc),
+            onClick = {
+                viewModel.share { uri ->
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                        .setType(BackupRepository.MIME_TYPE)
+                        .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent.createChooser(send, context.getString(R.string.settings_backup_share)),
+                        )
+                    }
+                }
+            },
+        )
+        ExpressiveRowDivider()
+
         val autoDescription = if (autoFolder.isEmpty()) {
             stringResource(R.string.settings_backup_auto_off)
         } else {
@@ -161,6 +193,7 @@ internal fun BackupSection(viewModel: BackupSettingsViewModel = hiltViewModel())
                         BackupMessage.WORKING -> R.string.settings_backup_working
                         BackupMessage.SAVED -> R.string.settings_backup_saved
                         BackupMessage.SAVE_FAILED -> R.string.settings_backup_save_failed
+                        BackupMessage.SHARE_FAILED -> R.string.settings_backup_share_failed
                         BackupMessage.AUTO_ON -> R.string.settings_backup_auto_started
                         BackupMessage.AUTO_FAILED -> R.string.settings_backup_auto_failed
                         BackupMessage.RESTORED -> R.string.settings_restore_done

@@ -125,4 +125,8 @@ class LauncherShellViewModel @Inject constructor(
      *  first frame should already draw the picked icons instead of flashing the default ones. */
     val customIcons: StateFlow<Map<String, String>> = settingsRepository.customIcons
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Per-app icon shapes (app key → shape), over the global one; eagerly, like [customIcons]. */
+    val iconShapes: StateFlow<Map<String, String>> = settingsRepository.iconShapes
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 }

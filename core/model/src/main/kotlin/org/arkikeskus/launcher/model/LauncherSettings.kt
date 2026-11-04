@@ -95,6 +95,8 @@ data class LauncherSettings(
         val pageBounceEnabled: Boolean = true,
         /** What the home pages do while being swiped (one of PAGE_EFFECT_*). */
         val pageScrollEffect: String = PAGE_EFFECT_SLIDE,
+        /** Unfolding the phone: the home pages open out from the hinge. */
+        val unfoldAnimation: Boolean = true,
         val innerDualPage: Boolean = false,
         val parallaxWallpaper: Boolean = false,
         /** What to show when swiping right from the first home page. */
@@ -402,6 +404,8 @@ data class LauncherSettings(
         val amoledDark: Boolean = false,
         /** Per-display font family: "default", "ndot", "ntype", "space_grotesk", "serif", "monospace". */
         val fontFamily: String = FONT_FAMILY_DEFAULT,
+        /** Per-display font for headings and titles only ([FONT_FAMILY_SAME]: the same as [fontFamily]). */
+        val headingFont: String = FONT_FAMILY_SAME,
         /** Per-display font bold style. */
         val fontBold: Boolean = false,
         /** Per-display font size scale (0.7f..1.4f). */
@@ -849,9 +853,20 @@ data class LauncherSettings(
         const val FONT_FAMILY_MOTO_WORK_SANS = "moto_work_sans"
         const val FONT_FAMILY_MOTO_EXO2 = "moto_exo2"
         const val FONT_FAMILY_MOTO_ROBOTO_SLAB = "moto_roboto_slab"
+        /** Families every Android phone carries (no font files of Folark's own). */
+        const val FONT_FAMILY_CONDENSED = "condensed"
+        const val FONT_FAMILY_LIGHT = "light"
+        const val FONT_FAMILY_MEDIUM = "medium"
+        const val FONT_FAMILY_CASUAL = "casual"
+        const val FONT_FAMILY_SMALLCAPS = "smallcaps"
+        const val FONT_FAMILY_CURSIVE = "cursive"
+        /** Headings only: the same font as the rest of the text. */
+        const val FONT_FAMILY_SAME = "same"
         val FONT_FAMILIES = listOf(
             FONT_FAMILY_DEFAULT, FONT_FAMILY_NDOT, FONT_FAMILY_NTYPE,
             FONT_FAMILY_SPACE_GROTESK, FONT_FAMILY_SERIF, FONT_FAMILY_MONOSPACE,
+            FONT_FAMILY_CONDENSED, FONT_FAMILY_LIGHT, FONT_FAMILY_MEDIUM,
+            FONT_FAMILY_CASUAL, FONT_FAMILY_SMALLCAPS, FONT_FAMILY_CURSIVE,
             FONT_FAMILY_MOTO_ROOKERY, FONT_FAMILY_MOTO_WORK_SANS, FONT_FAMILY_MOTO_EXO2,
             FONT_FAMILY_MOTO_ROBOTO_SLAB,
         )

@@ -55,9 +55,8 @@ class SettingsActivity : ComponentActivity() {
             LauncherTheme(
                 darkTheme = studio || isSystemInDarkTheme(),
                 amoledDark = settings.appearance.amoledDark,
-                fontFamily = settings.appearance.fontFamily
-                    .takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT }
-                    ?.let { LauncherFontFamily.resolve(it) },
+                fontFamily = LauncherFontFamily.resolveOrNull(settings.appearance.fontFamily),
+                headingFontFamily = LauncherFontFamily.resolveOrNull(settings.appearance.headingFont),
                 boldText = settings.appearance.fontBold,
                 fontScale = settings.appearance.fontSizeScale,
             ) {

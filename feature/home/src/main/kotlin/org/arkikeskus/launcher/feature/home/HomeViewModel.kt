@@ -663,6 +663,15 @@ class HomeViewModel @Inject constructor(
         settingsRepository.setCustomIcon(appItem.key, "$pack|$drawable")
     }
 
+    /** Per-app icon shapes, app key → shape, for the picker's shape row. */
+    val iconShapes: StateFlow<Map<String, String>> = settingsRepository.iconShapes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyMap())
+
+    /** Gives [appItem] its own icon [shape]; null follows the global shape again. */
+    fun setIconShape(appItem: AppItem, shape: String?) = viewModelScope.launch {
+        settingsRepository.setIconShape(appItem.key, shape)
+    }
+
     /** Returns [appItem] to its normal icon. */
     fun clearCustomIcon(appItem: AppItem) = viewModelScope.launch {
         settingsRepository.setCustomIcon(appItem.key, null)

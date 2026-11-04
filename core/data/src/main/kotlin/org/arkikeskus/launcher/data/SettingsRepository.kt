@@ -147,6 +147,7 @@ class SettingsRepository @Inject constructor(
                 iconSwipeUpAction = (p[Keys.iconSwipeUpAction(screenType)] ?: LauncherSettings.ICON_SWIPE_NONE).let { if (it in LauncherSettings.ICON_SWIPES) it else LauncherSettings.ICON_SWIPE_NONE },
                 autoRemoveEmptyPages = p[Keys.autoRemoveEmptyPages(screenType)] ?: false,
                 newPageOnDrag = p[Keys.newPageOnDrag(screenType)] ?: false,
+                unfoldAnimation = p[Keys.UNFOLD_ANIMATION] ?: true,
                 pageScrollEffect = (p[Keys.PAGE_SCROLL_EFFECT] ?: LauncherSettings.PAGE_EFFECT_SLIDE)
                     .let { if (it in LauncherSettings.PAGE_EFFECTS) it else LauncherSettings.PAGE_EFFECT_SLIDE },
                 innerDualPage = p[Keys.innerDualPageWorkspace(screenType)] ?: false,
@@ -387,6 +388,9 @@ class SettingsRepository @Inject constructor(
                 fontFamily = (p[Keys.appFontFamily(screenType)] ?: LauncherSettings.FONT_FAMILY_DEFAULT).let {
                     if (it in LauncherSettings.FONT_FAMILIES) it else LauncherSettings.FONT_FAMILY_DEFAULT
                 },
+                headingFont = (p[Keys.appHeadingFont(screenType)] ?: LauncherSettings.FONT_FAMILY_SAME).let {
+                    if (it in LauncherSettings.FONT_FAMILIES || it == LauncherSettings.FONT_FAMILY_SAME) it else LauncherSettings.FONT_FAMILY_SAME
+                },
                 fontBold = p[Keys.appFontBold(screenType)] ?: false,
                 fontSizeScale = (p[Keys.appFontSizeScale(screenType)] ?: 1.0f).coerceIn(0.7f, 1.4f),
                 dpiWorkspace = (p[Keys.dpiWorkspace(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
@@ -604,6 +608,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setAppOpenAnimation(value: String) = edit { it[Keys.APP_OPEN_ANIMATION] = value }
     suspend fun setFolderOpenAnimation(value: String) = edit { it[Keys.FOLDER_OPEN_ANIMATION] = value }
     suspend fun setPageScrollEffect(value: String) = edit { it[Keys.PAGE_SCROLL_EFFECT] = value }
+    suspend fun setUnfoldAnimation(value: Boolean) = edit { it[Keys.UNFOLD_ANIMATION] = value }
     suspend fun setWidgetBackgroundOpacity(value: Float) = edit { it[Keys.WIDGET_BACKGROUND_OPACITY] = value.coerceIn(0f, 1f) }
     /** The place typed in for the weather ("name<TAB>latitude<TAB>longitude"); "" = use the device's location. */
     val weatherLocation: Flow<String> = keyFlow(Keys.WEATHER_LOCATION) { it ?: "" }
@@ -617,6 +622,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setClockMinuteColor(value: String) = edit { it[Keys.CLOCK_MINUTE_COLOR] = value }
     suspend fun setClockMinuteOpacity(value: Float) = edit { it[Keys.CLOCK_MINUTE_OPACITY] = value.coerceIn(0.1f, 1f) }
     suspend fun setAppFontFamily(value: String, st: ScreenType) = edit { it[Keys.appFontFamily(st)] = value }
+    suspend fun setAppHeadingFont(value: String, st: ScreenType) = edit { it[Keys.appHeadingFont(st)] = value }
     suspend fun setAppFontBold(value: Boolean, st: ScreenType) = edit { it[Keys.appFontBold(st)] = value }
     suspend fun setAppFontSizeScale(value: Float, st: ScreenType) = edit { it[Keys.appFontSizeScale(st)] = value.coerceIn(0.7f, 1.4f) }
     suspend fun setWeatherWidgetAnimated(value: Boolean) = edit { it[Keys.WEATHER_WIDGET_ANIMATED] = value }
@@ -1042,6 +1048,16 @@ class SettingsRepository @Inject constructor(
         val current = parseLabels(p[Keys.CUSTOM_ICONS]).toMutableMap()
         if (icon.isNullOrBlank()) current.remove(key) else current[key] = icon
         p[Keys.CUSTOM_ICONS] = current.entries.joinToString("\n") { "${it.key}\t${it.value}" }
+    }
+
+    /** Per-app icon shapes, app key → LauncherSettings.ICON_SHAPE_* (both displays); the rest follow the global shape. */
+    val iconShapes: Flow<Map<String, String>> = keyFlow(Keys.ICON_SHAPES) { parseLabels(it) }
+
+    /** Gives the app [key] its own icon [shape], or (null/blank) returns it to the global one. */
+    suspend fun setIconShape(key: String, shape: String?) = edit { p ->
+        val current = parseLabels(p[Keys.ICON_SHAPES]).toMutableMap()
+        if (shape.isNullOrBlank()) current.remove(key) else current[key] = shape
+        p[Keys.ICON_SHAPES] = current.entries.joinToString("\n") { "${it.key}\t${it.value}" }
     }
     suspend fun setDpiWorkspace(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiWorkspace(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }
     suspend fun setDpiAppDrawer(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiAppDrawer(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }

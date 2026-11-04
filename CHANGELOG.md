@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Split screen
+- Works on the Razr's Android 17 build again: the module finds System UI's split calls by their leading parameters and passes a real InstanceId; the split drawer docks beside the app with `startTasks` (System UI's `startIntentAndTask` throws there) after waiting for its task to reach WM Shell; the Native engine falls back to the commands when System UI turns a request down. Check split screen shows the reason for a failure.
+
+### Taskbar
+- The bar scrolls sideways when it holds more than fits (never from a pinned icon, nor on a drag up to split).
+- Media controls show a progress bar, worked out from the player's last state (no polling); a drag seeks.
+- Over a full-screen video the mini pill steps aside too, and the pull handles shrink to a thin strip so the player's corner buttons stay tappable.
+- The launch glow reuses one window and caches its colour; the app watcher backs off while nothing changes and restarts properly after the screen was off.
+
+### Home, drawer and look
+- Unfolding the phone opens the home pages out from the hinge (Settings ▸ Appearance ▸ Unfold animation).
+- Per-app icon shapes (app menu ▸ Change icon ▸ Shape).
+- A separate heading font, and six more fonts every phone has (Condensed, Light, Medium, Casual, Small caps, Cursive).
+- Forgiving app search in the drawer and the split picker: initials ("gm"), letters in order ("gml"), one typo ("spotfy"), accents ignored; best match first.
+
+### Setup and backup
+- The first-run intro has a Split screen & taskbar page with live checks (overlay, usage access, the ADB grant with its command to copy, the Vector module).
+- Backups also keep the apps the taskbar hides in, the split pairs used most and the system-control choices; **Share setup** sends the whole setup to another phone.
+
+### Code
+- Workspace.kt (1,801 → 1,118 lines) and AppTaskbar.kt (1,662 → 865 lines) are split into smaller files; the home grid's cells are separate composables that skip recomposition while unchanged.
+- Split dumps are reused within a gesture (750 ms) instead of being read again.
+
 ## 2.1.0 (versionCode 210)
 
 ### Settings

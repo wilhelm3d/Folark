@@ -80,11 +80,15 @@ internal fun AppTaskbar.showHandles(s: TaskbarSetup) {
         else -> listOf(Gravity.START, Gravity.END)
     }
     val slop = ViewConfiguration.get(context).scaledTouchSlop
+    // Over a full-screen video the corners hold the player's own buttons (full screen, captions):
+    // the handles shrink to a thin strip along the very bottom, so a tap there still reaches the
+    // player and only a swipe up from the edge opens the bar.
+    val slim = s.hideFullScreen && fullScreen && !homeVisible
     sides.forEach { side ->
         val zone = FrameLayout(context).apply {
             contentDescription = context.getString(R.string.taskbar_handle)
             minimumWidth = dp(HANDLE_WIDTH_DP)
-            minimumHeight = dp(HANDLE_HEIGHT_DP)
+            minimumHeight = dp(if (slim) HANDLE_SLIM_HEIGHT_DP else HANDLE_HEIGHT_DP)
             var downY = 0f
             var opened = false
             setOnTouchListener { _, event ->
@@ -94,13 +98,14 @@ internal fun AppTaskbar.showHandles(s: TaskbarSetup) {
                         opened = true
                         open()
                     }
-                    MotionEvent.ACTION_UP -> if (!opened) open()
+                    // A plain tap opens it too, except on the slim strip over a video.
+                    MotionEvent.ACTION_UP -> if (!opened && !slim) open()
                 }
                 true
             }
         }
         // A pull hint shows where the swipe starts, in the chosen style (Settings ▸ Taskbar ▸ Pull style).
-        if (s.handleHint) {
+        if (s.handleHint && !slim) {
             val (hintView, lp) = handleHintView(s.handleStyle)
             zone.addView(hintView, lp)
         }
@@ -299,3 +304,6 @@ internal fun AppTaskbar.animateBarOut(view: View, anim: String, onEnd: () -> Uni
     }
     a.withEndAction { onEnd() }.start()
 }
+
+/** The handles' height over a full-screen video: a strip along the edge, clear of the player's buttons. */
+private const val HANDLE_SLIM_HEIGHT_DP = 14

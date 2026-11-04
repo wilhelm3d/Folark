@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Only the clipboard history's pictures are ever shared (see ClipboardHistoryRepository). -->
+<!-- Only the clipboard history's pictures (see ClipboardHistoryRepository) and a setup being
+     shared to another phone (BackupRepository.shareableBackup) are ever handed out. -->
 <paths>
     <files-path name="clips" path="clips/" />
+    <cache-path name="setup" path="setup/" />
 </paths>

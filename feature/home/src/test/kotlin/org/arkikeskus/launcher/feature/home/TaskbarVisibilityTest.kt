@@ -60,6 +60,9 @@ class TaskbarVisibilityTest {
         assertEquals(Mode.HANDLES, mode(overApp.copy(autoHideApps = setOf(pkg), keepOpen = true)))
         assertEquals(Mode.MINI, mode(overApp.copy(miniApps = setOf(pkg))))
         assertEquals(Mode.HANDLES, mode(overApp.copy(miniApps = setOf(pkg), keyboardUp = true)))
+        // Over a full-screen video the mini pill steps aside as well (unless that setting is off).
+        assertEquals(Mode.HANDLES, mode(overApp.copy(miniApps = setOf(pkg), fullScreen = true, hideFullScreen = true)))
+        assertEquals(Mode.MINI, mode(overApp.copy(miniApps = setOf(pkg), fullScreen = true, hideFullScreen = false)))
         // Rules for another app change nothing here.
         assertEquals(Mode.HANDLES, mode(overApp.copy(hiddenApps = setOf("other"), miniApps = setOf("other"))))
     }

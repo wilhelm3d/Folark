@@ -136,7 +136,8 @@ fun OnboardingFlow(
                 when (p) {
                     0 -> WelcomePage(onRestored)
                     1 -> GesturesPage()
-                    else -> PermissionsPage(onContactsGranted, onPhoneGranted)
+                    2 -> PermissionsPage(onContactsGranted, onPhoneGranted)
+                    else -> SplitSetupPage()
                 }
             }
             Row(
@@ -151,7 +152,7 @@ fun OnboardingFlow(
                     Spacer(Modifier.width(10.dp))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    repeat(3) { i ->
+                    repeat(PAGES) { i ->
                         val active = i == page
                         val w by animateDpAsState(if (active) 22.dp else 8.dp, label = "dot")
                         Box(
@@ -164,13 +165,13 @@ fun OnboardingFlow(
                 }
                 Spacer(Modifier.weight(1f))
                 Button(
-                    onClick = { if (page < 2) page++ else onFinish() },
+                    onClick = { if (page < PAGES - 1) page++ else onFinish() },
                     colors = ButtonDefaults.buttonColors(containerColor = AURORA_BLUE),
                     shape = RoundedCornerShape(50),
                     contentPadding = PaddingValues(horizontal = 26.dp, vertical = 13.dp),
                 ) {
                     Text(
-                        stringResource(if (page < 2) R.string.onboarding_next else R.string.onboarding_finish),
+                        stringResource(if (page < PAGES - 1) R.string.onboarding_next else R.string.onboarding_finish),
                         color = Color.White,
                     )
                 }
@@ -544,3 +545,6 @@ private fun PermissionRow(title: String, description: String, granted: Boolean, 
         }
     }
 }
+
+/** Welcome, gestures, permissions, split screen and taskbar. */
+private const val PAGES = 4

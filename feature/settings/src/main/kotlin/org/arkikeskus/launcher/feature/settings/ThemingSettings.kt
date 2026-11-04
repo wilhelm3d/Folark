@@ -273,22 +273,39 @@ internal fun TypographySection(
         icon = Icons.Rounded.AutoAwesome,
         subtitle = "Font family, bold weights and size scaling per display",
     ) {
+        val fontOptions = listOf(
+            LauncherSettings.FONT_FAMILY_DEFAULT to "Default",
+            LauncherSettings.FONT_FAMILY_NDOT to "Nothing NDot 57",
+            LauncherSettings.FONT_FAMILY_NTYPE to "Nothing NType 82",
+            LauncherSettings.FONT_FAMILY_SPACE_GROTESK to "Space Grotesk",
+            LauncherSettings.FONT_FAMILY_SERIF to "Serif",
+            LauncherSettings.FONT_FAMILY_MONOSPACE to "Monospace",
+            LauncherSettings.FONT_FAMILY_CONDENSED to stringResource(R.string.settings_font_condensed),
+            LauncherSettings.FONT_FAMILY_LIGHT to stringResource(R.string.settings_font_light),
+            LauncherSettings.FONT_FAMILY_MEDIUM to stringResource(R.string.settings_font_medium),
+            LauncherSettings.FONT_FAMILY_CASUAL to stringResource(R.string.settings_font_casual),
+            LauncherSettings.FONT_FAMILY_SMALLCAPS to stringResource(R.string.settings_font_smallcaps),
+            LauncherSettings.FONT_FAMILY_CURSIVE to stringResource(R.string.settings_font_cursive),
+            LauncherSettings.FONT_FAMILY_MOTO_ROOKERY to stringResource(R.string.settings_font_moto_rookery),
+            LauncherSettings.FONT_FAMILY_MOTO_WORK_SANS to stringResource(R.string.settings_font_moto_work_sans),
+            LauncherSettings.FONT_FAMILY_MOTO_EXO2 to stringResource(R.string.settings_font_moto_exo2),
+            LauncherSettings.FONT_FAMILY_MOTO_ROBOTO_SLAB to stringResource(R.string.settings_font_moto_roboto_slab),
+        ).filter { (key, _) -> phoneFonts.getValue(key) }
         ExpressiveSegmentedControl(
             title = "Font Family",
-            options = listOf(
-                LauncherSettings.FONT_FAMILY_DEFAULT to "Default",
-                LauncherSettings.FONT_FAMILY_NDOT to "Nothing NDot 57",
-                LauncherSettings.FONT_FAMILY_NTYPE to "Nothing NType 82",
-                LauncherSettings.FONT_FAMILY_SPACE_GROTESK to "Space Grotesk",
-                LauncherSettings.FONT_FAMILY_SERIF to "Serif",
-                LauncherSettings.FONT_FAMILY_MONOSPACE to "Monospace",
-                LauncherSettings.FONT_FAMILY_MOTO_ROOKERY to stringResource(R.string.settings_font_moto_rookery),
-                LauncherSettings.FONT_FAMILY_MOTO_WORK_SANS to stringResource(R.string.settings_font_moto_work_sans),
-                LauncherSettings.FONT_FAMILY_MOTO_EXO2 to stringResource(R.string.settings_font_moto_exo2),
-                LauncherSettings.FONT_FAMILY_MOTO_ROBOTO_SLAB to stringResource(R.string.settings_font_moto_roboto_slab),
-            ).filter { (key, _) -> phoneFonts.getValue(key) },
+            options = fontOptions,
             selected = s.appearance.fontFamily,
             onSelect = { viewModel.setAppFontFamily(it, screenType) },
+            icon = null,
+        )
+        ExpressiveRowDivider()
+
+        // Headings apart from the text: pixel titles over plain text, or plain titles over a pixel font.
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_heading_font),
+            options = listOf(LauncherSettings.FONT_FAMILY_SAME to stringResource(R.string.settings_heading_font_same)) + fontOptions,
+            selected = s.appearance.headingFont,
+            onSelect = { viewModel.setAppHeadingFont(it, screenType) },
             icon = null,
         )
         ExpressiveRowDivider()
@@ -796,6 +813,13 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
         ),
         selected = s.home.pageScrollEffect,
         onSelect = viewModel::setPageScrollEffect,
+    )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_unfold_animation),
+        subtitle = stringResource(R.string.settings_unfold_animation_desc),
+        checked = s.home.unfoldAnimation,
+        onCheckedChange = viewModel::setUnfoldAnimation,
     )
 }
 

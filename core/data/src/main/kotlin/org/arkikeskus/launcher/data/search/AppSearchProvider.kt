@@ -8,7 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Matches launchable apps by (effective) label, excluding hidden apps — preserving the drawer's
+ * Matches launchable apps by (effective) label (forgivingly, best first: [AppMatcher]), excluding hidden apps — preserving the drawer's
  * existing rule that hidden apps stay out of search results. Snapshots the current app + hidden
  * sets per query.
  */
@@ -23,11 +23,8 @@ class AppSearchProvider @Inject constructor(
     override suspend fun query(query: String): List<SearchResult> {
         val q = query.trim()
         val hidden = settingsRepository.hiddenApps.first()
-        return appRepository.apps.first()
-            .asSequence()
-            .filterNot { it.key in hidden }
-            .filter { it.label.contains(q, ignoreCase = true) }
-            .map { SearchResult.App(it) }
-            .toList()
+        val visible = appRepository.apps.first().filterNot { it.key in hidden }
+        // Best match first, with initials, gaps and a typo allowed (see AppMatcher).
+        return AppMatcher.rank(visible, q) { it.label }.map { SearchResult.App(it) }
     }
 }

@@ -174,7 +174,7 @@ fun SplitPickerDrawer(
     val current = realFolders.firstOrNull { it.id == open }
     val searching = look.search && query.isNotBlank()
     val results = remember(shown, query, searching) {
-        if (!searching) emptyList() else shown.filter { it.label.contains(query.trim(), ignoreCase = true) }
+        if (!searching) emptyList() else org.arkikeskus.launcher.data.search.AppMatcher.rank(shown, query.trim()) { it.label }
     }
 
     // Zoom: the app being opened, from where its icon was (in this drawer's coordinates).

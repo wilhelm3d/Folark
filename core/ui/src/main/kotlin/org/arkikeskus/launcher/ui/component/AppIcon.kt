@@ -80,6 +80,9 @@ val LocalAppLabelLines = compositionLocalOf { 1 }
  */
 val LocalCustomIcons = compositionLocalOf<Map<String, String>> { emptyMap() }
 
+/** Per-app icon shapes (app key → LauncherSettings.ICON_SHAPE_*), over [LocalIconShape]. */
+val LocalIconShapes = compositionLocalOf<Map<String, String>> { emptyMap() }
+
 /**
  * The per-display icon-size multiplier (Settings ▸ Grid): the surfaces multiply their preferred icon
  * size by it before fitting the icon into a cell.
@@ -151,7 +154,7 @@ fun AppIcon(
                     epoch = LocalIconEpochs.current.of(appItem.packageName),
                     customIcon = LocalCustomIcons.current[appItem.key].orEmpty(),
                     sizePx = iconRasterSize(with(LocalDensity.current) { iconSize.roundToPx() }),
-                    shape = LocalIconShape.current,
+                    shape = LocalIconShapes.current[appItem.key] ?: LocalIconShape.current,
                 ),
                 contentDescription = appItem.label,
                 modifier = nudge.size(iconSize),

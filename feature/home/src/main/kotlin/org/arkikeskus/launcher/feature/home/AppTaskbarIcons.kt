@@ -127,6 +127,8 @@ internal fun AppTaskbar.iconView(app: AppItem, s: TaskbarSetup, size: Int, hint:
     )
     val hold = Runnable {
         held = true
+        // Held: the gesture is the icon's (a scrolling bar must not take it).
+        icon.parent?.requestDisallowInterceptTouchEvent(true)
         org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.PICK_UP)
         showShortcuts(app, icon, s, fixed)
     }

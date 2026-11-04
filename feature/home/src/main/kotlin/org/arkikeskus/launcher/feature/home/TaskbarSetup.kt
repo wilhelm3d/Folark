@@ -49,6 +49,8 @@ internal data class TaskbarSetup(
     val themedIcons: Boolean,
     val iconPack: String,
     val customIcons: Map<String, String>,
+    /** Per-app icon shapes (app key → shape), over [iconShape]. */
+    val iconShapes: Map<String, String> = emptyMap(),
     val iconShape: String,
     /** Settings ▸ Shape every icon: plain icons on a plate of their colour, in the shape. */
     val shapeAllIcons: Boolean = true,

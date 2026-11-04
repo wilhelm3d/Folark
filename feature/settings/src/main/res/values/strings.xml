@@ -1109,4 +1109,17 @@
     <string name="settings_haptics_drag_desc">Ticks as you pick up, cross a drop zone and let go</string>
     <string name="settings_start_new_icons">Icons: five more shapes, Own colour and Soft colour themed icons in each app\'s colour, and older icons shaped too</string>
     <string name="settings_start_new_haptics">Haptics: a feel for opening apps, split screen, closing apps, Recents and dragging, with a strength choice</string>
+    <string name="settings_font_condensed">Condensed</string>
+    <string name="settings_font_light">Light</string>
+    <string name="settings_font_medium">Medium</string>
+    <string name="settings_font_casual">Casual</string>
+    <string name="settings_font_smallcaps">Small caps</string>
+    <string name="settings_font_cursive">Cursive</string>
+    <string name="settings_heading_font">Heading font</string>
+    <string name="settings_heading_font_same">Same as text</string>
+    <string name="settings_unfold_animation">Unfold animation</string>
+    <string name="settings_unfold_animation_desc">When you open the phone, the home pages open out from the hinge</string>
+    <string name="settings_backup_share">Share setup</string>
+    <string name="settings_backup_share_desc">Send your whole setup to another phone (Quick Share, a message, mail); open it there with Restore</string>
+    <string name="settings_backup_share_failed">The setup couldn\'t be packed. Try again</string>
 </resources>
