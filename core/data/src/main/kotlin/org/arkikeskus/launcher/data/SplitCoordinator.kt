@@ -361,14 +361,14 @@ class SplitCoordinator @Inject constructor(
      */
     suspend fun openPicker(first: SplitApp, firstOnRight: Boolean, peek: Boolean = false, three: Boolean = false) {
         val noAnim = ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
-        fun picker(selfDock: Boolean) = SplitPicker.intent(
-            context, first.packageName, right = firstOnRight, selfDockRight = selfDock, peek = peek,
-            firstKey = first.app?.key, firstTaskId = first.taskId, three = three,
+        fun picker(app: SplitApp, selfDock: Boolean) = SplitPicker.intent(
+            context, app.packageName, right = firstOnRight, selfDockRight = selfDock, peek = peek,
+            firstKey = app.app?.key, firstTaskId = app.taskId, three = three,
         )
+        fun picker(selfDock: Boolean) = picker(first, selfDock)
         val route = route()
-        // With Folark's module: one call opens the picker in the half beside the first app (the
-        // module route has no shell commands to move windows, so without this it was full screen).
-        if (!three && route.native && pickerNatively(first, firstOnRight, picker(false), route.root)) return
+        // With Folark's module: the picker opens hidden and docks itself beside the first app.
+        if (!three && route.native && pickerNatively(first, firstOnRight, ::picker, route.root)) return
         // Three apps don't fit a half: that picker opens full screen and builds the split after.
         if (three || !route.commands) {
             withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(false), noAnim) } }
@@ -391,25 +391,50 @@ class SplitCoordinator @Inject constructor(
     }
 
     /**
-     * The module's `startIntentAndTask`: the first app running (opened if need be), then the picker
-     * started straight into the other half beside it. False when that can't be done (the caller then
-     * falls back to another way).
+     * With the module: the first app running (opened if need be), then the picker started on its
+     * own, hidden until it is docked: it asks [dockPicker] to put it beside the first app with the
+     * module's `startTasks`. (`startIntentAndTask`, one step, throws inside WM Shell on Android 17
+     * builds: StageCoordinator.setSideStagePosition reads a third stage.) False when the first app
+     * can't be found or opened (the caller then falls back to another way).
      */
-    private suspend fun pickerNatively(first: SplitApp, firstOnRight: Boolean, pickerIntent: android.content.Intent, root: Boolean): Boolean {
+    private suspend fun pickerNatively(
+        first: SplitApp, firstOnRight: Boolean, picker: (SplitApp, Boolean) -> android.content.Intent, root: Boolean,
+    ): Boolean {
         val (id, _) = running(first, root) ?: open(first, root) ?: return false
         exitFirst(id, root)
-        SplitEvents.forget(listOf(id))
-        val pending = PendingIntent.getActivity(
-            context, PICKER_REQUEST, pickerIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val userId = android.os.Process.myUid() / PER_USER_RANGE
-        return SplitThree.startIntentAndTask(context, pending, userId, id, intentOnRight = !firstOnRight)
+        val noAnim = ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
+        return withContext(Dispatchers.Main) {
+            runCatching { context.startActivity(picker(first.copy(taskId = id), true), noAnim) }.isSuccess
+        }
     }
 
-    /** The picker (task [pickerTaskId]) moves itself into the right half, beside the app behind it. */
-    suspend fun dockPicker(pickerTaskId: Int): Boolean {
+    /**
+     * The picker (task [pickerTaskId]) docks itself beside [first], [first] on [firstOnRight]'s side:
+     * through the module's `startTasks` when it runs, else WM Shell's commands (those can only move
+     * the picker into the right half).
+     */
+    suspend fun dockPicker(pickerTaskId: Int, first: SplitApp? = null, firstOnRight: Boolean = false): Boolean {
         val route = route()
+        if (route.native && first != null) {
+            val firstId = first.taskId ?: withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, first.packageName, route.root) }
+            if (firstId != null && firstId != pickerTaskId) {
+                val position = if (firstOnRight) SplitThree.SPLIT_POSITION_RIGHT else SplitThree.SPLIT_POSITION_LEFT
+                SplitEvents.forget(listOf(firstId, pickerTaskId))
+                if (SplitThree.startSplitTasks(context, firstId, pickerTaskId, position) &&
+                    awaitInSplit(listOf(firstId, pickerTaskId), route.root)
+                ) return true
+            }
+        }
         if (!route.commands) return false
+        if (firstOnRight) {
+            // The commands only move a task into the right half: the first app comes over the
+            // picker and moves right, the picker filling the left (as openPicker does without the module).
+            val (id, read) = bringToFront(first ?: return false, route.root) ?: return false
+            delay(FRONT_SETTLE_MS)
+            return withContext(Dispatchers.IO) {
+                ShellSplit.moveToSide(context, id, right = true, root = route.root, read = read.fresh(route.root))
+            }
+        }
         return withContext(Dispatchers.IO) {
             repeat(DOCK_TRIES) {
                 if (ShellSplit.moveToSide(context, pickerTaskId, right = true, root = route.root)) return@withContext true

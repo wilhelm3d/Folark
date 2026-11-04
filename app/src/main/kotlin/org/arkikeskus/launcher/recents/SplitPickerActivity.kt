@@ -73,7 +73,7 @@ class SplitPickerActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 viewModel.loadRecents(firstPackage)
                 if (selfDockRight && !isInMultiWindowMode) {
-                    viewModel.dock(taskId)
+                    viewModel.dock(taskId, firstPackage, firstTaskId, firstOnRight)
                     // onMultiWindowModeChanged shows it; this is the fallback.
                     withTimeoutOrNull(DOCK_WAIT_MS) { while (!isInMultiWindowMode) delay(40L) }
                 }
@@ -200,7 +200,7 @@ class SplitPickerActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val DOCK_WAIT_MS = 450L
+        const val DOCK_WAIT_MS = 1_200L
         /** Zoom: how long the picker stays under the opening app (its window is up by then). */
         const val ZOOM_FINISH_MS = 700L
     }

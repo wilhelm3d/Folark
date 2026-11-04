@@ -247,7 +247,8 @@ class SplitPickerViewModel @Inject constructor(
     }
 
     /** The picker moves itself into the right half, beside the first app. */
-    suspend fun dock(pickerTaskId: Int): Boolean = splitCoordinator.dockPicker(pickerTaskId)
+    suspend fun dock(pickerTaskId: Int, firstPackage: String, firstTaskId: Int?, firstOnRight: Boolean): Boolean =
+        splitCoordinator.dockPicker(pickerTaskId, SplitApp(firstPackage, null, firstTaskId), firstOnRight)
 
     /** Left without a pick: the half-made split closes again, keeping the first app. */
     fun cancel(firstPackage: String, firstTaskId: Int?) {
