@@ -62,3 +62,7 @@ split_debug.log
 gemini/
 gemini_txt/
 folark_full_codebase.txt
+
+# Local AI review notes and agent plans (kept on disk, not in the repository)
+*.artifact.md
+/.agent/
