@@ -84,4 +84,5 @@
         <item>com.android.systemui</item>
     </string-array>
     <string name="split_native_paused">System UI restarted right after a split request, so Folark\'s native split is paused and the split commands are used instead. Settings ▸ Split screen &amp; peek can turn it back on, and it comes back by itself the next time System UI restarts.</string>
+    <string name="recents_taskbar_locked">Taskbar apps are locked (Settings ▸ Taskbar)</string>
 </resources>

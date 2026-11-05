@@ -23,6 +23,8 @@ object RootTasks {
      * picture (the smaller copy first) is copied into Folark's cache, read and deleted. Tasks
      * without a picture are left out.
      */
+    // One at a time: Recents and the taskbar share the folder the pictures are copied to.
+    @Synchronized
     fun snapshots(context: Context, tasks: Map<Int, Int>): Map<Int, ByteArray> {
         val wanted = tasks.filter { (id, user) -> id >= 0 && user >= 0 }
         if (wanted.isEmpty()) return emptyMap()

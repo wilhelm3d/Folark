@@ -508,6 +508,13 @@ data class LauncherSettings(
         val taskbarHandleStyle: String = TASKBAR_HANDLE_LINE,
         /** A button on the bar (next to Recents) that hides the bar and leaves the pull handles. */
         val hideButton: Boolean = true,
+        /** The pinned apps (and scenes) stay as they are: nothing is added, removed or moved from
+         *  the bar, the drawer, home or Recents (only Settings ▸ Taskbar can change them). */
+        val pinsLocked: Boolean = false,
+        /** A swipe down on the opened bar hides it to the pull handles. */
+        val swipeDownHide: Boolean = true,
+        /** Open apps on the bar as small pictures of the app (as Recents shows them, root). */
+        val openPreviews: Boolean = false,
         /** How the bar shows and hides: one of TASKBAR_ANIM_*. */
         val taskbarAnim: String = TASKBAR_ANIM_SLIDE,
         /** The glow when an app is started from the bar: in the app's colour, the accent colour, white, or none (LAUNCH_GLOW_*). */

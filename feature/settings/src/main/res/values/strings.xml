@@ -983,7 +983,7 @@
     <string name="settings_scene_layout_two_thirds">67 %</string>
     <string name="settings_scene_layout_app_third">%1$s 33 %%</string>
     <string name="settings_scene_layout_app_two_thirds">%1$s 67 %%</string>
-    <string name="settings_scene_layout_needs_module" formatted="false">Needs Folark\'s Vector module in System UI; without it the scene opens half and half. 33 % and 67 % need Divider stops (Settings ▸ Recents &amp; split screen)</string>
+    <string name="settings_scene_layout_needs_module">Needs Folark\'s Vector module in System UI; without it the scene opens half and half. 33 % and 67 % need Divider stops (Settings ▸ Recents &amp; split screen)</string>
     <string name="settings_scene_third">Third app</string>
     <string name="settings_scene_third_auto">As set in Multi-window</string>
     <string name="settings_scene_third_pane">Third pane</string>
@@ -1149,10 +1149,10 @@
     <string name="settings_split_drag_hint">Show where a drag can go</string>
     <string name="settings_split_drag_hint_desc">While you drag text or a picture out of an app in split screen, the panes light up (needs "Display over other apps")</string>
     <string name="settings_peek_fling_close">Fling peek view closed</string>
-    <string name="settings_peek_fling_close_desc">Fling peek view\'s divider hard towards the strip to close the app peeking in</string>
+    <string name="settings_peek_fling_close_desc">Fling peek view's divider hard towards the strip to close the app peeking in</string>
     <string name="settings_split_three_even">Three apps a third each</string>
     <string name="settings_split_three_even_desc">A third app joining a split makes three equal thirds (33 / 33 / 33) instead of Motorola\'s carousel, where one app shrinks to a strip (needs Folark\'s Vector module)</string>
-    <string name="settings_divider_stops_desc" formatted="false">The split divider rests at 33 %, 50 % and 67 %, the sizes Motorola\'s split screen lays apps out at (needs Folark\'s Vector module; from the next split)</string>
+    <string name="settings_divider_stops_desc">The split divider rests at 33 %, 50 % and 67 %, the sizes Motorola\'s split screen lays apps out at (needs Folark\'s Vector module; from the next split)</string>
 
     <!-- Settings, sorted anew: categories -->
     <string name="settings_cat_theme">Theme &amp; colours</string>
@@ -1199,4 +1199,10 @@
     <string name="settings_pv_recents_motion">Cards</string>
     <string name="settings_pv_recents_press">Press</string>
     <string name="settings_pv_split">Split picker</string>
+    <string name="settings_taskbar_pins_locked">Lock taskbar apps</string>
+    <string name="settings_taskbar_pins_locked_desc">Nothing is added to, removed from or moved on the bar (drops from the drawer, home or Recents, the long-press menu); only the list above changes it</string>
+    <string name="settings_taskbar_open_previews">Open apps as previews</string>
+    <string name="settings_taskbar_open_previews_desc">Recent apps show a small picture of the app with its icon in the corner, as in Recents (needs root; icons until a picture is there)</string>
+    <string name="settings_taskbar_swipe_down_hide">Swipe down to hide</string>
+    <string name="settings_taskbar_swipe_down_hide_desc">A swipe down on the bar tucks it away to the pull handles</string>
 </resources>

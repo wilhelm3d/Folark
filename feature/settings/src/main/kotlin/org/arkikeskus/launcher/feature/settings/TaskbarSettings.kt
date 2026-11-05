@@ -159,6 +159,13 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             onClick = { picking = true },
         )
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_pins_locked),
+            subtitle = stringResource(R.string.settings_taskbar_pins_locked_desc),
+            checked = s.taskbar.pinsLocked,
+            onCheckedChange = viewModel::setTaskbarPinsLocked,
+        )
+        ExpressiveRowDivider()
         ExpressiveStepperRow(
             title = stringResource(R.string.settings_taskbar_recents),
             value = s.taskbar.recentCount,
@@ -171,6 +178,15 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 title = stringResource(R.string.settings_taskbar_usage_access),
                 description = stringResource(R.string.settings_taskbar_usage_access_desc),
                 onClick = { openUsageAccess(context) },
+            )
+        }
+        if (s.taskbar.recentCount > 0) {
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_taskbar_open_previews),
+                subtitle = stringResource(R.string.settings_taskbar_open_previews_desc),
+                checked = s.taskbar.openPreviews,
+                onCheckedChange = viewModel::setTaskbarOpenPreviews,
             )
         }
         ExpressiveRowDivider()
@@ -392,6 +408,13 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             subtitle = stringResource(R.string.settings_taskbar_hide_button_desc),
             checked = s.taskbar.hideButton,
             onCheckedChange = viewModel::setTaskbarHideButton,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_swipe_down_hide),
+            subtitle = stringResource(R.string.settings_taskbar_swipe_down_hide_desc),
+            checked = s.taskbar.swipeDownHide,
+            onCheckedChange = viewModel::setTaskbarSwipeDownHide,
         )
     }
 

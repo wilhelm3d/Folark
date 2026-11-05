@@ -64,6 +64,8 @@ internal fun AppTaskbar.recentApps(s: TaskbarSetup): List<AppItem> {
     // the split pair below (read once for all three).
     val open = OpenTasks.list(context)
     runningPackages = open?.map { it.packageName }?.toSet().orEmpty()
+    // The newest task of each open app (the list is newest first), for the previews.
+    openTaskOf = if (s.openPreviews) open?.asReversed()?.associate { it.packageName to (it.taskId to it.userId) }.orEmpty() else emptyMap()
     // Count concurrently-open windows per package: freeform pop-ups and split tasks each count,
     // while any number of plain full-screen recents of one app counts once (not several stale ones).
     runningCounts = open?.groupBy { it.packageName }?.mapValues { (_, tasks) ->

@@ -17,6 +17,13 @@ internal fun AppTaskbar.pinnedKeys(): List<String> = setup?.pinned?.map { it.key
 
 internal fun AppTaskbar.isPinned(app: AppItem): Boolean = setup?.pinned?.any { it.key == app.key } == true
 
+/** Settings ▸ Taskbar ▸ Lock taskbar apps: true (and says so) when the pinned apps can't change. */
+internal fun AppTaskbar.pinsLocked(): Boolean {
+    if (setup?.pinsLocked != true) return false
+    Toast.makeText(context, R.string.taskbar_pins_locked, Toast.LENGTH_SHORT).show()
+    return true
+}
+
 private fun AppTaskbar.savePinned(keys: List<String>) {
     val repo = settingsRepo ?: return
     scope.launch { repo.setTaskbarPinned(keys.distinct().take(MAX_PINNED)) }
@@ -26,6 +33,7 @@ private fun AppTaskbar.savePinned(keys: List<String>) {
 internal fun AppTaskbar.pin(app: AppItem): Boolean {
     val keys = pinnedKeys()
     if (app.key in keys) return false
+    if (pinsLocked()) return false
     if (keys.size >= MAX_PINNED) {
         Toast.makeText(context, R.string.taskbar_full, Toast.LENGTH_SHORT).show()
         return false
@@ -37,6 +45,7 @@ internal fun AppTaskbar.pin(app: AppItem): Boolean {
 internal fun AppTaskbar.unpin(app: AppItem) {
     val keys = pinnedKeys()
     if (app.key !in keys) return
+    if (pinsLocked()) return
     savePinned(keys - app.key)
 }
 
@@ -47,6 +56,7 @@ internal fun AppTaskbar.movePinned(app: AppItem, to: Int) {
     if (from < 0) return
     val target = to.coerceIn(0, keys.size - 1)
     if (target == from) return
+    if (pinsLocked()) return
     keys.removeAt(from)
     keys.add(target, app.key)
     savePinned(keys)

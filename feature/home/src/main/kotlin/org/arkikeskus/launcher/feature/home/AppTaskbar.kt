@@ -220,6 +220,11 @@ internal class AppTaskbar(
 
     /** The app icons on the bar now, by badgeKey, for the notification nudge. */
     internal val iconViews = HashMap<String, View>()
+    /** Open apps' tasks (package → task id, user id), for the bar's previews (AppTaskbarPreviews.kt). */
+    @Volatile internal var openTaskOf: Map<String, Pair<Int, Int>> = emptyMap()
+    internal val previewCache = android.util.LruCache<Int, android.graphics.Bitmap>(12)
+    internal val previewTakenAt = HashMap<Int, Long>()
+    internal var previewJob: Job? = null
 
     internal var repository: AppRepository? = null
     internal var split: SplitCoordinator? = null
@@ -310,6 +315,9 @@ internal class AppTaskbar(
                     handleHint = s.taskbar.handleHint,
                     handleStyle = s.taskbar.taskbarHandleStyle,
                     hideButton = s.taskbar.hideButton,
+                    pinsLocked = s.taskbar.pinsLocked,
+                    swipeDownHide = s.taskbar.swipeDownHide,
+                    openPreviews = s.taskbar.openPreviews,
                     taskbarAnim = s.taskbar.taskbarAnim,
                     launchGlow = s.taskbar.launchGlow,
                     onHome = s.taskbar.onHome,
@@ -471,6 +479,7 @@ internal class AppTaskbar(
             onHome = false,
             keepOpen = false,
             hideButton = false,
+            openPreviews = false,
             mediaEnabled = false,
             liveEnabled = false,
             pairIds = emptyList(),

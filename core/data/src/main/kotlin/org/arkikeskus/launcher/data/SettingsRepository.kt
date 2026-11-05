@@ -451,6 +451,9 @@ class SettingsRepository @Inject constructor(
                 handleHint = p[Keys.TASKBAR_HANDLE_HINT] ?: true,
                 taskbarHandleStyle = p[Keys.TASKBAR_HANDLE_STYLE] ?: LauncherSettings.TASKBAR_HANDLE_LINE,
                 hideButton = p[Keys.TASKBAR_HIDE_BUTTON] ?: true,
+                pinsLocked = p[Keys.TASKBAR_PINS_LOCKED] ?: false,
+                swipeDownHide = p[Keys.TASKBAR_SWIPE_DOWN_HIDE] ?: true,
+                openPreviews = p[Keys.TASKBAR_OPEN_PREVIEWS] ?: false,
                 taskbarAnim = p[Keys.TASKBAR_ANIM] ?: LauncherSettings.TASKBAR_ANIM_SLIDE,
                 launchGlow = (p[Keys.TASKBAR_LAUNCH_GLOW] ?: LauncherSettings.LAUNCH_GLOW_APP),
                 source = if (p[Keys.TASKBAR_SOURCE] == LauncherSettings.TASKBAR_SOURCE_SYSTEM)
@@ -986,6 +989,15 @@ class SettingsRepository @Inject constructor(
     suspend fun setTaskbarHandleHint(value: Boolean) = edit { it[Keys.TASKBAR_HANDLE_HINT] = value }
     suspend fun setTaskbarHandleStyle(value: String) = edit { it[Keys.TASKBAR_HANDLE_STYLE] = value }
     suspend fun setTaskbarHideButton(value: Boolean) = edit { it[Keys.TASKBAR_HIDE_BUTTON] = value }
+    suspend fun setTaskbarPinsLocked(value: Boolean) {
+        // Pinned apps that follow the dock would still change with it: locked, they are kept as they are now.
+        if (value && settings(ScreenType.INNER).first().taskbar.pinnedApps == null) {
+            setTaskbarPinned(dockFavorites(ScreenType.INNER).first())
+        }
+        edit { it[Keys.TASKBAR_PINS_LOCKED] = value }
+    }
+    suspend fun setTaskbarSwipeDownHide(value: Boolean) = edit { it[Keys.TASKBAR_SWIPE_DOWN_HIDE] = value }
+    suspend fun setTaskbarOpenPreviews(value: Boolean) = edit { it[Keys.TASKBAR_OPEN_PREVIEWS] = value }
     suspend fun setTaskbarAnim(value: String) = edit { it[Keys.TASKBAR_ANIM] = value }
     suspend fun setTaskbarSource(value: String) = edit { it[Keys.TASKBAR_SOURCE] = value }
     suspend fun setSystemTaskbarMode(value: Int) = edit { it[Keys.SYSTEM_TASKBAR_MODE] = value }

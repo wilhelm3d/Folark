@@ -324,6 +324,9 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarHandleHint(value: Boolean) = update { repository.setTaskbarHandleHint(value) }
     fun setTaskbarHandleStyle(value: String) = update { repository.setTaskbarHandleStyle(value) }
     fun setTaskbarHideButton(value: Boolean) = update { repository.setTaskbarHideButton(value) }
+    fun setTaskbarPinsLocked(value: Boolean) = update { repository.setTaskbarPinsLocked(value) }
+    fun setTaskbarSwipeDownHide(value: Boolean) = update { repository.setTaskbarSwipeDownHide(value) }
+    fun setTaskbarOpenPreviews(value: Boolean) = update { repository.setTaskbarOpenPreviews(value) }
     fun setTaskbarAnim(value: String) = update { repository.setTaskbarAnim(value) }
     fun setTaskbarSource(value: String) = update { repository.setTaskbarSource(value) }
     fun setSystemTaskbarMode(value: Int) = update { repository.setSystemTaskbarMode(value) }

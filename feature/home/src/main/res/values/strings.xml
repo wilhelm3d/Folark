@@ -302,4 +302,5 @@
     <string name="onboarding_split_ready_native">Split screen is ready: Folark\'s module, with the commands as a fallback</string>
     <string name="onboarding_split_ready_commands">Split screen is ready: Android\'s split commands</string>
     <string name="onboarding_split_not_yet">Split screen needs the ADB grant (or root)</string>
+    <string name="taskbar_pins_locked">Taskbar apps are locked (Settings ▸ Taskbar)</string>
 </resources>

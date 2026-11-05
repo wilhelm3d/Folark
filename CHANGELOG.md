@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Taskbar
+- Lock taskbar apps (Settings ▸ Taskbar ▸ Apps on the bar): nothing is added, removed or moved from the bar, the drawer, home or Recents; only the pinned-apps list in Settings changes it. Pins that followed the dock are kept as they are when locked.
+- Swipe down to hide (Settings ▸ Taskbar ▸ Pull handles, on by default): a swipe down on the bar tucks it away to the pull handles, as the hide button does.
+- Open apps as previews (Settings ▸ Taskbar, root): the recent apps on the bar show a small picture of the app window, with its icon in the corner, as Recents does.
+
 ### Settings
 - Fixed: after System UI crashed once, Folark's own split stayed paused until the phone restarted, which hid the size buttons in the split drawer and turned the three-app split into a floating window. The pause now ends the next time System UI starts normally, and dropping a third app while it's paused says why.
 - Settings sorted anew, one topic per page: Look & feel (Theme & colours, Icons & badges, Motion & haptics), Home screen (Home screen, Dock & folders, Gestures), Apps & multitasking (App drawer, Taskbar, Recents, Split screen & peek) and Phone & system (Displays & fold, System, Permissions, Root, Backup). Everything about split screen and peek is now on one page, wherever the split starts from.

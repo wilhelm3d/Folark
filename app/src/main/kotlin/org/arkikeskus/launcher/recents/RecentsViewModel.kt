@@ -378,6 +378,13 @@ class RecentsViewModel @Inject constructor(
     fun pinSplitToTaskbar(card: RecentsCard) {
         if (!canSave(card)) return
         appScope.launch {
+            // Settings ▸ Taskbar ▸ Lock taskbar apps: nothing joins the bar.
+            if (settingsRepository.settings(ScreenType.INNER).first().taskbar.pinsLocked) {
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, org.arkikeskus.launcher.R.string.recents_taskbar_locked, android.widget.Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
             val fresh = scene(card) ?: return@launch
             val known = appRepository.appPairs.first().firstOrNull {
                 it.app1Key == fresh.app1Key && it.app2Key == fresh.app2Key && it.app3Key == fresh.app3Key

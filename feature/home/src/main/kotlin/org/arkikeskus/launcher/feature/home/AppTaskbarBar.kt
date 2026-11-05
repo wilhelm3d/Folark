@@ -100,6 +100,8 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
     }.apply {
         background = row.background
         row.background = null
+        // Swipe down on the bar: tucked away to the pull handles, as the hide button does.
+        if (s.swipeDownHide) onSwipeDown = { hideToHandles() }
     }
     val size = dp(s.iconSizeDp)
     fun addIcon(app: AppItem, pinnedIndex: Int = -1) {
@@ -115,6 +117,8 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
             marginStart = dp(s.spacingDp) / 2
             marginEnd = dp(s.spacingDp) / 2
         })
+        // An open app as a picture of its window (Settings ▸ Taskbar ▸ Open apps as previews).
+        if (pinnedIndex < 0 && s.openPreviews) previewFor(app)?.let { showPreview(view, app, it, s) }
     }
     fun addPairIcon(pair: AppPair) {
         row.addView(pairView(pair, s, size, fixed), LinearLayout.LayoutParams(size, size).apply {
@@ -301,6 +305,7 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
     barRow = row
     barColumn = column
     if (animateIn) animateBarIn(column, s.taskbarAnim)
+    loadPreviews(s)
     // Tell home and the drawer where the bar's top edge is (and drags where to drop to pin),
     // whenever it is laid out again.
     row.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishSpace(v) }

@@ -41,6 +41,12 @@ internal data class TaskbarSetup(
     val handleHint: Boolean,
     val handleStyle: String,
     val hideButton: Boolean,
+    /** Pinned apps can't be added, removed or moved from the bar or by drops (Settings only). */
+    val pinsLocked: Boolean = false,
+    /** A swipe down on the opened bar hides it. */
+    val swipeDownHide: Boolean = true,
+    /** Open (recent) apps as pictures of the app instead of icons. */
+    val openPreviews: Boolean = false,
     val taskbarAnim: String,
     /** The glow when an app starts from the bar (LauncherSettings.LAUNCH_GLOW_*). */
     val launchGlow: String = org.arkikeskus.launcher.model.LauncherSettings.LAUNCH_GLOW_APP,

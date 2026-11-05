@@ -101,7 +101,14 @@ internal fun AppTaskbar.iconView(app: AppItem, s: TaskbarSetup, size: Int, hint:
             val drawable = withContext(Dispatchers.IO) { loadIcon(app, s) }
             if (drawable != null) {
                 iconCache[app.key] = drawable
-                icon.setImageDrawable(drawable)
+                // Showing the app's picture already: the icon goes in its corner.
+                val tile = icon.drawable as? PreviewTileDrawable
+                if (tile != null) {
+                    tile.icon = drawable
+                    icon.invalidate()
+                } else {
+                    icon.setImageDrawable(drawable)
+                }
             }
         }
     }
@@ -149,7 +156,7 @@ internal fun AppTaskbar.iconView(app: AppItem, s: TaskbarSetup, size: Int, hint:
                 if (!moved && (abs(up) > slop || abs(dx) > slop)) {
                     moved = true
                     handler.removeCallbacks(hold)
-                    reordering = pinnedIndex >= 0 && abs(dx) > abs(up) * 2 && abs(up) < dp(16)
+                    reordering = pinnedIndex >= 0 && !s.pinsLocked && abs(dx) > abs(up) * 2 && abs(up) < dp(16)
                 }
                 if (reordering) {
                     if (up > armDistance * 0.6f) {

@@ -42,18 +42,35 @@ internal class TaskbarScroller(context: Context, private val maxWidth: () -> Int
 
     private val scrollable: Boolean get() = canScrollHorizontally(1) || canScrollHorizontally(-1)
 
+    /** A swipe down on the bar (Settings ▸ Taskbar ▸ Swipe down to hide); null: off. */
+    var onSwipeDown: (() -> Unit)? = null
+    private var swipingDown = false
+    private val hideDistance = 28f * context.resources.displayMetrics.density
+
+    /** Clearly downwards from where the finger went down. */
+    private fun isSwipeDown(ev: MotionEvent): Boolean {
+        val dx = ev.x - downX
+        val dy = ev.y - downY
+        return onSwipeDown != null && dy > slop * 2 && dy > abs(dx) * 1.5f
+    }
+
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        if (!scrollable) return false
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = ev.x
                 downY = ev.y
-                ownDrag = childUnder(ev.x + scrollX)?.let { it in ownDrags } == true
-                super.onInterceptTouchEvent(ev)
+                swipingDown = false
+                ownDrag = scrollable && childUnder(ev.x + scrollX)?.let { it in ownDrags } == true
+                if (scrollable) super.onInterceptTouchEvent(ev)
                 return false
             }
             MotionEvent.ACTION_MOVE -> {
-                if (ownDrag) return false
+                // Down, off the bar: taken from the icon (it gets a cancel) to hide the bar.
+                if (isSwipeDown(ev)) {
+                    swipingDown = true
+                    return true
+                }
+                if (!scrollable || ownDrag) return false
                 val dx = abs(ev.x - downX)
                 val dy = abs(ev.y - downY)
                 // Sideways, and clearly so: an icon dragged up and over (split, float) keeps it.
@@ -61,7 +78,31 @@ internal class TaskbarScroller(context: Context, private val maxWidth: () -> Int
                 return false
             }
         }
-        return super.onInterceptTouchEvent(ev)
+        return scrollable && super.onInterceptTouchEvent(ev)
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            // Straight onto the bar's own backdrop (between icons): nothing intercepted it.
+            MotionEvent.ACTION_DOWN -> {
+                downX = ev.x
+                downY = ev.y
+                swipingDown = false
+            }
+            MotionEvent.ACTION_MOVE -> if (!swipingDown && isSwipeDown(ev)) swipingDown = true
+        }
+        if (swipingDown) {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_UP -> {
+                    swipingDown = false
+                    if (ev.y - downY > hideDistance) onSwipeDown?.invoke()
+                }
+                MotionEvent.ACTION_CANCEL -> swipingDown = false
+            }
+            return true
+        }
+        return super.onTouchEvent(ev) || onSwipeDown != null
     }
 
     /** The row's child under [x] (in the row's own coordinates). */
