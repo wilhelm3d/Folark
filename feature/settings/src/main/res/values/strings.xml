@@ -861,6 +861,8 @@
     <string name="settings_recents_speaker_badge">Speaker badge</string>
     <string name="settings_recents_speaker_badge_desc">On a card playing audio, a pulsing speaker you can tap to pause or resume just that app (needs notification access)</string>
     <string name="settings_recents_label_size">Label size</string>
+    <string name="settings_recents_scroll_ticks">Tick while scrolling</string>
+    <string name="settings_recents_scroll_ticks_desc">A light haptic tick for each card scrolled past</string>
     <string name="settings_recents_menu_motion">Animate the long-press menu</string>
     <string name="settings_recents_menu_motion_desc">It grows from your finger and its rows slide in one by one</string>
     <string name="settings_three_app_split">Real three-app split</string>

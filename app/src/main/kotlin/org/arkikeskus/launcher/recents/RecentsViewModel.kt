@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.AppRepository
@@ -114,15 +115,31 @@ class RecentsViewModel @Inject constructor(
             publish()
             if (s.recents.thumbnails && result.root) loadThumbnails(result.cards, refresh = newest.toSet())
             if (s.recents.memoryBadge && result.root) {
-                val packages = result.cards.flatMap { c -> c.tasks.map { it.packageName } }
-                _memory.value = withContext(Dispatchers.IO) { RootTasks.memoryKb(packages) }
+                val packages = result.cards.flatMap { c -> c.tasks.map { it.packageName } }.toSet()
+                // Read again only after a while, or when new apps show up (E16).
+                val fresh = System.currentTimeMillis() - memoryAt < MEMORY_KEEP_MS && packages.all { it in _memory.value }
+                if (!fresh) {
+                    _memory.value = withContext(Dispatchers.IO) { RootTasks.memoryKb(packages) }
+                    memoryAt = System.currentTimeMillis()
+                }
             } else {
                 _memory.value = emptyMap()
             }
         }
     }
 
-    private suspend fun load(s: LauncherSettings): RecentsState {
+    /** When the memory badge was last read (E16). */
+    private var memoryAt = 0L
+    /** Tasks Android's task manager had no picture for, and when (E13: no helper start for them). */
+    private val noPicture = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+
+    private suspend fun load(s: LauncherSettings): RecentsState = kotlinx.coroutines.coroutineScope {
+        // The task list and the split read are two separate dumps: both at once (E11).
+        val splitRead = if (s.recents.groupSplits) async { ShellSplit.stagedSplitTasks(context).map { it.taskId }.toSet() } else null
+        loadWith(s, splitRead)
+    }
+
+    private suspend fun loadWith(s: LauncherSettings, splitRead: kotlinx.coroutines.Deferred<Set<Int>>?): RecentsState {
         val tasks = OpenTasks.list(context) ?: return RecentsState(loading = false, canList = false)
         if (tasks.isEmpty() && OpenTasks.formatProblem != null) {
             return RecentsState(loading = false, canList = true, unreadable = true)
@@ -130,8 +147,17 @@ class RecentsViewModel @Inject constructor(
         val needRoot = s.recents.thumbnails || s.recents.rootClose || s.recents.memoryBadge || (s.recents.pinned.isNotEmpty() && (s.recents.pinKeepAlive || s.recents.btnCloseAll))
         val root = needRoot && RootShell.available()
         val apps = appRepository.apps.first()
+        // Apps by package and user, built once per load (E15).
+        val byPackageUser = HashMap<String, AppItem>(apps.size * 2)
+        val byPackage = HashMap<String, AppItem>(apps.size)
+        for (a in apps) {
+            byPackageUser.putIfAbsent("${a.packageName}#${a.user.hashCode()}", a)
+            byPackage.putIfAbsent(a.packageName, a)
+        }
+        fun appFor(task: OpenTask, @Suppress("UNUSED_PARAMETER") all: List<AppItem>): AppItem? =
+            byPackageUser["${task.packageName}#${task.userId}"] ?: byPackage[task.packageName]
         // Use stagedSplitTasks so active split pairs stay grouped on one card even when Recents is covering them.
-        val inSplit = if (s.recents.groupSplits) ShellSplit.stagedSplitTasks(context).map { it.taskId }.toSet() else emptySet()
+        val inSplit = splitRead?.await() ?: emptySet()
         val splitGroup = tasks.filter { it.taskId in inSplit }
         // Older split pairs (not the one on screen) are still listed as two split-screen tasks next
         // to each other: each such pair becomes one double card too.
@@ -210,20 +236,24 @@ class RecentsViewModel @Inject constructor(
     /** [refresh]: tasks whose cached picture is taken again anyway (the app just left). */
     private fun loadThumbnails(cards: List<RecentsCard>, refresh: Set<Int> = emptySet()) {
         viewModelScope.launch(Dispatchers.IO) {
-            val missing = ArrayList<Int>()
-            for (task in cards.flatMap { it.tasks }) {
-                if (task.taskId !in refresh && cache.get(task.taskId) != null) continue
-                val bitmap = RootTasks.snapshot(task.taskId, task.userId)?.let(::decode)
-                if (bitmap != null) {
-                    cache.put(task.taskId, bitmap)
-                    publish()
-                } else {
-                    missing += task.taskId
-                }
-            }
+            val wanted = cards.flatMap { it.tasks }
+                .filter { it.taskId in refresh || cache.get(it.taskId) == null }
+                .associate { it.taskId to it.userId }
+            if (wanted.isEmpty()) return@launch
+            // All saved pictures in one root call, shown together (E12, E14).
+            val files = RootTasks.snapshots(context, wanted)
+            var added = false
+            for ((id, bytes) in files) decode(bytes)?.let { cache.put(id, it); added = true }
+            if (added) publish()
+            // The rest from Android's task manager (a helper start, about half a second): not again
+            // for a task it had nothing for a moment ago (E13).
+            val now = System.currentTimeMillis()
+            noPicture.entries.removeAll { now - it.value > NO_PICTURE_KEEP_MS }
+            val missing = wanted.keys.filter { it !in files.keys && !noPicture.containsKey(it) }
             if (missing.isEmpty()) return@launch
             val fromSystem = RootTasks.snapshotsFromSystem(context, missing)
             for ((id, bytes) in fromSystem) decode(bytes)?.let { cache.put(id, it) }
+            missing.filter { it !in fromSystem }.forEach { noPicture[it] = now }
             if (fromSystem.isNotEmpty()) publish()
         }
     }
@@ -341,6 +371,21 @@ class RecentsViewModel @Inject constructor(
             )
         }
         return true
+    }
+
+    /** The split [card] pinned on the taskbar as one scene (the same scene when saved before). */
+    fun pinSplitToTaskbar(card: RecentsCard) {
+        if (!canSave(card)) return
+        appScope.launch {
+            val fresh = scene(card) ?: return@launch
+            val known = appRepository.appPairs.first().firstOrNull {
+                it.app1Key == fresh.app1Key && it.app2Key == fresh.app2Key && it.app3Key == fresh.app3Key
+            }
+            val pair = known ?: fresh.also { appRepository.saveAppPair(it) }
+            val pinned = settingsRepository.settings(ScreenType.INNER).first().taskbar.pinnedPairs
+            if (pair.id !in pinned) settingsRepository.setTaskbarPairs(pinned + pair.id)
+            Haptics.play(context, Haptics.Event.SPLIT)
+        }
     }
 
     private fun canSave(card: RecentsCard): Boolean = card.apps.size in 2..3 && card.apps.none { it == null }
@@ -590,6 +635,8 @@ class RecentsViewModel @Inject constructor(
     private companion object {
         const val THUMB_MAX_EDGE = 720
 
+        const val MEMORY_KEEP_MS = 30_000L
+        const val NO_PICTURE_KEEP_MS = 20_000L
         fun thumbnailBudget(): Int = (Runtime.getRuntime().maxMemory() / 8).coerceAtMost(48L * 1024 * 1024).toInt()
 
         const val SPLIT_STEP_MS = 200L

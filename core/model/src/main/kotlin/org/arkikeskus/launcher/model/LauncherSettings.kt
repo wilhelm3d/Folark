@@ -576,6 +576,8 @@ data class LauncherSettings(
         val labelScale: Float = 1f,
         /** The long-press menu grows from the finger and its rows come in one by one (off: it just appears). */
         val menuMotion: Boolean = true,
+        /** A light haptic tick for every card scrolled past (off by default). */
+        val scrollTicks: Boolean = false,
         /** "Close all" asks once more before closing everything. */
         val confirmCloseAll: Boolean = false,
         /** Split view: a third app joins the split screen (phones that allow three, like the Razr

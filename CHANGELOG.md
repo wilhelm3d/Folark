@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Split screen
+- Recents opens faster: the task list and the split are read at once, all saved screenshots come in one root call and show together, apps are looked up by index, the memory badge is read again only after 30 s, and the root helper isn't started again for apps it had no picture for a moment ago. Cards recompose only when what they show changes.
+- Recents: split cards show the split as it really is (a third, peek, three apps side by side as placed), when Android reports where the apps sit.
+- Recents: a split card dropped on the taskbar is pinned there as one scene (single apps as before).
+- Recents: optional haptic tick for each card scrolled past (Settings ▸ Recents ▸ Motion ▸ Tick while scrolling).
 - Efficiency (data): deleting a scene removes its home shortcuts with one query; each app's own colour (themed icons) is kept across restarts and read again only after an update; text patterns in search and root parsing are built once.
 - Efficiency (System UI module): reflection is looked up once and kept (it ran on every frame of a divider drag); split events go to Folark in batches; System UI's questions to Folark wait 0.4 s at most.
 - Efficiency (split screen): a third app started from its intent is found from System UI's split events instead of re-reading the window list; window-list reads without events are fewer; the window-list parser only reads the lines that matter.

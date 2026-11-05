@@ -245,6 +245,7 @@ class SettingsViewModel @Inject constructor(
     fun setRecentsDragDrop(value: Boolean) = update { repository.setRecentsDragDrop(value) }
     fun setRecentsOverlayLabels(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsOverlayLabels(value, cover = cover) } }
     fun setRecentsMenuMotion(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsMenuMotion(value, cover = cover) } }
+    fun setRecentsScrollTicks(value: Boolean) = update { repository.setRecentsScrollTicks(value) }
     fun setRecentsBtnClose(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnClose(value, cover = cover) } }
     fun setRecentsBtnSplit(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnSplit(value, cover = cover) } }
     fun setRecentsBtnPopup(value: Boolean) = editRecentsCover.let { cover -> update { repository.setRecentsBtnPopup(value, cover = cover) } }

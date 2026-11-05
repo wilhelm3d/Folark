@@ -11,6 +11,8 @@ data class OpenTask(
     val inactiveMs: Long?,
     /** "fullscreen", "multi-window" (split), "freeform" (pop-up), or null. */
     val windowingMode: String?,
+    /** Where the task sits on screen (left, top, right, bottom) as Android last laid it out, or null. */
+    val bounds: List<Int>? = null,
 )
 
 /**
@@ -109,6 +111,7 @@ object OpenTasks {
                     userId = user,
                     inactiveMs = inactive(body),
                     windowingMode = MODE.find(header)?.groupValues?.get(1),
+                    bounds = BOUNDS.find(body)?.groupValues?.drop(1)?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 4 },
                 ),
             )
         }
@@ -140,5 +143,7 @@ object OpenTasks {
     private val COMPONENT = Regex("""mActivityComponent=([\w.]+/[\w.$]+)""")
     private val REAL_ACTIVITY = Regex("""realActivity=\{?([\w.]+/[\w.$]+)""")
     private val INTENT_CMP = Regex("""\bcmp=([\w.]+/[\w.$]+)""")
+    /** A task's laid-out bounds in its configuration: `mBounds=Rect(0, 0 - 600, 2000)`. */
+    private val BOUNDS = Regex("""mBounds=Rect\((-?\d+), (-?\d+) - (-?\d+), (-?\d+)\)""")
     private val INACTIVE = Regex("""inactive for (\d+)(ms|s|m|h|d)?""")
 }

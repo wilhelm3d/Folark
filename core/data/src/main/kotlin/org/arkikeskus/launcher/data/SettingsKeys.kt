@@ -272,6 +272,7 @@ internal object Keys {
     val RECENTS_LABEL_SCALE = floatPreferencesKey("recents_label_scale")
     val RECENTS_OUTER_LABEL_SCALE = floatPreferencesKey("recents_outer_label_scale")
     val RECENTS_MENU_MOTION = booleanPreferencesKey("recents_menu_motion")
+    val RECENTS_SCROLL_TICKS = booleanPreferencesKey("recents_scroll_ticks")
     val RECENTS_OUTER_MENU_MOTION = booleanPreferencesKey("recents_outer_menu_motion")
     val RECENTS_BTN_CLOSE = booleanPreferencesKey("recents_btn_close")
     val RECENTS_OUTER_BTN_CLOSE = booleanPreferencesKey("recents_outer_btn_close")

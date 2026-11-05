@@ -80,6 +80,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
@@ -234,6 +235,8 @@ internal fun RecentsScreen(
     onDismiss: () -> Unit,
     onSavePair: (RecentsCard) -> Unit = {},
     onAddToHome: (RecentsCard) -> Unit = {},
+    /** A split card dropped on the taskbar: pinned there as a scene. */
+    onPinSplit: ((RecentsCard) -> Unit)? = null,
     /** Long-press-drag a card to a screen edge (inner screen): place the app there (EDGE_*). */
     onPlaceAtEdge: (RecentsCard, Int) -> Unit = { _, _ -> },
     /** Persistent per-app mute (menu item beneath App info): is this card muted, and the toggle. */
@@ -287,6 +290,7 @@ internal fun RecentsScreen(
     drag.cards = state.cards
     // A split card takes a dropped app as its third with the real three-app split or the module
     // (as the split drawer's 33/33/33 does).
+    drag.onPinSplit = onPinSplit
     drag.allowThird = settings.launch.threeAppSplit || moduleReady
     drag.allowReplace = settings.launch.threeAppSplit || moduleReady
     // Aero edge placement: inner screen only, where there is room for side-by-side apps.
@@ -300,7 +304,13 @@ internal fun RecentsScreen(
 
     // Active media sessions, for the per-card speaker badge (no-op and empty when the badge is off).
     val audio = rememberRecentsAudio(settings.recents.speakerBadge)
-    val env = RecentsEnv(
+    // Built again only when something it carries changes, not on every recomposition of the
+    // screen (E17): each new env made every theme and card recompose.
+    val env = remember(
+        settings, thumbnails, accent, onAccent, selecting, state.root, glass, memory, peekCount, audio,
+        onOpen, onClose, onPopUp, onUnsplit, onCombine, onAppInfo, onTogglePin, onPeekSplit, onCloseAll,
+        onSavePair, onAddToHome, onPlaceAtEdge, isMuted, onToggleMute, onNativeSplit, onNativeThird, wide,
+    ) { RecentsEnv(
         settings = settings,
         thumbnails = thumbnails,
         accent = accent,
@@ -354,8 +364,7 @@ internal fun RecentsScreen(
         onToggleMute = onToggleMute,
         onNativeSplit = onNativeSplit,
         onNativeThird = onNativeThird,
-    )
-    env.coverScreen = !wide
+    ).also { it.coverScreen = !wide } }
 
     // Back undoes what is under way first (the menu, a drag, picking apps); only then does it leave.
     androidx.activity.compose.BackHandler(enabled = menu.isOpen || drag.card != null || selecting) {
@@ -453,7 +462,8 @@ internal fun RecentsScreen(
                 // ---------------------------------------------------------------- body
                 // Rows of cards (iPad, Carousel, Deck) run to the screen's edges; the rest keep the margin.
                 val edgeToEdge = settings.recents.theme in EDGE_TO_EDGE_THEMES
-                Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (edgeToEdge) 0.dp else side)) {
+                val ticks = rememberScrollTicks(settings.recents.scrollTicks)
+                Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (edgeToEdge) 0.dp else side).then(ticks)) {
                     when {
                         !state.canList -> NeedsGrant(accent)
                         state.unreadable -> Text(
@@ -930,13 +940,66 @@ internal fun PinGlyph(color: Color) {
     }
 }
 
+/**
+ * Haptic ticks while cards scroll (R12, Settings ▸ Recents ▸ Tick while scrolling): one per
+ * [TICK_STEP] scrolled, in any theme (they all scroll through nested scrolling).
+ */
+@Composable
+private fun rememberScrollTicks(on: Boolean): Modifier {
+    if (!on) return Modifier
+    val view = androidx.compose.ui.platform.LocalView.current
+    val step = with(LocalDensity.current) { TICK_STEP.toPx() }
+    val connection = remember(step) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            var travelled = 0f
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): Offset {
+                travelled += kotlin.math.abs(consumed.x) + kotlin.math.abs(consumed.y)
+                if (travelled >= step) {
+                    travelled %= step
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                }
+                return Offset.Zero
+            }
+        }
+    }
+    return Modifier.nestedScroll(connection)
+}
+
+private val TICK_STEP = 140.dp
+
+/**
+ * A card's panes in screen order with their share of the width: from each task's laid-out
+ * bounds when all have them (side by side), else in list order, equal.
+ */
+internal fun splitPanes(card: RecentsCard): List<Pair<Int, Float>> {
+    val equal = card.tasks.indices.map { it to 1f }
+    if (!card.isSplit) return equal
+    val bounds = card.tasks.map { it.bounds ?: return equal }
+    val sideBySide = bounds.map { it[0] }.distinct().size == bounds.size
+    val sizes = bounds.map { b -> (if (sideBySide) b[2] - b[0] else b[3] - b[1]).coerceAtLeast(1) }
+    val total = sizes.sum().toFloat()
+    val order = card.tasks.indices.sortedBy { i -> if (sideBySide) bounds[i][0] else bounds[i][1] }
+    // A peek strip stays wide enough to see.
+    return order.map { i -> i to (sizes[i] / total).coerceAtLeast(MIN_PANE_SHARE) }
+}
+
+private const val MIN_PANE_SHARE = 0.07f
+
 /** The card's picture: Android's screenshot of each app (split halves side by side), or its icon. */
 @Composable
 internal fun CardPicture(card: RecentsCard, env: RecentsEnv, modifier: Modifier, corner: Dp, iconSize: Dp = 64.dp) {
     Box(modifier) {
-        Row(Modifier.matchParentSize(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            card.tasks.forEachIndexed { i, task ->
-                Thumb(env.thumb(task.taskId), card.apps.getOrNull(i), Modifier.weight(1f).fillMaxSize(), RoundedCornerShape(corner), env.glass, iconSize)
+        // A split as it really is (R6): each app as wide as on screen (a third, peek, three apps),
+        // left to right as placed; half and half when Android didn't say.
+        val panes = remember(card.tasks) { splitPanes(card) }
+        Row(Modifier.matchParentSize(), horizontalArrangement = Arrangement.spacedBy(if (card.isSplit) 4.dp else 6.dp)) {
+            panes.forEach { (i, weight) ->
+                val task = card.tasks[i]
+                Thumb(env.thumb(task.taskId), card.apps.getOrNull(i), Modifier.weight(weight).fillMaxSize(), RoundedCornerShape(corner), env.glass, iconSize)
             }
         }
         // How much memory the card's apps use (Settings ▸ Recents ▸ Memory use on cards, root).

@@ -205,6 +205,7 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_recents_anim_speed, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_press, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_menu_motion, R.string.settings_recents_menu_motion_desc, SettingsCategory.RECENTS),
+    SettingsSearchEntry(R.string.settings_recents_scroll_ticks, R.string.settings_recents_scroll_ticks_desc, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_check, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_recents_check_copy, 0, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_taskbar_done, 0, SettingsCategory.RECENTS),

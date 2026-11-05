@@ -18,6 +18,33 @@ object RootTasks {
         return RootShell.runBytes(snapshotCommand(taskId, userId), bulk = true)?.takeIf { it.size > MIN_JPEG_BYTES }
     }
 
+    /**
+     * The saved screenshots of [tasks] (task id to user id) in one root call (E12): each found
+     * picture (the smaller copy first) is copied into Folark's cache, read and deleted. Tasks
+     * without a picture are left out.
+     */
+    fun snapshots(context: Context, tasks: Map<Int, Int>): Map<Int, ByteArray> {
+        val wanted = tasks.filter { (id, user) -> id >= 0 && user >= 0 }
+        if (wanted.isEmpty()) return emptyMap()
+        val dir = java.io.File(context.cacheDir, "recents_files").apply { mkdirs() }
+        val out = dir.absolutePath
+        if (out.any { it == '\'' || it == '"' || it == '`' || it == '$' || it == ' ' }) return emptyMap()
+        dir.listFiles()?.forEach { it.delete() }
+        val script = wanted.entries.groupBy({ it.value }, { it.key }).entries.joinToString(" ; ") { (user, ids) ->
+            "find /data/system_ce/$user/snapshots -maxdepth 3 -type f 2>/dev/null | " +
+                "grep -E '/(${ids.joinToString("|")})(_reduced)?\\.(jpg|png|webp)\$' | sort -r | " +
+                "while read f; do b=\${f##*/}; id=\${b%%[._]*}; [ -e '$out'/\$id ] || cp \"\$f\" '$out'/\$id; done"
+        } + " ; chmod 644 '$out'/* 2>/dev/null; echo done"
+        RootShell.run(script, SNAPSHOTS_TIMEOUT_MS) ?: return emptyMap()
+        val result = HashMap<Int, ByteArray>()
+        for (id in wanted.keys) {
+            val file = java.io.File(dir, id.toString())
+            runCatching { if (file.length() > MIN_JPEG_BYTES) result[id] = file.readBytes() }
+            file.delete()
+        }
+        return result
+    }
+
     private fun snapshotCommand(taskId: Int, userId: Int): String {
         val dir = "/data/system_ce/$userId/snapshots"
         return "f=\$(find $dir -maxdepth 3 -type f 2>/dev/null | grep -E '/${taskId}(_reduced)?\\.(jpg|png|webp)\$' | sort -r | head -1); " +

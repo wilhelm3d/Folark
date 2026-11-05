@@ -80,6 +80,9 @@ internal class RecentsDrag {
     val bounds = HashMap<Int, Rect>()
     var cards: List<RecentsCard> = emptyList()
 
+    /** A split card dropped on the taskbar: pinned as one scene (R13); null pins its apps one by one. */
+    var onPinSplit: ((RecentsCard) -> Unit)? = null
+
     /** Split cards (two apps) take a drop as their third app. */
     var allowThird = false
 
@@ -161,7 +164,9 @@ internal class RecentsDrag {
         val held = card
         // Over the taskbar (brought up for the drag): pin the card's app(s) there; it flies home.
         if (held != null && org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(pointer.x, pointer.y)) {
-            held.apps.filterNotNull().forEach { org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(it) }
+            val pinSplit = onPinSplit
+            if (held.isSplit && held.apps.none { it == null } && pinSplit != null) pinSplit(held)
+            else held.apps.filterNotNull().forEach { org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(it) }
             pinnedToTaskbar = true
             pending = null
             pendingEdge = null

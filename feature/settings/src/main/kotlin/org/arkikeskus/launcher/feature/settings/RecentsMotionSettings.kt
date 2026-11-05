@@ -104,6 +104,13 @@ internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel
         checked = s.recents.menuMotion,
         onCheckedChange = viewModel::setRecentsMenuMotion,
     )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_recents_scroll_ticks),
+        subtitle = stringResource(R.string.settings_recents_scroll_ticks_desc),
+        checked = s.recents.scrollTicks,
+        onCheckedChange = viewModel::setRecentsScrollTicks,
+    )
 }
 
 private val PRESS_LABELS = listOf(

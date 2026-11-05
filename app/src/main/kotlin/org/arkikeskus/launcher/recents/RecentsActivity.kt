@@ -118,6 +118,7 @@ class RecentsActivity : ComponentActivity() {
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                     },
+                    onPinSplit = { card -> viewModel.pinSplitToTaskbar(card) },
                     onDismiss = ::leave,
                 )
             }
