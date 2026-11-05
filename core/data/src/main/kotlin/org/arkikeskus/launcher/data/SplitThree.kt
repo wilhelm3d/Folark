@@ -72,6 +72,11 @@ object SplitThree {
      * of the three-app split showing now. Not a stop of the two-app divider.
      */
     const val SNAP_THREE_EVEN = 5
+    /**
+     * Three apps as peek view (Motorola's immersive three-app layout, SplitState 21): the middle
+     * app big, a strip of each other one at the screen's edges.
+     */
+    const val SNAP_THREE_PEEK = 21
 
     /** Provider methods SystemUI calls on Folark: "ready" when it starts, "result" per request. */
     const val METHOD_READY = "split3_ready"
@@ -241,7 +246,7 @@ object SplitThree {
         if (Build.VERSION.SDK_INT < 34) return false
         return send(context, "snap") { request ->
             // Not half and half: its answer tells whether sizes hold here.
-            if (snap != SNAP_EVEN && snap != SNAP_THREE_EVEN) snapRequests[request] = true
+            if (snap != SNAP_EVEN && snap != SNAP_THREE_EVEN && snap != SNAP_THREE_PEEK) snapRequests[request] = true
             putExtra(EXTRA_SNAP, snap)
             if (forTask > 0) putExtra(EXTRA_SNAP_FOR_TASK, forTask)
         }

@@ -80,6 +80,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -164,6 +166,8 @@ internal class RecentsEnv(
     val onCloseAll: () -> Unit = {},
     /** A split card's apps saved as an app pair (to open them together again from home or the taskbar). */
     val onSavePair: (RecentsCard) -> Unit = {},
+    /** A split (two or three apps) saved as a scene with a shortcut on the home screen. */
+    val onAddToHome: (RecentsCard) -> Unit = {},
     /** Speaker badge (Settings ▸ Recents): whether it shows, which packages have audio, whether one
      *  is playing, and the tap that pauses/resumes just that app. */
     val speakerBadge: Boolean = false,
@@ -221,12 +225,15 @@ internal fun RecentsScreen(
     onOpenTogether: (List<RecentsCard>) -> Unit,
     onOpenThree: (List<RecentsCard>) -> Unit,
     onPeek: (main: RecentsCard, peek: RecentsCard) -> Unit,
+    /** Peek view of three: the first picked app big in the middle, the other two at the edges. */
+    onPeekThree: (List<RecentsCard>) -> Unit = {},
     onPeekSplit: (RecentsCard) -> Unit,
     onCombine: (dragged: RecentsCard, target: RecentsCard, mode: String) -> Unit,
     onAppInfo: (RecentsCard) -> Unit,
     onTogglePin: (RecentsCard) -> Unit,
     onDismiss: () -> Unit,
     onSavePair: (RecentsCard) -> Unit = {},
+    onAddToHome: (RecentsCard) -> Unit = {},
     /** Long-press-drag a card to a screen edge (inner screen): place the app there (EDGE_*). */
     onPlaceAtEdge: (RecentsCard, Int) -> Unit = { _, _ -> },
     /** Persistent per-app mute (menu item beneath App info): is this card muted, and the toggle. */
@@ -260,6 +267,7 @@ internal fun RecentsScreen(
             delay(220)
             val chosen = picked.toList()
             when {
+                peekPick && chosen.size >= 3 -> onPeekThree(chosen)
                 peekPick -> onPeek(chosen[0], chosen[1])
                 openAt >= 3 -> onOpenThree(chosen)
                 else -> onOpenTogether(chosen)
@@ -268,6 +276,9 @@ internal fun RecentsScreen(
             peekPick = false
         }
     }
+    /** Peek view takes three apps (Motorola's three-app peek, through the module) where it can. */
+    val peekContext = LocalContext.current
+    val peekCount = if (settings.launch.threeAppSplit && remember { org.arkikeskus.launcher.data.SplitThree.ready(peekContext) }) 3 else 2
     var confirmAll by remember { mutableStateOf(false) }
     val drag = remember { RecentsDrag() }
     val hostView = androidx.compose.ui.platform.LocalView.current
@@ -325,10 +336,11 @@ internal fun RecentsScreen(
         onTogglePin = onTogglePin,
         menu = menu,
         onSplitThree = { card -> selecting = true; peekPick = false; picked.clear(); picked.add(card); openAt = 3 },
-        onPeekPick = { card -> selecting = true; peekPick = true; picked.clear(); picked.add(card); openAt = 2 },
+        onPeekPick = { card -> selecting = true; peekPick = true; picked.clear(); picked.add(card); openAt = peekCount },
         onPeekSplit = onPeekSplit,
         onCloseAll = onCloseAll,
         onSavePair = onSavePair,
+        onAddToHome = onAddToHome,
         speakerBadge = settings.recents.speakerBadge,
         memory = memory,
         audioActive = { pkg -> audio.active(pkg) },
@@ -486,7 +498,7 @@ internal fun RecentsScreen(
                     val modes = buildList {
                         add(Triple(R.string.recents_mode_two, 2, false))
                         if (settings.launch.threeAppSplit) add(Triple(R.string.recents_mode_three, 3, false))
-                        add(Triple(R.string.recents_mode_peek, 2, true))
+                        add(Triple(R.string.recents_mode_peek, peekCount, true))
                         add(Triple(R.string.recents_mode_free, 0, false))
                     }
                     modes.forEach { (label, count, peek) ->
@@ -496,6 +508,8 @@ internal fun RecentsScreen(
                             color = if (on) onAccent else Ink,
                             background = if (on) accent else Color.White.copy(alpha = 0.08f),
                             filled = true, glass = false,
+                            // Peek as a symbol: one big pane, the others peeking in at the edges.
+                            glyph = if (peek) ({ c -> PeekGlyph(c, three = count >= 3) }) else null,
                             onClick = {
                                 openAt = count
                                 peekPick = peek
@@ -513,7 +527,8 @@ internal fun RecentsScreen(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Text(
-                        if (peekPick && picked.size < 2) stringResource(R.string.recents_pick_peek)
+                        if (peekPick && openAt >= 3 && picked.size < 3) stringResource(if (picked.isEmpty()) R.string.recents_pick_peek_big else R.string.recents_pick_peek_edges)
+                        else if (peekPick && picked.size < 2) stringResource(R.string.recents_pick_peek)
                         else if (openAt > 0 && picked.size < openAt) pluralStringResource(R.plurals.recents_pick_more, openAt - picked.size, openAt - picked.size)
                         else if (picked.isEmpty()) stringResource(R.string.recents_pick_hint)
                         else picked.mapIndexed { i, c -> "${stringResource(labels[i])} · ${c.label}" }.joinToString("   "),
@@ -1074,6 +1089,8 @@ private fun Pill(
     filled: Boolean,
     glass: Boolean,
     background: Color = Color.Transparent,
+    /** Drawn instead of [text] (which then names it for TalkBack). */
+    glyph: (@Composable (Color) -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(999.dp)
@@ -1087,8 +1104,34 @@ private fun Pill(
                     else -> Modifier.clip(shape).border(1.dp, color.copy(alpha = 0.6f), shape)
                 },
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-    ) { Text(text, color = color, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .then(if (glyph != null) Modifier.semantics { contentDescription = text } else Modifier),
+    ) {
+        if (glyph != null) glyph(color)
+        else Text(text, color = color, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+/**
+ * Peek view as a symbol: one big pane with a thin strip at its edge, or ([three]) in the middle
+ * with a strip at each edge — Motorola's three-app peek.
+ */
+@Composable
+internal fun PeekGlyph(color: Color, three: Boolean) {
+    Canvas(Modifier.size(width = 30.dp, height = 19.dp)) {
+        val w = size.width
+        val h = size.height
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = h * 0.1f)
+        val r = androidx.compose.ui.geometry.CornerRadius(h * 0.14f)
+        val strip = w * 0.1f
+        val gap = w * 0.06f
+        val bigLeft = strip + gap
+        val bigRight = if (three) w - strip - gap else w
+        drawRoundRect(color, Offset(0f, h * 0.18f), androidx.compose.ui.geometry.Size(strip, h * 0.64f), androidx.compose.ui.geometry.CornerRadius(strip / 2))
+        if (three) drawRoundRect(color, Offset(w - strip, h * 0.18f), androidx.compose.ui.geometry.Size(strip, h * 0.64f), androidx.compose.ui.geometry.CornerRadius(strip / 2))
+        val inset = stroke.width / 2
+        drawRoundRect(color, Offset(bigLeft + inset, inset), androidx.compose.ui.geometry.Size(bigRight - bigLeft - 2 * inset, h - 2 * inset), r, style = stroke)
+    }
 }
 
 @Composable

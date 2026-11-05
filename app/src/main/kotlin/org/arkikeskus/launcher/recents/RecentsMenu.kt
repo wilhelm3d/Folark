@@ -120,6 +120,10 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
         if (card.isSplit) add(MenuItem(R.string.recents_menu_unsplit, Glyph.UNSPLIT) { env.onUnsplit(card) })
         // Keep this split: saved as an app pair, opened together again from home or the taskbar.
         if (card.isSplit && card.apps.none { it == null }) add(MenuItem(R.string.recents_menu_save_pair, Glyph.SAVE) { env.onSavePair(card) })
+        // The split (two or three apps) as a shortcut on the home screen, opening together again.
+        if (card.isSplit && card.apps.none { it == null }) {
+            add(MenuItem(if (card.tasks.size >= 3) R.string.recents_menu_home_three else R.string.recents_menu_home_two, Glyph.HOME) { env.onAddToHome(card) })
+        }
         add(MenuItem(if (card.pinned) R.string.recents_menu_unlock else R.string.recents_menu_lock, Glyph.LOCK) { env.onTogglePin(card) })
         add(MenuItem(R.string.recents_menu_info, Glyph.INFO) { env.onAppInfo(card) })
         // Persistent per-app mute: stays muted across restarts (appops PLAY_AUDIO on root).
@@ -218,7 +222,7 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
 
 private class MenuItem(val label: Int, val glyph: Glyph, val danger: Boolean = false, val action: () -> Unit)
 
-private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE, SAVE, MUTE, UNMUTE }
+private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE, SAVE, MUTE, UNMUTE, HOME }
 
 /**
  * Places the menu just below [at], centred on it, always fully on screen (above it if no room
@@ -257,6 +261,19 @@ private fun DrawScope.drawGlyph(glyph: Glyph, color: Color, locked: Boolean) {
             drawRoundRect(color, Offset(w * 0.44f, w * 0.14f), Size(w * 0.3f, w * 0.72f), r, style = stroke)
             drawLine(color, Offset(w * 0.86f, w * 0.38f), Offset(w * 0.86f, w * 0.62f), stroke.width, StrokeCap.Round)
             drawLine(color, Offset(w * 0.74f, w * 0.5f), Offset(w * 0.98f, w * 0.5f), stroke.width, StrokeCap.Round)
+        }
+        Glyph.HOME -> {
+            // A house: roof and walls, a door.
+            val roof = Path().apply {
+                moveTo(w * 0.1f, w * 0.48f)
+                lineTo(w * 0.5f, w * 0.12f)
+                lineTo(w * 0.9f, w * 0.48f)
+            }
+            drawPath(roof, color, style = stroke)
+            drawLine(color, Offset(w * 0.22f, w * 0.4f), Offset(w * 0.22f, w * 0.88f), stroke.width, StrokeCap.Round)
+            drawLine(color, Offset(w * 0.78f, w * 0.4f), Offset(w * 0.78f, w * 0.88f), stroke.width, StrokeCap.Round)
+            drawLine(color, Offset(w * 0.22f, w * 0.88f), Offset(w * 0.78f, w * 0.88f), stroke.width, StrokeCap.Round)
+            drawRoundRect(color, Offset(w * 0.42f, w * 0.6f), Size(w * 0.16f, w * 0.28f), CornerRadius(w * 0.04f))
         }
         Glyph.UNSPLIT -> {
             // One full box (back to full screen).

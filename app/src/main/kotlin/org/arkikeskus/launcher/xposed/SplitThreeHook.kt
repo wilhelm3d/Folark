@@ -220,8 +220,8 @@ internal object SplitThreeHook {
 
         // A layout change for the split showing now (peek, a third, half and half…).
         val snap = intent.getIntExtra(SplitThree.EXTRA_SNAP, -1)
-        if (snap == SplitThree.SNAP_THREE_EVEN) {
-            executor.execute { snapThreeEven(context, c, request, 0) }
+        if (snap == SplitThree.SNAP_THREE_EVEN || snap == SplitThree.SNAP_THREE_PEEK) {
+            executor.execute { snapThree(context, c, request, snap, 0) }
             return
         }
         if (snap >= 0) {
@@ -410,14 +410,14 @@ internal object SplitThreeHook {
      * layout from the dividers, which [hookThreeEven] answers with the even one. Answered once it
      * settled: ok only when Motorola's split state is the even one.
      */
-    private fun snapThreeEven(context: Context, c: Any, request: String, tries: Int) {
+    private fun snapThree(context: Context, c: Any, request: String, wanted: Int, tries: Int) {
         val manager = runCatching { splitManager(c) }.getOrNull()
         val layout = manager?.let { field(it, "mSplitLayout") }
         val three = layout != null && layout.javaClass.name.endsWith("Carousel3Apps") &&
             (field(layout, "mDividerPositions") as? IntArray)?.size == 2
         if (!three) {
             if (tries < THREE_WAIT_TRIES) {
-                Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({ snapThreeEven(context, c, request, tries + 1) }, WAIT_STEP_MS)
+                Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({ snapThree(context, c, request, wanted, tries + 1) }, WAIT_STEP_MS)
             } else {
                 reply(context, request, false, detail = "no three-app split showing")
             }
@@ -430,20 +430,20 @@ internal object SplitThreeHook {
                     it.parameterTypes.all { t -> t == Int::class.javaPrimitiveType }
             }
             get.isAccessible = true
-            val first = get.invoke(algorithm, STATE_THREE_EVEN, 0) ?: error("no even stop")
-            val second = get.invoke(algorithm, STATE_THREE_EVEN, 1) ?: error("no even stop")
+            val first = get.invoke(algorithm, wanted, 0) ?: error("no stop for $wanted")
+            val second = get.invoke(algorithm, wanted, 1) ?: error("no stop for $wanted")
             val positions = field(layout, "mDividerPositions") as IntArray
             val method = methods(layout.javaClass).first { it.name == "snapToTarget" && it.parameterTypes.size == 6 }
             method.isAccessible = true
             method.invoke(layout, positions[0], first, positions[1], second, SNAP_MS, PathInterpolator(0.2f, 0f, 0f, 1f))
         }.exceptionOrNull()
         if (failure != null) {
-            log("split layout: can't make three even: ${reason(failure)}")
+            log("split layout: can't make three apps $wanted: ${reason(failure)}")
             return reply(context, request, false, detail = reason(failure))
         }
         Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({
             val state = runCatching { field(field(manager, "mSplitState")!!, "mState") as Int }.getOrNull()
-            if (state == STATE_THREE_EVEN) reply(context, request, true)
+            if (state == wanted) reply(context, request, true)
             else reply(context, request, false, detail = "the dividers went back (split state $state)")
         }, SNAP_MS + SNAP_SETTLE_MS)
     }

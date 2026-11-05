@@ -192,7 +192,7 @@ class SplitCoordinator @Inject constructor(
      * when [native], else (with [orSideStage]) the third app moved into a side stage, as far as WM
      * Shell allows. False when it didn't join; callers then float it.
      */
-    suspend fun addThird(third: SplitApp, native: Boolean, orSideStage: Boolean = true, even: Boolean = false): Boolean {
+    suspend fun addThird(third: SplitApp, native: Boolean, orSideStage: Boolean = true, even: Boolean = false, peek: Boolean = false): Boolean {
         val route = route()
         if (native && SplitThree.ready(context)) {
             val id = third.taskId ?: withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, third.packageName, route.root) }
@@ -209,8 +209,10 @@ class SplitCoordinator @Inject constructor(
                 Haptics.play(context, Haptics.Event.SPLIT)
                 // Motorola starts three apps as its carousel (one a 10 % strip): a third each instead.
                 // [even]: asked for (the split drawer's 33/33/33), whatever the setting.
-                val thirds = even || runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.threeEven }.getOrDefault(true)
-                if (thirds) SplitThree.snap(context, SplitThree.SNAP_THREE_EVEN)
+                // [peek]: Motorola's three-app peek instead (the middle app big, the others at the edges).
+                val thirds = !peek && (even || runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.threeEven }.getOrDefault(true))
+                if (peek) SplitThree.snap(context, SplitThree.SNAP_THREE_PEEK)
+                else if (thirds) SplitThree.snap(context, SplitThree.SNAP_THREE_EVEN)
                 return true
             }
         }

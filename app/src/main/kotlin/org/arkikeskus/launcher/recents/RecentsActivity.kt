@@ -75,6 +75,12 @@ class RecentsActivity : ComponentActivity() {
                         viewModel.openAttached(main, peek, settings.recents.attachedSide, settings.recents.attachedPeek, windowManager.maximumWindowMetrics.bounds)
                         leave()
                     },
+                    onPeekThree = { cards ->
+                        viewModel.openPeekThree(cards) { main, peek ->
+                            viewModel.openAttached(main, peek, settings.recents.attachedSide, settings.recents.attachedPeek, windowManager.maximumWindowMetrics.bounds)
+                        }
+                        leave()
+                    },
                     onPeekSplit = { card -> viewModel.peekSplit(card, settings.recents.attachedSide, windowManager.maximumWindowMetrics.bounds, settings.recents.attachedPeek); leave() },
                     onCombine = { dragged, target, how ->
                         if (how == COMBINE_THIRD) {
@@ -100,6 +106,15 @@ class RecentsActivity : ComponentActivity() {
                         android.widget.Toast.makeText(
                             this,
                             if (saved) org.arkikeskus.launcher.R.string.recents_pair_saved else org.arkikeskus.launcher.R.string.recents_pair_not_saved,
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    },
+                    onAddToHome = { card ->
+                        val inner = resources.configuration.smallestScreenWidthDp >= 600
+                        val added = viewModel.addToHome(card, if (inner) org.arkikeskus.launcher.model.ScreenType.INNER else org.arkikeskus.launcher.model.ScreenType.OUTER)
+                        android.widget.Toast.makeText(
+                            this,
+                            if (added) org.arkikeskus.launcher.R.string.recents_home_added else org.arkikeskus.launcher.R.string.recents_pair_not_saved,
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                     },
