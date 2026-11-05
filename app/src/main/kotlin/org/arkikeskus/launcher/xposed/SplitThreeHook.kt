@@ -75,6 +75,8 @@ internal object SplitThreeHook {
     private const val THREE_EVEN_REACH = 0.02f
     /** How long the three-app layout gets to appear after a third app joined. */
     private const val THREE_WAIT_TRIES = 30
+    /** When the split state is logged after a third app was sent. */
+    private const val THIRD_CHECK_MS = 1_500L
 
     private const val LISTENER = "com.android.wm.shell.splitscreen.SplitScreen\$SplitScreenListener"
 
@@ -270,7 +272,9 @@ internal object SplitThreeHook {
     /** On WM Shell's thread: once two apps are in split screen, start the third into the third place. */
     private fun attempt(context: Context, c: Any, request: String, task: Int, launch: PendingIntent?, userId: Int, tries: Int) {
         val visible = runCatching { c.javaClass.getMethod("isSplitScreenVisible").invoke(c) as Boolean }.getOrDefault(false)
-        if (!visible) {
+        // Not while a split is still forming: Motorola adds the third app to whatever split shows
+        // at that moment (often the one before), and only as a third when two apps are settled.
+        if (!visible || splitBusy(c)) {
             if (tries < WAIT_TRIES) {
                 Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed(
                     { attempt(context, c, request, task, launch, userId, tries + 1) }, WAIT_STEP_MS,
@@ -303,8 +307,37 @@ internal object SplitThreeHook {
             }
         }.exceptionOrNull()
         if (failure != null) log("three-app split: start failed: ${reason(failure)}")
+        else log("three-app split: third ${if (task > 0) "task $task" else "app"} sent at split state ${splitState(c)} (after ${tries * WAIT_STEP_MS} ms)")
         reply(context, request, failure == null, detail = failure?.let { reason(it) })
+        // For the log: what Motorola made of it.
+        if (failure == null) {
+            Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed(
+                { log("three-app split: split state ${splitState(c)} after the third (${activeStages(c)} app(s))") }, THIRD_CHECK_MS,
+            )
+        }
     }
+
+    /** A split transition is under way (entering, resizing or animating): WM Shell's state is in flux. */
+    private fun splitBusy(c: Any): Boolean = runCatching {
+        val stage = field(c, "mStageCoordinator") ?: return false
+        val transitions = field(stage, "mSplitTransitions") ?: return false
+        field(transitions, "mPendingEnter") != null || field(transitions, "mPendingResize") != null ||
+            field(transitions, "mAnimatingTransition") != null ||
+            activeStages(c).let { it in 0..1 }
+    }.getOrDefault(false)
+
+    /** Motorola's split state now (SplitState.mState), or null. */
+    private fun splitState(c: Any): Int? = runCatching {
+        field(field(splitManager(c), "mSplitState")!!, "mState") as Int
+    }.getOrNull()
+
+    /** How many apps Motorola's split state holds (2 or 3; 0 for none), or -1 when unknown. */
+    private fun activeStages(c: Any): Int = runCatching {
+        val state = field(splitManager(c), "mSplitState")!!
+        val m = methods(state.javaClass).first { it.name == "getActiveStageCountBySplitState" && it.parameterTypes.isEmpty() }
+        m.isAccessible = true
+        m.invoke(state) as Int
+    }.getOrDefault(-1)
 
     /**
      * On WM Shell's thread: moves the split's divider to the snap target [snap], exactly where a
