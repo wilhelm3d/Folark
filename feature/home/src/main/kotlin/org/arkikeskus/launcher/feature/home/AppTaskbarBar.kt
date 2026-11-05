@@ -117,7 +117,7 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
         })
     }
     fun addPairIcon(pair: AppPair) {
-        row.addView(pairView(pair, s, size), LinearLayout.LayoutParams(size, size).apply {
+        row.addView(pairView(pair, s, size, fixed), LinearLayout.LayoutParams(size, size).apply {
             marginStart = dp(s.spacingDp) / 2
             marginEnd = dp(s.spacingDp) / 2
         })
@@ -169,11 +169,24 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
     if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE) addMedia()
     val recentApps = recents.filter { r -> s.pinned.none { it.key == r.key } }
     val livePair = openPair
-    if ((s.pinned.isNotEmpty() || s.pairs.isNotEmpty()) && (recentApps.isNotEmpty() || livePair != null)) {
-        val divider = View(context).apply {
-            setBackgroundColor(if (lightTheme) Color.argb(90, 0, 0, 0) else Color.argb(110, 255, 255, 255))
+    if ((s.pinned.isNotEmpty() || s.pairs.isNotEmpty()) && (recentApps.isNotEmpty() || livePair != null) &&
+        s.dividerStyle != LauncherSettings.TASKBAR_DIVIDER_NONE
+    ) {
+        // The mark between pinned and recent apps, as chosen (Settings ▸ Taskbar).
+        val ink = if (lightTheme) Color.argb(90, 0, 0, 0) else Color.argb(110, 255, 255, 255)
+        val (w, h) = when (s.dividerStyle) {
+            LauncherSettings.TASKBAR_DIVIDER_BOLD -> dp(3) to (size * 0.6f).toInt()
+            LauncherSettings.TASKBAR_DIVIDER_DOT -> dp(5) to dp(5)
+            LauncherSettings.TASKBAR_DIVIDER_GAP -> dp(6) to dp(1)
+            else -> dp(1) to (size * 0.6f).toInt()
         }
-        row.addView(divider, LinearLayout.LayoutParams(dp(1), (size * 0.6f).toInt()).apply {
+        val divider = View(context).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(3).toFloat()
+                setColor(if (s.dividerStyle == LauncherSettings.TASKBAR_DIVIDER_GAP) Color.TRANSPARENT else ink)
+            }
+        }
+        row.addView(divider, LinearLayout.LayoutParams(w, h).apply {
             marginStart = dp(6) + dp(s.spacingDp) / 2
             marginEnd = dp(6) + dp(s.spacingDp) / 2
         })
@@ -382,12 +395,53 @@ internal fun AppTaskbar.glassBackground(alpha: Int): Drawable {
  * opens them in split screen — with a third app as a third pane where Folark's Vector module
  * runs in SystemUI, floating otherwise (see AppRepository.launchAppPair).
  */
-internal fun AppTaskbar.pairView(pair: AppPair, s: TaskbarSetup, size: Int): View =
+internal fun AppTaskbar.pairView(pair: AppPair, s: TaskbarSetup, size: Int, fixed: Boolean = false): View =
     pairTile(listOfNotNull(pair.app1Key, pair.app2Key, pair.app3Key.takeIf { pair.hasThirdApp }), pair.name, s, size) {
         // A saved pair opens as a split: its haptic here (the open split's tile gets it from restore()).
         org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.SPLIT)
         repository?.launchAppPair(pair)
+    }.apply {
+        // Long press (T2): open it another way this once — peek view, half and half, a third each.
+        setOnLongClickListener { anchor ->
+            showPairLayouts(anchor, pair, s, fixed)
+            true
+        }
     }
+
+/** The ways to open the saved [pair] this once (its own layout stays as saved). */
+internal fun AppTaskbar.showPairLayouts(anchor: View, pair: AppPair, s: TaskbarSetup, fixed: Boolean) {
+    fun open(copy: AppPair, then: (suspend () -> Unit)? = null) {
+        org.arkikeskus.launcher.data.Haptics.play(context, org.arkikeskus.launcher.data.Haptics.Event.SPLIT)
+        repository?.launchAppPair(copy)
+        if (then != null) scope.launch { then() }
+    }
+    val rows = mutableListOf<Pair<String, (() -> Unit)?>>()
+    rows += context.getString(R.string.taskbar_pair_open_saved) to { open(pair) }
+    if (pair.hasThirdApp) {
+        rows += context.getString(R.string.taskbar_split_three_even) to {
+            open(pair.copy(thirdMode = AppPair.THIRD_PANE)) { waitForThree(); org.arkikeskus.launcher.data.SplitThree.snap(context, org.arkikeskus.launcher.data.SplitThree.SNAP_THREE_EVEN) }
+        }
+        rows += context.getString(R.string.taskbar_pair_three_peek) to {
+            open(pair.copy(thirdMode = AppPair.THIRD_PANE)) { waitForThree(); org.arkikeskus.launcher.data.SplitThree.snap(context, org.arkikeskus.launcher.data.SplitThree.SNAP_THREE_PEEK) }
+        }
+    } else {
+        rows += context.getString(R.string.taskbar_split_even) to { open(pair.copy(layout = AppPair.LAYOUT_EVEN, peek = false)) }
+        rows += context.getString(R.string.taskbar_pair_peek) to { open(pair.copy(layout = AppPair.LAYOUT_PEEK, peek = true)) }
+        rows += context.getString(R.string.taskbar_pair_first_two_thirds) to { open(pair.copy(layout = AppPair.LAYOUT_FIRST_TWO_THIRDS, peek = false)) }
+        rows += context.getString(R.string.taskbar_pair_first_third) to { open(pair.copy(layout = AppPair.LAYOUT_FIRST_THIRD, peek = false)) }
+    }
+    showMenu(anchor, s, fixed, rows)
+}
+
+/** Waits (up to a few seconds) until three apps are in split screen, as System UI reports. */
+private suspend fun waitForThree() {
+    val until = System.currentTimeMillis() + THREE_WAIT_MS
+    while (System.currentTimeMillis() < until && org.arkikeskus.launcher.data.SplitEvents.stagedNow().size < 3) {
+        kotlinx.coroutines.delay(150)
+    }
+}
+
+private const val THREE_WAIT_MS = 6_000L
 
 /** Two or three apps' icons together on one rounded tile; a tap runs [onClick]. */
 internal fun AppTaskbar.pairTile(keys: List<String>, description: String, s: TaskbarSetup, size: Int, onClick: () -> Unit): View {

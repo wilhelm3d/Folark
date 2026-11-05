@@ -76,6 +76,7 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_taskbar_media, R.string.settings_taskbar_media_desc, SettingsCategory.TASKBAR),
     SettingsSearchEntry(R.string.settings_taskbar_media_paused, R.string.settings_taskbar_media_paused_desc, SettingsCategory.TASKBAR),
     SettingsSearchEntry(R.string.settings_taskbar_media_position, 0, SettingsCategory.TASKBAR),
+    SettingsSearchEntry(R.string.settings_taskbar_divider_style, 0, SettingsCategory.TASKBAR),
     SettingsSearchEntry(R.string.settings_taskbar_media_shape, 0, SettingsCategory.TASKBAR),
     SettingsSearchEntry(R.string.settings_taskbar_media_badge, R.string.settings_taskbar_media_badge_desc, SettingsCategory.TASKBAR),
     SettingsSearchEntry(R.string.settings_taskbar_cover_bar, R.string.settings_taskbar_cover_bar_desc, SettingsCategory.TASKBAR),

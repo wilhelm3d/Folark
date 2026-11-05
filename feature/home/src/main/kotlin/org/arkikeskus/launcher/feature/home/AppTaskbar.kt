@@ -325,6 +325,7 @@ internal class AppTaskbar(
                     mediaEnabled = s.taskbar.mediaEnabled,
                     mediaShowPaused = s.taskbar.mediaShowPaused,
                     mediaPosition = s.taskbar.mediaPosition,
+                    dividerStyle = s.taskbar.dividerStyle,
                     mediaTap = s.taskbar.mediaTap,
                     mediaControls = s.taskbar.mediaControls,
                     mediaShape = s.taskbar.mediaShape,
@@ -372,6 +373,7 @@ internal class AppTaskbar(
                     iconCache.clear()
                 }
                 setup = next
+                preloadIcons(next)
                 if (previous?.liveSkipChips != next.liveSkipChips) live = liveShown(liveAll)
                 // Per-app rules need to know which app is in front: only then is the service told.
                 // ...and so does handing Android's Recents over to Folark Recents.
@@ -613,8 +615,8 @@ internal class AppTaskbar(
         val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         val nightChanged = night != lastNightMode
         lastNightMode = night
-        // Icons are tinted for dark or light: drawn again.
-        if (nightChanged) iconCache.clear()
+        // Icons are tinted for dark or light: the other theme's set (drawn again only the first time).
+        iconCache.theme = night.toString()
         loadRecents(rebuild = true, force = nightChanged)
     }
 
@@ -740,6 +742,19 @@ internal class AppTaskbar(
     /** How long the opened-up live pill stays over the bar. */
     internal val LIVE_PANEL_IDLE_MS = 10_000L
 
+    /**
+     * The pinned apps' icons loaded together in the background before the bar needs them (E24),
+     * instead of one by one as each icon view asks.
+     */
+    internal fun preloadIcons(s: TaskbarSetup) {
+        val missing = s.pinned.filter { iconCache[it.key] == null }
+        if (missing.isEmpty()) return
+        scope.launch {
+            val loaded = withContext(Dispatchers.IO) { missing.mapNotNull { app -> loadIcon(app, s)?.let { app.key to it } } }
+            loaded.forEach { (key, drawable) -> if (iconCache[key] == null) iconCache[key] = drawable }
+        }
+    }
+
     /** Puts [app]'s launcher icon into [view], from the cache or loaded in the background. */
     internal fun setIconInto(view: ImageView, app: AppItem, s: TaskbarSetup) {
         val cached = iconCache[app.key]
@@ -801,14 +816,21 @@ internal class AppTaskbar(
     internal var usageReadUntil = 0L
 
     /** [android.util.LruCache] with the map-style access the bar uses. */
-    internal class IconCache(size: Int) : android.util.LruCache<String, Drawable>(size) {
-        operator fun set(key: String, value: Drawable) { put(key, value) }
-        fun clear() = evictAll()
+    /**
+     * Icons by app key, kept per [theme] (dark / light): switching back and forth finds both
+     * already drawn (E23) instead of emptying the cache each time.
+     */
+    internal class IconCache(size: Int) {
+        private val icons = android.util.LruCache<String, Drawable>(size)
+        var theme: String = ""
+        operator fun get(key: String): Drawable? = icons.get("$key#$theme")
+        operator fun set(key: String, value: Drawable) { icons.put("$key#$theme", value) }
+        fun clear() = icons.evictAll()
     }
 
     companion object {
-        /** Room for every pinned and recent icon at once, with plenty to spare (counted in icons). */
-        internal const val ICON_CACHE_SIZE = 48
+        /** Room for every pinned and recent icon at once in both themes, with some to spare (counted in icons). */
+        internal const val ICON_CACHE_SIZE = 96
         internal const val MEDIA_CONTROLS_MS = 6_000L
         internal const val MEDIA_HIDE_SETTLE_MS = 2_000L
 

@@ -77,14 +77,7 @@ fun LivePill(
         }
     }
     // A running clock: the text changes once a second.
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(activity.ticks, animate) {
-        if (!activity.ticks) return@LaunchedEffect
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(1_000L - now % 1_000L)
-        }
-    }
+    val now by rememberSecondTick(activity.ticks)
     val ink = if (light) Color(0xFF1B1B1F) else Color.White
     val glowPad = 6.dp
     Row(

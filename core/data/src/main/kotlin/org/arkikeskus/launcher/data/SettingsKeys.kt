@@ -181,6 +181,7 @@ internal object Keys {
     val TASKBAR_MEDIA = booleanPreferencesKey("taskbar_media")
     val TASKBAR_MEDIA_PAUSED = booleanPreferencesKey("taskbar_media_paused")
     val TASKBAR_MEDIA_POSITION = stringPreferencesKey("taskbar_media_position")
+    val TASKBAR_DIVIDER_STYLE = stringPreferencesKey("taskbar_divider_style")
     val TASKBAR_MEDIA_TAP = stringPreferencesKey("taskbar_media_tap")
     val TASKBAR_MEDIA_CONTROLS = booleanPreferencesKey("taskbar_media_controls")
     val TASKBAR_MEDIA_SHAPE = stringPreferencesKey("taskbar_media_shape")

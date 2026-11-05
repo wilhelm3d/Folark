@@ -172,6 +172,7 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarMediaEnabled(value: Boolean) = update { repository.setTaskbarMediaEnabled(value) }
     fun setTaskbarMediaShowPaused(value: Boolean) = update { repository.setTaskbarMediaShowPaused(value) }
     fun setTaskbarMediaPosition(value: String) = update { repository.setTaskbarMediaPosition(value) }
+    fun setTaskbarDividerStyle(value: String) = update { repository.setTaskbarDividerStyle(value) }
     fun setTaskbarMediaTap(value: String) = update { repository.setTaskbarMediaTap(value) }
     fun setTaskbarMediaControls(value: Boolean) = update { repository.setTaskbarMediaControls(value) }
     fun setTaskbarMediaShape(value: String) = update { repository.setTaskbarMediaShape(value) }

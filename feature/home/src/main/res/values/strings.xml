@@ -267,6 +267,11 @@
     <string name="taskbar_split_peek_left">Left app peeks in</string>
     <string name="taskbar_split_peek_right">Right app peeks in</string>
     <string name="taskbar_split_even">Half and half</string>
+    <string name="taskbar_pair_open_saved">Open as saved</string>
+    <string name="taskbar_pair_peek">Peek view</string>
+    <string name="taskbar_pair_three_peek">Peek view (middle app big)</string>
+    <string name="taskbar_pair_first_two_thirds">First app ⅔</string>
+    <string name="taskbar_pair_first_third">First app ⅓</string>
     <string name="taskbar_split_three_even">A third each (33 / 33 / 33)</string>
     <string name="taskbar_split_three_even_failed">System UI didn\'t make three equal thirds</string>
     <string name="taskbar_split_two_thirds">%1$s 67 %%</string>

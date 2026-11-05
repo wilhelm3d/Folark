@@ -58,6 +58,8 @@ internal data class TaskbarSetup(
     val mediaEnabled: Boolean,
     val mediaShowPaused: Boolean,
     val mediaPosition: String,
+    /** The mark between pinned and recent apps (LauncherSettings.TASKBAR_DIVIDER_*). */
+    val dividerStyle: String = org.arkikeskus.launcher.model.LauncherSettings.TASKBAR_DIVIDER_LINE,
     val mediaTap: String,
     val mediaControls: Boolean,
     val mediaShape: String,

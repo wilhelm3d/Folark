@@ -460,6 +460,8 @@ data class LauncherSettings(
         val mediaShowPaused: Boolean = true,
         /** Taskbar media icon: where it sits, one of TASKBAR_MEDIA_POS_*. */
         val mediaPosition: String = TASKBAR_MEDIA_POS_MIDDLE,
+        /** The mark between pinned apps (and pairs) and recent apps: one of TASKBAR_DIVIDER_*. */
+        val dividerStyle: String = TASKBAR_DIVIDER_LINE,
         /** Taskbar media icon: what a tap does, one of TASKBAR_MEDIA_TAP_*. */
         val mediaTap: String = TASKBAR_MEDIA_TAP_OPEN,
         /** Taskbar media icon: pulling it up shows back, play/pause and forward. */
@@ -907,6 +909,11 @@ data class LauncherSettings(
         )
         const val TASKBAR_MEDIA_POS_START = "start"
         const val TASKBAR_MEDIA_POS_MIDDLE = "middle"
+        const val TASKBAR_DIVIDER_LINE = "line"
+        const val TASKBAR_DIVIDER_BOLD = "bold"
+        const val TASKBAR_DIVIDER_DOT = "dot"
+        const val TASKBAR_DIVIDER_GAP = "gap"
+        const val TASKBAR_DIVIDER_NONE = "none"
         const val TASKBAR_MEDIA_POS_END = "end"
         const val TASKBAR_MEDIA_TAP_OPEN = "open"
         const val TASKBAR_MEDIA_TAP_PLAY_PAUSE = "play_pause"

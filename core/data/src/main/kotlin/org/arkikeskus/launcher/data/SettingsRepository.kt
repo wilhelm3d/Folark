@@ -428,6 +428,7 @@ class SettingsRepository @Inject constructor(
                 mediaEnabled = p[Keys.TASKBAR_MEDIA] ?: true,
                 mediaShowPaused = p[Keys.TASKBAR_MEDIA_PAUSED] ?: true,
                 mediaPosition = p[Keys.TASKBAR_MEDIA_POSITION] ?: LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE,
+                dividerStyle = p[Keys.TASKBAR_DIVIDER_STYLE] ?: LauncherSettings.TASKBAR_DIVIDER_LINE,
                 mediaTap = p[Keys.TASKBAR_MEDIA_TAP] ?: LauncherSettings.TASKBAR_MEDIA_TAP_OPEN,
                 mediaControls = p[Keys.TASKBAR_MEDIA_CONTROLS] ?: true,
                 mediaShape = p[Keys.TASKBAR_MEDIA_SHAPE] ?: LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE,
@@ -657,6 +658,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setTaskbarMediaEnabled(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA] = value }
     suspend fun setTaskbarMediaShowPaused(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA_PAUSED] = value }
     suspend fun setTaskbarMediaPosition(value: String) = edit { it[Keys.TASKBAR_MEDIA_POSITION] = value }
+    suspend fun setTaskbarDividerStyle(value: String) = edit { it[Keys.TASKBAR_DIVIDER_STYLE] = value }
     suspend fun setTaskbarMediaTap(value: String) = edit { it[Keys.TASKBAR_MEDIA_TAP] = value }
     suspend fun setTaskbarMediaControls(value: Boolean) = edit { it[Keys.TASKBAR_MEDIA_CONTROLS] = value }
     suspend fun setTaskbarMediaShape(value: String) = edit { it[Keys.TASKBAR_MEDIA_SHAPE] = value }

@@ -341,17 +341,22 @@ internal fun WorkspacePendingWidgetCell(
             val ctxP = LocalContext.current
             // Resolve the provider's label + icon (falls back to the app icon). The
             // system caches these, so a plain remember keyed on the provider is fine.
-            val visual = remember(pending.provider) {
-                val info = AppWidgetManager.getInstance(ctxP).installedProviders
-                    .firstOrNull { it.provider == pending.provider }
-                val label = info?.loadLabel(ctxP.packageManager)
-                    ?: pending.provider.packageName
-                val icon = runCatching {
-                    (info?.loadIcon(ctxP, ctxP.resources.displayMetrics.densityDpi)
-                        ?: ctxP.packageManager.getApplicationIcon(pending.provider.packageName))
-                        .toBitmap().asImageBitmap()
-                }.getOrNull()
-                label to icon
+            // Read in the background (E18): the provider list and the icon cost a binder trip each.
+            val visual by androidx.compose.runtime.produceState<Pair<String, androidx.compose.ui.graphics.ImageBitmap?>>(
+                initialValue = pending.provider.packageName to null, pending.provider,
+            ) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val info = AppWidgetManager.getInstance(ctxP).installedProviders
+                        .firstOrNull { it.provider == pending.provider }
+                    val label = info?.loadLabel(ctxP.packageManager)
+                        ?: pending.provider.packageName
+                    val icon = runCatching {
+                        (info?.loadIcon(ctxP, ctxP.resources.displayMetrics.densityDpi)
+                            ?: ctxP.packageManager.getApplicationIcon(pending.provider.packageName))
+                            .toBitmap().asImageBitmap()
+                    }.getOrNull()
+                    label to icon
+                }
             }
             Box(
                 modifier = Modifier

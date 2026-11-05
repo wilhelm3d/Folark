@@ -197,7 +197,8 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                 time.floatValue = (System.nanoTime() - start) / 1_000_000_000f
                 delay(frameMs)
             } else {
-                delay(300)
+                // Scrolled away: look again now and then (E19).
+                delay(1_000)
             }
         }
     }

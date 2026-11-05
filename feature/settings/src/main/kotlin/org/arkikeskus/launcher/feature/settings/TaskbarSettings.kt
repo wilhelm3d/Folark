@@ -201,6 +201,20 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             )
             ExpressiveRowDivider()
             ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_taskbar_divider_style),
+                options = listOf(
+                    LauncherSettings.TASKBAR_DIVIDER_LINE to stringResource(R.string.settings_taskbar_divider_line),
+                    LauncherSettings.TASKBAR_DIVIDER_BOLD to stringResource(R.string.settings_taskbar_divider_bold),
+                    LauncherSettings.TASKBAR_DIVIDER_DOT to stringResource(R.string.settings_taskbar_divider_dot),
+                    LauncherSettings.TASKBAR_DIVIDER_GAP to stringResource(R.string.settings_taskbar_divider_gap),
+                    LauncherSettings.TASKBAR_DIVIDER_NONE to stringResource(R.string.settings_taskbar_divider_none),
+                ),
+                selected = s.taskbar.dividerStyle,
+                onSelect = viewModel::setTaskbarDividerStyle,
+                icon = null,
+            )
+            ExpressiveRowDivider()
+            ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_taskbar_media_shape),
                 options = listOf(
                     LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE to stringResource(R.string.settings_taskbar_media_shape_circle),

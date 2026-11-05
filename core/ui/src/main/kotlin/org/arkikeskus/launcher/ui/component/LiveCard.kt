@@ -76,14 +76,7 @@ fun LiveCard(
     val icon = remember(activity.key, activity.icon != null) {
         runCatching { activity.icon?.loadDrawable(context)?.squareBitmap(64)?.asImageBitmap() }.getOrNull()
     }
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(activity.ticks) {
-        if (!activity.ticks) return@LaunchedEffect
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(1_000L - now % 1_000L)
-        }
-    }
+    val now by rememberSecondTick(activity.ticks)
     val progress by animateFloatAsState(activity.progress ?: 0f, tween(500), label = "progress")
     // The moving sweep of a busy bar: only animated when there is one (it draws every frame).
     val sweep = if (activity.indeterminate) {

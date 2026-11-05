@@ -1127,6 +1127,12 @@
     <string name="settings_divider_stops">Divider stops ⅓ / ½ / ⅔</string>
     <string name="settings_split_free_divider">Divider stays where you let go</string>
     <string name="settings_split_free_divider_desc">Drag the divider to any size, for two apps and three, and it stays there instead of jumping to half and half or peek view. Near the screen\'s edge peek view and closing still work (needs Folark\'s Vector module)</string>
+    <string name="settings_taskbar_divider_style">Between pinned and recent apps</string>
+    <string name="settings_taskbar_divider_line">Line</string>
+    <string name="settings_taskbar_divider_bold">Bold</string>
+    <string name="settings_taskbar_divider_dot">Dot</string>
+    <string name="settings_taskbar_divider_gap">Gap</string>
+    <string name="settings_taskbar_divider_none">None</string>
     <string name="settings_split_three_even">Three apps a third each</string>
     <string name="settings_split_three_even_desc">A third app joining a split makes three equal thirds (33 / 33 / 33) instead of Motorola\'s carousel, where one app shrinks to a strip (needs Folark\'s Vector module)</string>
     <string name="settings_divider_stops_desc">The split divider rests at 33 %, 50 % and 67 %, the sizes Motorola\'s split screen lays apps out at (needs Folark\'s Vector module; from the next split)</string>

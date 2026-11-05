@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Split screen
+- Taskbar: long-press a pinned scene to open it another way this once: peek view, half and half, first app ⅔ or ⅓; a three-app scene as a third each or as peek view (middle app big).
+- Taskbar: the mark between pinned and recent apps can be a line, a bold line, a dot, a gap or nothing (Settings ▸ Taskbar).
+- Efficiency (taskbar): icons are kept per dark / light theme (switching back finds them drawn), and pinned icons load together in the background.
+- Efficiency (home): a widget being placed reads its name and icon off the main thread; live pills and cards share one clock; the weather animation looks less often whether it is scrolled back in.
 - Recents opens faster: the task list and the split are read at once, all saved screenshots come in one root call and show together, apps are looked up by index, the memory badge is read again only after 30 s, and the root helper isn't started again for apps it had no picture for a moment ago. Cards recompose only when what they show changes.
 - Recents: split cards show the split as it really is (a third, peek, three apps side by side as placed), when Android reports where the apps sit.
 - Recents: a split card dropped on the taskbar is pinned there as one scene (single apps as before).
