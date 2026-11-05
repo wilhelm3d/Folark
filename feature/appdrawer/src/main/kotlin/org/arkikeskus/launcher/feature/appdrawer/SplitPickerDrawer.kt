@@ -461,18 +461,59 @@ private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit
         Text(text, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         corner()
         if (peek != null) {
-            Spacer(Modifier.width(8.dp))
-            FilterChip(
-                selected = peek,
-                onClick = { onPeekChange(!peek) },
-                label = { Text(stringResource(R.string.split_picker_peek)) },
-                colors = FilterChipDefaults.filterChipColors(
-                    labelColor = Color.White.copy(alpha = 0.8f),
-                    selectedContainerColor = ACCENT.copy(alpha = 0.35f),
-                    selectedLabelColor = Color.White,
-                ),
+            Spacer(Modifier.width(6.dp))
+            PeekButton(peek) { onPeekChange(!peek) }
+        }
+    }
+}
+
+/**
+ * Peek view as a symbol in the size buttons' style: a big pane with a thin strip peeking in at
+ * its edge, lit when on, "Peek" beneath.
+ */
+@Composable
+private fun PeekButton(on: Boolean, onClick: () -> Unit) {
+    val border by androidx.compose.animation.animateColorAsState(
+        if (on) ACCENT else Color.White.copy(alpha = 0.18f), label = "peekBorder",
+    )
+    val label = stringResource(R.string.split_picker_peek)
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClickLabel = label, onClick = onClick)
+            .padding(2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            Modifier
+                .size(width = 38.dp, height = 22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White.copy(alpha = 0.06f))
+                .border(1.5.dp, border, RoundedCornerShape(6.dp))
+                .padding(2.5.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Box(
+                Modifier
+                    .weight(0.12f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(2.5.dp))
+                    .background(if (on) ACCENT else Color.White.copy(alpha = 0.45f)),
+            )
+            Box(
+                Modifier
+                    .weight(0.88f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(2.5.dp))
+                    .background(Color.White.copy(alpha = 0.16f)),
             )
         }
+        Text(
+            label,
+            color = if (on) ACCENT else Color.White.copy(alpha = 0.7f),
+            fontSize = 10.sp,
+            modifier = Modifier.padding(top = 1.dp),
+        )
     }
 }
 

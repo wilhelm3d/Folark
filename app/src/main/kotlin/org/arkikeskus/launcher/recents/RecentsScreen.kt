@@ -278,14 +278,17 @@ internal fun RecentsScreen(
     }
     /** Peek view takes three apps (Motorola's three-app peek, through the module) where it can. */
     val peekContext = LocalContext.current
-    val peekCount = if (settings.launch.threeAppSplit && remember { org.arkikeskus.launcher.data.SplitThree.ready(peekContext) }) 3 else 2
+    val moduleReady = remember { org.arkikeskus.launcher.data.SplitThree.ready(peekContext) }
+    val peekCount = if (settings.launch.threeAppSplit && moduleReady) 3 else 2
     var confirmAll by remember { mutableStateOf(false) }
     val drag = remember { RecentsDrag() }
     val hostView = androidx.compose.ui.platform.LocalView.current
     val menu = remember { RecentsMenuState() }
     drag.cards = state.cards
-    drag.allowThird = settings.launch.threeAppSplit
-    drag.allowReplace = settings.launch.threeAppSplit
+    // A split card takes a dropped app as its third with the real three-app split or the module
+    // (as the split drawer's 33/33/33 does).
+    drag.allowThird = settings.launch.threeAppSplit || moduleReady
+    drag.allowReplace = settings.launch.threeAppSplit || moduleReady
     // Aero edge placement: inner screen only, where there is room for side-by-side apps.
     drag.allowEdge = wide
     drag.zones = settings.recents.dropZones

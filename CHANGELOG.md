@@ -8,6 +8,9 @@
 - The crash guard no longer pauses Folark's module after a reboot (System UI starting right after the phone booted is a restart, not a crash), and a pause ends when the phone restarts. A false pause hid the split drawer's size row and blocked three-app split.
 - Three-app split: the module finds System UI's startTask / startIntent for the third pane by their leading parameters (the split index in the first number after them) and reports why it failed; the divider stops leave three-app layouts alone.
 - The split drawer's Size row shows whenever Folark's module runs, labelled 30/70, 50/50, 70/30; picking a size turns peek off.
+- Switching apps in peek view (tapping the app peeking in) no longer crashes System UI: Motorola's StageCoordinator.setSideStagePosition picks a stage by each split listener's place in its list, so one listener more than apps (Folark's) threw IndexOutOfBounds. Folark's listener steps out while it runs.
+- Recents: split cards take a dropped app as the third whenever Folark's Vector module runs (not only with the three-app split setting on).
+- Split drawer: Peek is a symbol like the size buttons.
 - Peek view no longer crashes System UI: while Motorola's own divider animation runs (to peek, half and half, closing, its three-app layouts) Folark's sizing keeps out of it; switching layouts under it mid-way wiped data Motorola reads every frame.
 - Three apps: moving a divider resizes the apps too (they kept their old widths and were cut off): the all-on-screen layout is laid out at the dividers.
 - Recents: an app dropped on a split card joins it as the third app (Recents went home and the app floated): the split is made again and the third added once it has settled, as the split drawer does.

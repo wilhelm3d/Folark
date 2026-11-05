@@ -78,6 +78,10 @@ internal object SplitThreeHook {
     /** When the split state is logged after a third app was sent. */
     private const val THIRD_CHECK_MS = 1_500L
 
+    private const val STAGE_COORDINATOR = "com.android.wm.shell.splitscreen.StageCoordinator"
+    /** Whether Folark's listener stepped out for the setSideStagePosition running on this thread. */
+    private val stepOut = ThreadLocal<Boolean>()
+
     private const val LISTENER = "com.android.wm.shell.splitscreen.SplitScreen\$SplitScreenListener"
 
     @Volatile private var controller: Any? = null
@@ -108,6 +112,44 @@ internal object SplitThreeHook {
         }.getOrDefault(0)
         log("split hook: hooked $hooked SystemUI method(s)")
         hookThreeEven(loader)
+        guardSideStagePosition(loader)
+    }
+
+    /**
+     * Motorola's StageCoordinator.setSideStagePosition tells each split listener about the stages
+     * with the listener's own place in the list as the stage index (`activeStages.get(size)`), so
+     * with more listeners than apps in the split it throws IndexOutOfBounds on WM Shell's thread
+     * and System UI dies — and Folark's listener is one more than Motorola's own. That happened on
+     * every swap (tapping the app peeking in) and some split starts. Folark's listener steps out of
+     * the list while that method runs and back in after (it needs nothing from that call).
+     */
+    private fun guardSideStagePosition(loader: ClassLoader) {
+        val cls = runCatching { XposedHelpers.findClass(STAGE_COORDINATOR, loader) }.getOrNull() ?: return
+        val hooked = runCatching {
+            XposedBridge.hookAllMethods(cls, "setSideStagePosition", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    stepOut.set(false)
+                    val listener = splitListener ?: return
+                    runCatching {
+                        @Suppress("UNCHECKED_CAST")
+                        val listeners = field(param.thisObject, "mListeners") as? MutableList<Any> ?: return
+                        if (listeners.removeAll { it === listener }) stepOut.set(true)
+                    }
+                }
+
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (stepOut.get() != true) return
+                    stepOut.set(false)
+                    val listener = splitListener ?: return
+                    runCatching {
+                        @Suppress("UNCHECKED_CAST")
+                        val listeners = field(param.thisObject, "mListeners") as? MutableList<Any> ?: return
+                        if (listeners.none { it === listener }) listeners.add(listener)
+                    }
+                }
+            }).size
+        }.getOrDefault(0)
+        log("split hook: side-stage guard ${if (hooked > 0) "on" else "not found"}")
     }
 
     /**
