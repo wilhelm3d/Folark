@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Efficiency and fixes (audit)
+- Battery: an ongoing notification already shown (a download, a timer, navigation, music) rebuilds dots, people tiles, widgets and the live pill at most once a second instead of on every update.
+- Battery: the taskbar's app watch (without the accessibility service) pauses on the cover screen when there is no bar there, instead of reading the usage history every 1–3 s; it resumes on unfolding.
+- Split drawer: leaving it without a pick after choosing 33/33/33 now closes the half-made split again (it stayed half made).
+- Folders that open apps from the tile: switching the tile between 2×2 and 3×3 no longer leaves old places that could open the wrong app.
+- Wallpaper follows the hinge: Android's zoom call is looked up once, not on every frame of a hinge move.
 - An ongoing download or timer no longer recomposes the whole home shell every second: the live pill and the icon rings read the live list on their own, and app notifications are read by the long-press menu only when it opens.
 - Icon rings: each app's ring is its own state, so a ticking download redraws one icon, not every icon on home and in the drawer.
 - The shared second clock (live pills, cards, timer rings) stops while home is behind an app.

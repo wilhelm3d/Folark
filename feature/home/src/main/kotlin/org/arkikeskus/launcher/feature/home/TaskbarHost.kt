@@ -73,6 +73,8 @@ object TaskbarHost {
             // A fold or unfold: the bar only belongs on the large display.
             override fun onConfigurationChanged(newConfig: Configuration) {
                 overlayBar?.onConfigurationChanged()
+                // Unfolded again: the app watch paused on the cover screen picks up at once.
+                checkNow()
             }
 
             @Deprecated("Required by ComponentCallbacks")
@@ -184,6 +186,9 @@ object TaskbarHost {
                 if (watchHandler !== handler) return
                 // Screen off: stop until checkNow() (screen on) starts it again.
                 if (power?.isInteractive == false) return
+                // Folded with no bar on the cover screen: nothing to follow; checkNow() (unfold)
+                // starts it again. It asked the usage history every 1-3 s on the cover screen.
+                if (current?.barPossibleHere() == false) return
                 var changed = false
                 if (usage != null) {
                     val now = System.currentTimeMillis()

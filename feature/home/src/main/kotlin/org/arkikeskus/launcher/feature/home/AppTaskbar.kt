@@ -455,6 +455,9 @@ internal class AppTaskbar(
     internal fun largeScreen(): Boolean =
         context.resources.configuration.smallestScreenWidthDp >= LARGE_SCREEN_DP
 
+    /** Whether a bar can show on the display in use (the inner one, or the cover one with its bar). */
+    internal fun barPossibleHere(): Boolean = largeScreen() || setup?.coverBar == true
+
     /**
      * The setup for the screen in use: the full one on the inner screen; on the cover screen the
      * slim bar when it is switched on (Settings ▸ Taskbar ▸ Cover screen), else none.

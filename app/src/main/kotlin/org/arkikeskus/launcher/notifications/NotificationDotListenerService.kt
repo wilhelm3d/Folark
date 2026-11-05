@@ -143,6 +143,8 @@ class NotificationDotListenerService : NotificationListenerService() {
 
         /** How long posts and removals are gathered into one rebuild (well under a frame's notice). */
         const val COALESCE_MS = 40L
+        /** Updates of an ongoing notification already shown: at most one rebuild a second. */
+        const val QUIET_UPDATE_MS = 1_000L
 
         /** Grace period for legacy snoozes to reappear before deleting stale bookkeeping. */
         const val RELEASE_SLACK_MS = 60_000L
@@ -165,12 +167,31 @@ class NotificationDotListenerService : NotificationListenerService() {
      * dots, the people tiles and the notifications widget, so they are gathered for [COALESCE_MS]
      * and done once. A steady stream still refreshes every [COALESCE_MS], never later.
      */
-    private fun scheduleRefresh() {
-        if (refreshQueued) return
+    private fun scheduleRefresh(delayMs: Long = COALESCE_MS) {
+        // Already coming at least as soon: nothing to do. A slow one waiting is brought forward.
+        if (refreshQueued && queuedDelay <= delayMs) return
+        handler.removeCallbacks(coalescedRefresh)
         refreshQueued = true
-        handler.postDelayed(coalescedRefresh, COALESCE_MS)
+        queuedDelay = delayMs
+        handler.postDelayed(coalescedRefresh, delayMs)
     }
 
+    /**
+     * Ongoing notifications seen before (a download, a timer, music, navigation): their updates
+     * come several times a second and change only a progress or a time, so they rebuild at most
+     * every [QUIET_UPDATE_MS] instead of after [COALESCE_MS]. Every rebuild reads Android's whole
+     * list and redraws dots, people tiles, widgets and the live pill.
+     */
+    private val ongoingKeys = HashSet<String>()
+
+    private fun isQuietUpdate(sbn: StatusBarNotification): Boolean {
+        val flags = sbn.notification?.flags ?: return false
+        val ongoing = (flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE)) != 0
+        if (!ongoing) return false
+        return !ongoingKeys.add(sbn.key)
+    }
+
+    private var queuedDelay = 0L
     private var refreshQueued = false
     private val coalescedRefresh = Runnable {
         refreshQueued = false
@@ -261,7 +282,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         if (sbn != null && isHeadsUpWorthy(sbn) && shouldAlert(sbn)) badgeRepository.notifyHeadsUp()
         if (sbn != null && settingsReady) holdForBatch(sbn)
         if (sbn != null) runCatching { maybeNudge(sbn) }
-        scheduleRefresh()
+        scheduleRefresh(if (sbn != null && isQuietUpdate(sbn)) QUIET_UPDATE_MS else COALESCE_MS)
     }
 
     /** Notifications that already nudged their app's icon (a silent update must not nudge again). */
@@ -344,6 +365,7 @@ class NotificationDotListenerService : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
         if (sbn != null) alertedKeys.remove(sbn.key)
         if (sbn != null) nudgedKeys.remove(sbn.key)
+        if (sbn != null) ongoingKeys.remove(sbn.key)
         // A user snoozing an already-held notification leaves its deadline intact. Only a real
         // removal (dismissed or cancelled by the app) forgets it.
         if (sbn != null && reason != REASON_SNOOZED && heldUntil.remove(sbn.key) != null) persistHeld()

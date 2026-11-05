@@ -119,8 +119,10 @@ internal fun WorkspaceFolderCell(
     ): Modifier = workspaceEntryDrag(ws, grid, env, entry, rowId, removable, onTap, onStillPress, onRemove)
     with(ws) { with(grid) { with(env) { with(deps) {
             // Apps opened right from the tile: where each place of it is, and where this cell is.
-            val directApps = LocalFolderStyle.current.directApps
-            val slotRects = remember(entry.id) { HashMap<Int, androidx.compose.ui.geometry.Rect>() }
+            val folderStyle = LocalFolderStyle.current
+            val directApps = folderStyle.directApps
+            // Started afresh when the tile changes from 2×2 to 3×3 (or back): old places must not count.
+            val slotRects = remember(entry.id, folderStyle.preview) { HashMap<Int, androidx.compose.ui.geometry.Rect>() }
             var cellOrigin by remember(entry.id) { mutableStateOf(Offset.Zero) }
             Box(
                 modifier = Modifier

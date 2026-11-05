@@ -170,8 +170,9 @@ class SplitPickerActivity : ComponentActivity() {
         super.onDestroy()
         // Left without a pick (back, or swiped away): close the half-made split, keeping the first app.
         // Not when only recreated (a fold or display change) — the split stays as it is then.
-        // A three-app picker opened full screen, without a half-made split to close.
-        if (!appPicked && !three && isFinishing && !isChangingConfigurations) {
+        // A three-app picker opened full screen (Recents) has no half-made split to close; one that
+        // only switched to 33/33/33 in its corner still sits in the half beside the first app.
+        if (!appPicked && !openedForThree && isFinishing && !isChangingConfigurations) {
             viewModel.cancel(firstPackage, firstTaskId)
         }
     }

@@ -611,12 +611,16 @@ private const val WALLPAPER_HINGE_ZOOM = 0.14f
 /** The same for Android's own wallpaper, as WallpaperManager's zoom (0 none, 1 the most). */
 private const val WALLPAPER_ZOOM_OUT = 0.8f
 
+/** WallpaperManager's zoom call, looked up once (it runs on every frame of a hinge move); null where hidden. */
+private val wallpaperZoomMethod: java.lang.reflect.Method? by lazy {
+    runCatching {
+        android.app.WallpaperManager::class.java.getMethod("setWallpaperZoomOut", android.os.IBinder::class.java, Float::class.javaPrimitiveType)
+    }.getOrNull()
+}
+
 /** Android's wallpaper zoom for the window of [view]; quietly nothing where Android won't allow it. */
 private fun setSystemWallpaperZoom(view: android.view.View, zoom: Float) {
     val token = view.windowToken ?: return
-    runCatching {
-        val manager = android.app.WallpaperManager.getInstance(view.context)
-        manager.javaClass.getMethod("setWallpaperZoomOut", android.os.IBinder::class.java, Float::class.javaPrimitiveType)
-            .invoke(manager, token, zoom.coerceIn(0f, 1f))
-    }
+    val method = wallpaperZoomMethod ?: return
+    runCatching { method.invoke(android.app.WallpaperManager.getInstance(view.context), token, zoom.coerceIn(0f, 1f)) }
 }
