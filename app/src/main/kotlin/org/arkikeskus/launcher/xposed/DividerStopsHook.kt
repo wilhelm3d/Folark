@@ -48,6 +48,7 @@ internal object DividerStopsHook {
         "com.android.wm.shell.shared.split.DividerSnapAlgorithm",
     )
 
+    private const val LAYOUT_MANAGER = "com.android.wm.shell.common.split.SplitLayoutManager"
     private const val SNAP_FIRST_THIRD = 0
     private const val SNAP_SECOND_THIRD = 2
     /** Inner stops of a two-app list: ⅓, ½, ⅔, 90/10, 10/90 and Motorola's 90/5, 5/90. */
@@ -71,6 +72,71 @@ internal object DividerStopsHook {
             }.getOrDefault(0)
         }
         log(if (hooked > 0) "divider stops: hooked updateTargets ($hooked)" else "divider stops: no DividerSnapAlgorithm.updateTargets here")
+        hookTwoAppBounds(loader)
+    }
+
+    /**
+     * Motorola sizes two apps itself (SplitLayoutManager.updateBoundsWithSnapPositionStageUISpec,
+     * its "immersive view" policy) and only knows 50/50 and its 5/90 layouts there: for ⅓ and ⅔
+     * (split states 0 and 2) it logs "unsupported" and keeps the small app as wide as the big one,
+     * pushed out under the other, so a third looked cut off and wasn't usable. For those two states
+     * the two apps are laid out side by side at the divider instead, as plain Android does
+     * (SplitLayout2Apps without the policy): each app really that wide. Three apps, 50/50 and
+     * Motorola's own layouts stay Motorola's.
+     */
+    private fun hookTwoAppBounds(loader: ClassLoader) {
+        val cls = runCatching { XposedHelpers.findClass(LAYOUT_MANAGER, loader) }.getOrNull() ?: return
+        val hooked = runCatching {
+            XposedBridge.hookAllMethods(cls, "updateBoundsWithSnapPositionStageUISpec", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    if (!on || param.args.size != 7) return
+                    val state = param.args[0] as? Int ?: return
+                    if (state != SNAP_FIRST_THIRD && state != SNAP_SECOND_THIRD) return
+                    runCatching {
+                        if (plainBounds(param.thisObject, param.args)) param.result = null
+                    }.onFailure { log("divider stops: Motorola's sizing kept ($it)") }
+                }
+            }).size
+        }.getOrDefault(0)
+        log(if (hooked > 0) "divider stops: two-app sizes laid out ($hooked)" else "divider stops: no two-app sizing here")
+    }
+
+    /**
+     * The two-app bounds for divider position args[1] into args[3] (left / top), args[4] (right /
+     * bottom) and args[5] (the divider), as AOSP's SplitLayout does. False (Motorola's way then)
+     * when this isn't a two-app layout or a field is missing.
+     */
+    private fun plainBounds(manager: Any, args: Array<Any?>): Boolean {
+        val layout = field(manager, "mSplitLayout") ?: return false
+        if (!layout.javaClass.name.endsWith("SplitLayout2Apps")) return false
+        val position = args[1] as? Int ?: return false
+        val first = args[3] as? Rect ?: return false
+        val second = args[4] as? Rect ?: return false
+        val divider = args[5] as? Rect ?: return false
+        val root = field(manager, "mRootBounds") as? Rect ?: return false
+        val leftRight = field(manager, "mIsLeftRightSplit") as? Boolean ?: return false
+        val size = field(manager, "mDividerSize") as? Int ?: return false
+        val dividerBounds = generateSequence<Class<*>>(manager.javaClass) { it.superclass }
+            .flatMap { it.declaredMethods.asSequence() }
+            .firstOrNull { it.name == "calculateDividerBounds" && it.parameterTypes.size == 2 }
+            ?.apply { isAccessible = true } ?: return false
+        // Motorola's resizing effect (scaled / pushed-out surfaces) off for this layout.
+        runCatching { (field(field(manager, "mImmersiveSurfaceEffectPolicy")!!, "mStageUISpecs") as? MutableCollection<*>)?.clear() }
+        divider.set(root)
+        first.set(root)
+        second.set(root)
+        if (leftRight) {
+            val at = position + root.left
+            dividerBounds.invoke(manager, at, divider)
+            first.right = at
+            second.left = at + size
+        } else {
+            val at = position + root.top
+            dividerBounds.invoke(manager, at, divider)
+            first.bottom = at
+            second.top = at + size
+        }
+        return true
     }
 
     /** Replaces the ⅓ / ⅔ stops of [algorithm] with 33 % / 67 % ones (adds them where missing). */
