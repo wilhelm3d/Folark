@@ -231,6 +231,7 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
 
     // While a slider is dragged the preview follows the finger (the saved value catches up after).
     var dragIcon by remember { mutableStateOf<Float?>(null) }
+    val overrides = LocalPreviewOverrides.current
     var dragOpacity by remember { mutableStateOf<Float?>(null) }
     val shown = look.copy(
         iconSize = dragIcon?.roundToInt() ?: look.iconSize,
@@ -243,8 +244,6 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         subtitle = stringResource(R.string.settings_split_picker_desc),
         sharedByBothDisplays = true,
     ) {
-        SplitPickerPreview(shown)
-        ExpressiveRowDivider()
         ExpressiveStepperRow(
             title = stringResource(R.string.settings_split_picker_columns),
             value = look.columns,
@@ -259,7 +258,7 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
             onValueChange = { viewModel.setSplitPickerIconSize(it.roundToInt()) },
             valueRange = SplitPickerLook.MIN_ICON.toFloat()..SplitPickerLook.MAX_ICON.toFloat(),
             valueDisplay = "${shown.iconSize} dp",
-            onDragValue = { dragIcon = it },
+            onDragValue = { dragIcon = it; overrides?.splitIcon = it },
         )
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
@@ -361,7 +360,7 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
             onValueChange = viewModel::setSplitPickerOpacity,
             valueRange = SplitPickerLook.MIN_OPACITY..SplitPickerLook.MAX_OPACITY,
             valueDisplay = "${(shown.opacity * 100).roundToInt()}%",
-            onDragValue = { dragOpacity = it },
+            onDragValue = { dragOpacity = it; overrides?.splitOpacity = it },
         )
         ExpressiveRowDivider()
         ExpressiveSegmentedControl(
@@ -640,7 +639,7 @@ private fun Hint(text: String) {
 
 /** A small split screen: an app on the left, the picker (as set) on the right. */
 @Composable
-private fun SplitPickerPreview(look: SplitPickerLook) {
+internal fun SplitPickerPreview(look: SplitPickerLook) {
     val accent = MaterialTheme.colorScheme.primary
     val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp).onScreen(visible)) {

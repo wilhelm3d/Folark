@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Settings
+- Settings sorted anew, one topic per page: Look & feel (Theme & colours, Icons & badges, Motion & haptics), Home screen (Home screen, Dock & folders, Gestures), Apps & multitasking (App drawer, Taskbar, Recents, Split screen & peek) and Phone & system (Displays & fold, System, Permissions, Root, Backup). Everything about split screen and peek is now on one page, wherever the split starts from.
+- Each page has one live preview pinned on top that stays while the settings scroll under it. A change brings the view it touches to the front (the menu, the glass, the backdrop, the dots…) and the frame lights up; slider values show while dragging. Tap the chips to switch views, or the title to fold the preview away.
+
 ### Split screen
 - Efficiency: the animated previews in Settings (taskbar, split drawer, icon nudge) pause while scrolled out of sight; Folark's code is compiled ahead of time at install (baseline profile), for a faster first start of home, the drawer and Recents; Compose may skip redrawing parts whose settings and apps didn't change (stability config).
 - Split screen (Settings ▸ Recents & split screen): faint marks at ⅓, ½ and ⅔ while dragging the divider, and a let-go near one lands on it; a haptic tick at each mark; sizes kept when the phone turns or folds; each set of apps reopens at the sizes it had last time; the divider can be locked (2 apps, 3 apps or always; also from the taskbar's split menu); while text or a picture is dragged out of an app in split screen the panes light up; peek view's divider flung towards the strip closes that app (off by default).

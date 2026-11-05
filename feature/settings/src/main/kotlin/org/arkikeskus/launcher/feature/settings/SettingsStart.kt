@@ -117,10 +117,10 @@ internal fun StartSection(
             R.string.settings_start_new_taskbar to SettingsCategory.TASKBAR,
             R.string.settings_start_new_recents to SettingsCategory.RECENTS,
             R.string.settings_start_new_drawer to SettingsCategory.APP_DRAWER,
-            R.string.settings_start_new_split to SettingsCategory.RECENTS,
-            R.string.settings_start_new_motion to SettingsCategory.APPEARANCE,
-            R.string.settings_start_new_icons to SettingsCategory.APPEARANCE,
-            R.string.settings_start_new_haptics to SettingsCategory.APPEARANCE,
+            R.string.settings_start_new_split to SettingsCategory.SPLIT,
+            R.string.settings_start_new_motion to SettingsCategory.MOTION,
+            R.string.settings_start_new_icons to SettingsCategory.ICONS,
+            R.string.settings_start_new_haptics to SettingsCategory.MOTION,
         )
         news.forEachIndexed { i, (text, category) ->
             if (i > 0) ExpressiveRowDivider()

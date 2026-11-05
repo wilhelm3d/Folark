@@ -83,6 +83,11 @@ internal class PreviewOverrides {
     var homeBlur by mutableStateOf<Float?>(null)
     var stackCorner by mutableStateOf<Float?>(null)
     var widgetOpacity by mutableStateOf<Float?>(null)
+    var splitIcon by mutableStateOf<Float?>(null)
+    var splitOpacity by mutableStateOf<Float?>(null)
+    var recentsSpeed by mutableStateOf<Float?>(null)
+    var dockOpacity by mutableStateOf<Float?>(null)
+    var dotScale by mutableStateOf<Float?>(null)
 }
 
 internal val LocalPreviewOverrides = staticCompositionLocalOf<PreviewOverrides?> { null }
@@ -101,6 +106,15 @@ internal fun LauncherSettings.withPreview(o: PreviewOverrides?): LauncherSetting
         stackCornerRadius = o.stackCorner?.roundToInt() ?: widgets.stackCornerRadius,
         backgroundOpacity = o.widgetOpacity ?: widgets.backgroundOpacity,
     ),
+    recents = recents.copy(
+        animationSpeed = o.recentsSpeed ?: recents.animationSpeed,
+        picker = recents.picker.copy(
+            iconSize = o.splitIcon?.roundToInt() ?: recents.picker.iconSize,
+            opacity = o.splitOpacity ?: recents.picker.opacity,
+        ),
+    ),
+    dock = dock.copy(backgroundOpacity = o.dockOpacity ?: dock.backgroundOpacity),
+    dots = dots.copy(scale = o.dotScale ?: dots.scale),
 )
 
 // ------------------------------------------------------------------ the mini home screen
@@ -273,7 +287,7 @@ internal fun FolderStylePreview(settings: LauncherSettings, modifier: Modifier =
 // ------------------------------------------------------------------ pieces
 
 @Composable
-private fun PreviewFrame(height: Dp, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+internal fun PreviewFrame(height: Dp, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
     val palette = LocalExpressivePalette.current
     Box(
         modifier = modifier
@@ -287,7 +301,7 @@ private fun PreviewFrame(height: Dp, modifier: Modifier = Modifier, content: @Co
 
 /** The home picture (or the wallpaper, or a fallback gradient), blurred and dimmed like home. */
 @Composable
-private fun BoxScope.Backdrop(path: String, blur: Float, dim: Float) {
+internal fun BoxScope.Backdrop(path: String, blur: Float, dim: Float) {
     val picture = rememberBackdrop(path)
     val blurModifier = if (blur > 0.5f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Modifier.blur(blur.dp) else Modifier
     if (picture != null) {

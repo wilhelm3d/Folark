@@ -243,6 +243,4 @@ internal fun PermissionsSection(
             permission = Manifest.permission.ACCESS_COARSE_LOCATION,
         )
     }
-
-    SystemControlsSection()
 }

@@ -23,6 +23,7 @@ internal fun NotificationsSection(
     screenType: ScreenType = LocalScreenType.current,
     previewIcon: ImageBitmap?,
 ) {
+    val overrides = LocalPreviewOverrides.current
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_notifications),
         icon = Icons.Rounded.Notifications,
@@ -48,22 +49,13 @@ internal fun NotificationsSection(
             onValueChange = { viewModel.setNotificationDotScale(it, screenType) },
             valueRange = 0.6f..1.8f,
             valueDisplay = "%.1fx".format(s.dots.scale),
+            onDragValue = { overrides?.dotScale = it },
         )
         ExpressiveRowDivider()
 
         NotificationDotStyleRows(s = s, viewModel = viewModel, screenType = screenType)
         ExpressiveRowDivider()
 
-        // The preview follows the shape, colour and corner chosen in the rows above.
-        CompositionLocalProvider(LocalBadgeStyle provides BadgeStyle(s.dots.shape, s.dots.color, s.dots.position)) {
-            BadgePreview(
-                icon = previewIcon,
-                showDots = s.dots.enabled,
-                showCount = s.dots.showCount,
-                scale = s.dots.scale,
-            )
-        }
-        ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_dot_avatars),

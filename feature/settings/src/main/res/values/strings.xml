@@ -530,7 +530,7 @@
     <string name="settings_taskbar_media_badge">Player badge</string>
     <string name="settings_taskbar_media_badge_desc">The player app\'s icon in the corner of the cover</string>
     <string name="settings_look">Settings look</string>
-    <string name="settings_look_desc">The look of these settings, and a live preview of your home screen</string>
+    <string name="settings_look_desc">The look of these settings screens</string>
     <string name="settings_look_style">Style</string>
     <string name="settings_look_standard">Standard</string>
     <string name="settings_look_studio">Studio</string>
@@ -1153,4 +1153,50 @@
     <string name="settings_split_three_even">Three apps a third each</string>
     <string name="settings_split_three_even_desc">A third app joining a split makes three equal thirds (33 / 33 / 33) instead of Motorola\'s carousel, where one app shrinks to a strip (needs Folark\'s Vector module)</string>
     <string name="settings_divider_stops_desc">The split divider rests at 33 %, 50 % and 67 %, the sizes Motorola\'s split screen lays apps out at (needs Folark\'s Vector module; from the next split)</string>
+
+    <!-- Settings, sorted anew: categories -->
+    <string name="settings_cat_theme">Theme &amp; colours</string>
+    <string name="settings_cat_theme_desc">Presets, Liquid Glass, dark mode, menus, backdrop and fonts</string>
+    <string name="settings_cat_icons">Icons &amp; badges</string>
+    <string name="settings_cat_icons_desc">Icon pack, shape, themed icons, notification dots</string>
+    <string name="settings_cat_motion">Motion &amp; haptics</string>
+    <string name="settings_cat_motion_desc">Animations, speed, battery saver and vibration</string>
+    <string name="settings_cat_home">Home screen</string>
+    <string name="settings_cat_home_desc">Grid, size, pages, status bar and widgets</string>
+    <string name="settings_cat_dock_folders">Dock &amp; folders</string>
+    <string name="settings_cat_dock_folders_desc">Dock icons and background, folder look and behaviour</string>
+    <string name="settings_cat_taskbar_desc">Apps on the bar, look, pull handles and placement</string>
+    <string name="settings_cat_recents_desc">Open apps as cards: look, motion, root</string>
+    <string name="settings_cat_split">Split screen &amp; peek</string>
+    <string name="settings_cat_split_desc">Two or three apps, the split picker, peek, Scenes and floating windows</string>
+    <string name="settings_cat_displays">Displays &amp; fold</string>
+    <string name="settings_cat_system">System</string>
+    <string name="settings_cat_system_desc">Android settings Folark can change, and Motorola\'s own</string>
+    <string name="settings_cat_backup">Backup</string>
+    <string name="settings_cat_backup_desc">Save all settings to a file and restore them</string>
+    <string name="settings_base_look_desc">Dark mode, parallax and the glass of folders</string>
+    <string name="settings_launch_modes">Opening apps together</string>
+    <string name="settings_launch_modes_desc">Scenes, opening in split screen or floating</string>
+    <!-- The live preview pinned above each page -->
+    <string name="settings_pv_live">Live</string>
+    <string name="settings_pv_show">Show the preview</string>
+    <string name="settings_pv_hide">Hide the preview</string>
+    <string name="settings_pv_home">Home</string>
+    <string name="settings_pv_glass">Glass</string>
+    <string name="settings_pv_menu">Menu</string>
+    <string name="settings_pv_stacks">Widgets</string>
+    <string name="settings_pv_backdrop">Backdrop</string>
+    <string name="settings_pv_icons">Icons</string>
+    <string name="settings_pv_badges">Dots</string>
+    <string name="settings_pv_motion">Motion</string>
+    <string name="settings_pv_motion_speed">Speed %1$s</string>
+    <string name="settings_pv_motion_saver">Battery saver: animations off</string>
+    <string name="settings_pv_dock">Dock</string>
+    <string name="settings_pv_folders">Folders</string>
+    <string name="settings_pv_gestures">Swipes</string>
+    <string name="settings_pv_drawer">Drawer</string>
+    <string name="settings_pv_taskbar">Taskbar</string>
+    <string name="settings_pv_recents_motion">Cards</string>
+    <string name="settings_pv_recents_press">Press</string>
+    <string name="settings_pv_split">Split picker</string>
 </resources>

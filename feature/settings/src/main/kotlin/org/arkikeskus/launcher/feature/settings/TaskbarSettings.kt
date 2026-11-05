@@ -259,8 +259,6 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         icon = Icons.Rounded.Palette,
         sharedByBothDisplays = true,
     ) {
-        TaskbarPreview(s.taskbar.taskbarHandleStyle, s.taskbar.handles, s.taskbar.taskbarAnim)
-        ExpressiveRowDivider()
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_theme),
             options = listOf(
@@ -398,89 +396,6 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
     }
 
     ExpressiveCategoryContainer(
-        title = stringResource(R.string.settings_tb_group_split),
-        icon = Icons.Rounded.VerticalSplit,
-        sharedByBothDisplays = true,
-    ) {
-        val grantCommand = ShellSplit.grantCommand(context.packageName)
-        ExpressiveActionItem(
-            title = stringResource(R.string.settings_taskbar_split_setup),
-            description = if (splitReady) {
-                stringResource(R.string.settings_taskbar_split_ready)
-            } else {
-                stringResource(R.string.settings_taskbar_split_needed, grantCommand)
-            },
-            onClick = {
-                if (!splitReady) {
-                    val clipboard = context.getSystemService(ClipboardManager::class.java)
-                    runCatching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", grantCommand)) }
-                    Toast.makeText(context, R.string.settings_taskbar_split_copied, Toast.LENGTH_SHORT).show()
-                }
-            },
-        )
-        ExpressiveRowDivider()
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_taskbar_split_side),
-            options = listOf(
-                LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT to stringResource(R.string.settings_taskbar_split_side_left),
-                LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT to stringResource(R.string.settings_taskbar_split_side_right),
-            ),
-            selected = s.taskbar.splitSide,
-            onSelect = viewModel::setTaskbarSplitSide,
-            icon = null,
-        )
-        ExpressiveRowDivider()
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_taskbar_three_app),
-            subtitle = stringResource(R.string.settings_taskbar_three_app_desc),
-            checked = s.taskbar.threeApp,
-            onCheckedChange = viewModel::setTaskbarThreeApp,
-        )
-        ExpressiveRowDivider()
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_taskbar_split_controls),
-            subtitle = stringResource(R.string.settings_taskbar_split_controls_desc),
-            checked = s.taskbar.splitControls,
-            onCheckedChange = viewModel::setTaskbarSplitControls,
-        )
-        ExpressiveRowDivider()
-        ExpressiveSegmentedControl(
-            title = stringResource(R.string.settings_taskbar_recents_button),
-            options = listOf(
-                LauncherSettings.TASKBAR_RECENTS_OFF to stringResource(R.string.settings_taskbar_recents_button_off),
-                LauncherSettings.TASKBAR_RECENTS_SYSTEM to stringResource(R.string.settings_taskbar_recents_button_system),
-                LauncherSettings.TASKBAR_RECENTS_DESKTOP to stringResource(R.string.settings_taskbar_recents_button_desktop),
-                LauncherSettings.TASKBAR_RECENTS_FOLARK to stringResource(R.string.settings_taskbar_recents_button_folark),
-            ),
-            selected = s.taskbar.recentsButton,
-            onSelect = viewModel::setTaskbarRecentsButton,
-            icon = null,
-        )
-        ExpressiveRowDivider()
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_taskbar_quick_switch),
-            subtitle = stringResource(R.string.settings_taskbar_quick_switch_desc),
-            checked = s.taskbar.quickSwitch,
-            onCheckedChange = viewModel::setTaskbarQuickSwitch,
-        )
-        SettingsAdvanced {
-            ExpressiveSwitchRow(
-                title = stringResource(R.string.settings_taskbar_edge_snap),
-                subtitle = stringResource(R.string.settings_taskbar_edge_snap_desc),
-                checked = s.taskbar.edgeSnap,
-                onCheckedChange = viewModel::setTaskbarEdgeSnap,
-            )
-                ExpressiveRowDivider()
-            ExpressiveSwitchRow(
-                title = stringResource(R.string.settings_taskbar_system_drag),
-                subtitle = stringResource(R.string.settings_taskbar_system_drag_desc),
-                checked = s.taskbar.systemDrag,
-                onCheckedChange = viewModel::setTaskbarSystemDrag,
-            )
-        }
-    }
-
-    ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_tb_group_place),
         icon = Icons.Rounded.VerticalAlignBottom,
         sharedByBothDisplays = true,
@@ -591,7 +506,7 @@ private fun TaskbarPinnedPicker(
 
 /** A looping demo of the taskbar: it shows, holds, hides to the chosen pull handle, and repeats. */
 @Composable
-private fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
+internal fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
     val accent = MaterialTheme.colorScheme.primary
     var shown by remember { mutableStateOf(true) }
     val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
@@ -710,5 +625,100 @@ private fun DrawScope.previewChevrons(count: Int, color: Color) {
         val bottom = slotTop + (h / count) * 0.72f
         drawLine(color, Offset(cx - armW, bottom), Offset(cx, top), sw, StrokeCap.Round)
         drawLine(color, Offset(cx, top), Offset(cx + armW, bottom), sw, StrokeCap.Round)
+    }
+}
+
+/** Split screen from the taskbar: the one-time grant and how a drag from the bar splits. */
+@Composable
+internal fun TaskbarSplitCard(s: LauncherSettings, viewModel: SettingsViewModel) {
+    // Android's own taskbar chosen: none of Folark's taskbar settings apply.
+    if (s.taskbar.source == LauncherSettings.TASKBAR_SOURCE_SYSTEM) return
+    val context = LocalContext.current
+    var splitReady by remember { mutableStateOf(splitPermissionGranted(context)) }
+    LifecycleResumeEffect(Unit) {
+        splitReady = splitPermissionGranted(context)
+        onPauseOrDispose { }
+    }
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_tb_group_split),
+        icon = Icons.Rounded.VerticalSplit,
+        sharedByBothDisplays = true,
+    ) {
+        val grantCommand = ShellSplit.grantCommand(context.packageName)
+        ExpressiveActionItem(
+            title = stringResource(R.string.settings_taskbar_split_setup),
+            description = if (splitReady) {
+                stringResource(R.string.settings_taskbar_split_ready)
+            } else {
+                stringResource(R.string.settings_taskbar_split_needed, grantCommand)
+            },
+            onClick = {
+                if (!splitReady) {
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    runCatching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", grantCommand)) }
+                    Toast.makeText(context, R.string.settings_taskbar_split_copied, Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+        ExpressiveRowDivider()
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_taskbar_split_side),
+            options = listOf(
+                LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT to stringResource(R.string.settings_taskbar_split_side_left),
+                LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT to stringResource(R.string.settings_taskbar_split_side_right),
+            ),
+            selected = s.taskbar.splitSide,
+            onSelect = viewModel::setTaskbarSplitSide,
+            icon = null,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_three_app),
+            subtitle = stringResource(R.string.settings_taskbar_three_app_desc),
+            checked = s.taskbar.threeApp,
+            onCheckedChange = viewModel::setTaskbarThreeApp,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_split_controls),
+            subtitle = stringResource(R.string.settings_taskbar_split_controls_desc),
+            checked = s.taskbar.splitControls,
+            onCheckedChange = viewModel::setTaskbarSplitControls,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_taskbar_recents_button),
+            options = listOf(
+                LauncherSettings.TASKBAR_RECENTS_OFF to stringResource(R.string.settings_taskbar_recents_button_off),
+                LauncherSettings.TASKBAR_RECENTS_SYSTEM to stringResource(R.string.settings_taskbar_recents_button_system),
+                LauncherSettings.TASKBAR_RECENTS_DESKTOP to stringResource(R.string.settings_taskbar_recents_button_desktop),
+                LauncherSettings.TASKBAR_RECENTS_FOLARK to stringResource(R.string.settings_taskbar_recents_button_folark),
+            ),
+            selected = s.taskbar.recentsButton,
+            onSelect = viewModel::setTaskbarRecentsButton,
+            icon = null,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_taskbar_quick_switch),
+            subtitle = stringResource(R.string.settings_taskbar_quick_switch_desc),
+            checked = s.taskbar.quickSwitch,
+            onCheckedChange = viewModel::setTaskbarQuickSwitch,
+        )
+        SettingsAdvanced {
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_taskbar_edge_snap),
+                subtitle = stringResource(R.string.settings_taskbar_edge_snap_desc),
+                checked = s.taskbar.edgeSnap,
+                onCheckedChange = viewModel::setTaskbarEdgeSnap,
+            )
+                ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_taskbar_system_drag),
+                subtitle = stringResource(R.string.settings_taskbar_system_drag_desc),
+                checked = s.taskbar.systemDrag,
+                onCheckedChange = viewModel::setTaskbarSystemDrag,
+            )
+        }
     }
 }

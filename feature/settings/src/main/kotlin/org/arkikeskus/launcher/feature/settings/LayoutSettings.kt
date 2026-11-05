@@ -77,7 +77,7 @@ internal fun BadgePreview(icon: ImageBitmap?, showDots: Boolean, showCount: Bool
 }
 
 @Composable
-private fun DockPreview(opacity: Float, icon: ImageBitmap?) {
+internal fun DockPreview(opacity: Float, icon: ImageBitmap?) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -114,7 +114,6 @@ internal fun DisplayProfilesSection(
     onFoldAction: () -> Unit,
     onUnfoldAction: () -> Unit,
     onFoldTransition: () -> Unit,
-    onAppPairs: () -> Unit,
     onCopyProfile: () -> Unit,
 ) {
     val inner = screenType == ScreenType.INNER
@@ -212,56 +211,21 @@ internal fun DisplayProfilesSection(
             checked = s.fold.halfOpenedModeEnabled,
             onCheckedChange = viewModel::setHalfOpenedModeEnabled,
         )
-        ExpressiveRowDivider()
 
         if (s.fold.halfOpenedModeEnabled && hasHingeSensor(LocalContext.current)) {
+            ExpressiveRowDivider()
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_hinge_tilt),
                 subtitle = stringResource(R.string.settings_hinge_tilt_desc),
                 checked = s.fold.hingeTilt,
                 onCheckedChange = viewModel::setHingeTilt,
             )
-            ExpressiveRowDivider()
         }
-
-        ExpressiveActionItem(
-            title = stringResource(R.string.settings_app_pairs),
-            description = stringResource(R.string.settings_app_pairs_desc),
-            onClick = onAppPairs,
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_split_launch),
-            subtitle = stringResource(R.string.settings_split_launch_desc),
-            checked = s.launch.splitEnabled,
-            onCheckedChange = viewModel::setSplitLaunchEnabled,
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_floating_launch),
-            subtitle = stringResource(R.string.settings_floating_launch_desc),
-            checked = s.launch.floatingEnabled,
-            onCheckedChange = viewModel::setFloatingLaunchEnabled,
-        )
-        ExpressiveRowDivider()
-
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_aspect_ratio_menu),
-            subtitle = stringResource(R.string.settings_aspect_ratio_menu_desc),
-            checked = s.launch.aspectRatioMenu,
-            onCheckedChange = viewModel::setAspectRatioMenu,
-        )
-        ExpressiveRowDivider()
-
-        FloatingSizeRow(s = s, viewModel = viewModel)
-        MotoPopupGestureRow()
     }
 }
 
 @Composable
-internal fun GridAndDpiSection(
+internal fun GridSizeCard(
     s: LauncherSettings,
     viewModel: SettingsViewModel,
     screenType: ScreenType = LocalScreenType.current,
@@ -362,7 +326,15 @@ internal fun GridAndDpiSection(
         )
     }
 
-    // ---- Home folders: the closed tile, and the folder when opened ------------------------------
+}
+
+/** Home folders: the closed tile, and the folder when opened. */
+@Composable
+internal fun FoldersCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+) {
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_folders),
         icon = Icons.Rounded.Folder,
@@ -391,7 +363,6 @@ internal fun GridAndDpiSection(
             selected = s.folders.shape,
             onSelect = { viewModel.setFolderShape(it, screenType) },
         )
-        FolderStylePreview(s)
         ExpressiveRowDivider()
 
         ExpressiveSegmentedControl(
@@ -437,12 +408,13 @@ internal fun GridAndDpiSection(
 }
 
 @Composable
-internal fun DockAndTaskbarSection(
+internal fun DockCard(
     s: LauncherSettings,
     viewModel: SettingsViewModel,
     screenType: ScreenType = LocalScreenType.current,
-    previewIcon: ImageBitmap?,
+    previewIcon: ImageBitmap? = null,
 ) {
+    val overrides = LocalPreviewOverrides.current
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_dock_taskbar),
         icon = Icons.Rounded.Dock,
@@ -476,10 +448,8 @@ internal fun DockAndTaskbarSection(
             value = s.dock.backgroundOpacity,
             onValueChange = { viewModel.setDockBackgroundOpacity(it, screenType) },
             valueDisplay = "%d%%".format((s.dock.backgroundOpacity * 100).toInt()),
+            onDragValue = { overrides?.dockOpacity = it },
         )
-        ExpressiveRowDivider()
-
-        DockPreview(opacity = s.dock.backgroundOpacity, icon = previewIcon)
         // Dock alignment only exists on the wide inner screen; the outer screen's dock is full width.
         if (screenType == ScreenType.INNER) {
             ExpressiveRowDivider()
@@ -500,3 +470,48 @@ internal fun DockAndTaskbarSection(
 
 /** Installed apps the theme previews draw (home row, folder, dock). */
 internal const val PREVIEW_APP_COUNT = 12
+
+/** How apps can open beside or over each other: Scenes (app pairs), split and floating launches. */
+@Composable
+internal fun LaunchModesCard(s: LauncherSettings, viewModel: SettingsViewModel, onAppPairs: () -> Unit) {
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_launch_modes),
+        icon = Icons.Rounded.Devices,
+        subtitle = stringResource(R.string.settings_launch_modes_desc),
+        sharedByBothDisplays = true,
+    ) {
+        ExpressiveActionItem(
+            title = stringResource(R.string.settings_app_pairs),
+            description = stringResource(R.string.settings_app_pairs_desc),
+            onClick = onAppPairs,
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_launch),
+            subtitle = stringResource(R.string.settings_split_launch_desc),
+            checked = s.launch.splitEnabled,
+            onCheckedChange = viewModel::setSplitLaunchEnabled,
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_floating_launch),
+            subtitle = stringResource(R.string.settings_floating_launch_desc),
+            checked = s.launch.floatingEnabled,
+            onCheckedChange = viewModel::setFloatingLaunchEnabled,
+        )
+        ExpressiveRowDivider()
+
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_aspect_ratio_menu),
+            subtitle = stringResource(R.string.settings_aspect_ratio_menu_desc),
+            checked = s.launch.aspectRatioMenu,
+            onCheckedChange = viewModel::setAspectRatioMenu,
+        )
+        ExpressiveRowDivider()
+
+        FloatingSizeRow(s = s, viewModel = viewModel)
+        MotoPopupGestureRow()
+    }
+}

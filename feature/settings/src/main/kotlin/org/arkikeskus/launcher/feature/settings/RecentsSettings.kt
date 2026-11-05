@@ -160,8 +160,6 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         }
         RecentsMoreCards(edited, viewModel, root = root, onRootCheck = { rootCheck++ })
     }
-    // Split screen (drag to an edge, the split picker): used by Recents and the taskbar alike.
-    SplitScreenSection(s, viewModel)
 }
 
 /** Recents' cards below the first: look, the cards' extras, motion, split view, root and open apps. */
@@ -319,44 +317,6 @@ private fun RecentsMoreCards(s: LauncherSettings, viewModel: SettingsViewModel, 
     }
 
     ExpressiveCategoryContainer(
-        title = stringResource(R.string.settings_rc_group_split),
-        icon = Icons.Rounded.VerticalSplit,
-        sharedByBothDisplays = true,
-    ) {
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_recents_third_in_split),
-            subtitle = stringResource(R.string.settings_recents_third_in_split_desc),
-            checked = s.recents.thirdInSplit,
-            onCheckedChange = viewModel::setRecentsThirdInSplit,
-        )
-        ExpressiveRowDivider()
-        // A real third pane through Folark's Vector module in SystemUI (Recents and saved app pairs).
-        val splitContext = androidx.compose.ui.platform.LocalContext.current
-        val threeReady = remember(s.launch.threeAppSplit) { SplitThree.ready(splitContext) }
-        ExpressiveSwitchRow(
-            title = stringResource(R.string.settings_three_app_split),
-            subtitle = stringResource(
-                when {
-                    !s.launch.threeAppSplit -> R.string.settings_three_app_split_desc
-                    threeReady -> R.string.settings_three_app_split_active
-                    else -> R.string.settings_three_app_split_missing
-                },
-            ),
-            checked = s.launch.threeAppSplit,
-            onCheckedChange = viewModel::setThreeAppSplit,
-        )
-        if (s.launch.threeAppSplit) {
-            ExpressiveRowDivider()
-            ExpressiveSwitchRow(
-                title = stringResource(R.string.settings_three_app_native),
-                subtitle = stringResource(R.string.settings_three_app_native_desc),
-                checked = s.launch.threeAppNative,
-                onCheckedChange = viewModel::setThreeAppNative,
-            )
-        }
-    }
-
-    ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_rc_group_root),
         icon = Icons.Rounded.Memory,
         sharedByBothDisplays = true,
@@ -476,4 +436,46 @@ private fun RecentsCheckRow() {
             }
         },
     )
+}
+
+/** Split screen started from Recents (a card dragged to an edge, three-app splits). */
+@Composable
+internal fun RecentsSplitCard(s: LauncherSettings, viewModel: SettingsViewModel) {
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_rc_group_split),
+        icon = Icons.Rounded.VerticalSplit,
+        sharedByBothDisplays = true,
+    ) {
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_recents_third_in_split),
+            subtitle = stringResource(R.string.settings_recents_third_in_split_desc),
+            checked = s.recents.thirdInSplit,
+            onCheckedChange = viewModel::setRecentsThirdInSplit,
+        )
+        ExpressiveRowDivider()
+        // A real third pane through Folark's Vector module in SystemUI (Recents and saved app pairs).
+        val splitContext = androidx.compose.ui.platform.LocalContext.current
+        val threeReady = remember(s.launch.threeAppSplit) { SplitThree.ready(splitContext) }
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_three_app_split),
+            subtitle = stringResource(
+                when {
+                    !s.launch.threeAppSplit -> R.string.settings_three_app_split_desc
+                    threeReady -> R.string.settings_three_app_split_active
+                    else -> R.string.settings_three_app_split_missing
+                },
+            ),
+            checked = s.launch.threeAppSplit,
+            onCheckedChange = viewModel::setThreeAppSplit,
+        )
+        if (s.launch.threeAppSplit) {
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_three_app_native),
+                subtitle = stringResource(R.string.settings_three_app_native_desc),
+                checked = s.launch.threeAppNative,
+                onCheckedChange = viewModel::setThreeAppNative,
+            )
+        }
+    }
 }

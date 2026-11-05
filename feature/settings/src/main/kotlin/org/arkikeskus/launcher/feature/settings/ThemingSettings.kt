@@ -50,26 +50,19 @@ import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
 import java.io.File
 import kotlin.math.roundToInt
 
-/**
- * The theming cards of the Appearance page: one-tap presets, the look of menus and widget stacks,
- * the home backdrop and Folark's own widgets. Settings that are not about looks live as rows on
- * the page they belong to (see the *Row / *Rows functions below).
- */
+// The theming cards of the Theme page: one-tap presets, the look of menus and widget stacks, the
+// home backdrop and Folark's own widgets. Settings that are not about looks live as rows on the
+// page they belong to (see the *Row / *Rows functions below).
+
+/** Presets: each sets the drawer, folders, menus, dots, stack indicator and dock at once. */
 @Composable
-internal fun ThemingExtrasSection(
+internal fun ThemePresetsCard(
     s: LauncherSettings,
     viewModel: SettingsViewModel,
     screenType: ScreenType = LocalScreenType.current,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val presetApplied = stringResource(R.string.settings_theme_preset_applied)
-    val overrides = LocalPreviewOverrides.current
-
-    // ---- Liquid Glass everywhere: one switch and one level -----------------------------------------
-    LiquidGlassEverywhereSection(s, viewModel)
-
-    // ---- Presets: each sets the drawer, folders, menus, dots, stack indicator and dock at once ----
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_theme_presets),
         icon = Icons.Rounded.AutoAwesome,
@@ -92,8 +85,16 @@ internal fun ThemingExtrasSection(
             )
         }
     }
+}
 
-    // ---- Menus, widget stacks and notification dots ----------------------------------------------
+/** Menus and widget stacks. */
+@Composable
+internal fun MenusAndStacksCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+) {
+    val overrides = LocalPreviewOverrides.current
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_theme_details),
         icon = Icons.Rounded.Palette,
@@ -111,7 +112,6 @@ internal fun ThemingExtrasSection(
             selected = s.appearance.popupTheme,
             onSelect = { viewModel.setPopupTheme(it, screenType) },
         )
-        PopupThemePreview(s.appearance.popupTheme)
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
@@ -122,7 +122,6 @@ internal fun ThemingExtrasSection(
             valueDisplay = "%d dp".format(s.widgets.stackCornerRadius),
             onDragValue = { overrides?.stackCorner = it },
         )
-        CornerPreview(s)
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
@@ -155,8 +154,18 @@ internal fun ThemingExtrasSection(
             onCheckedChange = { viewModel.setStackShowPill(it, screenType) },
         )
     }
+}
 
-    // ---- Home backdrop: dim, blur and this display's own picture ---------------------------------
+/** Home backdrop: dim, blur and this display's own picture. */
+@Composable
+internal fun HomeBackdropCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val overrides = LocalPreviewOverrides.current
     val pickBackground = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -213,7 +222,6 @@ internal fun ThemingExtrasSection(
             subtitle = stringResource(R.string.settings_home_blur_desc),
             onDragValue = { overrides?.homeBlur = it },
         )
-        BackdropPreview(s)
         ExpressiveRowDivider()
 
         ExpressiveActionItem(
@@ -252,11 +260,6 @@ internal fun ThemingExtrasSection(
             )
         }
     }
-
-    TypographySection(s = s, viewModel = viewModel, screenType = screenType)
-
-    // ---- Folark's own widgets -----------------------------------------------------------------------
-    FolarkWidgetsSection(s = s, viewModel = viewModel)
 }
 
 /** Per-display typography customization card (font family, bold weight, font size scaling). */

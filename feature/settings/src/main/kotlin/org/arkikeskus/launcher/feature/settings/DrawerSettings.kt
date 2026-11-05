@@ -62,9 +62,6 @@ internal fun AppDrawerSection(
         icon = Icons.Rounded.Palette,
         subtitle = stringResource(R.string.settings_drawer_look_desc),
     ) {
-        DrawerPreview(s = s)
-        ExpressiveRowDivider()
-
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_drawer_style),
             options = listOf(

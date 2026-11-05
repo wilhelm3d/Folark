@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material.icons.rounded.ViewCarousel
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -22,52 +26,15 @@ import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import kotlin.math.roundToInt
 
-// The Appearance section (split out of SettingsScreen.kt).
+// The cards of the Look pages (Theme, Icons, Motion) and of the Home screen page, one function each.
 
+/** The look of these settings screens. */
 @Composable
-internal fun AppearanceSection(
+internal fun SettingsLookCard(
     s: LauncherSettings,
     viewModel: SettingsViewModel,
     screenType: ScreenType = LocalScreenType.current,
-    iconPacks: List<IconPackInfo>,
-    onIconPack: () -> Unit,
-    onCountStyle: () -> Unit,
-    onPeoplePrivacy: () -> Unit,
-    onBatchTimes: () -> Unit,
-    onFoldTransition: () -> Unit,
 ) {
-    // Values of the slider being dragged, for the previews (ThemePreview.kt).
-    val overrides = remember { PreviewOverrides() }
-    CompositionLocalProvider(LocalPreviewOverrides provides overrides) {
-        AppearanceSectionContent(
-            s = s,
-            viewModel = viewModel,
-            screenType = screenType,
-            iconPacks = iconPacks,
-            overrides = overrides,
-            onIconPack = onIconPack,
-            onCountStyle = onCountStyle,
-            onPeoplePrivacy = onPeoplePrivacy,
-            onBatchTimes = onBatchTimes,
-            onFoldTransition = onFoldTransition,
-        )
-    }
-}
-
-@Composable
-private fun AppearanceSectionContent(
-    s: LauncherSettings,
-    viewModel: SettingsViewModel,
-    screenType: ScreenType,
-    iconPacks: List<IconPackInfo>,
-    overrides: PreviewOverrides,
-    onIconPack: () -> Unit,
-    onCountStyle: () -> Unit,
-    onPeoplePrivacy: () -> Unit,
-    onBatchTimes: () -> Unit,
-    onFoldTransition: () -> Unit,
-) {
-    // The look of these settings screens, and a small home screen that shows every option below.
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_look),
         icon = Icons.Rounded.Palette,
@@ -82,22 +49,16 @@ private fun AppearanceSectionContent(
             selected = s.appearance.settingsStyle,
             onSelect = viewModel::setSettingsStyle,
         )
-        ExpressiveRowDivider()
-        Text(
-            text = stringResource(R.string.settings_preview_title),
-            color = LocalExpressivePalette.current.dim,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp, top = 2.dp),
-        )
-        HomeThemePreview(s)
     }
+}
 
-    // Presets, menu / stack / dot styling, the home backdrop and related switches (ThemingSettings.kt).
-    ThemingExtrasSection(s = s, viewModel = viewModel, screenType = screenType)
-
-    // Motorola's own settings and Motorola Weather (MotorolaSettings.kt; hidden on other phones).
-    MotorolaSection(s = s, viewModel = viewModel)
-
+/** Animations and fluid motion. */
+@Composable
+internal fun AnimationsCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+) {
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_animations_fluid_motion),
         icon = Icons.Rounded.AutoAwesome,
@@ -126,13 +87,20 @@ private fun AppearanceSectionContent(
 
         AnimationStyleRows(s = s, viewModel = viewModel)
     }
+}
 
-    HapticsSection(s = s, viewModel = viewModel)
-
+/** Dark mode, parallax and the folder glass. */
+@Composable
+internal fun BaseLookCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+) {
+    val overrides = LocalPreviewOverrides.current
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_appearance),
         icon = Icons.Rounded.Palette,
-        subtitle = stringResource(R.string.settings_category_appearance_desc),
+        subtitle = stringResource(R.string.settings_base_look_desc),
     ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_amoled_dark),
@@ -155,7 +123,7 @@ private fun AppearanceSectionContent(
             valueRange = 0f..50f,
             onValueChange = { viewModel.setGlassBlurRadius(it, screenType) },
             valueDisplay = "%d%%".format((s.drawer.glassBlurRadius * 2).roundToInt()),
-            onDragValue = { overrides.glassBlur = it },
+            onDragValue = { overrides?.glassBlur = it },
         )
         ExpressiveRowDivider()
 
@@ -165,11 +133,24 @@ private fun AppearanceSectionContent(
             valueRange = 0f..0.9f,
             onValueChange = { viewModel.setGlassDarkTint(it, screenType) },
             valueDisplay = "%d%%".format((s.drawer.glassDarkTint * 100).roundToInt()),
-            onDragValue = { overrides.glassTint = it },
+            onDragValue = { overrides?.glassTint = it },
         )
-        GlassBlurPreview(s)
+    }
+}
 
-        SettingsGroupHeading(stringResource(R.string.settings_heading_icons))
+/** Themed icons, icon pack and shape. */
+@Composable
+internal fun IconsCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+    iconPacks: List<IconPackInfo>,
+    onIconPack: () -> Unit,
+) {
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_heading_icons),
+        icon = Icons.Rounded.Apps,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_themed_icons),
@@ -223,8 +204,20 @@ private fun AppearanceSectionContent(
                 shared = true,
             )
         }
+    }
+}
 
-        SettingsGroupHeading(stringResource(R.string.settings_heading_status_bar))
+/** Folark's status bar and weather on home, and room at the ends of Android's status bar. */
+@Composable
+internal fun StatusBarCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+) {
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_heading_status_bar),
+        icon = Icons.Rounded.WbSunny,
+    ) {
         WeatherToggle(enabled = s.widgets.showWeather, onSetEnabled = { viewModel.setShowWeather(it, screenType) })
         ExpressiveRowDivider()
 
@@ -273,8 +266,24 @@ private fun AppearanceSectionContent(
                 onValueChange = viewModel::setSystemBarPaddingCover,
             )
         }
+    }
+}
 
-        SettingsGroupHeading(stringResource(R.string.settings_heading_widgets))
+/** Widgets on home: background, counts and the People widget. */
+@Composable
+internal fun WidgetsCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+    onCountStyle: () -> Unit,
+    onPeoplePrivacy: () -> Unit,
+    onBatchTimes: () -> Unit,
+) {
+    val overrides = LocalPreviewOverrides.current
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_heading_widgets),
+        icon = Icons.Rounded.Widgets,
+    ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_widget_tonal),
             checked = s.widgets.tonalBackground,
@@ -288,7 +297,7 @@ private fun AppearanceSectionContent(
             onValueChange = { viewModel.setWidgetBackgroundOpacity((it * 20f).roundToInt() / 20f) },
             valueDisplay = "%d%%".format((s.widgets.backgroundOpacity * 100).roundToInt()),
             subtitle = stringResource(R.string.settings_widget_background_opacity_desc),
-            onDragValue = { overrides.widgetOpacity = it },
+            onDragValue = { overrides?.widgetOpacity = it },
         )
         ExpressiveRowDivider()
 
@@ -342,8 +351,20 @@ private fun AppearanceSectionContent(
                 onClick = onBatchTimes,
             )
         }
+    }
+}
 
-        SettingsGroupHeading(stringResource(R.string.settings_heading_home_pages))
+/** Home pages: the page indicator and the lock. */
+@Composable
+internal fun HomePagesCard(
+    s: LauncherSettings,
+    viewModel: SettingsViewModel,
+    screenType: ScreenType = LocalScreenType.current,
+) {
+    ExpressiveCategoryContainer(
+        title = stringResource(R.string.settings_heading_home_pages),
+        icon = Icons.Rounded.ViewCarousel,
+    ) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_page_indicator),
             checked = s.home.showPageIndicator,
@@ -359,3 +380,4 @@ private fun AppearanceSectionContent(
         )
     }
 }
+

@@ -64,9 +64,8 @@ private val SELECT_LABELS = listOf(
 @Composable
 internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel) {
     var dragSpeed by remember { mutableStateOf<Float?>(null) }
+    val overrides = LocalPreviewOverrides.current
     val speed = dragSpeed ?: s.recents.animationSpeed
-    RecentsMotionPreview(s.recents.enterAnimation, s.recents.selectAnimation, speed)
-    ExpressiveRowDivider()
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_recents_enter),
         options = ENTER_LABELS.map { (key, label) -> key to stringResource(label) },
@@ -87,7 +86,7 @@ internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel
         onValueChange = viewModel::setRecentsAnimationSpeed,
         valueRange = LauncherSettings.MIN_RECENTS_ANIM_SPEED..LauncherSettings.MAX_RECENTS_ANIM_SPEED,
         valueDisplay = "%.1f×".format(speed),
-        onDragValue = { dragSpeed = it },
+        onDragValue = { dragSpeed = it; overrides?.recentsSpeed = it },
     )
     ExpressiveRowDivider()
     ExpressiveSegmentedControl(
@@ -96,7 +95,6 @@ internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel
         selected = s.recents.pressAnimation,
         onSelect = viewModel::setRecentsPressAnimation,
     )
-    PressPreview(s.recents.pressAnimation, speed)
     ExpressiveRowDivider()
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_recents_menu_motion),
@@ -125,7 +123,7 @@ private val PRESS_LABELS = listOf(
 
 /** Three buttons to press, answering with the chosen effect. */
 @Composable
-private fun PressPreview(effect: String, speed: Float) {
+internal fun PressPreview(effect: String, speed: Float) {
     val accent = LocalAccent.current
     val palette = LocalExpressivePalette.current
     androidx.compose.runtime.CompositionLocalProvider(
@@ -153,7 +151,7 @@ private fun PressPreview(effect: String, speed: Float) {
 }
 
 @Composable
-private fun RecentsMotionPreview(enter: String, select: String, speed: Float) {
+internal fun RecentsMotionPreview(enter: String, select: String, speed: Float) {
     val palette = LocalExpressivePalette.current
     val accent = LocalAccent.current
     var play by remember { mutableIntStateOf(0) }
