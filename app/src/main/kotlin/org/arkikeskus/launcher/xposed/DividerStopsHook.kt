@@ -43,6 +43,17 @@ internal object DividerStopsHook {
     @Volatile private var on = true
     /** The divider stays where it is let go, between [FREE_FROM] and [FREE_TO] of the screen. */
     @Volatile private var free = true
+
+    /**
+     * Until when (uptime) Motorola's own divider animation runs (to peek, half and half, closing,
+     * its three-app layouts): Folark's sizing stays out of it then. Motorola keeps resizing data
+     * from frame to frame (StageUISpecs), and switching layouts under it mid-way crashed System UI.
+     */
+    @Volatile private var motoUntil = 0L
+    /** Set while Folark itself moves the divider (its own snaps don't count as Motorola's). */
+    @Volatile private var ours = false
+
+    private fun motoMoving(): Boolean = android.os.SystemClock.uptimeMillis() < motoUntil
     @Volatile private var asked = false
     private var log: (String) -> Unit = {}
     private val worker by lazy { Handler(HandlerThread("folark-divider-stops").apply { start() }.looper) }
@@ -69,6 +80,12 @@ internal object DividerStopsHook {
     private const val LAYOUT_3 = "com.android.wm.shell.common.split.SplitLayoutCarousel3Apps"
     /** How long a let-go divider takes to settle (it is already where it stays). */
     private const val FREE_SNAP_MS = 120
+    /** How long after Motorola starts a divider animation Folark's sizing keeps out. */
+    private const val MOTO_WINDOW_MS = 900L
+    /** Snap positions of Folark's layouts: ⅓, ⅔ (two apps) and three apps all on screen. */
+    private val FOLARK_SNAPS = setOf(0, 2, 5, 6)
+    /** Whether the snapToTarget running on this thread turned [ours] on (and so turns it off). */
+    private val snapSetOurs = ThreadLocal<Boolean>()
     private const val FIRST = 0.33f
     private const val SECOND = 0.67f
 
@@ -113,7 +130,7 @@ internal object DividerStopsHook {
             hooked += runCatching {
                 XposedBridge.hookAllMethods(algorithm, "getSplitStateByDividerPositions", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        if (!free) return
+                        if (!free || motoMoving()) return
                         runCatching {
                             val result = param.result as? Int ?: return
                             if (result == -1) return
@@ -126,7 +143,7 @@ internal object DividerStopsHook {
             hooked += runCatching {
                 XposedBridge.hookAllMethods(algorithm, "calculateNearestSplitSnapPosition", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        if (!free) return
+                        if (!free || motoMoving()) return
                         runCatching {
                             val result = param.result as? Int ?: return
                             if (result != 6 && result != 7 && result != 21) return
@@ -160,7 +177,91 @@ internal object DividerStopsHook {
                 }).size
             }.getOrDefault(0)
         }
+        // Motorola's own divider animations (any not started by Folark's free divider).
+        for (name in listOf(LAYOUT_2, LAYOUT_3)) {
+            val cls = runCatching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
+            // A snap to one of Folark's layouts (⅓ / ⅔, three apps all on screen) is Folark's own,
+            // whoever asked for it (the free divider, the size buttons, 33/33/33).
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(cls, "snapToTarget", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val targets = param.args.filter { it != null && it !is Int && it !is android.view.animation.Interpolator }
+                        val snaps = targets.map { field(it!!, "snapPosition") as? Int }
+                        val mine = snaps.isNotEmpty() && snaps.all { it in FOLARK_SNAPS } && !ours
+                        snapSetOurs.set(mine)
+                        if (mine) ours = true
+                    }
+
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (snapSetOurs.get() == true) ours = false
+                        snapSetOurs.set(false)
+                    }
+                }).size
+            }.getOrDefault(0)
+            val names = cls.declaredMethods.map { it.name }.filter { it.startsWith("flingDividerPosition") }.toSet()
+            for (name in names) {
+                hooked += runCatching {
+                    XposedBridge.hookAllMethods(cls, name, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            if (!ours) motoUntil = android.os.SystemClock.uptimeMillis() + MOTO_WINDOW_MS
+                        }
+                    }).size
+                }.getOrDefault(0)
+            }
+        }
         if (algorithm != null) log("free divider: hooked $hooked method(s)")
+    }
+
+    /**
+     * Three apps in the all-on-screen layout (state 5, even or as let go): args[4..6] the apps
+     * left to right (or top to bottom), args[7] / args[8] the dividers, at the divider positions
+     * args[1] / args[2] — as Motorola's own code does when the dividers rest (its resizing branch
+     * kept the old widths, so a moved divider left apps cut off).
+     */
+    private fun plainBoundsThree(manager: Any, args: Array<Any?>): Boolean {
+        val layout = field(manager, "mSplitLayout") ?: return false
+        if (!layout.javaClass.name.endsWith("SplitLayoutCarousel3Apps")) return false
+        val p0 = args[1] as? Int ?: return false
+        val p1 = args[2] as? Int ?: return false
+        val rects = (4..8).map { args[it] as? Rect ?: return false }
+        val root = field(manager, "mRootBounds") as? Rect ?: return false
+        val leftRight = field(manager, "mIsLeftRightSplit") as? Boolean ?: return false
+        val size = field(manager, "mDividerSize") as? Int ?: return false
+        val dividerBounds = generateSequence<Class<*>>(manager.javaClass) { it.superclass }
+            .flatMap { it.declaredMethods.asSequence() }
+            .firstOrNull { it.name == "calculateDividerBounds" && it.parameterTypes.size == 2 }
+            ?.apply { isAccessible = true } ?: return false
+        if (args[9] != true) clearSpecs(manager)
+        val first = minOf(p0, p1)
+        val second = maxOf(p0, p1)
+        rects.forEach { it.set(root) }
+        val (a, b, c, d0, d1) = rects
+        if (leftRight) {
+            val at0 = first + root.left
+            val at1 = second + root.left
+            dividerBounds.invoke(manager, at0, d0)
+            dividerBounds.invoke(manager, at1, d1)
+            a.right = at0
+            b.left = at0 + size
+            b.right = at1
+            c.left = at1 + size
+        } else {
+            val at0 = first + root.top
+            val at1 = second + root.top
+            dividerBounds.invoke(manager, at0, d0)
+            dividerBounds.invoke(manager, at1, d1)
+            a.bottom = at0
+            b.top = at0 + size
+            b.bottom = at1
+            c.top = at1 + size
+        }
+        return true
+    }
+
+    /** Motorola's per-frame resizing data (StageUISpecs) cleared, so surfaces follow the bounds. */
+    private fun clearSpecs(manager: Any?) {
+        manager ?: return
+        runCatching { (field(field(manager, "mImmersiveSurfaceEffectPolicy")!!, "mStageUISpecs") as? MutableCollection<*>)?.clear() }
     }
 
     /** The screen's length along the split (width side by side, else height), or null. */
@@ -192,7 +293,12 @@ internal object DividerStopsHook {
             .flatMap { it.declaredMethods.asSequence() }
             .firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 4 } ?: return false
         snap.isAccessible = true
-        snap.invoke(layout, position, target, FREE_SNAP_MS, android.view.animation.PathInterpolator(0.4f, 0f, 0.2f, 1f))
+        ours = true
+        try {
+            snap.invoke(layout, position, target, FREE_SNAP_MS, android.view.animation.PathInterpolator(0.4f, 0f, 0.2f, 1f))
+        } finally {
+            ours = false
+        }
         return true
     }
 
@@ -223,7 +329,14 @@ internal object DividerStopsHook {
         snap.isAccessible = true
         val from0 = if (index == 0) position else now[0]
         val from1 = if (index == 1) position else now[1]
-        snap.invoke(layout, minOf(from0, from1), t0, maxOf(from0, from1), t1, FREE_SNAP_MS, android.view.animation.PathInterpolator(0.4f, 0f, 0.2f, 1f))
+        // Motorola's resizing effect from the drag off: the three apps take the dividers' places.
+        clearSpecs(field(layout, "mSplitLayoutManager"))
+        ours = true
+        try {
+            snap.invoke(layout, minOf(from0, from1), t0, maxOf(from0, from1), t1, FREE_SNAP_MS, android.view.animation.PathInterpolator(0.4f, 0f, 0.2f, 1f))
+        } finally {
+            ours = false
+        }
         return true
     }
 
@@ -241,11 +354,15 @@ internal object DividerStopsHook {
         val hooked = runCatching {
             XposedBridge.hookAllMethods(cls, "updateBoundsWithSnapPositionStageUISpec", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    if ((!on && !free) || param.args.size != 7) return
-                    val state = param.args[0] as? Int ?: return
-                    if (state != SNAP_FIRST_THIRD && state != SNAP_SECOND_THIRD) return
+                    if ((!on && !free) || motoMoving()) return
+                    val state = param.args.getOrNull(0) as? Int ?: return
                     runCatching {
-                        if (plainBounds(param.thisObject, param.args)) param.result = null
+                        when {
+                            param.args.size == 7 && (state == SNAP_FIRST_THIRD || state == SNAP_SECOND_THIRD) ->
+                                if (plainBounds(param.thisObject, param.args)) param.result = null
+                            param.args.size == 10 && state == STATE_THREE_EVEN ->
+                                if (plainBoundsThree(param.thisObject, param.args)) param.result = null
+                        }
                     }.onFailure { log("divider stops: Motorola's sizing kept ($it)") }
                 }
             }).size
@@ -272,8 +389,9 @@ internal object DividerStopsHook {
             .flatMap { it.declaredMethods.asSequence() }
             .firstOrNull { it.name == "calculateDividerBounds" && it.parameterTypes.size == 2 }
             ?.apply { isAccessible = true } ?: return false
-        // Motorola's resizing effect (scaled / pushed-out surfaces) off for this layout.
-        runCatching { (field(field(manager, "mImmersiveSurfaceEffectPolicy")!!, "mStageUISpecs") as? MutableCollection<*>)?.clear() }
+        // Motorola's resizing effect (scaled / pushed-out surfaces) off for this layout, once the
+        // divider rests (while it moves Motorola keeps using it, as its own code does).
+        if (args[6] != true) clearSpecs(manager)
         divider.set(root)
         first.set(root)
         second.set(root)

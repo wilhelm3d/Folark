@@ -62,6 +62,25 @@ object SplitDiagnostics {
             val at = a.substringAfterLast(" at ").toLongOrNull()
             if (at != null) a.substringBeforeLast(" at ") + " " + time(at) else a
         } ?: "none yet"))
+        // What System UI died of last (Android's crash log, through root): the cause of a restart.
+        if (root) {
+            val crash = runCatching { lastSystemUiCrash() }.getOrNull()
+            appendLine("10. Last System UI crash: " + (crash ?: "none in Android's crash log"))
+        }
+    }
+
+    /** The newest System UI crash in Android's crash log (logcat -b crash): its first lines. */
+    private fun lastSystemUiCrash(): String? {
+        val log = RootShell.run("logcat -b crash -d -v time 2>/dev/null | tail -n 400", 4_000L) ?: return null
+        val lines = log.lines()
+        val start = lines.indexOfLast { it.contains("FATAL EXCEPTION") || it.contains("Process: com.android.systemui") }
+            .let { at -> if (at < 0) return null else at }
+        // Back to the block's "FATAL EXCEPTION" line, then forward to the first Folark / Motorola frames.
+        val head = (start downTo maxOf(0, start - 3)).firstOrNull { lines[it].contains("FATAL EXCEPTION") } ?: start
+        val block = lines.drop(head).takeWhile { it.contains("AndroidRuntime") || it.isBlank() }.filter { it.isNotBlank() }
+        if (block.none { it.contains("com.android.systemui") }) return null
+        val text = block.take(18).joinToString("\n   ") { it.substringAfter("): ", it).trim() }
+        return "\n   $text"
     }
 
     private fun engineName(engine: Int) = when (engine) {

@@ -439,13 +439,23 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * [third] dropped on the split [pair]: the pair made again (left and right as on the card) and
+     * the third added once it has settled, as the split drawer does — bringing the old split back
+     * first left System UI no split to add to (the third app floated, Recents went home).
+     */
     fun addThird(pair: RecentsCard, third: RecentsCard) {
         if (third.tasks.isEmpty()) return
+        if (pair.tasks.size < 2) {
+            openTogether(listOf(pair, third), thirdInSplit = true, threeApp = true)
+            return
+        }
         appScope.launch {
-            openNow(pair)
-            val joined = settings.value.launch.threeAppNative &&
-                splitCoordinator.addThird(third.splitApp(0), native = true, orSideStage = false)
-            if (!joined) popUp(third)
+            val got = splitCoordinator.three(pair.splitApp(0), pair.splitApp(1), third.splitApp(0), native = true)
+            when (got) {
+                0 -> openNow(pair)
+                2 -> popUp(third)
+            }
         }
     }
 
