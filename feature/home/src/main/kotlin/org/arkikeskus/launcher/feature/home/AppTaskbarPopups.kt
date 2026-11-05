@@ -73,6 +73,16 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
                         }
                     }
                 }
+                // Three apps: a third each (Motorola's even three-app layout, through the module).
+                if (tasks.size == 3 && SplitThree.ready(context)) {
+                    rows += context.getString(R.string.taskbar_split_three_even) to {
+                        scope.launch {
+                            if (!SplitThree.snap(context, SplitThree.SNAP_THREE_EVEN)) {
+                                Toast.makeText(context, R.string.taskbar_split_three_even_failed, Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }
                 tasks.forEach { task ->
                     val label = allApps.firstOrNull { it.packageName == task.packageName }?.label ?: task.packageName
                     rows += context.getString(R.string.taskbar_split_keep, label) to {

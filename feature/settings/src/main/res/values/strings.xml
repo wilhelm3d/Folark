@@ -1123,5 +1123,7 @@
     <string name="settings_backup_share_desc">Send your whole setup to another phone (Quick Share, a message, mail); open it there with Restore</string>
     <string name="settings_backup_share_failed">The setup couldn\'t be packed. Try again</string>
     <string name="settings_divider_stops">Divider stops ⅓ / ½ / ⅔</string>
+    <string name="settings_split_three_even">Three apps a third each</string>
+    <string name="settings_split_three_even_desc">A third app joining a split makes three equal thirds (33 / 33 / 33) instead of Motorola\'s carousel, where one app shrinks to a strip (needs Folark\'s Vector module)</string>
     <string name="settings_divider_stops_desc">The split divider rests at 33 %, 50 % and 67 %, the sizes Motorola\'s split screen lays apps out at (needs Folark\'s Vector module; from the next split)</string>
 </resources>

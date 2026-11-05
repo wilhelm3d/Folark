@@ -207,6 +207,9 @@ class SplitCoordinator @Inject constructor(
             // caller floats it over the split.
             if (ok && thirdLanded(third.copy(taskId = id), route.root)) {
                 Haptics.play(context, Haptics.Event.SPLIT)
+                // Motorola starts three apps as its carousel (one a 10 % strip): a third each instead.
+                val even = runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.threeEven }.getOrDefault(true)
+                if (even) SplitThree.snap(context, SplitThree.SNAP_THREE_EVEN)
                 return true
             }
         }

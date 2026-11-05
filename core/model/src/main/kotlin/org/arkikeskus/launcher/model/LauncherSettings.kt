@@ -660,8 +660,10 @@ data class LauncherSettings(
         val dropZones: DropZones = DropZones(),
         /** An "Undo split" pill on the taskbar for a few seconds after a split forms. */
         val splitUndo: Boolean = true,
-        /** The split divider stops at 30 %, 50 % and 70 % (Folark's Vector module in System UI). */
+        /** The split divider stops at 33 %, 50 % and 67 % (Folark's Vector module in System UI). */
         val dividerStops: Boolean = true,
+        /** A third app joining a split makes three equal thirds, not Motorola's carousel (needs the module). */
+        val threeEven: Boolean = true,
         /** Divider sizes (⅓, ½, ⅔) in the taskbar's split menu (needs Folark's Vector module). */
         val splitRatioMenu: Boolean = true,
         /** "Open with …": opening an app you often pair offers its usual partner for a few seconds. */

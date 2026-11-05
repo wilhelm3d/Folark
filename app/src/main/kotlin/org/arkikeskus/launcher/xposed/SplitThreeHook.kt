@@ -65,6 +65,17 @@ internal object SplitThreeHook {
     /** How far (of the divider's whole travel) a stop may be from a third and still count as one. */
     private const val THIRD_REACH = 0.08f
 
+    /** Motorola's split states (SplitState): three apps even, its carousel both ways, immersive. */
+    private const val SNAP_ALGORITHM = "com.android.wm.shell.common.split.DividerSnapAlgorithm"
+    private const val STATE_THREE_EVEN = 5
+    private const val STATE_CAROUSEL_RIGHT = 6
+    private const val STATE_CAROUSEL_LEFT = 7
+    private const val STATE_IMMERSIVE_3 = 21
+    /** How far (of the screen) a divider may be from an even stop and still count (2 %). */
+    private const val THREE_EVEN_REACH = 0.02f
+    /** How long the three-app layout gets to appear after a third app joined. */
+    private const val THREE_WAIT_TRIES = 30
+
     private const val LISTENER = "com.android.wm.shell.splitscreen.SplitScreen\$SplitScreenListener"
 
     @Volatile private var controller: Any? = null
@@ -94,7 +105,55 @@ internal object SplitThreeHook {
                 XposedBridge.hookAllMethods(cls, "isSplitScreenVisible", capture).size
         }.getOrDefault(0)
         log("split hook: hooked $hooked SystemUI method(s)")
+        hookThreeEven(loader)
     }
+
+    /**
+     * Motorola's three-app split has an even layout (state 5: dividers at 33 % and 66 %, all three
+     * apps on screen), but on the Razr Fold it works out the layout from the two divider positions
+     * (DividerSnapAlgorithm.calculateNearestSplitSnapPosition) and only ever answers its carousel
+     * (6 / 7: one app a 10 % strip) or immersive view (21). With both dividers at the even stops it
+     * now answers 5, so the even layout Motorola already has is used, and kept on rotation (the
+     * dividers are put back at state 5's stops). Anywhere else nothing changes.
+     */
+    private fun hookThreeEven(loader: ClassLoader) {
+        val cls = runCatching { XposedHelpers.findClass(SNAP_ALGORITHM, loader) }.getOrNull() ?: return
+        val hooked = runCatching {
+            XposedBridge.hookAllMethods(cls, "calculateNearestSplitSnapPosition", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    runCatching {
+                        val result = param.result as? Int ?: return
+                        if (result != STATE_CAROUSEL_LEFT && result != STATE_CAROUSEL_RIGHT && result != STATE_IMMERSIVE_3) return
+                        val p0 = param.args.getOrNull(0) as? Int ?: return
+                        val p1 = param.args.getOrNull(1) as? Int ?: return
+                        if (atThreeEven(param.thisObject, minOf(p0, p1), maxOf(p0, p1))) param.result = STATE_THREE_EVEN
+                    }
+                }
+            }).size
+        }.getOrDefault(0)
+        log("split hook: three even ${if (hooked > 0) "on" else "not found"}")
+    }
+
+    /** Whether divider positions [first] and [second] sit at state 5's stops (33 % / 66 %). */
+    private fun atThreeEven(algorithm: Any, first: Int, second: Int): Boolean {
+        val (at0, at1) = threeEvenStops(algorithm) ?: return false
+        val leftRight = field(algorithm, "mIsLeftRightSplit") as? Boolean ?: true
+        val span = (field(algorithm, if (leftRight) "mDisplayWidth" else "mDisplayHeight") as? Int) ?: 0
+        val slack = maxOf(SNAP_SLACK_PX, (span * THREE_EVEN_REACH).toInt())
+        return kotlin.math.abs(first - at0) <= slack && kotlin.math.abs(second - at1) <= slack
+    }
+
+    /** State 5's two divider stops, as Motorola works them out (getDividerSnapTarget(5, 0 / 1)). */
+    private fun threeEvenStops(algorithm: Any): Pair<Int, Int>? = runCatching {
+        val get = methods(algorithm.javaClass).first {
+            it.name == "getDividerSnapTarget" && it.parameterTypes.size == 2 &&
+                it.parameterTypes.all { t -> t == Int::class.javaPrimitiveType }
+        }
+        get.isAccessible = true
+        val a = field(get.invoke(algorithm, STATE_THREE_EVEN, 0)!!, "position") as Int
+        val b = field(get.invoke(algorithm, STATE_THREE_EVEN, 1)!!, "position") as Int
+        minOf(a, b) to maxOf(a, b)
+    }.getOrNull()
 
     private fun keep(found: Any?) {
         if (found == null || controller != null) return
@@ -159,6 +218,10 @@ internal object SplitThreeHook {
 
         // A layout change for the split showing now (peek, a third, half and half…).
         val snap = intent.getIntExtra(SplitThree.EXTRA_SNAP, -1)
+        if (snap == SplitThree.SNAP_THREE_EVEN) {
+            executor.execute { snapThreeEven(context, c, request, 0) }
+            return
+        }
         if (snap >= 0) {
             val forTask = intent.getIntExtra(SplitThree.EXTRA_SNAP_FOR_TASK, -1)
             executor.execute { snapTo(context, c, request, snap, 0, forTask) }
@@ -305,6 +368,57 @@ internal object SplitThreeHook {
             return
         }
         reply(context, request, ok)
+    }
+
+    /**
+     * On WM Shell's thread: the three-app split showing now (or about to, after a third app joined)
+     * to three equal thirds, both dividers gliding to Motorola's own even stops
+     * (SplitLayoutCarousel3Apps.snapToTarget, as when dropped by a finger). Its end works out the
+     * layout from the dividers, which [hookThreeEven] answers with the even one. Answered once it
+     * settled: ok only when Motorola's split state is the even one.
+     */
+    private fun snapThreeEven(context: Context, c: Any, request: String, tries: Int) {
+        val manager = runCatching { splitManager(c) }.getOrNull()
+        val layout = manager?.let { field(it, "mSplitLayout") }
+        val three = layout != null && layout.javaClass.name.endsWith("Carousel3Apps") &&
+            (field(layout, "mDividerPositions") as? IntArray)?.size == 2
+        if (!three) {
+            if (tries < THREE_WAIT_TRIES) {
+                Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({ snapThreeEven(context, c, request, tries + 1) }, WAIT_STEP_MS)
+            } else {
+                reply(context, request, false, detail = "no three-app split showing")
+            }
+            return
+        }
+        val failure = runCatching {
+            val algorithm = field(layout, "mDividerSnapAlgorithm") ?: error("no DividerSnapAlgorithm")
+            val get = methods(algorithm.javaClass).first {
+                it.name == "getDividerSnapTarget" && it.parameterTypes.size == 2 &&
+                    it.parameterTypes.all { t -> t == Int::class.javaPrimitiveType }
+            }
+            get.isAccessible = true
+            val first = get.invoke(algorithm, STATE_THREE_EVEN, 0) ?: error("no even stop")
+            val second = get.invoke(algorithm, STATE_THREE_EVEN, 1) ?: error("no even stop")
+            val positions = field(layout, "mDividerPositions") as IntArray
+            val method = methods(layout.javaClass).first { it.name == "snapToTarget" && it.parameterTypes.size == 6 }
+            method.isAccessible = true
+            method.invoke(layout, positions[0], first, positions[1], second, SNAP_MS, PathInterpolator(0.2f, 0f, 0f, 1f))
+        }.exceptionOrNull()
+        if (failure != null) {
+            log("split layout: can't make three even: ${reason(failure)}")
+            return reply(context, request, false, detail = reason(failure))
+        }
+        Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({
+            val state = runCatching { field(field(manager, "mSplitState")!!, "mState") as Int }.getOrNull()
+            if (state == STATE_THREE_EVEN) reply(context, request, true)
+            else reply(context, request, false, detail = "the dividers went back (split state $state)")
+        }, SNAP_MS + SNAP_SETTLE_MS)
+    }
+
+    /** WM Shell's SplitLayoutManager (Motorola), which holds the current split layout and state. */
+    private fun splitManager(c: Any): Any {
+        val stage = field(c, "mStageCoordinator") ?: error("no StageCoordinator")
+        return field(stage, "mSplitLayoutManager") ?: error("no SplitLayoutManager")
     }
 
     /**

@@ -367,6 +367,7 @@ internal object Keys {
     val DROP_ZONE_HAPTICS = booleanPreferencesKey("drop_zone_haptics")
     val SPLIT_UNDO = booleanPreferencesKey("split_undo")
     val DIVIDER_STOPS = booleanPreferencesKey("divider_stops")
+    val SPLIT_THREE_EVEN = booleanPreferencesKey("split_three_even")
     val SPLIT_RATIO_MENU = booleanPreferencesKey("split_ratio_menu")
     val SPLIT_OPEN_WITH = booleanPreferencesKey("split_open_with")
     val NOTIFICATION_SPLIT = booleanPreferencesKey("notification_split")

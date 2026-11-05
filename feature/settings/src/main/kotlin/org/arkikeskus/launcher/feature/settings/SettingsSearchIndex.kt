@@ -166,6 +166,7 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_drop_zone_haptics, R.string.settings_drop_zone_haptics_desc, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_split_undo, R.string.settings_split_undo_desc, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_divider_stops, R.string.settings_divider_stops_desc, SettingsCategory.RECENTS),
+    SettingsSearchEntry(R.string.settings_split_three_even, R.string.settings_split_three_even_desc, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_split_ratio_menu, R.string.settings_split_ratio_menu_desc, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_notification_split, R.string.settings_notification_split_desc, SettingsCategory.RECENTS),
     SettingsSearchEntry(R.string.settings_split_open_with, R.string.settings_split_open_with_desc, SettingsCategory.RECENTS),

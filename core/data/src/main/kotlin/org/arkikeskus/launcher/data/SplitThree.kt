@@ -67,6 +67,11 @@ object SplitThree {
     const val SNAP_PEEK_RIGHT = 3
     /** Android's peek view: the right app 90%, the left one peeking in from the edge (SNAP_TO_2_10_90). */
     const val SNAP_PEEK_LEFT = 4
+    /**
+     * Three apps, a third each (Motorola's SNAP_TO_3_33_33_33): both dividers to the even stops
+     * of the three-app split showing now. Not a stop of the two-app divider.
+     */
+    const val SNAP_THREE_EVEN = 5
 
     /** Provider methods SystemUI calls on Folark: "ready" when it starts, "result" per request. */
     const val METHOD_READY = "split3_ready"
@@ -236,7 +241,7 @@ object SplitThree {
         if (Build.VERSION.SDK_INT < 34) return false
         return send(context, "snap") { request ->
             // Not half and half: its answer tells whether sizes hold here.
-            if (snap != SNAP_EVEN) snapRequests[request] = true
+            if (snap != SNAP_EVEN && snap != SNAP_THREE_EVEN) snapRequests[request] = true
             putExtra(EXTRA_SNAP, snap)
             if (forTask > 0) putExtra(EXTRA_SNAP_FOR_TASK, forTask)
         }
