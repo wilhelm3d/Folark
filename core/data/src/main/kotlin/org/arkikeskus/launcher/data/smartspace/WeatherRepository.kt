@@ -116,8 +116,9 @@ class WeatherRepository @Inject constructor(
 
     init {
         scope.launch {
-            runCatching {
-                settingsRepository.weatherLocation.collect { raw ->
+            // A failure handles one change of place, not the whole watch.
+            settingsRepository.weatherLocation.collect { raw ->
+                runCatching {
                     val chosen = WeatherPlace.parse(raw)
                     if (chosen != place) {
                         place = chosen

@@ -958,7 +958,10 @@ internal fun WidgetPreview(
                 view.onRenderFailed = { failedRemote = true }
                 val w = (widthDp * density).toInt().coerceAtLeast(1)
                 val h = (heightDp * density).toInt().coerceAtLeast(1)
-                view.render(preview.remote!!, provider!!, w, h)
+                // Read once: the preview of a previous choice can still be here for a frame.
+                val remote = preview.remote
+                val info = provider
+                if (remote != null && info != null) view.render(remote, info, w, h)
                 onSnapshot { view.capture() }
             },
             modifier = modifier,

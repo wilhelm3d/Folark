@@ -166,6 +166,9 @@ internal fun WidgetEditOverlay(
     // laid out at that size as it goes (live resize); it settles on the cells when let go.
     var live by remember(widget.rowId) { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     val currentLiveBounds by rememberUpdatedState(onLiveBounds)
+    // Edit mode left mid-drag (the gesture is cancelled without a callback): the widget goes back
+    // to its cells instead of staying at the dragged size.
+    DisposableEffect(widget.rowId) { onDispose { currentLiveBounds(null) } }
     val cellsRect = androidx.compose.ui.geometry.Rect(cx * cellW, cy * cellH, (cx + sx) * cellW, (cy + sy) * cellH)
     val cellsNow by rememberUpdatedState(cellsRect)
     val shownRect = live ?: cellsRect

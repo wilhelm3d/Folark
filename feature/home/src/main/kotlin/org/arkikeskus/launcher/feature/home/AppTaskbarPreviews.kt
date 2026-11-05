@@ -43,6 +43,8 @@ internal fun AppTaskbar.loadPreviews(s: TaskbarSetup) {
     if (!s.openPreviews || RootShell.lastKnown != true) return
     if (previewJob?.isActive == true) return
     val now = SystemClock.elapsedRealtime()
+    // Tasks come and go: forget when old ones were asked for, so this never grows without end.
+    if (previewTakenAt.size > 48) previewTakenAt.entries.removeIf { now - it.value > PREVIEW_STALE_MS * 3 }
     val wanted = recents.mapNotNull { openTaskOf[it.packageName] }
         .filter { (id, _) -> now - (previewTakenAt[id] ?: 0L) > PREVIEW_STALE_MS }
         .toMap()

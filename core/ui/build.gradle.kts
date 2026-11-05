@@ -13,6 +13,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.coil.compose)
+    // collectAsStateWithLifecycle: the shared second ticker stops while home is behind an app.
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // JVM unit tests (pure icon/label sizing).
     testImplementation(libs.junit)

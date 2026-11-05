@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Efficiency and fixes (audit)
+- An ongoing download or timer no longer recomposes the whole home shell every second: the live pill and the icon rings read the live list on their own, and app notifications are read by the long-press menu only when it opens.
+- Icon rings: each app's ring is its own state, so a ticking download redraws one icon, not every icon on home and in the drawer.
+- The shared second clock (live pills, cards, timer rings) stops while home is behind an app.
+- Live widget resize: only the widget being resized recomposes per frame; it goes back to its cells if edit mode closes mid-drag; its size is sent in 16 dp steps.
+- Folark's own widgets (top apps, note, now playing, mixer, device status) redraw only when widget settings change, not on any setting.
+- The settings watch behind app launches and icon theming, and the weather place watch, survive a single failure instead of stopping for good.
+- Widget picker: a preview of a previous choice can no longer crash it.
+- Taskbar previews: the record of when pictures were read no longer grows without end.
+
 ### Home screen
 - Live widget resize: while a resize handle is held the widget's frame follows the finger (not just whole cells) and the widget lays itself out at that size as it goes; it settles on the cells when let go.
 - Open apps from the folder tile (Settings ▸ Dock & folders ▸ Folders): a tap on an app in a 2×2 or 3×3 folder tile opens that app; the label, a free place or the "+N" place opens the folder.

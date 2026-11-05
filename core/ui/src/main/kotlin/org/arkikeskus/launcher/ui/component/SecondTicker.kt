@@ -2,7 +2,7 @@ package org.arkikeskus.launcher.ui.component
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableLongStateOf
 import kotlinx.coroutines.CoroutineScope
@@ -30,7 +30,11 @@ object SecondTicker {
     }.stateIn(scope, SharingStarted.WhileSubscribed(1_000), System.currentTimeMillis())
 }
 
-/** The current time, updated every second while [ticking]; a fixed time otherwise. */
+/**
+ * The current time, updated every second while [ticking] and the screen it is on is started; a
+ * fixed time otherwise. Home stays composed behind every app, and used to keep this clock (and
+ * every pill and card reading it) ticking there.
+ */
 @Composable
 fun rememberSecondTick(ticking: Boolean): State<Long> =
-    if (ticking) SecondTicker.now.collectAsState() else remember { mutableLongStateOf(System.currentTimeMillis()) }
+    if (ticking) SecondTicker.now.collectAsStateWithLifecycle() else remember { mutableLongStateOf(System.currentTimeMillis()) }

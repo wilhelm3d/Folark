@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -100,8 +101,11 @@ class FolarkWidgetsViewModel @Inject constructor(
 ) : ViewModel() {
 
     /** The widgets' themes and options are stored once for both displays, so either profile reads them. */
-    val settings: StateFlow<LauncherSettings> = settingsRepository.settings(ScreenType.OUTER)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LauncherSettings())
+    // Only the widgets' part: any other setting changing doesn't redraw these widgets.
+    val widgets: StateFlow<LauncherSettings.Widgets> = settingsRepository.settings(ScreenType.OUTER)
+        .map { it.widgets }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LauncherSettings.Widgets())
 
     val battery: StateFlow<BatteryStatus?> = batteryMonitor.status
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), null)
@@ -322,11 +326,11 @@ internal fun FolarkWidgetSurface(
 /** A grid of the apps used most lately; it fills whatever footprint it is given and reorders itself. */
 @Composable
 fun TopAppsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val apps by viewModel.topApps.collectAsStateWithLifecycle()
-    FolarkWidgetSurface(theme = settings.widgets.appsTheme, modifier = modifier) { ink ->
+    FolarkWidgetSurface(theme = widgets.appsTheme, modifier = modifier) { ink ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center) {
-            val labels = settings.widgets.appsLabels
+            val labels = widgets.appsLabels
             val cellWidth = 64.dp
             val cellHeight = if (labels) 78.dp else 56.dp
             val columns = (maxWidth / cellWidth).toInt().coerceAtLeast(1)
@@ -364,21 +368,21 @@ fun TopAppsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewMod
 /** A sticky note: shows the text, a tap opens an editor. One note, shared by every note widget. */
 @Composable
 fun NoteWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
-    val fontSize = when (settings.widgets.noteTextSize) {
+    val fontSize = when (widgets.noteTextSize) {
         LauncherSettings.FOLDER_OPEN_SMALL -> 13.sp
         LauncherSettings.FOLDER_OPEN_LARGE -> 20.sp
         else -> 16.sp
     }
-    FolarkWidgetSurface(theme = settings.widgets.noteTheme, modifier = modifier) { ink ->
+    FolarkWidgetSurface(theme = widgets.noteTheme, modifier = modifier) { ink ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable { editing = true }
                 .padding(14.dp),
         ) {
-            val text = settings.widgets.noteText
+            val text = widgets.noteText
             Text(
                 text = text.ifBlank { stringResource(R.string.note_widget_hint) },
                 color = if (text.isBlank()) ink.copy(alpha = 0.6f) else ink,
@@ -391,7 +395,7 @@ fun NoteWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel 
     if (editing) {
         // Edited in a dialog, not in place: a text field on the home screen would fight the
         // launcher's own gestures and leave the keyboard over the icons.
-        var draft by remember { mutableStateOf(settings.widgets.noteText) }
+        var draft by remember { mutableStateOf(widgets.noteText) }
         AlertDialog(
             onDismissRequest = { editing = false },
             title = { Text(stringResource(R.string.note_widget_name)) },

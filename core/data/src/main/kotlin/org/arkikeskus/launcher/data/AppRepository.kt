@@ -248,8 +248,9 @@ open class AppRepository @Inject constructor(
 
     init {
         scope.launch {
-            runCatching {
-                settingsRepository.settings(ScreenType.OUTER).collect {
+            // A failure handles one settings change, not the whole watch (it ended for good before).
+            settingsRepository.settings(ScreenType.OUTER).collect {
+                runCatching {
                     cachedFloatingSize = it.launch.floatingWindowSize
                     cachedThreeAppSplit = it.launch.threeAppSplit
                     cachedOpenAnimation = it.motion.appOpenAnimation

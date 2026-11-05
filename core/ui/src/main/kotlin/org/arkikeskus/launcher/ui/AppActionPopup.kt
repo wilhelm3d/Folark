@@ -129,7 +129,7 @@ fun AppActionPopup(
     }
 
     // The app's own notifications, newest first, above its shortcuts.
-    val notifications = LocalAppNotifications.current
+    val notifications = LocalAppNotifications.current()
         .filter { it.packageName == app.packageName && it.userSerial == app.userSerial }
         .take(MAX_POPUP_NOTIFICATIONS)
 

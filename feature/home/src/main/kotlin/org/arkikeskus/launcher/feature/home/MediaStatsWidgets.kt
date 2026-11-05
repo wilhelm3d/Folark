@@ -211,7 +211,7 @@ internal class MediaSessionWatcher(private val context: Context) {
 @Composable
 fun NowPlayingWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val context = LocalContext.current
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val watcher = remember(context) { MediaSessionWatcher(context) }
     LifecycleResumeEffect(watcher) {
         watcher.start()
@@ -219,8 +219,8 @@ fun NowPlayingWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
     }
     val playing = watcher.nowPlaying
     val idle = playing == null && !watcher.accessDenied
-    FolarkWidgetSurface(theme = settings.widgets.mediaTheme, modifier = modifier, seeThrough = idle) { themeInk ->
-        val artBackground = settings.widgets.mediaArtwork && playing?.art != null
+    FolarkWidgetSurface(theme = widgets.mediaTheme, modifier = modifier, seeThrough = idle) { themeInk ->
+        val artBackground = widgets.mediaArtwork && playing?.art != null
         // Over cover art the text is always white on a dark veil, whatever the theme.
         val ink = if (artBackground) Color.White else themeInk
         if (artBackground) {
@@ -316,7 +316,7 @@ private fun MediaButton(icon: Int, description: Int, tint: Color, size: Dp, onCl
 /** Device status: ring gauges for the battery, storage, memory and connected Bluetooth devices. */
 @Composable
 fun DeviceStatsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val battery by viewModel.battery.collectAsStateWithLifecycle()
     val stats by viewModel.deviceStats.collectAsStateWithLifecycle()
     val launcherColors = LocalLauncherColors.current
@@ -325,26 +325,26 @@ fun DeviceStatsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsVie
         viewModel.refreshStats()
     }
     val gauges = buildList {
-        if (settings.widgets.statsShowBattery) {
+        if (widgets.statsShowBattery) {
             battery?.let {
                 add(StatGaugeData(stringResource(R.string.battery_widget_name), it.percent / 100f, launcherColors.batteryColor(it.percent), R.drawable.ic_stat_battery))
             }
         }
-        if (settings.widgets.statsShowStorage) {
+        if (widgets.statsShowStorage) {
             add(StatGaugeData(stringResource(R.string.stats_widget_storage), stats.storageUsed, accent, R.drawable.ic_stat_storage))
         }
-        if (settings.widgets.statsShowMemory) {
+        if (widgets.statsShowMemory) {
             add(StatGaugeData(stringResource(R.string.stats_widget_memory), stats.memoryUsed, accent, R.drawable.ic_stat_memory))
         }
-        if (settings.widgets.statsShowBluetooth) {
+        if (widgets.statsShowBluetooth) {
             stats.bluetooth.forEach { (name, level) ->
                 add(StatGaugeData(name, level / 100f, launcherColors.batteryColor(level), R.drawable.ic_status_bluetooth))
             }
         }
     }
-    val needsBluetoothPermission = settings.widgets.statsShowBluetooth && stats.bluetoothNeedsPermission &&
+    val needsBluetoothPermission = widgets.statsShowBluetooth && stats.bluetoothNeedsPermission &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    FolarkWidgetSurface(theme = settings.widgets.statsTheme, modifier = modifier) { ink ->
+    FolarkWidgetSurface(theme = widgets.statsTheme, modifier = modifier) { ink ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
             val slots = gauges.size + if (needsBluetoothPermission) 1 else 0
             if (slots == 0) return@BoxWithConstraints

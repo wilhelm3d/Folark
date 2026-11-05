@@ -52,7 +52,7 @@ class PopupNotification(
  * Every app's current notifications, newest first (Settings ▸ Notifications ▸ Notifications in
  * the long-press menu); empty when that is off or there is no notification access.
  */
-val LocalAppNotifications = compositionLocalOf { emptyList<PopupNotification>() }
+val LocalAppNotifications = compositionLocalOf<() -> List<PopupNotification>> { { emptyList() } }
 
 /** Most an app's menu lists before its own shortcuts. */
 internal const val MAX_POPUP_NOTIFICATIONS = 3

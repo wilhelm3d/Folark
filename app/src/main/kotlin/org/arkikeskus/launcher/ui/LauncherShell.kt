@@ -117,8 +117,11 @@ fun LauncherShell(
     }
     val iconStyle by viewModel.iconStyle.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val live by viewModel.live.collectAsStateWithLifecycle()
-    val statusNotifications by viewModel.notifications.collectAsStateWithLifecycle()
+    // Read only where it is shown (the pill layer, the icon rings): a download ticking along used to
+    // recompose this whole shell every second.
+    val liveState = viewModel.live.collectAsStateWithLifecycle()
+    // Read only when an app's long-press menu shows them (see popupNotifications below).
+    val statusNotifications = viewModel.notifications.collectAsStateWithLifecycle()
     val avatars by viewModel.avatars.collectAsStateWithLifecycle()
     val shellSettings by viewModel.settings.collectAsStateWithLifecycle()
     val drawerHeightFraction by viewModel.drawerHeightFraction.collectAsStateWithLifecycle()
@@ -234,11 +237,14 @@ fun LauncherShell(
 
     // Each app's notifications for its long-press menu (Settings ▸ Notifications), sender photos
     // for the dots: provided to home, dock and drawer alike.
-    val popupNotifications = remember(statusNotifications, shellSettings.live.popupNotifications) {
-        if (!shellSettings.live.popupNotifications) {
+    // A function, read by the menu as it shows: an ongoing download's notification changing every
+    // second used to recompose this whole shell each time.
+    val popupOn = shellSettings.live.popupNotifications
+    val popupNotifications: () -> List<org.arkikeskus.launcher.ui.PopupNotification> = remember(popupOn) { {
+        if (!popupOn) {
             emptyList()
         } else {
-            statusNotifications.mapNotNull { n ->
+            statusNotifications.value.mapNotNull { n ->
                 val title = n.title?.takeIf { it.isNotBlank() } ?: n.text?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 PopupNotification(
                     key = n.key,
@@ -256,7 +262,7 @@ fun LauncherShell(
                 )
             }
         }
-    }
+    } }
     // A new notification nudges its app's icon (newest per app; each with its own id so a second
     // message replays the effect). Not in battery saver.
     val nudgeEvents = remember { mutableStateMapOf<String, IconNudgeEvent>() }
@@ -274,27 +280,26 @@ fun LauncherShell(
     // Rings around icons (Settings ▸ Icons & badges): a download's progress, a running timer, and
     // with "progress & unread" the apps with new notifications. Only what has something to show.
     val ringMode = shellSettings.icons.ring
-    val iconRings = remember(ringMode, live) {
-        if (ringMode == LauncherSettings.RING_OFF) {
-            null
-        } else {
-            IconRings(
-                ringMode,
-                live.filter { it.progress != null || it.indeterminate || it.chronometerBase != 0L }
-                    .groupBy { "${it.packageName}/${it.userSerial}" }
-                    .mapValues { (_, items) ->
-                        // A determinate progress first (it says the most), else a timer, else busy.
-                        val a = items.firstOrNull { it.progress != null && !it.indeterminate }
-                            ?: items.firstOrNull { it.chronometerBase != 0L } ?: items.first()
-                        IconRing(
-                            progress = a.progress,
-                            indeterminate = a.indeterminate,
-                            chronometerBase = if (a.progress == null) a.chronometerBase else 0L,
-                            color = a.color,
-                        )
-                    },
-            )
-        }
+    val iconRings = remember(ringMode) {
+        if (ringMode == LauncherSettings.RING_OFF) null else IconRings(ringMode)
+    }
+    LaunchedEffect(iconRings) {
+        val rings = iconRings ?: return@LaunchedEffect
+        androidx.compose.runtime.snapshotFlow { liveState.value }.collect { live -> rings.update(
+            live.filter { it.progress != null || it.indeterminate || it.chronometerBase != 0L }
+                .groupBy { "${it.packageName}/${it.userSerial}" }
+                .mapValues { (_, items) ->
+                    // A determinate progress first (it says the most), else a timer, else busy.
+                    val a = items.firstOrNull { it.progress != null && !it.indeterminate }
+                        ?: items.firstOrNull { it.chronometerBase != 0L } ?: items.first()
+                    IconRing(
+                        progress = a.progress,
+                        indeterminate = a.indeterminate,
+                        chronometerBase = if (a.progress == null) a.chronometerBase else 0L,
+                        color = a.color,
+                    )
+                },
+        ) }
     }
     // Folark's taskbar staying on home (inner display): the dock and the drawer keep clear of it.
     val taskbarPx by TaskbarSpace.bottomPx.collectAsStateWithLifecycle()
@@ -399,8 +404,9 @@ fun LauncherShell(
         // What is going on right now (a timer, navigation, a download): a live pill on top of home.
         // While Android's status bar shows, what it already has a chip for (calls, Live updates)
         // isn't shown a second time.
+        val liveLayer: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit = {
         val chipsShown = shellSettings.live.skipSystemChips && !shellSettings.statusBar.hideSystem
-        val live = if (chipsShown) live.filterNot { it.systemChip } else live
+        val live = liveState.value.let { all -> if (chipsShown) all.filterNot { it.systemChip } else all }
         val cameraClear = rememberCameraClearance()
         if (shellSettings.live.activities && live.isNotEmpty() && !homeCovered) {
             var liveIndex by remember { mutableIntStateOf(0) }
@@ -480,6 +486,8 @@ fun LauncherShell(
                 }
             }
         }
+        }
+        liveLayer()
 
         // Always compose AppDrawerScreen at fillMaxSize to keep it pre-composed, pre-measured, and pre-laid out.
         // When closed, it is translated completely off-screen (translationY = size.height).

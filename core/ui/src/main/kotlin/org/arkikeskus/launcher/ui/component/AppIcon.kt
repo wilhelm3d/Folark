@@ -162,7 +162,7 @@ fun AppIcon(
                     .let { m ->
                         val rings = LocalIconRings.current
                         if (rings == null) m else m.iconRing(
-                            rings.live[appItem.badgeKey],
+                            rings.ring(appItem.badgeKey),
                             unread = badgeCount > 0,
                             mode = rings.mode,
                             accent = androidx.compose.material3.MaterialTheme.colorScheme.primary,

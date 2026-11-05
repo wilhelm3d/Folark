@@ -265,7 +265,7 @@ internal fun WorkspaceWidgetCell(
                 onDispose { dragController.scrollableWidgetRects.remove(widget.rowId) }
             }
             // Being resized: the frame that follows the finger (live resize), else its cells.
-            val liveRect = widgetLive?.takeIf { it.first == widget.rowId }?.second
+            val liveRect = remember(widget.rowId) { androidx.compose.runtime.derivedStateOf { widgetLive?.takeIf { it.first == widget.rowId }?.second } }.value
             val boxW = liveRect?.width ?: (widget.spanX * cellW)
             val boxH = liveRect?.height ?: (widget.spanY * cellH)
             Box(
@@ -470,7 +470,7 @@ internal fun WorkspaceBuiltinCell(
                 onDispose { dragController.scrollableWidgetRects.remove(space.rowId) }
             }
             // Being resized: the frame that follows the finger (live resize), else its cells.
-            val liveRect = widgetLive?.takeIf { it.first == space.rowId }?.second
+            val liveRect = remember(space.rowId) { androidx.compose.runtime.derivedStateOf { widgetLive?.takeIf { it.first == space.rowId }?.second } }.value
             Box(
                 modifier = Modifier
                     .offset {
@@ -560,7 +560,7 @@ internal fun WorkspaceWidgetStackCell(
                 onDispose { dragController.scrollableWidgetRects.remove(stack.rowId) }
             }
             // Being resized: the frame that follows the finger (live resize), else its cells.
-            val liveRect = widgetLive?.takeIf { it.first == stack.rowId }?.second
+            val liveRect = remember(stack.rowId) { androidx.compose.runtime.derivedStateOf { widgetLive?.takeIf { it.first == stack.rowId }?.second } }.value
             Box(
                 modifier = Modifier
                     .offset {
@@ -735,4 +735,4 @@ internal fun WorkspaceWidgetEditFrame(
 }
 
 /** Live resize: the size given to a widget changes in steps this big (dp) while its frame is dragged. */
-private const val LIVE_SIZE_STEP_DP = 8
+private const val LIVE_SIZE_STEP_DP = 16

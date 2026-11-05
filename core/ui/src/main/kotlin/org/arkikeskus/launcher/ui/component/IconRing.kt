@@ -40,9 +40,27 @@ data class IconRing(
     val color: Int? = null,
 )
 
-/** The rings on this surface: [mode] (LauncherSettings.RING_*) and the running ones by badge key. */
-@Immutable
-class IconRings(val mode: String, val live: Map<String, IconRing>)
+/**
+ * The rings on this surface: [mode] (LauncherSettings.RING_*) and the running ones by badge key.
+ * Each app's ring is its own state, so a download ticking along redraws that one icon, not every
+ * icon on home and in the drawer.
+ */
+@androidx.compose.runtime.Stable
+class IconRings(val mode: String) {
+    private val states = HashMap<String, androidx.compose.runtime.MutableState<IconRing?>>()
+
+    /** [key]'s ring now (read in composition: only that icon follows it). */
+    fun ring(key: String): IconRing? = states.getOrPut(key) { androidx.compose.runtime.mutableStateOf(null) }.value
+
+    /** The running rings are [next] now; only the ones that changed are written. */
+    fun update(next: Map<String, IconRing>) {
+        for ((key, state) in states) {
+            val value = next[key]
+            if (state.value != value) state.value = value
+        }
+        for ((key, value) in next) if (key !in states) states[key] = androidx.compose.runtime.mutableStateOf(value)
+    }
+}
 
 val LocalIconRings = compositionLocalOf<IconRings?> { null }
 
@@ -102,16 +120,11 @@ fun Modifier.iconRing(ring: IconRing?, unread: Boolean, mode: String, accent: Co
     }
 }
 
-/** 0..1 through the current minute of a timer that started (or ends) at [base], ticking each second. */
+/** 0..1 through the current minute of a timer that started (or ends) at [base], ticking each second
+ *  on the shared clock (paused while home is behind an app). */
 @Composable
 private fun rememberSecondsSweep(base: Long): Float {
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(base) {
-        while (true) {
-            now = System.currentTimeMillis()
-            delay(1000L - now % 1000L)
-        }
-    }
+    val now by rememberSecondTick(ticking = true)
     val seconds = (kotlin.math.abs(now - base) / 1000L) % 60L
     return (seconds + 1) / 60f
 }
