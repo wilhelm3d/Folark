@@ -141,6 +141,10 @@ fun SplitPickerDrawer(
     share: Int? = null,
     pickedOnLeft: Boolean = false,
     onShareChange: (Int) -> Unit = {},
+    /** Offer the 67/33 · 50/50 · 33/67 sizes ([share] is still shown for [threeEven] alone). */
+    sizes: Boolean = true,
+    /** Offer 33/33/33 next to the sizes: [share] [SHARE_THREE] picks two more apps for three thirds. */
+    threeEven: Boolean = false,
 ) {
     val columns = look.columns.coerceIn(SplitPickerLook.MIN_COLUMNS, SplitPickerLook.MAX_COLUMNS)
     val iconSize = look.iconSize.coerceIn(SplitPickerLook.MIN_ICON, SplitPickerLook.MAX_ICON).dp
@@ -168,6 +172,8 @@ fun SplitPickerDrawer(
     }
     // A three-app split: the apps chosen so far, in order.
     val chosen = remember { mutableStateListOf<AppItem>() }
+    // A new choice of how many apps to pick (the 33/33/33 button) starts over.
+    LaunchedEffect(pickCount) { chosen.clear() }
     val badge: (AppItem) -> Int? = { a -> chosen.indexOfFirst { it.key == a.key }.takeIf { it >= 0 }?.plus(1) }
 
     var open by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -253,8 +259,8 @@ fun SplitPickerDrawer(
                 ) {
                     // In the corner: how the screen is shared, 67/33 · 50/50 · 33/67 as on screen
                     // (picking one turns peek off).
-                    if (share != null && pickCount == 1) {
-                        ShareButtons(share, pickedOnLeft, peek == true, onShareChange)
+                    if (share != null && (pickCount == 1 || share == SHARE_THREE)) {
+                        ShareButtons(share, pickedOnLeft, peek == true, onShareChange, sizes, threeEven)
                     }
                 }
             }
@@ -470,16 +476,26 @@ private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit
     }
 }
 
+/** [SplitPickerDrawer]'s share for three apps a third each (two more apps to pick). */
+const val SHARE_THREE = 0
+
 /**
- * The three ways to share the screen, in the header's corner: 67/33, 50/50 and 33/67 (the sizes
+ * The ways to share the screen, in the header's corner: 67/33, 50/50 and 33/67 (the sizes
  * Motorola's split screen lays apps out at), read left to
- * right as on screen, each a tiny preview with its label; the chosen one is lit. [share] is the
- * picked app's part.
+ * right as on screen, and with [threeEven] 33/33/33 (three apps); each a tiny preview with its
+ * label, the chosen one lit. [share] is the picked app's part ([SHARE_THREE] for three apps).
  */
 @Composable
-private fun ShareButtons(share: Int, pickedOnLeft: Boolean, peekOn: Boolean, onShareChange: (Int) -> Unit) {
+private fun ShareButtons(
+    share: Int,
+    pickedOnLeft: Boolean,
+    peekOn: Boolean,
+    onShareChange: (Int) -> Unit,
+    sizes: Boolean = true,
+    threeEven: Boolean = false,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        listOf(67, 50, 33).forEach { left ->
+        (if (sizes) listOf(67, 50, 33) else emptyList()).forEach { left ->
             // The picked app's part for this layout.
             val option = if (pickedOnLeft) left else 100 - left
             val selected = option == share && !peekOn
@@ -515,6 +531,50 @@ private fun ShareButtons(share: Int, pickedOnLeft: Boolean, peekOn: Boolean, onS
                 }
                 Text(
                     "$left/${100 - left}",
+                    color = if (selected) ACCENT else Color.White.copy(alpha = 0.7f),
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+        }
+        if (threeEven) {
+            // Three apps a third each: the first app's third stays dim, the two to pick are lit.
+            val selected = share == SHARE_THREE
+            val border by androidx.compose.animation.animateColorAsState(
+                if (selected) ACCENT else Color.White.copy(alpha = 0.18f), label = "threeBorder",
+            )
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onShareChange(if (selected) 50 else SHARE_THREE) }
+                    .padding(2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    Modifier
+                        .size(width = 44.dp, height = 22.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .border(1.5.dp, border, RoundedCornerShape(6.dp))
+                        .padding(2.5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    repeat(3) { i ->
+                        val isFirst = (i == 2) == pickedOnLeft
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(2.5.dp))
+                                .background(
+                                    if (isFirst) Color.White.copy(alpha = 0.16f)
+                                    else if (selected) ACCENT else Color.White.copy(alpha = 0.45f),
+                                ),
+                        )
+                    }
+                }
+                Text(
+                    "33/33/33",
                     color = if (selected) ACCENT else Color.White.copy(alpha = 0.7f),
                     fontSize = 10.sp,
                     modifier = Modifier.padding(top = 1.dp),

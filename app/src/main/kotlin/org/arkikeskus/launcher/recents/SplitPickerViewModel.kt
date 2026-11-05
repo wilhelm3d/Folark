@@ -97,6 +97,9 @@ class SplitPickerViewModel @Inject constructor(
     /** 33 / 67 % can be offered: the module runs and System UI hasn't moved a size straight back. */
     val sizesAvailable: Boolean get() = SplitThree.ready(context) && SplitThree.sizesHold(context) != false
 
+    /** 33/33/33 can be offered: Android's three-app split through the module. */
+    val threeEvenAvailable: Boolean get() = SplitThree.ready(context)
+
     /**
      * The row of recent apps: the newest open apps but the first one, as many as set. Screenshots
      * only with previews on and root, and only for the apps shown (each is a root call).
@@ -198,13 +201,13 @@ class SplitPickerViewModel @Inject constructor(
      * Three apps: the first left, [second] right, [third] as Android's third pane (Settings ▸
      * Recents ▸ Real three-app split) or else floating over the two.
      */
-    fun formThree(firstPackage: String, firstKey: String?, firstTaskId: Int?, second: AppItem, third: AppItem) {
+    fun formThree(firstPackage: String, firstKey: String?, firstTaskId: Int?, second: AppItem, third: AppItem, even: Boolean = false) {
         appScope.launch {
             val all = appRepository.apps.first()
             val first = all.firstOrNull { it.key == firstKey } ?: all.firstOrNull { it.packageName == firstPackage }
-            val native = settingsRepository.settings(ScreenType.INNER).first().launch.threeAppSplit
+            val native = even || settingsRepository.settings(ScreenType.INNER).first().launch.threeAppSplit
             delay(PICKER_CLOSE_MS)
-            val got = splitCoordinator.three(SplitApp(firstPackage, first, firstTaskId), SplitApp(second), SplitApp(third), native)
+            val got = splitCoordinator.three(SplitApp(firstPackage, first, firstTaskId), SplitApp(second), SplitApp(third), native, even = even)
             withContext(Dispatchers.Main) {
                 when (got) {
                     0 -> appRepository.launch(second)

@@ -28,6 +28,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.arkikeskus.launcher.data.SplitPicker
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
 import org.arkikeskus.launcher.feature.appdrawer.SplitPickAction
+import org.arkikeskus.launcher.feature.appdrawer.SHARE_THREE
 import org.arkikeskus.launcher.feature.appdrawer.SplitPickerDrawer
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.SplitPickerLook
@@ -47,7 +48,10 @@ class SplitPickerActivity : ComponentActivity() {
     private var peek by mutableStateOf(false)
     /** The picked app's share of the split in percent (Size row: 33, 50, 67). */
     private var share by mutableStateOf(50)
-    private val three get() = intent.getBooleanExtra(SplitPicker.EXTRA_THREE, false)
+    /** Opened for three apps (Recents' three-app split). */
+    private val openedForThree get() = intent.getBooleanExtra(SplitPicker.EXTRA_THREE, false)
+    /** Three apps a third each, chosen in the corner (33/33/33): two more apps to pick. */
+    private val three get() = openedForThree || share == SHARE_THREE
 
     private val firstPackage get() = intent.getStringExtra(SplitPicker.EXTRA_FIRST_PACKAGE).orEmpty()
     private val firstKey get() = intent.getStringExtra(SplitPicker.EXTRA_FIRST_KEY)
@@ -97,7 +101,9 @@ class SplitPickerActivity : ComponentActivity() {
                             onAction = ::onAction,
                             onPick = { app -> pick(app, peek, look.openAnim) },
                             // The divider sizes need Folark's Vector module (as peek does).
-                            share = if (!three && viewModel.sizesAvailable) share else null,
+                            share = if (!openedForThree && (viewModel.sizesAvailable || viewModel.threeEvenAvailable)) share else null,
+                            sizes = viewModel.sizesAvailable,
+                            threeEven = !openedForThree && viewModel.threeEvenAvailable,
                             pickedOnLeft = firstOnRight,
                             // A size is a plain split: it ends peek.
                             onShareChange = { share = it; peek = false },
@@ -142,7 +148,8 @@ class SplitPickerActivity : ComponentActivity() {
     private fun pickThree(apps: List<AppItem>) {
         if (appPicked || apps.size < 2) return
         appPicked = true
-        viewModel.formThree(firstPackage, firstKey, firstTaskId, apps[0], apps[1])
+        // From the 33/33/33 button: Android's real three-app split, made even, whatever the setting.
+        viewModel.formThree(firstPackage, firstKey, firstTaskId, apps[0], apps[1], even = share == SHARE_THREE)
         finishAndRemoveTask()
     }
 

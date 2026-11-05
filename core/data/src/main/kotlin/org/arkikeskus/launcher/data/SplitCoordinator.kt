@@ -149,9 +149,9 @@ class SplitCoordinator @Inject constructor(
      * through the module (when [native]). Returns how far it got: 0 nothing, 2 the two-app split,
      * 3 all three; on 2 callers float the third.
      */
-    suspend fun three(first: SplitApp, second: SplitApp, third: SplitApp, native: Boolean): Int {
+    suspend fun three(first: SplitApp, second: SplitApp, third: SplitApp, native: Boolean, even: Boolean = false): Int {
         if (!pair(first, second, firstOnRight = false, keepOnUndo = first)) return 0
-        return if (addThird(third, native = native, orSideStage = false)) 3 else 2
+        return if (addThird(third, native = native, orSideStage = false, even = even)) 3 else 2
     }
 
     /**
@@ -192,7 +192,7 @@ class SplitCoordinator @Inject constructor(
      * when [native], else (with [orSideStage]) the third app moved into a side stage, as far as WM
      * Shell allows. False when it didn't join; callers then float it.
      */
-    suspend fun addThird(third: SplitApp, native: Boolean, orSideStage: Boolean = true): Boolean {
+    suspend fun addThird(third: SplitApp, native: Boolean, orSideStage: Boolean = true, even: Boolean = false): Boolean {
         val route = route()
         if (native && SplitThree.ready(context)) {
             val id = third.taskId ?: withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, third.packageName, route.root) }
@@ -208,8 +208,9 @@ class SplitCoordinator @Inject constructor(
             if (ok && thirdLanded(third.copy(taskId = id), route.root)) {
                 Haptics.play(context, Haptics.Event.SPLIT)
                 // Motorola starts three apps as its carousel (one a 10 % strip): a third each instead.
-                val even = runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.threeEven }.getOrDefault(true)
-                if (even) SplitThree.snap(context, SplitThree.SNAP_THREE_EVEN)
+                // [even]: asked for (the split drawer's 33/33/33), whatever the setting.
+                val thirds = even || runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.threeEven }.getOrDefault(true)
+                if (thirds) SplitThree.snap(context, SplitThree.SNAP_THREE_EVEN)
                 return true
             }
         }
