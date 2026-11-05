@@ -83,5 +83,5 @@
         <item>com.google.android.apps.nexuslauncher</item>
         <item>com.android.systemui</item>
     </string-array>
-    <string name="split_native_paused">System UI restarted right after a split request, so Folark\'s native split is paused and the split commands are used instead. Settings ▸ Recents ▸ Split screen can turn it back on.</string>
+    <string name="split_native_paused">System UI restarted right after a split request, so Folark\'s native split is paused and the split commands are used instead. Settings ▸ Split screen &amp; peek can turn it back on, and it comes back by itself the next time System UI restarts.</string>
 </resources>

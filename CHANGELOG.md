@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Settings
+- Fixed: after System UI crashed once, Folark's own split stayed paused until the phone restarted, which hid the size buttons in the split drawer and turned the three-app split into a floating window. The pause now ends the next time System UI starts normally, and dropping a third app while it's paused says why.
 - Settings sorted anew, one topic per page: Look & feel (Theme & colours, Icons & badges, Motion & haptics), Home screen (Home screen, Dock & folders, Gestures), Apps & multitasking (App drawer, Taskbar, Recents, Split screen & peek) and Phone & system (Displays & fold, System, Permissions, Root, Backup). Everything about split screen and peek is now on one page, wherever the split starts from.
 - Each page has one live preview pinned on top that stays while the settings scroll under it. A change brings the view it touches to the front (the menu, the glass, the backdrop, the dots…) and the frame lights up; slider values show while dragging. Tap the chips to switch views, or the title to fold the preview away.
 

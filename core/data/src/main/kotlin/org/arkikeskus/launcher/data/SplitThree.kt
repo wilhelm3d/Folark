@@ -98,6 +98,8 @@ object SplitThree {
     private const val PAUSED_AT = "split3_paused_at"
     private const val PAUSED_AFTER = "split3_paused_after"
     private const val CRASH_WINDOW_MS = 15_000L
+    /** A pause outlives System UI starts this soon after it (the same start announcing itself again). */
+    private const val PAUSE_KEEP_MS = 2L * 60_000L
     /** System UI starting this soon after the phone booted is a restart, not a crash. */
     private const val BOOT_GRACE_MS = 3L * 60_000L
     private const val LAST_ANSWER = "split3_last_answer"
@@ -124,7 +126,13 @@ object SplitThree {
         val crashed = !booted && lastAt > 0L && now - lastAt in 0..CRASH_WINDOW_MS
         // A System UI start (a new module, say) gives the divider sizes a new chance.
         val edit = p.edit().putLong(READY_AT, now).remove(LAST_REQUEST_AT).remove(SIZES_HOLD)
+        // Crashed: paused, so a request that brings System UI down can't do it over and over. A
+        // clean start (System UI restarted by hand, a new module, the phone rebooted) ends an older
+        // pause: the cause may well be fixed (a pause from the night before kept the split drawer's
+        // sizes and the three-app split off all day).
         if (crashed) edit.putLong(PAUSED_AT, now).putString(PAUSED_AFTER, p.getString(LAST_REQUEST_KIND, null))
+        // (Not a second "ready" from the same start, moments after the pause was set.)
+        else if (now - p.getLong(PAUSED_AT, now) > PAUSE_KEEP_MS) edit.remove(PAUSED_AT).remove(PAUSED_AFTER)
         edit.apply()
         SplitEvents.onSystemUiRestart()
         waiting.values.forEach { it.complete(false) }

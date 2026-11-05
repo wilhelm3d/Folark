@@ -515,6 +515,13 @@ class RecentsViewModel @Inject constructor(
             return
         }
         appScope.launch {
+            // Paused by the crash guard: three panes can't be made, and the person is told why
+            // instead of finding the third app floating.
+            if (SplitThree.paused(context)) {
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, org.arkikeskus.launcher.R.string.split_native_paused, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
             val got = splitCoordinator.three(pair.splitApp(0), pair.splitApp(1), third.splitApp(0), native = true)
             when (got) {
                 0 -> openNow(pair)
