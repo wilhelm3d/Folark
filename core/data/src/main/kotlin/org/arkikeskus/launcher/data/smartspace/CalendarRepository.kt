@@ -40,7 +40,11 @@ class CalendarRepository @Inject constructor(
     val events: StateFlow<List<CalendarEvent>> = _events.asStateFlow()
 
     private val observer = object : ContentObserver(null) {
-        override fun onChange(selfChange: Boolean) = refresh()
+        // Calendar sync changes the provider often, also with the screen off. Read again only while
+        // a widget shows the events; otherwise the next home resume (refresh()) reads it.
+        override fun onChange(selfChange: Boolean) {
+            if (_events.subscriptionCount.value > 0) refresh()
+        }
     }
     private var observing = false
 
