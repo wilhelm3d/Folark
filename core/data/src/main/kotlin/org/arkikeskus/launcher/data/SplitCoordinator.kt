@@ -197,6 +197,8 @@ class SplitCoordinator @Inject constructor(
         if (native && SplitThree.ready(context)) {
             val id = third.taskId ?: withContext(Dispatchers.IO) { ShellSplit.taskIdOf(context, third.packageName, route.root) }
             val app = third.app
+            // What is staged before: a new task staged after the request is the third (E27).
+            val stagedBefore = SplitEvents.stagedNow()
             val ok = when {
                 id != null -> SplitThree.addThird(context, taskId = id)
                 app != null -> SplitThree.addThird(context, component = app.componentName, user = app.user)
@@ -205,7 +207,7 @@ class SplitCoordinator @Inject constructor(
             // System UI can say yes and still not make a third pane (Motorola's split accepts the
             // call on some builds): only a third app really in a split stage counts, else the
             // caller floats it over the split.
-            if (ok && thirdLanded(third.copy(taskId = id), route.root)) {
+            if (ok && thirdLanded(third.copy(taskId = id), route.root, stagedBefore)) {
                 Haptics.play(context, Haptics.Event.SPLIT)
                 // Motorola starts three apps as its carousel (one a 10 % strip): a third each instead.
                 // [even]: asked for (the split drawer's 33/33/33), whatever the setting.
@@ -536,7 +538,12 @@ class SplitCoordinator @Inject constructor(
     }
 
     /** [third] (its task if known, else its newest task once it is running) sits in a split stage. */
-    private suspend fun thirdLanded(third: SplitApp, root: Boolean): Boolean {
+    private suspend fun thirdLanded(third: SplitApp, root: Boolean, stagedBefore: Set<Int> = emptySet()): Boolean {
+        // Started from its intent (no task id yet): System UI's split events say which task joined,
+        // without reading the window list again and again (E27).
+        if (third.taskId == null && SplitEvents.live) {
+            if (SplitEvents.awaitNewStaged(stagedBefore, EVENT_WAIT_MS * 2) != null) return true
+        }
         val id = third.taskId ?: awaitTask(third.packageName, root)?.first ?: return false
         return awaitInSplit(listOf(id), root)
     }
@@ -589,8 +596,9 @@ class SplitCoordinator @Inject constructor(
         const val LANDED_CHECK_MS = 700L
         const val FIND_TRIES = 10
         const val FIND_RETRY_MS = 80L
-        const val VERIFY_TRIES = 6
-        const val VERIFY_STEP_MS = 150L
+        // Without split events: a full window list read per step, so fewer, wider steps (E25).
+        const val VERIFY_TRIES = 5
+        const val VERIFY_STEP_MS = 200L
         const val DOCK_TRIES = 3
         const val DOCK_RETRY_MS = 150L
         /** "Open with …" waits for the app to be up first. */

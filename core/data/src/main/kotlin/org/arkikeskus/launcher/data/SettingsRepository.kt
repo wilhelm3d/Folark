@@ -57,6 +57,18 @@ class SettingsRepository @Inject constructor(
     private var storeRepaired = false
     private val repairLock = Mutex()
 
+    /**
+     * The settings last built per screen, with the store snapshot they came from (E6): every
+     * collector gets the same snapshot, so the whole model is built once per change, not once per
+     * reader (about 40 one-shot reads plus the long-lived collectors).
+     */
+    private val built = java.util.concurrent.ConcurrentHashMap<ScreenType, Pair<Preferences, LauncherSettings>>()
+
+    private fun memoSettingsFor(p: Preferences, screenType: ScreenType): LauncherSettings {
+        built[screenType]?.let { (from, settings) -> if (from === p) return settings }
+        return settingsFor(p, screenType).also { built[screenType] = p to it }
+    }
+
     // No default screen: on a foldable, the wrong profile is an easy, silent mistake.
     fun settings(screenType: ScreenType): Flow<LauncherSettings> = dataStore.data.onStart {
         // 0.7 imports unknown numeric backup keys as Long. Repair them before the first typed
@@ -67,7 +79,7 @@ class SettingsRepository @Inject constructor(
                 storeRepaired = true
             }
         }
-    }.map { p -> settingsFor(p, screenType) }
+    }.map { p -> memoSettingsFor(p, screenType) }
         // Unrelated writes to the store (app-usage counts, held notifications) must not make every
         // collector rebuild its state.
         .distinctUntilChanged()

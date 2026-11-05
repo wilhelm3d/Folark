@@ -74,10 +74,10 @@ class RecentsHookState : ContentProvider() {
             edit.apply()
         }
         val settings = runCatching {
-            runBlocking {
+            runBlocking { kotlinx.coroutines.withTimeoutOrNull(PROVIDER_WAIT_MS) {
                 EntryPointAccessors.fromApplication(context, Deps::class.java)
                     .settingsRepository().settings(ScreenType.INNER).first()
-            }
+            } }
         }.getOrNull()
         return Bundle().apply {
             putBoolean("replace", settings?.recents?.enabled == true && settings.recents.replaceSystem)
@@ -90,10 +90,10 @@ class RecentsHookState : ContentProvider() {
         if (callingPackage != RecentsHook.SYSTEMUI) return null
         val context = context ?: return null
         val s = runCatching {
-            runBlocking {
+            runBlocking { kotlinx.coroutines.withTimeoutOrNull(PROVIDER_WAIT_MS) {
                 EntryPointAccessors.fromApplication(context, Deps::class.java)
                     .settingsRepository().settings(ScreenType.INNER).first().statusBar
-            }
+            } }
         }.getOrNull() ?: return null
         return Bundle().apply {
             putBoolean(StatusBarPaddingHook.EXTRA_ON, s.systemPadding)
@@ -107,10 +107,10 @@ class RecentsHookState : ContentProvider() {
         if (callingPackage != RecentsHook.SYSTEMUI) return null
         val context = context ?: return null
         val recents = runCatching {
-            runBlocking {
+            runBlocking { kotlinx.coroutines.withTimeoutOrNull(PROVIDER_WAIT_MS) {
                 EntryPointAccessors.fromApplication(context, Deps::class.java)
                     .settingsRepository().settings(ScreenType.INNER).first().recents
-            }
+            } }
         }.getOrNull()
         return Bundle().apply {
             putBoolean(DividerStopsHook.EXTRA_ON, recents?.dividerStops ?: true)
@@ -153,3 +153,6 @@ class RecentsHookState : ContentProvider() {
         const val UNLOCK_SEEN_AT = "unlock_seen_at"
     }
 }
+
+/** How long System UI's question may wait for Folark's settings on the binder thread (E5). */
+private const val PROVIDER_WAIT_MS = 400L

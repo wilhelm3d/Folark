@@ -17,7 +17,13 @@ internal object ShellSplitParser {
     /** `ActivityRecord{9f8e7d u0 com.android.chrome/.Main t15520}`: the package of an activity in task 15520. */
     private val ACTIVITY = Regex("""ActivityRecord\{\S+ u\d+ ([\w.]+)/\S+ t(\d+)""")
 
-    fun parse(text: String, ownPackage: String): TaskSnapshot {
+    fun parse(dump: String, ownPackage: String): TaskSnapshot {
+        // Only these lines say anything here; a dump is often hundreds of KB of activity details,
+        // so the patterns below run over the few lines that matter (E26).
+        val text = dump.lineSequence().filter { line ->
+            line.contains("Task{") || line.contains("ActivityRecord{") || line.startsWith("Display ") ||
+                line.contains("TaskDisplayArea") || line.startsWith("RootHomeTask")
+        }.joinToString("\n")
         // The bottom (root) activity of each task names its app; lines list activities top first,
         // so the last one seen for a task is its root.
         val rootPackage = HashMap<Int, String>()

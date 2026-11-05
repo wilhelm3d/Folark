@@ -77,6 +77,8 @@ internal object SplitThreeHook {
     private const val THREE_WAIT_TRIES = 30
     /** When the split state is logged after a third app was sent. */
     private const val THIRD_CHECK_MS = 1_500L
+    /** How long split events gather before they go to Folark together. */
+    private const val EVENT_BATCH_MS = 24L
 
     private const val STAGE_COORDINATOR = "com.android.wm.shell.splitscreen.StageCoordinator"
     /** Whether Folark's listener stepped out for the setSideStagePosition running on this thread. */
@@ -90,7 +92,10 @@ internal object SplitThreeHook {
     @Volatile private var splitListener: Any? = null
     @Volatile private var appContext: Context? = null
     /** Everything sent to Folark goes out here, in order and off WM Shell's thread. */
-    private val outbox = Executors.newSingleThreadExecutor()
+    private val outbox = Executors.newSingleThreadScheduledExecutor()
+    /** Split events waiting to go to Folark together (E4: a three-app start fires about six). */
+    private val pendingEvents = ArrayList<Bundle>()
+    private var flushQueued = false
     private var log: (String) -> Unit = {}
 
     fun install(loader: ClassLoader, log: (String) -> Unit) {
@@ -804,15 +809,28 @@ internal object SplitThreeHook {
 
     /** Passes a split change on to Folark (its RecentsHookState), off WM Shell's thread. */
     private fun send(context: Context, extras: Bundle) {
-        outbox.execute {
-            runCatching {
-                context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), SplitEvents.METHOD_EVENT, null, extras)
-            }
+        synchronized(pendingEvents) {
+            pendingEvents += extras
+            if (flushQueued) return
+            flushQueued = true
+        }
+        outbox.schedule({ flush(context) }, EVENT_BATCH_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+    }
+
+    /** Everything [send] collected in the last [EVENT_BATCH_MS], in order, in one call. */
+    private fun flush(context: Context) {
+        val batch = synchronized(pendingEvents) {
+            flushQueued = false
+            ArrayList(pendingEvents).also { pendingEvents.clear() }
+        }
+        if (batch.isEmpty()) return
+        val extras = if (batch.size == 1) batch[0] else Bundle().apply { putParcelableArrayList(SplitEvents.EXTRA_BATCH, batch) }
+        runCatching {
+            context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), SplitEvents.METHOD_EVENT, null, extras)
         }
     }
 
-    private fun methods(cls: Class<*>): List<java.lang.reflect.Method> = generateSequence(cls) { it.superclass }
-        .flatMap { it.declaredMethods.asSequence() }.toList()
+    private fun methods(cls: Class<*>): List<java.lang.reflect.Method> = Reflect.methods(cls)
 
     private fun reply(context: Context, request: String, ok: Boolean, value: Int? = null, detail: String? = null) {
         Thread {
@@ -835,9 +853,7 @@ internal object SplitThreeHook {
             ?: allFields(c.javaClass).firstOrNull { Executor::class.java.isAssignableFrom(it.type) }
                 ?.let { runCatching { it.isAccessible = true; it.get(c) as? Executor }.getOrNull() }
 
-    private fun field(target: Any, name: String): Any? =
-        allFields(target.javaClass).firstOrNull { it.name == name }
-            ?.let { runCatching { it.isAccessible = true; it.get(target) }.getOrNull() }
+    private fun field(target: Any, name: String): Any? = Reflect.get(target, name)
 
     private fun allFields(cls: Class<*>): List<Field> = generateSequence(cls) { it.superclass }
         .flatMap { it.declaredFields.asSequence() }.toList()

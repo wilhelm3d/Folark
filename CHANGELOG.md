@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Split screen
+- Efficiency (System UI module): reflection is looked up once and kept (it ran on every frame of a divider drag); split events go to Folark in batches; System UI's questions to Folark wait 0.4 s at most.
+- Efficiency (split screen): a third app started from its intent is found from System UI's split events instead of re-reading the window list; window-list reads without events are fewer; the window-list parser only reads the lines that matter.
+- Efficiency (settings): the settings are built once per change, not once per reader.
 - Three-app split: a third pane System UI says yes to but doesn't show no longer counts; the third app then floats over the split.
 - Divider sizes: the module checks that the divider stayed at 30 / 70 % after a snap; where System UI moves it straight back (50/50 only), the split drawer and the taskbar's split menu stop offering the sizes until System UI restarts.
 - The crash guard no longer pauses Folark's module after a reboot (System UI starting right after the phone booted is a restart, not a crash), and a pause ends when the phone restarts. A false pause hid the split drawer's size row and blocked three-app split.

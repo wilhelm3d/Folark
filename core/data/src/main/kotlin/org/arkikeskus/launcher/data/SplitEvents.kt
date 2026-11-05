@@ -18,6 +18,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 object SplitEvents {
     /** Provider method System UI calls on Folark with each change (see RecentsHookState). */
     const val METHOD_EVENT = "split_event"
+    /** Several events in one call, in order (a ParcelableArrayList of event Bundles). */
+    const val EXTRA_BATCH = "batch"
     const val EXTRA_KIND = "kind"
     const val EXTRA_TASK = "task"
     const val EXTRA_STAGE = "stage"
@@ -51,6 +53,12 @@ object SplitEvents {
     val live: Boolean get() = attachedAt > 0L
 
     fun onEvent(extras: Bundle) {
+        @Suppress("DEPRECATION")
+        val batch = extras.getParcelableArrayList<Bundle>(EXTRA_BATCH)
+        if (batch != null) {
+            batch.forEach { onEvent(it) }
+            return
+        }
         // A split stage changed: a cached window list no longer says what is open.
         ShellSplit.forget()
         lastEventAt = System.currentTimeMillis()
@@ -79,6 +87,18 @@ object SplitEvents {
     /** Waits up to [timeoutMs] until every task of [ids] is reported in a split stage. */
     suspend fun awaitStaged(ids: Collection<Int>, timeoutMs: Long): Boolean =
         withTimeoutOrNull(timeoutMs) { stages.first { m -> ids.all { (m[it] ?: STAGE_NONE) != STAGE_NONE } } } != null
+
+    /** Tasks reported in a split stage right now. */
+    fun stagedNow(): Set<Int> = stages.value.filterValues { it != STAGE_NONE }.keys
+
+    /**
+     * Waits up to [timeoutMs] for a task not in [known] to be reported in a split stage (a third
+     * app just started from its intent, whose task id isn't known yet); that task, or null.
+     */
+    suspend fun awaitNewStaged(known: Set<Int>, timeoutMs: Long): Int? = withTimeoutOrNull(timeoutMs) {
+        stages.first { m -> m.any { (task, stage) -> stage != STAGE_NONE && task !in known } }
+            .entries.first { (task, stage) -> stage != STAGE_NONE && task !in known }.key
+    }
 
     /** Waits up to [timeoutMs] until every task of [ids] is reported out of its split stage. */
     suspend fun awaitUnstaged(ids: Collection<Int>, timeoutMs: Long): Boolean =

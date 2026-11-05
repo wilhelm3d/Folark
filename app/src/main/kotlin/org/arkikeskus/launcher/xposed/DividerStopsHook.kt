@@ -227,8 +227,7 @@ internal object DividerStopsHook {
         val root = field(manager, "mRootBounds") as? Rect ?: return false
         val leftRight = field(manager, "mIsLeftRightSplit") as? Boolean ?: return false
         val size = field(manager, "mDividerSize") as? Int ?: return false
-        val dividerBounds = generateSequence<Class<*>>(manager.javaClass) { it.superclass }
-            .flatMap { it.declaredMethods.asSequence() }
+        val dividerBounds = Reflect.methods(manager.javaClass)
             .firstOrNull { it.name == "calculateDividerBounds" && it.parameterTypes.size == 2 }
             ?.apply { isAccessible = true } ?: return false
         if (args[9] != true) clearSpecs(manager)
@@ -289,8 +288,7 @@ internal object DividerStopsHook {
         val state = freeState(algorithm, position) ?: return false
         if (state == 1) return false // half and half: Motorola's own
         val target = newTarget(field(algorithm, "mMiddleTarget") ?: return false, position, state) ?: return false
-        val snap = generateSequence<Class<*>>(layout.javaClass) { it.superclass }
-            .flatMap { it.declaredMethods.asSequence() }
+        val snap = Reflect.methods(layout.javaClass)
             .firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 4 } ?: return false
         snap.isAccessible = true
         ours = true
@@ -323,8 +321,7 @@ internal object DividerStopsHook {
         val t0 = newTarget(like, first, 5) ?: return false
         val t1 = newTarget(like, second, 6) ?: return false
         val now = field(layout, "mDividerPositions") as IntArray
-        val snap = generateSequence<Class<*>>(layout.javaClass) { it.superclass }
-            .flatMap { it.declaredMethods.asSequence() }
+        val snap = Reflect.methods(layout.javaClass)
             .firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 6 } ?: return false
         snap.isAccessible = true
         val from0 = if (index == 0) position else now[0]
@@ -385,8 +382,7 @@ internal object DividerStopsHook {
         val root = field(manager, "mRootBounds") as? Rect ?: return false
         val leftRight = field(manager, "mIsLeftRightSplit") as? Boolean ?: return false
         val size = field(manager, "mDividerSize") as? Int ?: return false
-        val dividerBounds = generateSequence<Class<*>>(manager.javaClass) { it.superclass }
-            .flatMap { it.declaredMethods.asSequence() }
+        val dividerBounds = Reflect.methods(manager.javaClass)
             .firstOrNull { it.name == "calculateDividerBounds" && it.parameterTypes.size == 2 }
             ?.apply { isAccessible = true } ?: return false
         // Motorola's resizing effect (scaled / pushed-out surfaces) off for this layout, once the
@@ -464,7 +460,7 @@ internal object DividerStopsHook {
     /** A SnapTarget like [like] at [position] for [snapPosition]; other parameters neutral. */
     private fun newTarget(like: Any, position: Int, snapPosition: Int): Any? {
         val int = Int::class.javaPrimitiveType
-        val constructor = like.javaClass.declaredConstructors
+        val constructor = Reflect.constructors(like.javaClass)
             .filter { it.parameterTypes.size >= 2 && it.parameterTypes[0] == int && it.parameterTypes[1] == int }
             .minByOrNull { it.parameterTypes.size } ?: return null
         constructor.isAccessible = true
@@ -509,21 +505,9 @@ internal object DividerStopsHook {
         log("divider stops: ${if (on) "33/50/67" else "Android's own"}, ${if (free) "stays where let go" else "snaps"} (from the next split)")
     }
 
-    private fun field(target: Any, name: String): Any? {
-        var cls: Class<*>? = target.javaClass
-        while (cls != null) {
-            runCatching { return cls.getDeclaredField(name).apply { isAccessible = true }.get(target) }
-            cls = cls.superclass
-        }
-        return null
-    }
+    private fun field(target: Any, name: String): Any? = Reflect.get(target, name)
 
     private fun setField(target: Any, name: String, value: Any?) {
-        var cls: Class<*>? = target.javaClass
-        while (cls != null) {
-            val done = runCatching { cls.getDeclaredField(name).apply { isAccessible = true }.set(target, value) }.isSuccess
-            if (done) return
-            cls = cls.superclass
-        }
+        Reflect.set(target, name, value)
     }
 }
