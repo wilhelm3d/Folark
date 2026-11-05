@@ -360,6 +360,26 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
             onCheckedChange = viewModel::setWeatherWidgetAnimated,
         )
         ExpressiveRowDivider()
+        if (s.widgets.weatherAnimated) {
+            ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_weather_awake),
+                options = listOf(
+                    "15" to "15 s",
+                    "45" to "45 s",
+                    "120" to "2 min",
+                    "0" to stringResource(R.string.settings_weather_awake_always),
+                ),
+                selected = s.widgets.weatherAwakeSeconds.toString(),
+                onSelect = { viewModel.setWeatherAwakeSeconds(it.toInt()) },
+            )
+            Text(
+                text = stringResource(R.string.settings_weather_awake_desc),
+                color = LocalExpressivePalette.current.dim,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+            )
+            ExpressiveRowDivider()
+        }
 
         WeatherLocationRow()
         ExpressiveRowDivider()

@@ -315,6 +315,8 @@ data class LauncherSettings(
         val clockMinuteOpacity: Float = 1f,
         /** Weather day widget (both displays): animated conditions behind it. */
         val weatherAnimated: Boolean = true,
+        /** How long the sky moves each time home comes back, in seconds (0 = as long as home shows). */
+        val weatherAwakeSeconds: Int = 45,
         /** Show the current weather (Open-Meteo; needs a location permission) in the smartspace widget. */
         val showWeather: Boolean = true,
         /** A tap on Folark's weather opens Motorola Weather (where the phone has it). */

@@ -187,7 +187,9 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
     // Rain, snow and storms move fast and get about 30 frames a second; sun, stars, clouds and fog
     // drift slowly and look the same at about 15.
     val frameMs = if (sky == Sky.RAIN || sky == Sky.SNOW || sky == Sky.STORM) 33L else 66L
-    LaunchedEffect(animate, frameMs) {
+    // Settings ▸ Folark widgets ▸ Sky moves for (0: as long as home shows).
+    val awakeNs = if (widgets.weatherAwakeSeconds <= 0) Long.MAX_VALUE else widgets.weatherAwakeSeconds * 1_000_000_000L
+    LaunchedEffect(animate, frameMs, awakeNs) {
         if (!animate) return@LaunchedEffect
         // The sky moves for a while after home comes back (or the widget scrolls into view), then
         // rests where it is: a phone left on the home screen no longer draws rain at 30 frames a
@@ -201,7 +203,7 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
             val now = System.nanoTime()
             if (onScreen && !wasOnScreen) awakeSince = now
             wasOnScreen = onScreen
-            if (onScreen && now - awakeSince < WEATHER_AWAKE_NS) {
+            if (onScreen && now - awakeSince < awakeNs) {
                 time.floatValue = (now - start) / 1_000_000_000f
                 delay(frameMs)
             } else {
@@ -561,6 +563,3 @@ private fun DrawScope.drawLightning(t: Float) {
     }
     if (flash > 0f) drawRect(Color.White.copy(alpha = flash))
 }
-
-/** How long the weather animation plays each time home comes back or the widget comes into view. */
-private const val WEATHER_AWAKE_NS = 45_000_000_000L

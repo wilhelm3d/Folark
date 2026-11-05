@@ -113,6 +113,8 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_people_batch_times, 0, SettingsCategory.HOME_SCREEN),
     SettingsSearchEntry(R.string.settings_folark_widgets, R.string.settings_folark_widgets_desc, SettingsCategory.HOME_SCREEN),
     SettingsSearchEntry(R.string.settings_weather_animated, R.string.settings_weather_animated_desc, SettingsCategory.HOME_SCREEN),
+    SettingsSearchEntry(R.string.settings_weather_awake, 0, SettingsCategory.HOME_SCREEN),
+    SettingsSearchEntry(R.string.settings_weather_awake_desc, 0, SettingsCategory.HOME_SCREEN),
     SettingsSearchEntry(R.string.settings_clock_style, 0, SettingsCategory.HOME_SCREEN),
     SettingsSearchEntry(R.string.settings_clock_text, 0, SettingsCategory.HOME_SCREEN),
     SettingsSearchEntry(R.string.settings_clock_minutes, 0, SettingsCategory.HOME_SCREEN),

@@ -1214,4 +1214,7 @@
     <string name="settings_icon_ring_progress">Progress</string>
     <string name="settings_icon_ring_all">Progress &amp; unread</string>
     <string name="settings_icon_ring_desc">A ring fills around the icon with a download or upload, ticks with a running timer, and (with unread) circles an app with new notifications</string>
+    <string name="settings_weather_awake">Sky moves for</string>
+    <string name="settings_weather_awake_always">Always</string>
+    <string name="settings_weather_awake_desc">After coming back to home or scrolling the widget into view; then it rests. Always: as long as home shows (uses more battery)</string>
 </resources>

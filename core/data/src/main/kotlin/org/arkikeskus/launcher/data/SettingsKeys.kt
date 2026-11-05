@@ -166,6 +166,7 @@ internal object Keys {
     val CLOCK_MINUTE_COLOR = stringPreferencesKey("clock_minute_color")
     val CLOCK_MINUTE_OPACITY = floatPreferencesKey("clock_minute_opacity")
     val WEATHER_WIDGET_ANIMATED = booleanPreferencesKey("weather_widget_animated")
+    val WEATHER_AWAKE_SECONDS = intPreferencesKey("weather_awake_seconds")
     val TASKBAR_ENABLED = booleanPreferencesKey("taskbar_enabled")
     val TASKBAR_PINNED = stringPreferencesKey("taskbar_pinned")
     val TASKBAR_RECENTS = intPreferencesKey("taskbar_recents")

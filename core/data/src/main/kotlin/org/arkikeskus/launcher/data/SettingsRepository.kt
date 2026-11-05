@@ -319,6 +319,7 @@ class SettingsRepository @Inject constructor(
                 noteText = p[Keys.NOTE_WIDGET_TEXT] ?: "",
                 motoWeatherTap = p[Keys.MOTO_WEATHER_TAP] ?: true,
                 weatherAnimated = p[Keys.WEATHER_WIDGET_ANIMATED] ?: true,
+                weatherAwakeSeconds = (p[Keys.WEATHER_AWAKE_SECONDS] ?: 45).coerceIn(0, 600),
                 clockDarkText = p[Keys.CLOCK_WIDGET_DARK_TEXT] ?: false,
                 clockGlassEffect = p[Keys.CLOCK_WIDGET_GLASS_EFFECT] ?: true,
                 clockMinuteColor = (p[Keys.CLOCK_MINUTE_COLOR] ?: LauncherSettings.CLOCK_MINUTE_STYLE).let {
@@ -647,6 +648,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setAppFontBold(value: Boolean, st: ScreenType) = edit { it[Keys.appFontBold(st)] = value }
     suspend fun setAppFontSizeScale(value: Float, st: ScreenType) = edit { it[Keys.appFontSizeScale(st)] = value.coerceIn(0.7f, 1.4f) }
     suspend fun setWeatherWidgetAnimated(value: Boolean) = edit { it[Keys.WEATHER_WIDGET_ANIMATED] = value }
+    suspend fun setWeatherAwakeSeconds(value: Int) = edit { it[Keys.WEATHER_AWAKE_SECONDS] = value }
     suspend fun setTaskbarEnabled(value: Boolean) = edit { it[Keys.TASKBAR_ENABLED] = value }
     /** Null goes back to the inner dock's apps. */
     suspend fun setTaskbarPinned(keys: List<String>?) = edit { p ->

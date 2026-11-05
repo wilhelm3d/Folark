@@ -157,6 +157,7 @@ class SettingsViewModel @Inject constructor(
     fun setClockMinuteOpacity(value: Float) = update { repository.setClockMinuteOpacity(value) }
     fun setClockWidgetGlassEffect(value: Boolean) = update { repository.setClockWidgetGlassEffect(value) }
     fun setWeatherWidgetAnimated(value: Boolean) = update { repository.setWeatherWidgetAnimated(value) }
+    fun setWeatherAwakeSeconds(value: Int) = update { repository.setWeatherAwakeSeconds(value) }
     fun setTaskbarEnabled(value: Boolean) = update { repository.setTaskbarEnabled(value) }
     fun setTaskbarPinned(keys: List<String>?) = update { repository.setTaskbarPinned(keys) }
     fun setTaskbarRecentCount(value: Int) = update { repository.setTaskbarRecentCount(value) }

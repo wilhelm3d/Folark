@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Efficiency and fixes (audit)
+- Weather widget: "Sky moves for" 15 s, 45 s (default), 2 min or Always (Settings ▸ Home screen ▸ Folark widgets).
 - Battery: calendar sync no longer makes Folark read the calendar in the background; it is read when the smartspace widget is showing (and on every return to home).
 - Battery: the weather widget's sky moves for 45 s each time home comes back or the widget scrolls into view, then rests (a phone left on home drew rain at 30 frames a second until the screen went off).
 - Battery: a busy icon ring spins for 30 s and then rests, and it redraws only the ring (it recomposed the icon every frame).
