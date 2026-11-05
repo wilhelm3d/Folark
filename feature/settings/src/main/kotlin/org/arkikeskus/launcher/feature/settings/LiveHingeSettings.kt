@@ -34,9 +34,8 @@ import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import kotlin.math.roundToInt
 
 /** Whether the phone reports its hinge angle (the live-hinge transition needs it). */
-internal fun hasHingeSensor(context: Context): Boolean = runCatching {
-    context.getSystemService(SensorManager::class.java)?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE) != null
-}.getOrDefault(false)
+internal fun hasHingeSensor(context: Context): Boolean =
+    org.arkikeskus.launcher.ui.component.HingeSensor.available(context)
 
 /**
  * Inner display card, under the fold transition when "Live hinge" is chosen: a preview that plays

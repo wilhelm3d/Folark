@@ -1,9 +1,5 @@
 package org.arkikeskus.launcher.feature.home
 
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -17,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.abs
+import org.arkikeskus.launcher.ui.component.HingeSensor
 
 /**
  * How far the phone is folded from flat, 0 (flat) to 1 ([FULL_TILT_ANGLE] or more), from Android's
@@ -38,21 +35,18 @@ fun rememberHingeFold(enabled: Boolean): State<Float> {
     // is not kept on in the dark, nor behind Folark Recents or the split picker (see-through, so home
     // stays started under them).
     LifecycleResumeEffect(enabled, context) {
-        val sensors = context.getSystemService(SensorManager::class.java)
-        val sensor = if (enabled) runCatching { sensors?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE) }.getOrNull() else null
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                val angle = event.values.firstOrNull() ?: return
+        // One shared hinge listener for all of Folark (HingeSensor); this asks it at UI pace.
+        val token = Any()
+        if (enabled) {
+            HingeSensor.acquire(context, token, HingeSensor.SAMPLING_UI_US) { angle ->
                 val next = ((180f - angle) / (180f - FULL_TILT_ANGLE)).coerceIn(0f, 1f)
                 if (abs(next - target.floatValue) > MIN_STEP) target.floatValue = next
             }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        } else {
+            target.floatValue = 0f
         }
-        if (sensor != null) runCatching { sensors?.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI) }
-        else target.floatValue = 0f
         onPauseOrDispose {
-            if (sensor != null) runCatching { sensors?.unregisterListener(listener) }
+            if (enabled) HingeSensor.release(token)
             target.floatValue = 0f
         }
     }

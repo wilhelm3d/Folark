@@ -1,11 +1,8 @@
 package org.arkikeskus.launcher.ui
 
 import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.SystemClock
+import org.arkikeskus.launcher.ui.component.HingeSensor
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.runtime.withFrameNanos
@@ -14,54 +11,31 @@ import kotlin.math.exp
 import kotlin.math.max
 
 /**
- * The phone's hinge angle (Android's public hinge sensor; the Razr Fold reports it as "Hinge Angle",
- * no permission needed), in degrees: 0 closed, 180 flat. Read only while [start]ed.
+ * The hinge angle for the live hinge effect, read only while [start]ed: a client of the one shared
+ * hinge listener ([HingeSensor]), at its fast rate.
  */
-class HingeAngleSource(context: Context) {
-    private val sensors = context.getSystemService(SensorManager::class.java)
-    private val sensor: Sensor? = runCatching { sensors?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE) }.getOrNull()
-
+class HingeAngleSource(private val context: Context) {
     /** Whether this phone has a hinge sensor. */
-    val available: Boolean get() = sensor != null
+    val available: Boolean get() = HingeSensor.available(context)
 
     /** The last reading, NaN until the first one after [start]. */
-    @Volatile var angle: Float = Float.NaN
-        private set
+    val angle: Float get() = if (listening) HingeSensor.angle else Float.NaN
 
     /** When the angle last changed (uptime ms). */
-    @Volatile var lastChange: Long = 0L
-        private set
+    val lastChange: Long get() = HingeSensor.lastChange
 
     private var listening = false
 
-    private val listener = object : SensorEventListener {
-        override fun onSensorChanged(event: SensorEvent) {
-            val value = event.values.firstOrNull() ?: return
-            if (value != angle) {
-                angle = value
-                lastChange = SystemClock.uptimeMillis()
-            }
-        }
-
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-    }
-
     fun start() {
-        val s = sensor ?: return
         if (listening) return
-        // The hinge sensor reports on change; 100 Hz is the most it is asked for.
-        listening = runCatching { sensors?.registerListener(listener, s, SAMPLING_US) == true }.getOrDefault(false)
+        listening = true
+        HingeSensor.acquire(context, this, HingeSensor.SAMPLING_FAST_US)
     }
 
     fun stop() {
         if (!listening) return
-        runCatching { sensors?.unregisterListener(listener) }
         listening = false
-        angle = Float.NaN
-    }
-
-    private companion object {
-        const val SAMPLING_US = 10_000
+        HingeSensor.release(this)
     }
 }
 
