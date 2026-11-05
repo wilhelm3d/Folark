@@ -12,14 +12,21 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 
 /**
- * In System UI (WM Shell): the split divider's stops at 30 %, 50 % and 70 % (Settings ▸ Recents &
- * split screen ▸ Divider stops). The Razr's split screen only offers 50/50 besides the "close"
- * ends; every new DividerSnapAlgorithm gets its ⅓ and ⅔ stops replaced (or added) at 30 % and
- * 70 %, under the same snap positions (SNAP_TO_2_33_66 = 0, SNAP_TO_2_66_33 = 2), so dragging the
- * divider rests there and everything that asks for "a third" (Folark's layouts, saved pairs, the
- * system) lands on them. 50/50, peek stops and the dismiss ends stay as they are.
+ * In System UI (WM Shell): the split divider's stops at ⅓, ½ and ⅔ (Settings ▸ Recents & split
+ * screen ▸ Divider stops).
  *
- * Anything unexpected (a renamed field, a target it can't build) leaves the stops untouched.
+ * How the Razr's WM Shell works (read from its SystemUI): with Motorola's three-app split on,
+ * DividerSnapAlgorithm runs in snap mode 6, and on the inner screen side by side its two-app stops
+ * are 5/90 (14), 50/50 (1) and 90/5 (13) only. After every move the layout takes the split state
+ * of the stop nearest the divider (getSplitStateByDividerPositions: stop 0 → state 0, 2 → 2) and
+ * sizes the apps from SplitState's table, which has ⅓ (33 %) and ⅔ (67 %) for states 0 and 2.
+ * updateTargets() rebuilds the stops on every rotation, bounds or state change, so the stops are
+ * added after each rebuild (not once), at 33 % and 67 % to match that table exactly. Middle,
+ * first, last and the Moto 5/90 stops stay Android's; the second / second-last stops become ours,
+ * as updateTargets itself picks them for a five-stop list.
+ *
+ * Lists with three-app stops (Motorola's 7 to 12) are left alone, and anything unexpected (a
+ * renamed field, a target it can't build) leaves the stops untouched.
  */
 internal object DividerStopsHook {
     const val METHOD = "divider_stops"
@@ -43,17 +50,19 @@ internal object DividerStopsHook {
 
     private const val SNAP_FIRST_THIRD = 0
     private const val SNAP_SECOND_THIRD = 2
-    private val THREE_APP_SNAPS = 5..9
-    private const val FIRST = 0.30f
-    private const val SECOND = 0.70f
+    /** Inner stops of a two-app list: ⅓, ½, ⅔, 90/10, 10/90 and Motorola's 90/5, 5/90. */
+    private val TWO_APP_SNAPS = setOf(0, 1, 2, 3, 4, 13, 14)
+    private const val FIRST = 0.33f
+    private const val SECOND = 0.67f
 
     fun install(loader: ClassLoader, log: (String) -> Unit) {
         this.log = log
         var hooked = 0
         for (name in CLASSES) {
             val cls = runCatching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
+            // After every rebuild of the stops (the constructor calls it too).
             hooked += runCatching {
-                XposedBridge.hookAllConstructors(cls, object : XC_MethodHook() {
+                XposedBridge.hookAllMethods(cls, "updateTargets", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         ask()
                         if (on) runCatching { addStops(param.thisObject) }.onFailure { log("divider stops: left as they are ($it)") }
@@ -61,16 +70,18 @@ internal object DividerStopsHook {
                 }).size
             }.getOrDefault(0)
         }
-        log(if (hooked > 0) "divider stops: hooked $hooked constructor(s)" else "divider stops: no DividerSnapAlgorithm here")
+        log(if (hooked > 0) "divider stops: hooked updateTargets ($hooked)" else "divider stops: no DividerSnapAlgorithm.updateTargets here")
     }
 
-    /** Replaces the ⅓ / ⅔ stops of [algorithm] with 30 % / 70 % ones (adds them where missing). */
+    /** Replaces the ⅓ / ⅔ stops of [algorithm] with 33 % / 67 % ones (adds them where missing). */
     private fun addStops(algorithm: Any) {
         @Suppress("UNCHECKED_CAST")
         val targets = field(algorithm, "mTargets") as? MutableList<Any?> ?: error("no mTargets")
         if (targets.size < 3) error("only ${targets.size} targets")
-        // A three-app layout (its stops are SNAP_TO_3_*: 5 to 9) keeps Android's own stops.
-        if (targets.any { (field(it ?: return@any false, "snapPosition") as? Int) in THREE_APP_SNAPS }) return
+        // Only a two-app list (its inner stops all two-app ones) gets the sizes; three-app layouts
+        // (Motorola's stops 5 to 12) keep theirs.
+        val innerSnaps = targets.subList(1, targets.size - 1).map { field(it ?: return, "snapPosition") as? Int ?: return }
+        if (innerSnaps.any { it !in TWO_APP_SNAPS }) return
         val middle = field(algorithm, "mMiddleTarget") ?: targets[targets.size / 2] ?: error("no middle")
         val middleAt = field(middle, "position") as? Int ?: error("no target position")
 
@@ -84,7 +95,7 @@ internal object DividerStopsHook {
         val span = if (leftRight) width - insets.left - insets.right else height - insets.top - insets.bottom
         if (span <= 0) error("no room ($span)")
         // Measured from the 50/50 stop, so however Android places the divider (its own width,
-        // insets), 30 % and 70 % sit the same way.
+        // insets), 33 % and 67 % sit the same way.
         fun at(ratio: Float) = middleAt + ((ratio - 0.5f) * span).toInt()
 
         val first = newTarget(middle, at(FIRST), SNAP_FIRST_THIRD) ?: error("can't build a stop")
@@ -100,7 +111,16 @@ internal object DividerStopsHook {
         targets.add(dismissStart)
         targets.addAll(inner)
         targets.add(dismissEnd)
-        // The outermost stops the divider can rest at (beyond them it closes a side).
+        // As updateTargets picks them: the outermost stops stay (Motorola's 5/90 and 90/5 when
+        // there), the second and second-last are the sizes. Older builds' names too.
+        val all = targets.filterNotNull()
+        setField(algorithm, "mMiddleTarget", all[all.size / 2])
+        setField(algorithm, "mFirstDividerTarget", all[1])
+        setField(algorithm, "mLastDividerTarget", all[all.size - 2])
+        if (all.size >= 5) {
+            setField(algorithm, "mSecondDividerTarget", all[2])
+            setField(algorithm, "mSecondLastDividerTarget", all[all.size - 3])
+        }
         setField(algorithm, "mFirstSplitTarget", inner.first())
         setField(algorithm, "mLastSplitTarget", inner.last())
     }
@@ -149,7 +169,7 @@ internal object DividerStopsHook {
             context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), METHOD, null, null)
         }.getOrNull() ?: return
         on = answer.getBoolean(EXTRA_ON, false)
-        log("divider stops: ${if (on) "30/50/70" else "Android's own"} (from the next split)")
+        log("divider stops: ${if (on) "33/50/67" else "Android's own"} (from the next split)")
     }
 
     private fun field(target: Any, name: String): Any? {

@@ -251,7 +251,7 @@ fun SplitPickerDrawer(
                     peek = peek,
                     onPeekChange = onPeekChange,
                 ) {
-                    // In the corner: how the screen is shared, 70/30 · 50/50 · 30/70 as on screen
+                    // In the corner: how the screen is shared, 67/33 · 50/50 · 33/67 as on screen
                     // (picking one turns peek off).
                     if (share != null && pickCount == 1) {
                         ShareButtons(share, pickedOnLeft, peek == true, onShareChange)
@@ -471,14 +471,15 @@ private fun Header(text: String, peek: Boolean?, onPeekChange: (Boolean) -> Unit
 }
 
 /**
- * The three ways to share the screen, in the header's corner: 70/30, 50/50 and 30/70, read left to
+ * The three ways to share the screen, in the header's corner: 67/33, 50/50 and 33/67 (the sizes
+ * Motorola's split screen lays apps out at), read left to
  * right as on screen, each a tiny preview with its label; the chosen one is lit. [share] is the
  * picked app's part.
  */
 @Composable
 private fun ShareButtons(share: Int, pickedOnLeft: Boolean, peekOn: Boolean, onShareChange: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        listOf(70, 50, 30).forEach { left ->
+        listOf(67, 50, 33).forEach { left ->
             // The picked app's part for this layout.
             val option = if (pickedOnLeft) left else 100 - left
             val selected = option == share && !peekOn
