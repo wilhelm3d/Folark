@@ -267,6 +267,10 @@ internal object SplitThreeHook {
 
         // A layout change for the split showing now (peek, a third, half and half…).
         val snap = intent.getIntExtra(SplitThree.EXTRA_SNAP, -1)
+        intent.getIntArrayExtra(SplitThree.EXTRA_SNAP_FRACTIONS)?.let { fractions ->
+            executor.execute { snapFractions(context, c, request, fractions, 0) }
+            return
+        }
         if (snap == SplitThree.SNAP_THREE_EVEN || snap == SplitThree.SNAP_THREE_PEEK) {
             executor.execute { snapThree(context, c, request, snap, 0) }
             return
@@ -493,6 +497,72 @@ internal object SplitThreeHook {
             if (state == wanted) reply(context, request, true)
             else reply(context, request, false, detail = "the dividers went back (split state $state)")
         }, SNAP_MS + SNAP_SETTLE_MS)
+    }
+
+    /**
+     * On WM Shell's thread: the split showing (or about to) to the divider places [fractions]
+     * (thousandths): one for two apps, two for three. Waits for a layout with that many apps.
+     */
+    private fun snapFractions(context: Context, c: Any, request: String, fractions: IntArray, tries: Int) {
+        val layout = runCatching { field(splitManager(c), "mSplitLayout") }.getOrNull()
+        val three = layout?.javaClass?.name?.endsWith("Carousel3Apps") == true
+        val fits = layout != null && !splitBusy(c) && (if (fractions.size == 2) three else !three)
+        if (!fits) {
+            if (tries < THREE_WAIT_TRIES) {
+                Handler(Looper.myLooper() ?: Looper.getMainLooper()).postDelayed({ snapFractions(context, c, request, fractions, tries + 1) }, WAIT_STEP_MS)
+            } else {
+                reply(context, request, false, detail = "no split with ${fractions.size + 1} apps showing")
+            }
+            return
+        }
+        val ok = runCatching {
+            val algorithm = field(layout!!, "mDividerSnapAlgorithm") ?: error("no DividerSnapAlgorithm")
+            val leftRight = field(algorithm, "mIsLeftRightSplit") as? Boolean ?: true
+            val span = field(algorithm, if (leftRight) "mDisplayWidth" else "mDisplayHeight") as Int
+            val at = fractions.map { (it.coerceIn(1, 999).toLong() * span / 1000).toInt() }.sorted()
+            if (three) DividerStopsHook.placeThree(layout, at[0], at[1]) else DividerStopsHook.placeTwo(layout, at[0])
+        }.getOrElse { log("split layout: can't place the divider: ${reason(it)}"); false }
+        reply(context, request, ok)
+    }
+
+    /** S5: a divider started / stopped being dragged, for Folark's marks overlay. */
+    fun reportDrag(on: Boolean, panes: Int) {
+        val context = appContext ?: return
+        send(context, Bundle().apply {
+            putInt(SplitEvents.EXTRA_KIND, SplitEvents.KIND_DRAG)
+            putBoolean(SplitEvents.EXTRA_VISIBLE, on)
+            putInt(SplitEvents.EXTRA_PANES, panes)
+        })
+    }
+
+    /**
+     * S1: the split's apps (left to right, by WM Shell's stage order) and divider places in
+     * thousandths, once a divider rests: Folark keeps them per set of apps.
+     */
+    fun reportLayout() {
+        val c = controller ?: return
+        val context = appContext ?: return
+        val executor = mainExecutor(c) ?: return
+        executor.execute {
+            runCatching {
+                val stage = field(c, "mStageCoordinator") ?: return@runCatching
+                val layout = field(splitManager(c), "mSplitLayout") ?: return@runCatching
+                val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return@runCatching
+                val leftRight = field(algorithm, "mIsLeftRightSplit") as? Boolean ?: true
+                val span = (field(algorithm, if (leftRight) "mDisplayWidth" else "mDisplayHeight") as? Int)?.takeIf { it > 0 } ?: return@runCatching
+                val positions = (field(layout, "mDividerPositions") as? IntArray)?.sorted()
+                    ?: listOfNotNull(field(layout, "mDividerPosition") as? Int)
+                if (positions.isEmpty()) return@runCatching
+                val getTask = methods(stage.javaClass).first { it.name == "getTaskId" && it.parameterTypes.size == 1 }
+                val tasks = (0..positions.size).map { getTask.invoke(stage, it) as Int }
+                if (tasks.any { it <= 0 }) return@runCatching
+                send(context, Bundle().apply {
+                    putInt(SplitEvents.EXTRA_KIND, SplitEvents.KIND_LAYOUT)
+                    putIntArray(SplitEvents.EXTRA_TASKS, tasks.toIntArray())
+                    putIntArray(SplitEvents.EXTRA_FRACTIONS, positions.map { (it.toLong() * 1000 / span).toInt() }.toIntArray())
+                })
+            }
+        }
     }
 
     /** WM Shell's SplitLayoutManager (Motorola), which holds the current split layout and state. */

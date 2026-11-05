@@ -66,6 +66,8 @@
     <string name="recents_mode_peek">Peek</string>
     <string name="recents_mode_free">Free</string>
     <string name="recents_pick_peek">Tap the app that peeks in</string>
+    <string name="recents_pick_peek_three">Pick three apps for peek view</string>
+    <string name="recents_pick_peek_which">Which one big?</string>
     <string name="recents_pick_peek_big">Tap the big app (in the middle)</string>
     <string name="recents_pick_peek_edges">Now the two apps that peek in at the edges</string>
     <string name="recents_menu_home_two">Add split to home screen</string>

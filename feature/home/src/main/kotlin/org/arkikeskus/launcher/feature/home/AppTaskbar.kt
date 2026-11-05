@@ -326,6 +326,7 @@ internal class AppTaskbar(
                     mediaShowPaused = s.taskbar.mediaShowPaused,
                     mediaPosition = s.taskbar.mediaPosition,
                     dividerStyle = s.taskbar.dividerStyle,
+                    dividerLock = s.recents.dividerLock,
                     mediaTap = s.taskbar.mediaTap,
                     mediaControls = s.taskbar.mediaControls,
                     mediaShape = s.taskbar.mediaShape,

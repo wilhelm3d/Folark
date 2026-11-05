@@ -32,6 +32,22 @@ object SplitEvents {
     /** The module's listener is (again) attached; the current state follows right before this. */
     const val KIND_ATTACHED = 3
 
+    /** A divider started ([EXTRA_VISIBLE] true, with [EXTRA_PANES]) or stopped being dragged. */
+    const val KIND_DRAG = 4
+    /** A divider came to rest: the split's tasks ([EXTRA_TASKS], left to right) and divider places ([EXTRA_FRACTIONS]). */
+    const val KIND_LAYOUT = 5
+    const val EXTRA_PANES = "panes"
+    const val EXTRA_TASKS = "tasks"
+    const val EXTRA_FRACTIONS = "fractions"
+
+    /** How many apps the split being dragged has (0: no divider is being dragged). */
+    private val _dragging = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val dragging: StateFlow<Int> = _dragging.asStateFlow()
+
+    /** The last divider rest System UI reported: task ids left to right, and divider places (‰). */
+    private val _layouts = kotlinx.coroutines.flow.MutableSharedFlow<Pair<IntArray, IntArray>>(extraBufferCapacity = 4)
+    val layouts: kotlinx.coroutines.flow.SharedFlow<Pair<IntArray, IntArray>> = _layouts
+
     /** WM Shell's stage for "in no split stage" (SplitScreen.STAGE_TYPE_UNDEFINED). */
     const val STAGE_NONE = -1
 
@@ -69,6 +85,12 @@ object SplitEvents {
             }
             KIND_VISIBLE -> splitVisible = extras.getBoolean(EXTRA_VISIBLE)
             KIND_ATTACHED -> attachedAt = System.currentTimeMillis()
+            KIND_DRAG -> _dragging.value = if (extras.getBoolean(EXTRA_VISIBLE)) extras.getInt(EXTRA_PANES, 2) else 0
+            KIND_LAYOUT -> {
+                val tasks = extras.getIntArray(EXTRA_TASKS)
+                val fractions = extras.getIntArray(EXTRA_FRACTIONS)
+                if (tasks != null && fractions != null) _layouts.tryEmit(tasks to fractions)
+            }
         }
     }
 

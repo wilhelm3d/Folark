@@ -62,6 +62,8 @@ internal fun ShortcutIconContent(
                         aquamorphicTouchEnabled = false,
                     )
                 }
+                // P8: a peek scene wears a small peek mark (a big pane, a strip at its edge).
+                if (shortcut.appPair?.let(::isPeekScene) == true) PeekMark(iconSize)
                 // A three-app layout: the floating app, smaller, on top in the middle of the two —
                 // on a dark disc so it reads as sitting above them.
                 shortcut.pairThirdApp?.let { third ->
@@ -126,5 +128,40 @@ internal fun ShortcutIconContent(
             Box(Modifier.size(iconSize))
         }
         if (showLabel) AppLabel(shortcut.label, labelColor, reserveLines = true)
+    }
+}
+
+/** A scene that opens as peek view: two apps in peek layout, or three with a narrow strip. */
+internal fun isPeekScene(pair: org.arkikeskus.launcher.model.AppPair): Boolean {
+    if (!pair.hasThirdApp) return pair.effectiveLayout == org.arkikeskus.launcher.model.AppPair.LAYOUT_PEEK ||
+        pair.sizeList.singleOrNull()?.let { it < 150 || it > 850 } == true
+    val sizes = pair.sizeList
+    return sizes.size == 2 && (sizes[0] < 150 || sizes[1] > 850)
+}
+
+/** The peek mark on a scene's tile (P8), at its top end. */
+@Composable
+private fun PeekMark(iconSize: Dp) {
+    val color = MaterialTheme.colorScheme.primary
+    Box(Modifier.size(iconSize), contentAlignment = Alignment.TopEnd) {
+        androidx.compose.foundation.Canvas(
+            Modifier
+                .offset(x = iconSize * 0.08f, y = -(iconSize * 0.06f))
+                .size(width = iconSize * 0.42f, height = iconSize * 0.28f)
+                .background(color, RoundedCornerShape(iconSize * 0.08f))
+                .padding(iconSize * 0.04f),
+        ) {
+            val w = size.width
+            val h = size.height
+            val strip = w * 0.16f
+            drawRoundRect(Color.White, size = androidx.compose.ui.geometry.Size(strip, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(strip / 2))
+            drawRoundRect(
+                Color.White,
+                topLeft = androidx.compose.ui.geometry.Offset(strip + w * 0.08f, 0f),
+                size = androidx.compose.ui.geometry.Size(w - strip - w * 0.08f, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(h * 0.2f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = h * 0.14f),
+            )
+        }
     }
 }

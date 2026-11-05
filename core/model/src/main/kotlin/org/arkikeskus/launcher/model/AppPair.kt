@@ -31,7 +31,14 @@ data class AppPair(
     val thirdMode: String = THIRD_AUTO,
     /** On the cover screen: the split as on the inner screen, or the first app alone (COVER_*). */
     val coverMode: String = COVER_SPLIT,
+    /**
+     * The divider(s) as saved, in thousandths of the screen from the left (or top): one for two
+     * apps, two for three ("333,667"); empty: by [layout]. Covers free sizes and three-app layouts.
+     */
+    val sizes: String = "",
 ) {
+    /** [sizes] as numbers (empty when none or unreadable). */
+    val sizeList: List<Int> get() = sizes.split(',').mapNotNull { it.trim().toIntOrNull() }.filter { it in 1..999 }
     val hasThirdApp: Boolean get() = app3Package.isNotEmpty() && app3ClassName.isNotEmpty()
     val app3ComponentName: ComponentName get() = ComponentName(app3Package, app3ClassName)
     val app1ComponentName: ComponentName get() = ComponentName(app1Package, app1ClassName)

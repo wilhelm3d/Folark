@@ -78,6 +78,9 @@ object SplitThree {
      */
     const val SNAP_THREE_PEEK = 21
 
+    /** Divider places in thousandths of the screen (one for two apps, two for three): an IntArray. */
+    const val EXTRA_SNAP_FRACTIONS = "snap_fractions"
+
     /** Provider methods SystemUI calls on Folark: "ready" when it starts, "result" per request. */
     const val METHOD_READY = "split3_ready"
     const val METHOD_RESULT = "split3_result"
@@ -250,6 +253,16 @@ object SplitThree {
             putExtra(EXTRA_SNAP, snap)
             if (forTask > 0) putExtra(EXTRA_SNAP_FOR_TASK, forTask)
         }
+    }
+
+    /**
+     * The split showing now to the divider places [fractions] (thousandths of the screen from the
+     * left / top): one for two apps, two for three. False without the module, or when the split
+     * showing has a different number of apps.
+     */
+    suspend fun snapFractions(context: Context, fractions: List<Int>): Boolean {
+        if (Build.VERSION.SDK_INT < 34 || fractions.size !in 1..2) return false
+        return send(context, "sizes") { putExtra(EXTRA_SNAP_FRACTIONS, fractions.toIntArray()) }
     }
 
     /**

@@ -82,6 +82,23 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
                             }
                         }
                     }
+                    // S4: one app half the screen, the other two a quarter each.
+                    listOf(
+                        R.string.taskbar_split_three_half_left to listOf(500, 750),
+                        R.string.taskbar_split_three_half_middle to listOf(250, 750),
+                        R.string.taskbar_split_three_half_right to listOf(250, 500),
+                    ).forEach { (label, fractions) ->
+                        rows += context.getString(label) to { scope.launch { SplitThree.snapFractions(context, fractions) } }
+                    }
+                }
+                // S13: the divider lock, one tap (Settings ▸ Recents & split screen ▸ Lock the divider).
+                if (SplitThree.ready(context)) {
+                    val locked = s.dividerLock != LauncherSettings.DIVIDER_LOCK_OFF
+                    rows += context.getString(if (locked) R.string.taskbar_split_unlock else R.string.taskbar_split_lock) to {
+                        scope.launch {
+                            settingsRepo?.setSplitDividerLock(if (locked) LauncherSettings.DIVIDER_LOCK_OFF else LauncherSettings.DIVIDER_LOCK_ALL)
+                        }
+                    }
                 }
                 tasks.forEach { task ->
                     val label = allApps.firstOrNull { it.packageName == task.packageName }?.label ?: task.packageName

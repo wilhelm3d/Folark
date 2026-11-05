@@ -540,6 +540,7 @@ class SettingsRepository @Inject constructor(
                     ?: if (parts.getOrNull(14) == "1") AppPair.LAYOUT_PEEK else AppPair.LAYOUT_EVEN,
                 thirdMode = parts.getOrNull(16)?.takeIf { it in AppPair.THIRD_MODES } ?: AppPair.THIRD_AUTO,
                 coverMode = parts.getOrNull(17)?.takeIf { it in AppPair.COVER_MODES } ?: AppPair.COVER_SPLIT,
+                sizes = parts.getOrNull(18).orEmpty(),
             )
         } ?: emptyList()
 
@@ -564,6 +565,7 @@ class SettingsRepository @Inject constructor(
                 p.effectiveLayout,
                 p.thirdMode,
                 p.coverMode,
+                p.sizes,
             ).joinToString("\t")
         }
 
@@ -870,6 +872,13 @@ class SettingsRepository @Inject constructor(
         dividerStops = p[Keys.DIVIDER_STOPS] ?: true,
         threeEven = p[Keys.SPLIT_THREE_EVEN] ?: true,
         freeDivider = p[Keys.SPLIT_FREE_DIVIDER] ?: true,
+        dividerLock = p[Keys.SPLIT_DIVIDER_LOCK]?.takeIf { it in LauncherSettings.DIVIDER_LOCKS } ?: LauncherSettings.DIVIDER_LOCK_OFF,
+        dividerMarks = p[Keys.SPLIT_DIVIDER_MARKS] ?: true,
+        dividerHaptics = p[Keys.SPLIT_DIVIDER_HAPTICS] ?: true,
+        keepSplitSize = p[Keys.SPLIT_KEEP_SIZE] ?: true,
+        rememberSplitSize = p[Keys.SPLIT_REMEMBER_SIZE] ?: true,
+        splitDragHint = p[Keys.SPLIT_DRAG_HINT] ?: true,
+        peekFlingClose = p[Keys.PEEK_FLING_CLOSE] ?: false,
         splitRatioMenu = p[Keys.SPLIT_RATIO_MENU] ?: true,
         openWith = p[Keys.SPLIT_OPEN_WITH] ?: false,
         notificationSplit = p[Keys.NOTIFICATION_SPLIT] ?: true,
@@ -935,6 +944,13 @@ class SettingsRepository @Inject constructor(
     suspend fun setDividerStops(value: Boolean) = edit { it[Keys.DIVIDER_STOPS] = value }
     suspend fun setSplitThreeEven(value: Boolean) = edit { it[Keys.SPLIT_THREE_EVEN] = value }
     suspend fun setSplitFreeDivider(value: Boolean) = edit { it[Keys.SPLIT_FREE_DIVIDER] = value }
+    suspend fun setSplitDividerLock(value: String) = edit { it[Keys.SPLIT_DIVIDER_LOCK] = value }
+    suspend fun setSplitDividerMarks(value: Boolean) = edit { it[Keys.SPLIT_DIVIDER_MARKS] = value }
+    suspend fun setSplitDividerHaptics(value: Boolean) = edit { it[Keys.SPLIT_DIVIDER_HAPTICS] = value }
+    suspend fun setSplitKeepSize(value: Boolean) = edit { it[Keys.SPLIT_KEEP_SIZE] = value }
+    suspend fun setSplitRememberSize(value: Boolean) = edit { it[Keys.SPLIT_REMEMBER_SIZE] = value }
+    suspend fun setSplitDragHint(value: Boolean) = edit { it[Keys.SPLIT_DRAG_HINT] = value }
+    suspend fun setPeekFlingClose(value: Boolean) = edit { it[Keys.PEEK_FLING_CLOSE] = value }
     suspend fun setSplitRatioMenu(value: Boolean) = edit { it[Keys.SPLIT_RATIO_MENU] = value }
     suspend fun setSplitOpenWith(value: Boolean) = edit { it[Keys.SPLIT_OPEN_WITH] = value }
     suspend fun setNotificationSplit(value: Boolean) = edit { it[Keys.NOTIFICATION_SPLIT] = value }

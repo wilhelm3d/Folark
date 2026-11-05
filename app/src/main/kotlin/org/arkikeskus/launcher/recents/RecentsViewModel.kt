@@ -41,6 +41,7 @@ import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import org.arkikeskus.launcher.data.LaunchOrigin
 import org.arkikeskus.launcher.data.Haptics
+import org.arkikeskus.launcher.data.SplitSizes
 
 /** One card in Folark's Recents: an open app, or the apps sharing a split screen. */
 data class RecentsCard(
@@ -409,7 +410,25 @@ class RecentsViewModel @Inject constructor(
             layout = layout,
             // A trio saved from a three-pane split opens as one again.
             thirdMode = if (c != null && card.tasks.size >= 3) AppPair.THIRD_PANE else AppPair.THIRD_AUTO,
+            // S11: the divider places as they are now (a free size, three apps' sizes, peek).
+            sizes = dividerPlaces(card)?.joinToString(",").orEmpty(),
         )
+    }
+
+    /**
+     * The split's divider places in thousandths, from where Android laid its tasks out (left to
+     * right); null when it didn't say, or for plain half and half.
+     */
+    private fun dividerPlaces(card: RecentsCard): List<Int>? {
+        val bounds = card.tasks.map { it.bounds ?: return null }
+        if (bounds.size !in 2..3) return null
+        val sideBySide = bounds.map { it[0] }.distinct().size == bounds.size
+        val sorted = bounds.sortedBy { if (sideBySide) it[0] else it[1] }
+        val start = if (sideBySide) sorted.first()[0] else sorted.first()[1]
+        val end = if (sideBySide) sorted.last()[2] else sorted.last()[3]
+        val span = (end - start).takeIf { it > 0 } ?: return null
+        val places = sorted.dropLast(1).map { b -> (((if (sideBySide) b[2] else b[3]) - start).toLong() * 1000 / span).toInt() }
+        return places.takeUnless { SplitSizes.isEven(it) }
     }
 
     fun togglePin(card: RecentsCard) {

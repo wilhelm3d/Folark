@@ -60,6 +60,8 @@ internal data class TaskbarSetup(
     val mediaPosition: String,
     /** The mark between pinned and recent apps (LauncherSettings.TASKBAR_DIVIDER_*). */
     val dividerStyle: String = org.arkikeskus.launcher.model.LauncherSettings.TASKBAR_DIVIDER_LINE,
+    /** Which split dividers are locked (LauncherSettings.DIVIDER_LOCK_*), for the split menu's toggle. */
+    val dividerLock: String = org.arkikeskus.launcher.model.LauncherSettings.DIVIDER_LOCK_OFF,
     val mediaTap: String,
     val mediaControls: Boolean,
     val mediaShape: String,

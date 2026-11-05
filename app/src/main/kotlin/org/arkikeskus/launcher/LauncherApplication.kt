@@ -67,7 +67,7 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // The module's divider stops (Settings ▸ Recents & split screen): tell it when they change.
         appScope.launch {
             settingsRepository.settings(ScreenType.INNER)
-                .map { it.recents.dividerStops to it.recents.freeDivider }
+                .map { r -> with(r.recents) { listOf(dividerStops, freeDivider, dividerLock, dividerMarks, dividerHaptics, keepSplitSize, peekFlingClose) } }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
@@ -77,5 +77,17 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // Folark's taskbar in its own overlay windows, when "Display over other apps" is allowed
         // (otherwise the accessibility service hosts it, if enabled).
         runCatching { org.arkikeskus.launcher.feature.home.TaskbarHost.refresh(this) }
+        // Split screen: marks while a divider is dragged, the drag hint between panes (S5, S14).
+        org.arkikeskus.launcher.feature.home.SplitOverlays.start(this, appScope, settingsRepository.settings(ScreenType.INNER))
+        // S1: where a split's divider rests is kept per set of apps (left to right).
+        appScope.launch {
+            org.arkikeskus.launcher.data.SplitEvents.layouts.collect { (tasks, fractions) ->
+                val read = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    org.arkikeskus.launcher.data.ShellSplit.recent(this@LauncherApplication)
+                }
+                val packages = tasks.map { id -> read?.tasks?.firstOrNull { it.id == id }?.packageName ?: return@collect }
+                org.arkikeskus.launcher.data.SplitSizes.remember(this@LauncherApplication, packages, fractions.toList())
+            }
+        }
     }
 }

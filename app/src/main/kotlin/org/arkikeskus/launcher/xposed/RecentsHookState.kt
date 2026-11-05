@@ -115,6 +115,11 @@ class RecentsHookState : ContentProvider() {
         return Bundle().apply {
             putBoolean(DividerStopsHook.EXTRA_ON, recents?.dividerStops ?: true)
             putBoolean(DividerStopsHook.EXTRA_FREE, recents?.freeDivider ?: true)
+            putString(DividerStopsHook.EXTRA_LOCK, recents?.dividerLock ?: "off")
+            putBoolean(DividerStopsHook.EXTRA_MARKS, recents?.dividerMarks ?: true)
+            putBoolean(DividerStopsHook.EXTRA_HAPTICS, recents?.dividerHaptics ?: true)
+            putBoolean(DividerStopsHook.EXTRA_KEEP, recents?.keepSplitSize ?: true)
+            putBoolean(DividerStopsHook.EXTRA_PEEK_FLING, recents?.peekFlingClose ?: false)
         }
     }
 

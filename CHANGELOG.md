@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Split screen
+- Split screen (Settings ▸ Recents & split screen): faint marks at ⅓, ½ and ⅔ while dragging the divider, and a let-go near one lands on it; a haptic tick at each mark; sizes kept when the phone turns or folds; each set of apps reopens at the sizes it had last time; the divider can be locked (2 apps, 3 apps or always; also from the taskbar's split menu); while text or a picture is dragged out of an app in split screen the panes light up; peek view's divider flung towards the strip closes that app (off by default).
+- Three apps: 50 / 25 / 25, 25 / 50 / 25 and 25 / 25 / 50 in the taskbar's split menu.
+- Scenes keep their sizes: a split added to home or the taskbar from Recents opens at the sizes it had (free sizes, three apps, peek), and peek scenes show a peek mark on home.
+- Recents: with three apps picked for peek view, tap the one to show big.
 - Taskbar: long-press a pinned scene to open it another way this once: peek view, half and half, first app ⅔ or ⅓; a three-app scene as a third each or as peek view (middle app big).
 - Taskbar: the mark between pinned and recent apps can be a line, a bold line, a dot, a gap or nothing (Settings ▸ Taskbar).
 - Efficiency (taskbar): icons are kept per dark / light theme (switching back finds them drawn), and pinned icons load together in the background.

@@ -124,8 +124,23 @@ class SplitCoordinator @Inject constructor(
         if (formed && peek) {
             delay(PEEK_AFTER_MS)
             snapPeek(peekOnLeft = !firstOnRight)
+        } else if (formed) {
+            // S1: these two apps open at the sizes they had last time.
+            val left = if (firstOnRight) second.packageName else first.packageName
+            val right = if (firstOnRight) first.packageName else second.packageName
+            restoreSizes(listOf(left, right))
         }
         return formed
+    }
+
+    /** S1: [packages] (left to right) back at their last sizes, when remembered (and not half and half). */
+    private suspend fun restoreSizes(packages: List<String>) {
+        if (!SplitThree.ready(context)) return
+        val on = runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.rememberSplitSize }.getOrDefault(true)
+        if (!on) return
+        val sizes = SplitSizes.of(context, packages) ?: return
+        if (SplitSizes.isEven(sizes)) return
+        SplitThree.snapFractions(context, sizes)
     }
 
     /**
@@ -151,7 +166,10 @@ class SplitCoordinator @Inject constructor(
      */
     suspend fun three(first: SplitApp, second: SplitApp, third: SplitApp, native: Boolean, even: Boolean = false): Int {
         if (!pair(first, second, firstOnRight = false, keepOnUndo = first)) return 0
-        return if (addThird(third, native = native, orSideStage = false, even = even)) 3 else 2
+        if (!addThird(third, native = native, orSideStage = false, even = even)) return 2
+        // S1: three apps that were together before, at their last sizes (not when 33/33/33 was asked for).
+        if (!even) restoreSizes(listOf(first.packageName, second.packageName, third.packageName))
+        return 3
     }
 
     /**

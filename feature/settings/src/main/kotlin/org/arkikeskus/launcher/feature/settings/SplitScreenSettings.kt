@@ -141,6 +141,61 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         )
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_divider_marks),
+            subtitle = stringResource(R.string.settings_split_divider_marks_desc),
+            checked = s.recents.dividerMarks,
+            onCheckedChange = viewModel::setSplitDividerMarks,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_divider_haptics),
+            subtitle = stringResource(R.string.settings_split_divider_haptics_desc),
+            checked = s.recents.dividerHaptics,
+            onCheckedChange = viewModel::setSplitDividerHaptics,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_keep_size),
+            subtitle = stringResource(R.string.settings_split_keep_size_desc),
+            checked = s.recents.keepSplitSize,
+            onCheckedChange = viewModel::setSplitKeepSize,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_remember_size),
+            subtitle = stringResource(R.string.settings_split_remember_size_desc),
+            checked = s.recents.rememberSplitSize,
+            onCheckedChange = viewModel::setSplitRememberSize,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_split_divider_lock),
+            options = listOf(
+                LauncherSettings.DIVIDER_LOCK_OFF to stringResource(R.string.settings_split_divider_lock_off),
+                LauncherSettings.DIVIDER_LOCK_TWO to stringResource(R.string.settings_split_divider_lock_two),
+                LauncherSettings.DIVIDER_LOCK_THREE to stringResource(R.string.settings_split_divider_lock_three),
+                LauncherSettings.DIVIDER_LOCK_ALL to stringResource(R.string.settings_split_divider_lock_all),
+            ),
+            selected = s.recents.dividerLock,
+            onSelect = viewModel::setSplitDividerLock,
+            icon = null,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_drag_hint),
+            subtitle = stringResource(R.string.settings_split_drag_hint_desc),
+            checked = s.recents.splitDragHint,
+            onCheckedChange = viewModel::setSplitDragHint,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_peek_fling_close),
+            subtitle = stringResource(R.string.settings_peek_fling_close_desc),
+            checked = s.recents.peekFlingClose,
+            onCheckedChange = viewModel::setPeekFlingClose,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
             title = stringResource(R.string.settings_split_three_even),
             subtitle = stringResource(R.string.settings_split_three_even_desc),
             checked = s.recents.threeEven,

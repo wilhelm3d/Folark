@@ -668,6 +668,20 @@ data class LauncherSettings(
         val dividerStops: Boolean = true,
         /** The split divider stays where it is let go, for two apps and three (needs the module). */
         val freeDivider: Boolean = true,
+        /** Divider lock: one of DIVIDER_LOCK_* (which splits' dividers can't be dragged). */
+        val dividerLock: String = DIVIDER_LOCK_OFF,
+        /** Faint marks at ⅓, ½, ⅔ while the divider is dragged, and a let-go near one lands on it. */
+        val dividerMarks: Boolean = true,
+        /** A haptic tick when the dragged divider passes ⅓, ½ or ⅔. */
+        val dividerHaptics: Boolean = true,
+        /** A split keeps its own sizes when the phone turns or folds (Motorola resets them). */
+        val keepSplitSize: Boolean = true,
+        /** Each set of apps opens again at the sizes it had last time. */
+        val rememberSplitSize: Boolean = true,
+        /** While something is dragged out of an app in split screen, the panes show where it can go. */
+        val splitDragHint: Boolean = true,
+        /** Flinging the divider of peek view towards the strip closes the app peeking in. */
+        val peekFlingClose: Boolean = false,
         /** A third app joining a split makes three equal thirds, not Motorola's carousel (needs the module). */
         val threeEven: Boolean = true,
         /** Divider sizes (⅓, ½, ⅔) in the taskbar's split menu (needs Folark's Vector module). */
@@ -909,6 +923,11 @@ data class LauncherSettings(
         )
         const val TASKBAR_MEDIA_POS_START = "start"
         const val TASKBAR_MEDIA_POS_MIDDLE = "middle"
+        const val DIVIDER_LOCK_OFF = "off"
+        const val DIVIDER_LOCK_TWO = "two"
+        const val DIVIDER_LOCK_THREE = "three"
+        const val DIVIDER_LOCK_ALL = "all"
+        val DIVIDER_LOCKS = listOf(DIVIDER_LOCK_OFF, DIVIDER_LOCK_TWO, DIVIDER_LOCK_THREE, DIVIDER_LOCK_ALL)
         const val TASKBAR_DIVIDER_LINE = "line"
         const val TASKBAR_DIVIDER_BOLD = "bold"
         const val TASKBAR_DIVIDER_DOT = "dot"

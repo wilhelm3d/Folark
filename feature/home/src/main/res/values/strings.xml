@@ -267,6 +267,11 @@
     <string name="taskbar_split_peek_left">Left app peeks in</string>
     <string name="taskbar_split_peek_right">Right app peeks in</string>
     <string name="taskbar_split_even">Half and half</string>
+    <string name="taskbar_split_three_half_left">50 / 25 / 25</string>
+    <string name="taskbar_split_three_half_middle">25 / 50 / 25</string>
+    <string name="taskbar_split_three_half_right">25 / 25 / 50</string>
+    <string name="taskbar_split_lock">Lock the divider</string>
+    <string name="taskbar_split_unlock">Unlock the divider</string>
     <string name="taskbar_pair_open_saved">Open as saved</string>
     <string name="taskbar_pair_peek">Peek view</string>
     <string name="taskbar_pair_three_peek">Peek view (middle app big)</string>

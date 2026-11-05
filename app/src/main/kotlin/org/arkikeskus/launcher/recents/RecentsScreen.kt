@@ -265,12 +265,20 @@ internal fun RecentsScreen(
      */
     var openAt by remember { mutableIntStateOf(2) }
     var peekPick by remember { mutableStateOf(false) }
-    LaunchedEffect(picked.size, openAt, peekPick) {
+    /** P3: three apps picked for peek view; which one shows big is chosen by tapping it. */
+    var peekBig by remember { mutableStateOf<RecentsCard?>(null) }
+    LaunchedEffect(picked.size, openAt, peekPick, peekBig) {
+        if (peekPick && openAt >= 3 && picked.size >= 3 && peekBig == null) return@LaunchedEffect
         if (openAt > 0 && picked.size >= openAt) {
             delay(220)
             val chosen = picked.toList()
             when {
-                peekPick && chosen.size >= 3 -> onPeekThree(chosen)
+                peekPick && chosen.size >= 3 -> {
+                    // The chosen big app first (it opens in the middle), the others at the edges.
+                    val big = peekBig ?: chosen[0]
+                    onPeekThree(listOf(big) + chosen.filter { it.key != big.key })
+                    peekBig = null
+                }
                 peekPick -> onPeek(chosen[0], chosen[1])
                 openAt >= 3 -> onOpenThree(chosen)
                 else -> onOpenTogether(chosen)
@@ -532,6 +540,23 @@ internal fun RecentsScreen(
                         )
                     }
                 }
+                if (peekPick && openAt >= 3 && picked.size >= 3) {
+                    // P3: which app shows big in the middle — tap it.
+                    Row(
+                        Modifier
+                            .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(stringResource(R.string.recents_pick_peek_which), color = accent, fontSize = 13.sp)
+                        picked.toList().forEach { card ->
+                            Box(Modifier.clip(RoundedCornerShape(12.dp)).clickable { peekBig = card }.padding(4.dp)) {
+                                AppBadge(card.apps.firstOrNull(), 36.dp)
+                            }
+                        }
+                    }
+                }
                 Row(
                     Modifier
                         .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
@@ -540,7 +565,7 @@ internal fun RecentsScreen(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Text(
-                        if (peekPick && openAt >= 3 && picked.size < 3) stringResource(if (picked.isEmpty()) R.string.recents_pick_peek_big else R.string.recents_pick_peek_edges)
+                        if (peekPick && openAt >= 3 && picked.size < 3) stringResource(R.string.recents_pick_peek_three)
                         else if (peekPick && picked.size < 2) stringResource(R.string.recents_pick_peek)
                         else if (openAt > 0 && picked.size < openAt) pluralStringResource(R.plurals.recents_pick_more, openAt - picked.size, openAt - picked.size)
                         else if (picked.isEmpty()) stringResource(R.string.recents_pick_hint)

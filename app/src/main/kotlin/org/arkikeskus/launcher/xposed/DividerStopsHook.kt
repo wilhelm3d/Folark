@@ -33,6 +33,11 @@ internal object DividerStopsHook {
     const val EXTRA_ON = "on"
     /** The divider stays where it is let go (Settings ▸ Recents & split screen ▸ Free divider). */
     const val EXTRA_FREE = "free"
+    const val EXTRA_LOCK = "lock"
+    const val EXTRA_MARKS = "marks"
+    const val EXTRA_HAPTICS = "haptics"
+    const val EXTRA_KEEP = "keep"
+    const val EXTRA_PEEK_FLING = "peek_fling"
     val CHANGED_URI: Uri = Uri.parse("content://${RecentsHook.STATE_AUTHORITY}/divider_stops")
 
     /**
@@ -43,6 +48,18 @@ internal object DividerStopsHook {
     @Volatile private var on = true
     /** The divider stays where it is let go, between [FREE_FROM] and [FREE_TO] of the screen. */
     @Volatile private var free = true
+    /** Which dividers are locked: "off", "two", "three" or "all" (S13). */
+    @Volatile private var lock = "off"
+    /** Let-go near ⅓ / ½ / ⅔ lands on it (S5); a tick when the divider passes one (S6). */
+    @Volatile private var marks = true
+    @Volatile private var haptics = true
+    /** A split keeps its sizes when the phone turns or folds (S7). */
+    @Volatile private var keep = true
+    /** A fling of peek view's divider towards the strip closes that app (P13). */
+    @Volatile private var peekFling = false
+    /** A divider is being dragged now (for the marks overlay and the ticks). */
+    @Volatile private var dragging = false
+    @Volatile private var lastZone = -1
 
     /**
      * Until when (uptime) Motorola's own divider animation runs (to peek, half and half, closing,
@@ -80,6 +97,13 @@ internal object DividerStopsHook {
     private const val LAYOUT_3 = "com.android.wm.shell.common.split.SplitLayoutCarousel3Apps"
     /** How long a let-go divider takes to settle (it is already where it stays). */
     private const val FREE_SNAP_MS = 120
+    /** Motorola's peek states: the strip at the start (left / top) or at the end. */
+    private const val STATE_PEEK_START = 23
+    private const val STATE_PEEK_END = 22
+    /** How fast (px/s) a fling of peek view's divider must be to close the strip's app. */
+    private const val FLING_CLOSE_SPEED = 2_500f
+    /** When a divider's final place is reported to Folark after it rests. */
+    private const val REPORT_AFTER_MS = 700L
     /** How long after Motorola starts a divider animation Folark's sizing keeps out. */
     private const val MOTO_WINDOW_MS = 900L
     /** Snap positions of Folark's layouts: ⅓, ⅔ (two apps) and three apps all on screen. */
@@ -159,10 +183,20 @@ internal object DividerStopsHook {
             hooked += runCatching {
                 XposedBridge.hookAllMethods(cls, "onDividerFinishMoving", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        if (!free || param.args.size != 3) return
-                        runCatching { if (stayTwo(param.thisObject, param.args[2] as Int)) param.result = null }
-                            .onFailure { log("free divider: Motorola's snap kept ($it)") }
+                        dragEnded()
+                        if (param.args.size != 3) return
+                        val layout = param.thisObject
+                        val velocity = (param.args[1] as? Float) ?: 0f
+                        var position = param.args[2] as Int
+                        runCatching { if (flingClosesPeek(layout, position, velocity)) { param.result = null; return } }
+                        if (!free) return
+                        runCatching {
+                            position = magnet(layout, position)
+                            if (stayTwo(layout, position)) param.result = null
+                        }.onFailure { log("free divider: Motorola's snap kept ($it)") }
                     }
+
+                    override fun afterHookedMethod(param: MethodHookParam) = reportLayoutSoon()
                 }).size
             }.getOrDefault(0)
         }
@@ -170,10 +204,15 @@ internal object DividerStopsHook {
             hooked += runCatching {
                 XposedBridge.hookAllMethods(cls, "onDividerFinishMoving", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
+                        dragEnded()
                         if (!free || param.args.size != 3) return
-                        runCatching { if (stayThree(param.thisObject, param.args[0] as Int, param.args[2] as Int)) param.result = null }
-                            .onFailure { log("free divider: Motorola's snap kept ($it)") }
+                        runCatching {
+                            val layout = param.thisObject
+                            if (stayThree(layout, param.args[0] as Int, magnet(layout, param.args[2] as Int, three = true))) param.result = null
+                        }.onFailure { log("free divider: Motorola's snap kept ($it)") }
                     }
+
+                    override fun afterHookedMethod(param: MethodHookParam) = reportLayoutSoon()
                 }).size
             }.getOrDefault(0)
         }
@@ -209,7 +248,206 @@ internal object DividerStopsHook {
                 }.getOrDefault(0)
             }
         }
+        hooked += hookDragAndLock(loader)
         if (algorithm != null) log("free divider: hooked $hooked method(s)")
+    }
+
+    // ------------------------------------------------------------------ lock, marks, keep size, peek fling
+
+    private fun hookDragAndLock(loader: ClassLoader): Int {
+        var hooked = 0
+        for (name in listOf(LAYOUT_2, LAYOUT_3)) {
+            val cls = runCatching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
+            val three = name == LAYOUT_3
+            // S13: a locked divider counts as one Motorola doesn't let move (its own check).
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(cls, "isNotMovableDivider", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (lock == "all" || (lock == "two" && !three) || (lock == "three" && three)) param.result = true
+                    }
+                }).size
+            }.getOrDefault(0)
+            // S5 / S6: the drag starts (Folark shows its marks) and passes ⅓, ½, ⅔ (a tick).
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(cls, "onDividerMoving", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        runCatching { onDragMove(param.thisObject, param.args[0] as Int, param.args[1] as Int, three) }
+                    }
+                }).size
+            }.getOrDefault(0)
+            // S7: Motorola puts the divider back on one of its fixed stops after a turn or fold.
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(cls, "initDividerPositionByRatio", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!keep || !free || motoMoving()) return
+                        runCatching {
+                            val kept = if (three) keepThree(param.thisObject, param.args[0] as Rect, param.args[1] as Boolean)
+                            else keepTwo(param.thisObject, param.args[0] as Rect, param.args[1] as Boolean)
+                            if (kept) {
+                                param.result = null
+                                reportLayoutSoon()
+                            }
+                        }.onFailure { log("keep size: Motorola's kept ($it)") }
+                    }
+                }).size
+            }.getOrDefault(0)
+        }
+        return hooked
+    }
+
+    /** The marks ⅓, ½, ⅔ the drag ticks at and a let-go lands on (S5, S6). */
+    private val MARKS = floatArrayOf(1f / 3, 0.5f, 2f / 3)
+    private val MARKS_THREE = floatArrayOf(0.25f, 1f / 3, 0.5f, 2f / 3, 0.75f)
+    private const val MAGNET = 0.025f
+
+    private fun onDragMove(layout: Any, index: Int, position: Int, three: Boolean) {
+        val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return
+        val span = span(algorithm) ?: return
+        if (!dragging) {
+            dragging = true
+            lastZone = -1
+            SplitThreeHook.reportDrag(true, if (three) 3 else 2)
+        }
+        if (!haptics) return
+        val f = position.toFloat() / span
+        val zone = (if (three) MARKS_THREE else MARKS).count { it < f }
+        if (lastZone >= 0 && zone != lastZone) dividerView(layout, index, three)?.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+        lastZone = zone
+    }
+
+    private fun dragEnded() {
+        if (!dragging) return
+        dragging = false
+        SplitThreeHook.reportDrag(false, 0)
+    }
+
+    private fun dividerView(layout: Any, index: Int, three: Boolean): android.view.View? = runCatching {
+        val manager = if (three) (field(layout, "mSplitWindowManagers") as? Array<*>)?.getOrNull(index) else field(layout, "mSplitWindowManager")
+        manager?.let { field(it, "mDividerView") } as? android.view.View
+    }.getOrNull()
+
+    /** [position] moved onto a mark when let go close to it (S5); unchanged otherwise. */
+    private fun magnet(layout: Any, position: Int, three: Boolean = false): Int {
+        if (!marks) return position
+        val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return position
+        val span = span(algorithm) ?: return position
+        val f = position.toFloat() / span
+        val mark = (if (three) MARKS_THREE else MARKS).minByOrNull { kotlin.math.abs(it - f) } ?: return position
+        if (kotlin.math.abs(mark - f) > MAGNET) return position
+        if (!three && mark == 0.5f) {
+            (field(field(algorithm, "mMiddleTarget") ?: return position, "position") as? Int)?.let { return it }
+        }
+        return (mark * span).toInt()
+    }
+
+    /**
+     * P13: peek view's divider flung hard towards the strip: that app closes (the divider goes to
+     * the dismiss stop on its side, as Motorola's own close does).
+     */
+    private fun flingClosesPeek(layout: Any, position: Int, velocity: Float): Boolean {
+        if (!peekFling) return false
+        val manager = field(layout, "mSplitLayoutManager") ?: return false
+        val state = field(field(manager, "mSplitState") ?: return false, "mState") as? Int ?: return false
+        val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return false
+        val target = when {
+            state == STATE_PEEK_START && velocity < -FLING_CLOSE_SPEED -> field(algorithm, "mDismissStartTarget")
+            state == STATE_PEEK_END && velocity > FLING_CLOSE_SPEED -> field(algorithm, "mDismissEndTarget")
+            else -> null
+        } ?: return false
+        val snap = Reflect.methods(layout.javaClass).firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 4 } ?: return false
+        snap.invoke(layout, position, target, FREE_SNAP_MS * 2, android.view.animation.PathInterpolator(0.4f, 0f, 0.2f, 1f))
+        return true
+    }
+
+    /** S7, two apps at a free size: the divider at the same share of the new screen. */
+    private fun keepTwo(layout: Any, before: Rect, wasLeftRight: Boolean): Boolean {
+        val manager = field(layout, "mSplitLayoutManager") ?: return false
+        val state = field(field(manager, "mSplitState") ?: return false, "mState") as? Int ?: return false
+        if (state != SNAP_FIRST_THIRD && state != SNAP_SECOND_THIRD) return false
+        val leftRight = field(manager, "mIsLeftRightSplit") as? Boolean ?: return false
+        if (leftRight != wasLeftRight) return false
+        val root = field(layout, "mRootBounds") as? Rect ?: return false
+        val oldSpan = if (wasLeftRight) before.width() else before.height()
+        val newSpan = if (leftRight) root.width() else root.height()
+        val position = field(layout, "mDividerPosition") as? Int ?: return false
+        if (oldSpan <= 0 || newSpan <= 0) return false
+        val now = (position.toLong() * newSpan / oldSpan).toInt()
+        val update = Reflect.methods(layout.javaClass).firstOrNull {
+            it.name.startsWith("updateBounds") && it.parameterTypes.size == 1 && it.parameterTypes[0] == Int::class.javaPrimitiveType
+        } ?: return false
+        setField(layout, "mDividerPosition", now)
+        update.invoke(layout, now)
+        return true
+    }
+
+    /** S7, three apps all on screen: both dividers at the same shares of the new screen. */
+    private fun keepThree(layout: Any, before: Rect, wasLeftRight: Boolean): Boolean {
+        val manager = field(layout, "mSplitLayoutManager") ?: return false
+        val state = field(field(manager, "mSplitState") ?: return false, "mState") as? Int ?: return false
+        if (state != STATE_THREE_EVEN) return false
+        val leftRight = field(manager, "mIsLeftRightSplit") as? Boolean ?: return false
+        if (leftRight != wasLeftRight) return false
+        val root = field(layout, "mRootBounds") as? Rect ?: return false
+        val oldSpan = if (wasLeftRight) before.width() else before.height()
+        val newSpan = if (leftRight) root.width() else root.height()
+        val positions = field(layout, "mDividerPositions") as? IntArray ?: return false
+        if (oldSpan <= 0 || newSpan <= 0 || positions.size != 2) return false
+        val update = Reflect.methods(layout.javaClass).firstOrNull {
+            it.name.startsWith("updateBounds") && it.parameterTypes.size == 2 &&
+                it.parameterTypes.all { t -> t == Int::class.javaPrimitiveType }
+        } ?: return false
+        positions[0] = (positions[0].toLong() * newSpan / oldSpan).toInt()
+        positions[1] = (positions[1].toLong() * newSpan / oldSpan).toInt()
+        update.invoke(layout, positions[0], positions[1])
+        return true
+    }
+
+    /** After a divider rests: its place goes to Folark (S1: each set of apps remembers its sizes). */
+    private fun reportLayoutSoon() {
+        worker.postDelayed({ runCatching { SplitThreeHook.reportLayout() } }, REPORT_AFTER_MS)
+    }
+
+    /**
+     * Two apps: the divider to [position] (S1 / S4 / S11) — a free place in the middle range, the
+     * nearest of Motorola's own stops outside it (peek), or half and half at the middle.
+     */
+    fun placeTwo(layout: Any, position: Int): Boolean {
+        val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return false
+        val span = span(algorithm) ?: return false
+        val f = position.toFloat() / span
+        val middle = field(algorithm, "mMiddleTarget") ?: return false
+        val target = when {
+            f in FREE_FROM..FREE_TO -> {
+                val state = freeState(algorithm, position) ?: return false
+                if (state == 1) middle else newTarget(middle, position, state)
+            }
+            else -> {
+                val targets = (field(algorithm, "mTargets") as? List<*>).orEmpty().filterNotNull()
+                val inner = if (targets.size >= 3) targets.subList(1, targets.size - 1) else targets
+                inner.minByOrNull { kotlin.math.abs(((field(it, "position") as? Int) ?: Int.MAX_VALUE / 2) - position) }
+            }
+        } ?: return false
+        val from = field(layout, "mDividerPosition") as? Int ?: return false
+        val snap = Reflect.methods(layout.javaClass).firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 4 } ?: return false
+        snap.invoke(layout, from, target, FREE_SNAP_MS * 3, android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f))
+        reportLayoutSoon()
+        return true
+    }
+
+    /** Three apps: the dividers to [first] and [second] (S1 / S4 / S11); Motorola's layout for narrow panes. */
+    fun placeThree(layout: Any, first: Int, second: Int): Boolean {
+        val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return false
+        val like = field(algorithm, "mMiddleTarget") ?: return false
+        // All on screen: Folark's targets (state 5); a narrow strip: Motorola's (its peek / carousel).
+        val free = threeFree(algorithm, first, second)
+        val t0 = newTarget(like, first, if (free) 5 else 11) ?: return false
+        val t1 = newTarget(like, second, if (free) 6 else 12) ?: return false
+        val now = field(layout, "mDividerPositions") as? IntArray ?: return false
+        val snap = Reflect.methods(layout.javaClass).firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 6 } ?: return false
+        clearSpecs(field(layout, "mSplitLayoutManager"))
+        snap.invoke(layout, now[0], t0, now[1], t1, FREE_SNAP_MS * 3, android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f))
+        reportLayoutSoon()
+        return true
     }
 
     /**
@@ -502,6 +740,11 @@ internal object DividerStopsHook {
         }.getOrNull() ?: return
         on = answer.getBoolean(EXTRA_ON, false)
         free = answer.getBoolean(EXTRA_FREE, true)
+        lock = answer.getString(EXTRA_LOCK) ?: "off"
+        marks = answer.getBoolean(EXTRA_MARKS, true)
+        haptics = answer.getBoolean(EXTRA_HAPTICS, true)
+        keep = answer.getBoolean(EXTRA_KEEP, true)
+        peekFling = answer.getBoolean(EXTRA_PEEK_FLING, false)
         log("divider stops: ${if (on) "33/50/67" else "Android's own"}, ${if (free) "stays where let go" else "snaps"} (from the next split)")
     }
 

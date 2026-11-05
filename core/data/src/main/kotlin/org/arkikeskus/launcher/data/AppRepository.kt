@@ -153,7 +153,11 @@ open class AppRepository @Inject constructor(
                     // The scene's layout, for the first app wherever it landed (Vector module). Not
                     // with a third pane coming: three panes have their own layout.
                     val layout = pair.effectiveLayout
-                    if (layout != AppPair.LAYOUT_EVEN && !thirdInPane) {
+                    val twoSizes = pair.sizeList.takeIf { it.size == 1 }
+                    if (twoSizes != null && !thirdInPane) {
+                        // S11: the scene's own divider place (a free size, saved with it).
+                        SplitThree.snapFractions(context, twoSizes)
+                    } else if (layout != AppPair.LAYOUT_EVEN && !thirdInPane) {
                         val first = if (ShellSplit.hasDump(context)) withContext(Dispatchers.IO) {
                             ShellSplit.snapshot(context)?.taskOf(pair.app1ComponentName.packageName)?.id
                         } else null
@@ -165,6 +169,9 @@ open class AppRepository @Inject constructor(
                     // else floats over the pair once the split has settled.
                     delay(SPLIT_THIRD_APP_DELAY_MS)
                     val inSplit = thirdInPane && source.launchAppPairThirdInSplit(pair)
+                    // S11: a three-app scene at its saved sizes (a third each, peek, or as it was).
+                    val threeSizes = pair.sizeList.takeIf { it.size == 2 }
+                    if (inSplit && threeSizes != null) SplitThree.snapFractions(context, threeSizes)
                     if (inSplit || source.launchAppPairThird(pair, floatingWindowSize()).isSuccess) {
                         launched += pair.app3Key
                     }
