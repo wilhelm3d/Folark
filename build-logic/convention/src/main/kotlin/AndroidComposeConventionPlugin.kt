@@ -19,6 +19,17 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
             buildFeatures.compose = true
         }
 
+        // E30: the stability config (compose-stability.conf at the project root), set through the
+        // Compose compiler plugin's extension by name (build-logic doesn't depend on its classes).
+        extensions.findByName("composeCompiler")?.let { ext ->
+            runCatching {
+                @Suppress("UNCHECKED_CAST")
+                val files = ext.javaClass.getMethod("getStabilityConfigurationFiles").invoke(ext)
+                    as org.gradle.api.provider.ListProperty<org.gradle.api.file.RegularFile>
+                files.add(rootProject.layout.projectDirectory.file("compose-stability.conf"))
+            }.onFailure { logger.warn("Compose stability config not applied: $it") }
+        }
+
         val bom = libs.findLibrary("androidx-compose-bom").get()
         dependencies {
             add("implementation", platform(bom))

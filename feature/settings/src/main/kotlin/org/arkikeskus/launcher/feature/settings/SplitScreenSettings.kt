@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.settings
 
+import org.arkikeskus.launcher.ui.component.onScreen
 import android.animation.ValueAnimator
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -641,7 +642,8 @@ private fun Hint(text: String) {
 @Composable
 private fun SplitPickerPreview(look: SplitPickerLook) {
     val accent = MaterialTheme.colorScheme.primary
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp).onScreen(visible)) {
         Text(
             stringResource(R.string.settings_split_picker_preview),
             style = MaterialTheme.typography.labelMedium,
@@ -668,7 +670,7 @@ private fun SplitPickerPreview(look: SplitPickerLook) {
                     Box(Modifier.fillMaxWidth(if (i % 2 == 0) 0.9f else 0.65f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFC9CFD6)))
                 }
             }
-            PickerMock(look, accent, Modifier.weight(1f).fillMaxHeight())
+            PickerMock(look, accent, visible = visible, modifier = Modifier.weight(1f).fillMaxHeight())
         }
     }
 }
@@ -679,7 +681,7 @@ private fun SplitPickerPreview(look: SplitPickerLook) {
  * it in); Off shows no animation, as Android's own is used then.
  */
 @Composable
-private fun PickerMock(look: SplitPickerLook, accent: Color, modifier: Modifier) {
+private fun PickerMock(look: SplitPickerLook, accent: Color, modifier: Modifier, visible: androidx.compose.runtime.MutableState<Boolean>? = null) {
     val scale = 0.42f
     val icon = (look.iconSize * scale).dp
     val gap = 4.dp
@@ -692,6 +694,8 @@ private fun PickerMock(look: SplitPickerLook, accent: Color, modifier: Modifier)
         p.snapTo(0f)
         if (anim == SplitPickerLook.OPEN_NONE) return@LaunchedEffect
         while (true) {
+            // Only while it can be seen (E28).
+            if (visible != null) org.arkikeskus.launcher.ui.component.awaitOnScreen(visible)
             delay(PREVIEW_IDLE_MS)
             p.animateTo(1f, tween(PREVIEW_OPEN_MS, easing = FastOutSlowInEasing))
             delay(PREVIEW_HOLD_MS)

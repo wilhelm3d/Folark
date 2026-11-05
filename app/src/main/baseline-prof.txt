@@ -1,0 +1,5 @@
+# Baseline profile (E29): Folark's own code compiled ahead of time at install (ART profile rules,
+# installed by androidx.profileinstaller), so home, the drawer, Recents and the taskbar don't start
+# on interpreted code. Compose and AndroidX ship their own profiles.
+HSPLorg/arkikeskus/launcher/**;->**(**)**
+Lorg/arkikeskus/launcher/**;

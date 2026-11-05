@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.settings
 
+import org.arkikeskus.launcher.ui.component.onScreen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -100,12 +101,13 @@ internal fun IconNudgeRows(s: LauncherSettings, viewModel: SettingsViewModel, pr
 /** The chosen effect on a big icon, replaying every few seconds and on a tap. */
 @Composable
 private fun NudgePreview(icon: ImageBitmap?, effect: String, softness: Float) {
-    val event = rememberLoopingNudge(effect, startDelayMs = 0L)
+    val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
+    val event = rememberLoopingNudge(effect, startDelayMs = 0L, visible)
     var tapped by remember { mutableStateOf<IconNudgeEvent?>(null) }
     var taps by remember { mutableLongStateOf(0L) }
     val accent = LocalAccent.current
     val shown = listOfNotNull(event.value, tapped).maxByOrNull { it.time }
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp).onScreen(visible)) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -134,7 +136,8 @@ private fun NudgePreview(icon: ImageBitmap?, effect: String, softness: Float) {
 private fun NudgeGallery(icon: ImageBitmap?, selected: String, softness: Float, onPick: (String) -> Unit) {
     val palette = LocalExpressivePalette.current
     val accent = LocalAccent.current
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp).onScreen(visible)) {
         Text(
             stringResource(R.string.settings_icon_nudge_all),
             color = palette.text,
@@ -151,7 +154,7 @@ private fun NudgeGallery(icon: ImageBitmap?, selected: String, softness: Float, 
         ) {
             NUDGE_LABELS.forEachIndexed { index, (key, label) ->
                 // Staggered so the row ripples along instead of everything moving at once.
-                val event = rememberLoopingNudge(key, startDelayMs = index * GALLERY_STAGGER_MS)
+                val event = rememberLoopingNudge(key, startDelayMs = index * GALLERY_STAGGER_MS, visible)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -196,13 +199,19 @@ private fun NudgeIcon(icon: ImageBitmap?, event: IconNudgeEvent?, effect: String
 
 /** A nudge that fires every few seconds while shown (after [startDelayMs]), in the accent colour. */
 @Composable
-private fun rememberLoopingNudge(effect: String, startDelayMs: Long): androidx.compose.runtime.State<IconNudgeEvent?> {
+private fun rememberLoopingNudge(
+    effect: String,
+    startDelayMs: Long,
+    visible: androidx.compose.runtime.MutableState<Boolean>? = null,
+): androidx.compose.runtime.State<IconNudgeEvent?> {
     val accent = LocalAccent.current.toArgb()
     val state = remember { mutableStateOf<IconNudgeEvent?>(null) }
     LaunchedEffect(effect, accent) {
         delay(startDelayMs)
         var n = 0L
         while (true) {
+            // Only while it can be seen (E28).
+            if (visible != null) org.arkikeskus.launcher.ui.component.awaitOnScreen(visible)
             state.value = IconNudgeEvent("preview:$effect", accent, System.currentTimeMillis(), ++n)
             delay(IconNudge.DURATION_MS + PREVIEW_PAUSE_MS)
         }

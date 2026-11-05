@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.settings
 
+import org.arkikeskus.launcher.ui.component.onScreen
 import android.content.Context
 import android.widget.Toast
 import android.content.pm.PackageManager
@@ -593,10 +594,13 @@ private fun TaskbarPinnedPicker(
 private fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
     val accent = MaterialTheme.colorScheme.primary
     var shown by remember { mutableStateOf(true) }
+    val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
     LaunchedEffect(anim, handleStyle, handles) {
         shown = true
         while (true) {
             kotlinx.coroutines.delay(1500)
+            // Only while it can be seen (E28).
+            org.arkikeskus.launcher.ui.component.awaitOnScreen(visible)
             shown = !shown
         }
     }
@@ -604,7 +608,7 @@ private fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
         if (anim == LauncherSettings.TASKBAR_ANIM_BOUNCE || anim == LauncherSettings.TASKBAR_ANIM_POP) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)
         else tween(300)
     val p by animateFloatAsState(if (shown) 1f else 0f, spec, label = "tbprev")
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).onScreen(visible)) {
         Text(
             stringResource(R.string.settings_taskbar_preview),
             style = MaterialTheme.typography.labelMedium,
