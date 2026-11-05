@@ -189,15 +189,23 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
     val frameMs = if (sky == Sky.RAIN || sky == Sky.SNOW || sky == Sky.STORM) 33L else 66L
     LaunchedEffect(animate, frameMs) {
         if (!animate) return@LaunchedEffect
+        // The sky moves for a while after home comes back (or the widget scrolls into view), then
+        // rests where it is: a phone left on the home screen no longer draws rain at 30 frames a
+        // second until the screen times out.
         val start = System.nanoTime()
+        var awakeSince = start
+        var wasOnScreen = true
         while (true) {
             val where = placed[0]
             val onScreen = where != null && where.isAttached && !where.boundsInWindow().isEmpty
-            if (onScreen) {
-                time.floatValue = (System.nanoTime() - start) / 1_000_000_000f
+            val now = System.nanoTime()
+            if (onScreen && !wasOnScreen) awakeSince = now
+            wasOnScreen = onScreen
+            if (onScreen && now - awakeSince < WEATHER_AWAKE_NS) {
+                time.floatValue = (now - start) / 1_000_000_000f
                 delay(frameMs)
             } else {
-                // Scrolled away: look again now and then (E19).
+                // Scrolled away, or resting: look again now and then (E19).
                 delay(1_000)
             }
         }
@@ -553,3 +561,6 @@ private fun DrawScope.drawLightning(t: Float) {
     }
     if (flash > 0f) drawRect(Color.White.copy(alpha = flash))
 }
+
+/** How long the weather animation plays each time home comes back or the widget comes into view. */
+private const val WEATHER_AWAKE_NS = 45_000_000_000L

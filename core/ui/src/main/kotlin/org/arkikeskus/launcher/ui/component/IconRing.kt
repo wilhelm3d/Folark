@@ -82,16 +82,20 @@ fun Modifier.iconRing(ring: IconRing?, unread: Boolean, mode: String, accent: Co
             ring.chronometerBase != 0L -> rememberSecondsSweep(ring.chronometerBase)
             else -> 0.28f
         }
-        // Busy without an end: a short arc going round.
-        val spin = if (ring?.indeterminate == true || (ring != null && ring.progress == null && ring.chronometerBase == 0L)) {
-            rememberInfiniteTransition(label = "ringSpin").animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
-                label = "spin",
-            ).value
-        } else {
-            0f
+        // Busy without an end: a short arc going round for a while after it appears, then resting
+        // (a download can stay busy for minutes; every frame would redraw the icon). The angle is
+        // read only while drawing, so only the ring is drawn again, nothing recomposes.
+        val busy = ring?.indeterminate == true || (ring != null && ring.progress == null && ring.chronometerBase == 0L)
+        val spinState = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        if (busy) {
+            LaunchedEffect(Unit) {
+                val start = androidx.compose.runtime.withFrameNanos { it }
+                while (true) {
+                    val now = androidx.compose.runtime.withFrameNanos { it }
+                    if (now - start > SPIN_AWAKE_NS) break
+                    spinState.floatValue = ((now - start) / 1_000_000f / SPIN_PERIOD_MS * 360f) % 360f
+                }
+            }
         }
         drawWithContent {
             drawContent()
@@ -109,7 +113,7 @@ fun Modifier.iconRing(ring: IconRing?, unread: Boolean, mode: String, accent: Co
             }
             drawArc(
                 color = if (ring == null) color.copy(alpha = 0.85f) else color,
-                startAngle = -90f + spin,
+                startAngle = -90f + (if (busy) spinState.floatValue else 0f),
                 sweepAngle = 360f * sweep,
                 useCenter = false,
                 topLeft = topLeft,
@@ -128,3 +132,7 @@ private fun rememberSecondsSweep(base: Long): Float {
     val seconds = (kotlin.math.abs(now - base) / 1000L) % 60L
     return (seconds + 1) / 60f
 }
+
+/** One turn of the busy arc, and how long it turns before it rests. */
+private const val SPIN_PERIOD_MS = 1400f
+private const val SPIN_AWAKE_NS = 30_000_000_000L

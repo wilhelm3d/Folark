@@ -110,7 +110,22 @@ class NotificationBadgeRepository @Inject constructor() {
 
     /** Replaces the active-notification icon list with a fresh snapshot from the listener. */
     fun setIcons(icons: List<StatusNotification>) {
+        // Every rebuild makes new Icon objects (no equals), so the list never looked the same and
+        // the status bar and the notifications widget redrew on every notification update (a
+        // download, a timer). What they show is compared instead: skipped when nothing changed.
+        val signature = icons.map(::iconSignature)
+        if (signature == iconsSignature) return
+        iconsSignature = signature
         _icons.value = icons
+    }
+
+    private var iconsSignature: List<Any?> = emptyList()
+
+    /** What the status bar and the notifications widget draw of [n] (not its text or time). */
+    private fun iconSignature(n: StatusNotification): List<Any?> {
+        val icon = n.icon
+        val picture: Any = if (icon.type == Icon.TYPE_RESOURCE) "${icon.resPackage}:${icon.resId}" else System.identityHashCode(icon)
+        return listOf(n.key, n.packageName, n.userSerial, n.count, n.color, n.preferSmallIcon, n.autoCancel, n.contentIntent, picture)
     }
     
     fun setAllNotifications(notifications: List<StatusNotification>) {

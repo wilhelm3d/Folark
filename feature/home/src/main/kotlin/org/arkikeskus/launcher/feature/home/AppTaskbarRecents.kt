@@ -29,7 +29,14 @@ internal fun AppTaskbar.loadRecents(rebuild: Boolean, force: Boolean = true) {
     val s = current() ?: run { refresh(rebuild); return }
     recentsJob?.cancel()
     // Nothing on screen would show recent apps: no usage query.
-    if (!s.enabled || !screenOn || (homeVisible && !s.onHome)) {
+    // Over an app with only the pull handles showing (not kept open, no "always show" apps): the
+    // list is read when the bar is opened (open() asks again), not on every switch between home and
+    // an app. That read is a dump of Android's task list and a usage query each time.
+    // Only once there is something to open the bar for: with nothing pinned and nothing read yet,
+    // the read decides whether the handles show at all.
+    val handlesOnly = !homeVisible && !expanded && !s.keepOpen && s.alwaysApps.isEmpty() &&
+        (recents.isNotEmpty() || s.pinned.isNotEmpty() || s.pairs.isNotEmpty())
+    if (!s.enabled || !screenOn || (homeVisible && !s.onHome) || handlesOnly) {
         pendingForce = false
         refresh(rebuild)
         return

@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Efficiency and fixes (audit)
+- Battery: the weather widget's sky moves for 45 s each time home comes back or the widget scrolls into view, then rests (a phone left on home drew rain at 30 frames a second until the screen went off).
+- Battery: a busy icon ring spins for 30 s and then rests, and it redraws only the ring (it recomposed the icon every frame).
+- Battery: the status bar and the notifications widget redraw only when what they show changes (every notification update made new icon objects, so they redrew on every download tick).
+- Battery: over an app with only the taskbar's pull handles showing, the list of open apps is read when the bar opens, not on every switch between home and an app.
 - Battery: an ongoing notification already shown (a download, a timer, navigation, music) rebuilds dots, people tiles, widgets and the live pill at most once a second instead of on every update.
 - Battery: the taskbar's app watch (without the accessibility service) pauses on the cover screen when there is no bar there, instead of reading the usage history every 1–3 s; it resumes on unfolding.
 - Split drawer: leaving it without a pick after choosing 33/33/33 now closes the half-made split again (it stayed half made).
