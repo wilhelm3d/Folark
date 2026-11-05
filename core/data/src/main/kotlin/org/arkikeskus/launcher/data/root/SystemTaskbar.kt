@@ -40,7 +40,7 @@ object SystemTaskbar {
     fun apply(mode: Int): Boolean {
         if (mode !in listOf(MODE_ALWAYS, MODE_GESTURE, MODE_OFF)) return false
         val pkg = launcherPackage()
-        if (!Regex("^[A-Za-z0-9_.]+$").matches(pkg)) return false
+        if (!SAFE_PACKAGE.matches(pkg)) return false
         // The launcher is stopped BEFORE the edit (a running launcher writes its prefs back from
         // memory and would undo it), and again after it, in case Android restarted it in between
         // (it is the bound Recents/gesture service) and it read the old file.
@@ -67,4 +67,7 @@ object SystemTaskbar {
     }
 
     private const val APPLY_TIMEOUT_MS = 10_000L
+
+    /** Built once (E10). */
+    private val SAFE_PACKAGE = Regex("^[A-Za-z0-9_.]+$")
 }

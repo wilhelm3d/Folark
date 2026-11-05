@@ -129,6 +129,13 @@ object SearchActions {
     private val EVENT = Regex("^(?:(?:new|add|create) )?(event|meeting|appointment)(?: (.+))?$")
     private val REMIND = Regex("^remind me(?: to)?(?: (.+))?$")
     private val AT_TIME = Regex("(?:^|\\s)(?:at )?(\\d{1,2}(?:[:.]\\d{2})?\\s*(?:am|pm)?)(?=\\s|$)")
+    /** Each weekday's pattern, built once (E10). */
+    private val WEEKDAYS: List<Pair<DayOfWeek, Regex>> = DayOfWeek.entries.map { dow ->
+        val full = dow.getDisplayName(TextStyle.FULL, Locale.ENGLISH).lowercase(Locale.ROOT)
+        dow to Regex("(?:^|\\s)(?:on |next )?(?:$full|${full.take(3)})(?=\\s|$)")
+    }
+    private val TODAY = Regex("(?:^|\\s)(?:on )?today(?=\\s|$)")
+    private val TOMORROW = Regex("(?:^|\\s)(?:on )?tomorrow(?=\\s|$)")
     private val DAY_MONTH = Regex("(?:^|\\s)(?:on )?(\\d{1,2})[./](\\d{1,2})\\.?(?=\\s|$)")
 
     private fun event(original: String, lower: String, now: ZonedDateTime): SearchResult.Action? {
@@ -148,14 +155,11 @@ object SearchActions {
             date = day
             rest = rest.removeRange(hit.range).trim()
         }
-        take(Regex("(?:^|\\s)(?:on )?today(?=\\s|$)"), now.toLocalDate())
-        if (date == null) take(Regex("(?:^|\\s)(?:on )?tomorrow(?=\\s|$)"), now.toLocalDate().plusDays(1))
+        take(TODAY, now.toLocalDate())
+        if (date == null) take(TOMORROW, now.toLocalDate().plusDays(1))
         if (date == null) {
-            for (dow in DayOfWeek.entries) {
-                val full = dow.getDisplayName(TextStyle.FULL, Locale.ENGLISH).lowercase(Locale.ROOT)
-                val short = full.take(3)
-                val next = nextDay(now.toLocalDate(), dow)
-                take(Regex("(?:^|\\s)(?:on |next )?(?:$full|$short)(?=\\s|$)"), next)
+            for ((dow, word) in WEEKDAYS) {
+                take(word, nextDay(now.toLocalDate(), dow))
                 if (date != null) break
             }
         }

@@ -19,6 +19,9 @@ interface HomeItemDao {
     suspend fun getContainer(containerId: Long, screenType: String): List<HomeItemEntity>
 
     /** Every row in both containers, for the ghost-row sweep. */
+    @Query("DELETE FROM home_items WHERE shortcutId = :shortcutId")
+    suspend fun deleteByShortcutId(shortcutId: String): Int
+
     @Query("SELECT * FROM home_items")
     suspend fun getAll(): List<HomeItemEntity>
 

@@ -19,7 +19,7 @@ class CalculatorSearchProvider @Inject constructor() : SearchProvider {
         val q = query.trim().replace(',', '.')
         // A lone number like "5" or "3.14" is not a useful calculation — skip it to avoid
         // showing redundant "5 = 5" results.  Unit conversions contain letters, so they pass.
-        if (Regex("^-?\\d*\\.?\\d+$").matches(q)) return emptyList()
+        if (PLAIN_NUMBER.matches(q)) return emptyList()
         val result = evalUnit(q) ?: evalArithmetic(q) ?: return emptyList()
         if (!result.isFinite()) return emptyList()
         // Show the ORIGINAL query (with its comma) as the label so the user sees what they typed.
@@ -104,6 +104,7 @@ class CalculatorSearchProvider @Inject constructor() : SearchProvider {
     }
 
     private companion object {
+        val PLAIN_NUMBER = Regex("^-?\\d*\\.?\\d+$")
         val UNIT_PATTERN = Regex("""(-?[\d.]+)\s*([a-z]+)\s+to\s+([a-z]+)""")
         val LENGTH = mapOf("mm" to 0.001, "cm" to 0.01, "m" to 1.0, "km" to 1000.0,
             "in" to 0.0254, "ft" to 0.3048, "mi" to 1609.344)

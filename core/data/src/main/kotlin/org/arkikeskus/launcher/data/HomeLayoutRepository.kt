@@ -123,10 +123,8 @@ open class HomeLayoutRepository @Inject constructor(
 
     /** Removes every home shortcut of the app pair [pairId], on both displays — the pair was deleted. */
     suspend fun removeAppPairShortcuts(pairId: String) {
-        db.withTransaction {
-            val shortcutId = HomeItemEntity.appPairShortcutId(pairId)
-            dao.getAll().filter { it.shortcutId == shortcutId }.forEach { dao.deleteById(it.id) }
-        }
+        // One query instead of reading every home item (E8).
+        dao.deleteByShortcutId(HomeItemEntity.appPairShortcutId(pairId))
     }
 
     suspend fun reflow(columns: Int, rows: Int, screenType: ScreenType) {

@@ -65,7 +65,7 @@ internal fun Modifier.searchFocus(title: String): Modifier {
  */
 @Composable
 internal fun SettingsSearchResults(query: String, onPick: (SettingsCategory, String) -> Unit): Boolean {
-    val words = query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    val words = query.trim().lowercase().split(SEARCH_SPACES).filter { it.isNotEmpty() }
     if (words.isEmpty()) return false
     val context = LocalContext.current
     val palette = LocalExpressivePalette.current
@@ -112,3 +112,6 @@ internal fun SettingsSearchResults(query: String, onPick: (SettingsCategory, Str
 }
 
 private const val MAX_RESULTS = 40
+
+/** Built once (E10). */
+private val SEARCH_SPACES = Regex("\\s+")

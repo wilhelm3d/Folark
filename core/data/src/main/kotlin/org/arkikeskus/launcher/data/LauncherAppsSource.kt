@@ -755,12 +755,24 @@ class LauncherAppsSource @Inject constructor(
      */
     private val appColors = android.util.LruCache<String, Int>(APP_COLOR_CACHE)
 
-    private fun colorKey(info: LauncherActivityInfo): String = "${info.componentName.flattenToShortString()}#${info.user.hashCode()}"
+    /** The app's install path is in the key: an update (new path) gets its colour read again. */
+    private fun colorKey(info: LauncherActivityInfo): String =
+        "${info.componentName.flattenToShortString()}#${info.user.hashCode()}@${info.applicationInfo.sourceDir.hashCode()}"
+
+    /** App colours kept across restarts (E9): reading one means drawing the icon and its pixels. */
+    private val savedColors by lazy { context.getSharedPreferences(APP_COLOR_PREFS, Context.MODE_PRIVATE) }
 
     private fun appColor(key: String, icon: Drawable): Int? {
         appColors.get(key)?.let { return if (it == NO_APP_COLOR) null else it }
-        val color = IconColors.dominant(icon)
+        val saved = runCatching { if (savedColors.contains(key)) savedColors.getInt(key, NO_APP_COLOR) else null }.getOrNull()
+        val color = if (saved != null) saved.takeIf { it != NO_APP_COLOR } else IconColors.dominant(icon)
         appColors.put(key, color ?: NO_APP_COLOR)
+        if (saved == null) runCatching {
+            // Old keys (apps updated or removed) pile up: start over now and then.
+            val edit = savedColors.edit()
+            if (savedColors.all.size > APP_COLOR_SAVED_MAX) edit.clear()
+            edit.putInt(key, color ?: NO_APP_COLOR).apply()
+        }
         return color
     }
 
@@ -778,6 +790,8 @@ class LauncherAppsSource @Inject constructor(
 private const val SPLIT_FIND_TRIES = 10
 /** Apps whose colour is remembered (a few bytes each). */
 private const val APP_COLOR_CACHE = 512
+private const val APP_COLOR_PREFS = "folark_app_colors"
+private const val APP_COLOR_SAVED_MAX = 1_500
 /** "This icon has no colour of its own" in the colour cache (a fully transparent black). */
 private const val NO_APP_COLOR = 0
 private const val SPLIT_RETRY_MS = 100L

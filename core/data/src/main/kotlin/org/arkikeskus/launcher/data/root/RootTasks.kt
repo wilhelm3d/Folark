@@ -158,7 +158,7 @@ object RootTasks {
     internal fun parseMemory(psOutput: String, wanted: Set<String>): Map<String, Long> {
         val totals = HashMap<String, Long>()
         for (line in psOutput.lineSequence()) {
-            val parts = line.trim().split(Regex("\\s+"), limit = 2)
+            val parts = line.trim().split(WHITESPACE, limit = 2)
             if (parts.size < 2) continue
             val kb = parts[0].toLongOrNull() ?: continue
             val pkg = parts[1].substringBefore(':')
@@ -174,6 +174,7 @@ object RootTasks {
     }
 
     private val PACKAGE = Regex("^[A-Za-z0-9_.]+$")
+    private val WHITESPACE = Regex("\\s+")
     private const val MIN_JPEG_BYTES = 64
     private const val HELPER_TIMEOUT_MS = 10_000L
     private const val SNAPSHOTS_TIMEOUT_MS = 20_000L
