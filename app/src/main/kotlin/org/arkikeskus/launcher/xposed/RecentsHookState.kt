@@ -106,13 +106,16 @@ class RecentsHookState : ContentProvider() {
     private fun dividerStops(): Bundle? {
         if (callingPackage != RecentsHook.SYSTEMUI) return null
         val context = context ?: return null
-        val on = runCatching {
+        val recents = runCatching {
             runBlocking {
                 EntryPointAccessors.fromApplication(context, Deps::class.java)
-                    .settingsRepository().settings(ScreenType.INNER).first().recents.dividerStops
+                    .settingsRepository().settings(ScreenType.INNER).first().recents
             }
-        }.getOrDefault(true)
-        return Bundle().apply { putBoolean(DividerStopsHook.EXTRA_ON, on) }
+        }.getOrNull()
+        return Bundle().apply {
+            putBoolean(DividerStopsHook.EXTRA_ON, recents?.dividerStops ?: true)
+            putBoolean(DividerStopsHook.EXTRA_FREE, recents?.freeDivider ?: true)
+        }
     }
 
     /** SystemUI (the module's [UnlockHook]) says the lock screen has started to leave. */

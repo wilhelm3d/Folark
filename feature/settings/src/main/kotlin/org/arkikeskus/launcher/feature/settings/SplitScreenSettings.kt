@@ -134,6 +134,13 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         )
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_split_free_divider),
+            subtitle = stringResource(R.string.settings_split_free_divider_desc),
+            checked = s.recents.freeDivider,
+            onCheckedChange = viewModel::setSplitFreeDivider,
+        )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
             title = stringResource(R.string.settings_split_three_even),
             subtitle = stringResource(R.string.settings_split_three_even_desc),
             checked = s.recents.threeEven,

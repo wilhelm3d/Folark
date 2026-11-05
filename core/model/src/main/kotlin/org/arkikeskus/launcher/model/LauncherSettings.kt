@@ -662,6 +662,8 @@ data class LauncherSettings(
         val splitUndo: Boolean = true,
         /** The split divider stops at 33 %, 50 % and 67 % (Folark's Vector module in System UI). */
         val dividerStops: Boolean = true,
+        /** The split divider stays where it is let go, for two apps and three (needs the module). */
+        val freeDivider: Boolean = true,
         /** A third app joining a split makes three equal thirds, not Motorola's carousel (needs the module). */
         val threeEven: Boolean = true,
         /** Divider sizes (⅓, ½, ⅔) in the taskbar's split menu (needs Folark's Vector module). */

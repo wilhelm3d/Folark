@@ -31,6 +31,8 @@ import de.robv.android.xposed.XposedHelpers
 internal object DividerStopsHook {
     const val METHOD = "divider_stops"
     const val EXTRA_ON = "on"
+    /** The divider stays where it is let go (Settings ▸ Recents & split screen ▸ Free divider). */
+    const val EXTRA_FREE = "free"
     val CHANGED_URI: Uri = Uri.parse("content://${RecentsHook.STATE_AUTHORITY}/divider_stops")
 
     /**
@@ -39,6 +41,8 @@ internal object DividerStopsHook {
      * restart has the stops too.
      */
     @Volatile private var on = true
+    /** The divider stays where it is let go, between [FREE_FROM] and [FREE_TO] of the screen. */
+    @Volatile private var free = true
     @Volatile private var asked = false
     private var log: (String) -> Unit = {}
     private val worker by lazy { Handler(HandlerThread("folark-divider-stops").apply { start() }.looper) }
@@ -53,6 +57,18 @@ internal object DividerStopsHook {
     private const val SNAP_SECOND_THIRD = 2
     /** Inner stops of a two-app list: ⅓, ½, ⅔, 90/10, 10/90 and Motorola's 90/5, 5/90. */
     private val TWO_APP_SNAPS = setOf(0, 1, 2, 3, 4, 13, 14)
+    /** Where a let-go divider stays put (of the screen): nearer an edge, Motorola's peek / close. */
+    private const val FREE_FROM = 0.15f
+    private const val FREE_TO = 0.85f
+    /** How near the middle (of the screen) still counts as half and half. */
+    private const val MIDDLE_REACH = 0.025f
+    /** Three apps stay as let go while each has at least this much of the screen. */
+    private const val FREE_MIN_PANE = 0.15f
+    private const val STATE_THREE_EVEN = 5
+    private const val LAYOUT_2 = "com.android.wm.shell.common.split.SplitLayout2Apps"
+    private const val LAYOUT_3 = "com.android.wm.shell.common.split.SplitLayoutCarousel3Apps"
+    /** How long a let-go divider takes to settle (it is already where it stays). */
+    private const val FREE_SNAP_MS = 120
     private const val FIRST = 0.33f
     private const val SECOND = 0.67f
 
@@ -73,6 +89,142 @@ internal object DividerStopsHook {
         }
         log(if (hooked > 0) "divider stops: hooked updateTargets ($hooked)" else "divider stops: no DividerSnapAlgorithm.updateTargets here")
         hookTwoAppBounds(loader)
+        hookFree(loader)
+    }
+
+    /**
+     * The divider stays where it is let go (two apps and three), instead of Motorola's choice
+     * between half and half, peek and closing:
+     *
+     * - two apps: let go between [FREE_FROM] and [FREE_TO] of the screen (not at the middle), the
+     *   divider stays there (SplitLayout2Apps.onDividerFinishMoving → snapToTarget at that very
+     *   place), and the layout is a third / two thirds state (0 / 2) by side
+     *   (getSplitStateByDividerPositions), which [plainBounds] lays out at the real divider;
+     * - three apps: let go with every app at least [FREE_MIN_PANE] wide, both dividers stay, and
+     *   the layout is Motorola's all-on-screen state 5 (calculateNearestSplitSnapPosition), whose
+     *   bounds follow the dividers.
+     *
+     * Nearer an edge, Motorola's own peek and close still work.
+     */
+    private fun hookFree(loader: ClassLoader) {
+        var hooked = 0
+        val algorithm = CLASSES.firstNotNullOfOrNull { runCatching { XposedHelpers.findClass(it, loader) }.getOrNull() }
+        if (algorithm != null) {
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(algorithm, "getSplitStateByDividerPositions", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!free) return
+                        runCatching {
+                            val result = param.result as? Int ?: return
+                            if (result == -1) return
+                            val position = param.args.getOrNull(0) as? Int ?: return
+                            freeState(param.thisObject, position)?.let { param.result = it }
+                        }
+                    }
+                }).size
+            }.getOrDefault(0)
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(algorithm, "calculateNearestSplitSnapPosition", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (!free) return
+                        runCatching {
+                            val result = param.result as? Int ?: return
+                            if (result != 6 && result != 7 && result != 21) return
+                            val a = param.args.getOrNull(0) as? Int ?: return
+                            val b = param.args.getOrNull(1) as? Int ?: return
+                            if (threeFree(param.thisObject, minOf(a, b), maxOf(a, b))) param.result = STATE_THREE_EVEN
+                        }
+                    }
+                }).size
+            }.getOrDefault(0)
+        }
+        runCatching { XposedHelpers.findClass(LAYOUT_2, loader) }.getOrNull()?.let { cls ->
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(cls, "onDividerFinishMoving", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!free || param.args.size != 3) return
+                        runCatching { if (stayTwo(param.thisObject, param.args[2] as Int)) param.result = null }
+                            .onFailure { log("free divider: Motorola's snap kept ($it)") }
+                    }
+                }).size
+            }.getOrDefault(0)
+        }
+        runCatching { XposedHelpers.findClass(LAYOUT_3, loader) }.getOrNull()?.let { cls ->
+            hooked += runCatching {
+                XposedBridge.hookAllMethods(cls, "onDividerFinishMoving", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!free || param.args.size != 3) return
+                        runCatching { if (stayThree(param.thisObject, param.args[0] as Int, param.args[2] as Int)) param.result = null }
+                            .onFailure { log("free divider: Motorola's snap kept ($it)") }
+                    }
+                }).size
+            }.getOrDefault(0)
+        }
+        if (algorithm != null) log("free divider: hooked $hooked method(s)")
+    }
+
+    /** The screen's length along the split (width side by side, else height), or null. */
+    private fun span(algorithm: Any): Int? {
+        val leftRight = field(algorithm, "mIsLeftRightSplit") as? Boolean ?: true
+        return (field(algorithm, if (leftRight) "mDisplayWidth" else "mDisplayHeight") as? Int)?.takeIf { it > 0 }
+    }
+
+    /** The two-app state for a divider at [position] in the free range: 1 at the middle, else 0 / 2 by side. */
+    private fun freeState(algorithm: Any, position: Int): Int? {
+        val span = span(algorithm) ?: return null
+        val f = position.toFloat() / span
+        if (f < FREE_FROM || f > FREE_TO) return null
+        val middle = (field(field(algorithm, "mMiddleTarget") ?: return null, "position") as? Int) ?: return null
+        return when {
+            kotlin.math.abs(position - middle) <= span * MIDDLE_REACH -> 1
+            position < middle -> SNAP_FIRST_THIRD
+            else -> SNAP_SECOND_THIRD
+        }
+    }
+
+    /** Two apps let go at [position]: the divider stays there (true), or Motorola decides (false). */
+    private fun stayTwo(layout: Any, position: Int): Boolean {
+        val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return false
+        val state = freeState(algorithm, position) ?: return false
+        if (state == 1) return false // half and half: Motorola's own
+        val target = newTarget(field(algorithm, "mMiddleTarget") ?: return false, position, state) ?: return false
+        val snap = generateSequence<Class<*>>(layout.javaClass) { it.superclass }
+            .flatMap { it.declaredMethods.asSequence() }
+            .firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 4 } ?: return false
+        snap.isAccessible = true
+        snap.invoke(layout, position, target, FREE_SNAP_MS, android.view.animation.PathInterpolator(0.4f, 0f, 0.2f, 1f))
+        return true
+    }
+
+    /** Three apps with dividers at [first] and [second]: each app at least [FREE_MIN_PANE] wide. */
+    private fun threeFree(algorithm: Any, first: Int, second: Int): Boolean {
+        val span = span(algorithm) ?: return false
+        val min = span * FREE_MIN_PANE
+        return first >= min && second - first >= min && span - second >= min
+    }
+
+    /** Three apps, divider [index] let go at [position]: both dividers stay (true), or Motorola decides. */
+    private fun stayThree(layout: Any, index: Int, position: Int): Boolean {
+        if (index !in 0..1) return false
+        val algorithm = field(layout, "mDividerSnapAlgorithm") ?: return false
+        val positions = (field(layout, "mDividerPositions") as? IntArray)?.copyOf() ?: return false
+        if (positions.size != 2) return false
+        positions[index] = position
+        val first = minOf(positions[0], positions[1])
+        val second = maxOf(positions[0], positions[1])
+        if (!threeFree(algorithm, first, second)) return false
+        val like = field(algorithm, "mMiddleTarget") ?: return false
+        val t0 = newTarget(like, first, 5) ?: return false
+        val t1 = newTarget(like, second, 6) ?: return false
+        val now = field(layout, "mDividerPositions") as IntArray
+        val snap = generateSequence<Class<*>>(layout.javaClass) { it.superclass }
+            .flatMap { it.declaredMethods.asSequence() }
+            .firstOrNull { it.name == "snapToTarget" && it.parameterTypes.size == 6 } ?: return false
+        snap.isAccessible = true
+        val from0 = if (index == 0) position else now[0]
+        val from1 = if (index == 1) position else now[1]
+        snap.invoke(layout, minOf(from0, from1), t0, maxOf(from0, from1), t1, FREE_SNAP_MS, android.view.animation.PathInterpolator(0.4f, 0f, 0.2f, 1f))
+        return true
     }
 
     /**
@@ -89,7 +241,7 @@ internal object DividerStopsHook {
         val hooked = runCatching {
             XposedBridge.hookAllMethods(cls, "updateBoundsWithSnapPositionStageUISpec", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!on || param.args.size != 7) return
+                    if ((!on && !free) || param.args.size != 7) return
                     val state = param.args[0] as? Int ?: return
                     if (state != SNAP_FIRST_THIRD && state != SNAP_SECOND_THIRD) return
                     runCatching {
@@ -235,7 +387,8 @@ internal object DividerStopsHook {
             context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), METHOD, null, null)
         }.getOrNull() ?: return
         on = answer.getBoolean(EXTRA_ON, false)
-        log("divider stops: ${if (on) "33/50/67" else "Android's own"} (from the next split)")
+        free = answer.getBoolean(EXTRA_FREE, true)
+        log("divider stops: ${if (on) "33/50/67" else "Android's own"}, ${if (free) "stays where let go" else "snaps"} (from the next split)")
     }
 
     private fun field(target: Any, name: String): Any? {

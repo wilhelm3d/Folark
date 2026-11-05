@@ -298,6 +298,7 @@ class SettingsViewModel @Inject constructor(
     fun setSplitUndo(value: Boolean) = update { repository.setSplitUndo(value) }
     fun setDividerStops(value: Boolean) = update { repository.setDividerStops(value) }
     fun setSplitThreeEven(value: Boolean) = update { repository.setSplitThreeEven(value) }
+    fun setSplitFreeDivider(value: Boolean) = update { repository.setSplitFreeDivider(value) }
     fun setSplitRatioMenu(value: Boolean) = update { repository.setSplitRatioMenu(value) }
     fun setSplitOpenWith(value: Boolean) = update { repository.setSplitOpenWith(value) }
     fun setNotificationSplit(value: Boolean) = update { repository.setNotificationSplit(value) }

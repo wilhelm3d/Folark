@@ -67,7 +67,7 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // The module's divider stops (Settings ▸ Recents & split screen): tell it when they change.
         appScope.launch {
             settingsRepository.settings(ScreenType.INNER)
-                .map { it.recents.dividerStops }
+                .map { it.recents.dividerStops to it.recents.freeDivider }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {

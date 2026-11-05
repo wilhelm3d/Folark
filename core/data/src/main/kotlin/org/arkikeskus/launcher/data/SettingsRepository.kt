@@ -853,6 +853,7 @@ class SettingsRepository @Inject constructor(
         splitUndo = p[Keys.SPLIT_UNDO] ?: true,
         dividerStops = p[Keys.DIVIDER_STOPS] ?: true,
         threeEven = p[Keys.SPLIT_THREE_EVEN] ?: true,
+        freeDivider = p[Keys.SPLIT_FREE_DIVIDER] ?: true,
         splitRatioMenu = p[Keys.SPLIT_RATIO_MENU] ?: true,
         openWith = p[Keys.SPLIT_OPEN_WITH] ?: false,
         notificationSplit = p[Keys.NOTIFICATION_SPLIT] ?: true,
@@ -917,6 +918,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setSplitUndo(value: Boolean) = edit { it[Keys.SPLIT_UNDO] = value }
     suspend fun setDividerStops(value: Boolean) = edit { it[Keys.DIVIDER_STOPS] = value }
     suspend fun setSplitThreeEven(value: Boolean) = edit { it[Keys.SPLIT_THREE_EVEN] = value }
+    suspend fun setSplitFreeDivider(value: Boolean) = edit { it[Keys.SPLIT_FREE_DIVIDER] = value }
     suspend fun setSplitRatioMenu(value: Boolean) = edit { it[Keys.SPLIT_RATIO_MENU] = value }
     suspend fun setSplitOpenWith(value: Boolean) = edit { it[Keys.SPLIT_OPEN_WITH] = value }
     suspend fun setNotificationSplit(value: Boolean) = edit { it[Keys.NOTIFICATION_SPLIT] = value }
