@@ -28,6 +28,8 @@ internal class WorkspaceCellDeps(
     val glassDarkTint: Float,
     val currentFolderTap: (PlacedFolder) -> Unit,
     val currentOpenFolder: (PlacedFolder) -> Unit,
+    /** An app tapped right on a folder's tile (Settings ▸ Folders ▸ Open apps from the tile). */
+    val currentFolderAppTap: (org.arkikeskus.launcher.model.AppItem) -> Unit = {},
     val currentLaunchShortcut: (PlacedShortcut) -> Unit,
     val currentRemoveShortcut: (Long) -> Unit,
     val onRestorePendingWidget: (PendingWidget) -> Unit,

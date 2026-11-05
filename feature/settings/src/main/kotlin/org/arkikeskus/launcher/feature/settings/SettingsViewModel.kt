@@ -386,6 +386,9 @@ class SettingsViewModel @Inject constructor(
     fun setSwipeUpAction(value: String, screenType: ScreenType = _screenType.value) = update { repository.setSwipeUpAction(value, screenType) }
     fun setHalfOpenedModeEnabled(value: Boolean) = update { repository.setHalfOpenedModeEnabled(value) }
     fun setHingeTilt(value: Boolean) = update { repository.setHingeTilt(value) }
+    fun setWallpaperHinge(value: Boolean) = update { repository.setWallpaperHinge(value) }
+    fun setIconRing(value: String) = update { repository.setIconRing(value) }
+    fun setFolderDirectApps(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setFolderDirectApps(value, screenType) }
     fun setTaskbarHideFullScreen(value: Boolean) = update { repository.setTaskbarHideFullScreen(value) }
     fun setTaskbarClearSystemInset(value: Boolean) = update { repository.setTaskbarClearSystemInset(value) }
     fun setSplitLaunchEnabled(value: Boolean) = update { repository.setSplitLaunchEnabled(value) }

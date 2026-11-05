@@ -118,6 +118,10 @@ internal fun WorkspaceFolderCell(
         onRemove: () -> Unit,
     ): Modifier = workspaceEntryDrag(ws, grid, env, entry, rowId, removable, onTap, onStillPress, onRemove)
     with(ws) { with(grid) { with(env) { with(deps) {
+            // Apps opened right from the tile: where each place of it is, and where this cell is.
+            val directApps = LocalFolderStyle.current.directApps
+            val slotRects = remember(entry.id) { HashMap<Int, androidx.compose.ui.geometry.Rect>() }
+            var cellOrigin by remember(entry.id) { mutableStateOf(Offset.Zero) }
             Box(
                 modifier = Modifier
                     .offset {
@@ -131,12 +135,22 @@ internal fun WorkspaceFolderCell(
                     .graphicsLayer {
                         alpha = if ((draggingLocal as? PlacedFolder)?.id == entry.id && localMoving) 0f else 1f
                     }
+                    .onGloballyPositioned { cellOrigin = it.boundsInRoot().topLeft }
                     .aquamorphicTouch()
                     .localEntryDrag(
                         entry = entry,
                         rowId = entry.id,
                         removable = false,
-                        onTap = { currentFolderTap(entry) },
+                        onTap = {
+                            // On an app of the tile: that app; anywhere else (the label, a free place,
+                            // "+N"): the folder, as before.
+                            val at = cellOrigin + lastTapLocal
+                            val index = if (directApps) slotRects.entries.firstOrNull { it.value.contains(at) }?.key else null
+                            val slots = slotRects.size
+                            val hasMore = slots > 0 && entry.apps.size > slots
+                            val app = index?.takeUnless { hasMore && it == slots - 1 }?.let { entry.apps.getOrNull(it) }
+                            if (app != null) currentFolderAppTap(app) else currentFolderTap(entry)
+                        },
                         onStillPress = { currentOpenFolder(entry) },
                         onRemove = {},
                     ),
@@ -154,6 +168,7 @@ internal fun WorkspaceFolderCell(
                         size = cellIconSize,
                         glassBlurRadius = glassBlurRadius,
                         glassDarkTint = glassDarkTint,
+                        onSlotBounds = if (directApps) ({ i, r -> slotRects[i] = r }) else null,
                     )
                 }
             }
@@ -249,17 +264,25 @@ internal fun WorkspaceWidgetCell(
             DisposableEffect(widget.rowId) {
                 onDispose { dragController.scrollableWidgetRects.remove(widget.rowId) }
             }
+            // Being resized: the frame that follows the finger (live resize), else its cells.
+            val liveRect = widgetLive?.takeIf { it.first == widget.rowId }?.second
+            val boxW = liveRect?.width ?: (widget.spanX * cellW)
+            val boxH = liveRect?.height ?: (widget.spanY * cellH)
             Box(
                 modifier = Modifier
                     .offset {
-                        IntOffset(
-                            (widget.cellX.coerceIn(0, columns - 1) * cellW).roundToInt(),
-                            (widget.cellY.coerceIn(0, rows - 1) * cellH).roundToInt(),
-                        )
+                        if (liveRect != null) {
+                            IntOffset(liveRect.left.roundToInt(), liveRect.top.roundToInt())
+                        } else {
+                            IntOffset(
+                                (widget.cellX.coerceIn(0, columns - 1) * cellW).roundToInt(),
+                                (widget.cellY.coerceIn(0, rows - 1) * cellH).roundToInt(),
+                            )
+                        }
                     }
                     .size(
-                        with(density) { (widget.spanX * cellW).toDp() },
-                        with(density) { (widget.spanY * cellH).toDp() },
+                        with(density) { boxW.toDp() },
+                        with(density) { boxH.toDp() },
                     )
                     .onGloballyPositioned {
                         widgetRect = it.boundsInRoot()
@@ -283,8 +306,11 @@ internal fun WorkspaceWidgetCell(
                     AndroidView(
                         factory = { c -> android.widget.FrameLayout(c) },
                         update = { container ->
-                            val wDp = (widget.spanX * cellW / density.density).toInt()
-                            val hDp = (widget.spanY * cellH / density.density).toInt()
+                            // While resizing, the size in steps of a few dp: the widget's app lays it
+                            // out again as the frame moves, without a call for every pixel.
+                            val step = if (liveRect != null) LIVE_SIZE_STEP_DP else 1
+                            val wDp = (boxW / density.density).toInt() / step * step
+                            val hDp = (boxH / density.density).toInt() / step * step
                             pushWidgetSize(hostView, wDp, hDp)
                             if (hostView.parent !== container) {
                                 (hostView.parent as? android.view.ViewGroup)?.removeView(hostView)
@@ -443,17 +469,23 @@ internal fun WorkspaceBuiltinCell(
             DisposableEffect(space.rowId) {
                 onDispose { dragController.scrollableWidgetRects.remove(space.rowId) }
             }
+            // Being resized: the frame that follows the finger (live resize), else its cells.
+            val liveRect = widgetLive?.takeIf { it.first == space.rowId }?.second
             Box(
                 modifier = Modifier
                     .offset {
-                        IntOffset(
-                            (space.cellX.coerceIn(0, columns - 1) * cellW).roundToInt(),
-                            (space.cellY.coerceIn(0, rows - 1) * cellH).roundToInt(),
-                        )
+                        if (liveRect != null) {
+                            IntOffset(liveRect.left.roundToInt(), liveRect.top.roundToInt())
+                        } else {
+                            IntOffset(
+                                (space.cellX.coerceIn(0, columns - 1) * cellW).roundToInt(),
+                                (space.cellY.coerceIn(0, rows - 1) * cellH).roundToInt(),
+                            )
+                        }
                     }
                     .size(
-                        with(density) { (space.spanX * cellW).toDp() },
-                        with(density) { (space.spanY * cellH).toDp() },
+                        with(density) { (liveRect?.width ?: (space.spanX * cellW)).toDp() },
+                        with(density) { (liveRect?.height ?: (space.spanY * cellH)).toDp() },
                     )
                     .onGloballyPositioned {
                         builtinRect = it.boundsInRoot()
@@ -527,17 +559,23 @@ internal fun WorkspaceWidgetStackCell(
             DisposableEffect(stack.rowId) {
                 onDispose { dragController.scrollableWidgetRects.remove(stack.rowId) }
             }
+            // Being resized: the frame that follows the finger (live resize), else its cells.
+            val liveRect = widgetLive?.takeIf { it.first == stack.rowId }?.second
             Box(
                 modifier = Modifier
                     .offset {
-                        IntOffset(
-                            (stack.cellX.coerceIn(0, columns - 1) * cellW).roundToInt(),
-                            (stack.cellY.coerceIn(0, rows - 1) * cellH).roundToInt(),
-                        )
+                        if (liveRect != null) {
+                            IntOffset(liveRect.left.roundToInt(), liveRect.top.roundToInt())
+                        } else {
+                            IntOffset(
+                                (stack.cellX.coerceIn(0, columns - 1) * cellW).roundToInt(),
+                                (stack.cellY.coerceIn(0, rows - 1) * cellH).roundToInt(),
+                            )
+                        }
                     }
                     .size(
-                        with(density) { (stack.spanX * cellW).toDp() },
-                        with(density) { (stack.spanY * cellH).toDp() },
+                        with(density) { (liveRect?.width ?: (stack.spanX * cellW)).toDp() },
+                        with(density) { (liveRect?.height ?: (stack.spanY * cellH)).toDp() },
                     )
                     .onGloballyPositioned {
                         stackRect = it.boundsInRoot()
@@ -665,6 +703,7 @@ internal fun WorkspaceWidgetEditFrame(
         onPreviewBounds = { x, y, sx, sy ->
             widgetOptimistic = ew.rowId to WidgetBounds(ew.page, x, y, sx, sy)
         },
+        onLiveBounds = { r -> widgetLive = r?.let { ew.rowId to it } },
         onReconfigure = { ew.appWidgetId?.let(onReconfigureWidget); editingWidget = null },
         onStyle = { lookEditing = ew.rowId; editingWidget = null },
         onDeleteWidget = { onRemoveWidget(ew.rowId, ew.appWidgetId); editingWidget = null },
@@ -694,3 +733,6 @@ internal fun WorkspaceWidgetEditFrame(
 
     } } } }
 }
+
+/** Live resize: the size given to a widget changes in steps this big (dp) while its frame is dragged. */
+private const val LIVE_SIZE_STEP_DP = 8

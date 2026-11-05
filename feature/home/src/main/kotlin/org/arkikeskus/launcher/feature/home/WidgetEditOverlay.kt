@@ -87,6 +87,8 @@ internal fun WidgetEditOverlay(
     canFit: (x: Int, y: Int, spanX: Int, spanY: Int) -> Boolean,
     onSetBounds: suspend (x: Int, y: Int, spanX: Int, spanY: Int) -> Boolean,
     onPreviewBounds: (x: Int, y: Int, spanX: Int, spanY: Int) -> Unit,
+    /** The frame following the finger while a handle is held (grid pixels), null when let go. */
+    onLiveBounds: (androidx.compose.ui.geometry.Rect?) -> Unit = {},
     onReconfigure: () -> Unit,
     onStyle: () -> Unit,
     onDeleteWidget: () -> Unit,
@@ -160,16 +162,23 @@ internal fun WidgetEditOverlay(
     // Scrim: consumes a tap (exit)
     Box(Modifier.fillMaxSize().pointerInput(widget.rowId) { detectTapGestures { onExit() } })
 
-    val left = cx * cellW
-    val top = cy * cellH
-    val right = (cx + sx) * cellW
-    val bottom = (cy + sy) * cellH
+    // While a handle is held the frame follows the finger, not only whole cells, and the widget is
+    // laid out at that size as it goes (live resize); it settles on the cells when let go.
+    var live by remember(widget.rowId) { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val currentLiveBounds by rememberUpdatedState(onLiveBounds)
+    val cellsRect = androidx.compose.ui.geometry.Rect(cx * cellW, cy * cellH, (cx + sx) * cellW, (cy + sy) * cellH)
+    val cellsNow by rememberUpdatedState(cellsRect)
+    val shownRect = live ?: cellsRect
+    val left = shownRect.left
+    val top = shownRect.top
+    val right = shownRect.right
+    val bottom = shownRect.bottom
 
     // Bounding Box Frame with glowing 1.5.dp accent stroke and rounded corners
     Box(
         Modifier
             .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
-            .size(with(density) { (sx * cellW).toDp() }, with(density) { (sy * cellH).toDp() })
+            .size(with(density) { (right - left).toDp() }, with(density) { (bottom - top).toDp() })
             .drawBehind {
                 drawRoundRect(
                     color = borderColor.copy(alpha = 0.25f),
@@ -277,6 +286,8 @@ internal fun WidgetEditOverlay(
             label: String,
             // 0 = corner dot, 1 = horizontal bar (top / bottom edge), 2 = vertical bar (left / right edge)
             bar: Int = 0,
+            // Which edges of the frame this handle moves (EDGE_L / EDGE_T / EDGE_R / EDGE_B).
+            edges: Int,
             onDrag: (Offset) -> Unit,
         ) {
             var active by remember { mutableStateOf(false) }
@@ -293,20 +304,32 @@ internal fun WidgetEditOverlay(
                     .pointerInput(widget.rowId, cellW, cellH, range, committing) {
                         if (committing) return@pointerInput
                         detectDragGestures(
-                            onDragStart = { active = true },
+                            onDragStart = {
+                                active = true
+                                live = cellsNow
+                            },
                             onDragEnd = {
                                 active = false
                                 accX = 0f; accY = 0f; blocked = false
+                                live = null
+                                currentLiveBounds(null)
                                 commitBounds()
                             },
                             onDragCancel = {
                                 active = false
                                 accX = 0f; accY = 0f; blocked = false
+                                live = null
+                                currentLiveBounds(null)
                                 cx = okX; cy = okY; sx = okSx; sy = okSy
                                 previewing = false
                                 cancelPreview()
                             },
-                        ) { ch, d -> ch.consume(); onDrag(d) }
+                        ) { ch, d ->
+                            ch.consume()
+                            onDrag(d)
+                            live = live?.let { liveResized(it, d, edges, range, cellW, cellH, columns, rows) }
+                            currentLiveBounds(live)
+                        }
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -326,7 +349,7 @@ internal fun WidgetEditOverlay(
 
         // Edge Handles
         if (range.horizontal) {
-            ResizeHandlePill(right, (top + bottom) / 2f, widthLabel, bar = 2) { d ->
+            ResizeHandlePill(right, (top + bottom) / 2f, widthLabel, bar = 2, edges = EDGE_R) { d ->
                 accX += d.x
                 val s = step(accX, cellW)
                 if (s != 0) {
@@ -335,7 +358,7 @@ internal fun WidgetEditOverlay(
                     accX = 0f
                 }
             }
-            ResizeHandlePill(left, (top + bottom) / 2f, widthLabel, bar = 2) { d ->
+            ResizeHandlePill(left, (top + bottom) / 2f, widthLabel, bar = 2, edges = EDGE_L) { d ->
                 accX += d.x
                 val s = step(accX, cellW)
                 if (s != 0) {
@@ -350,7 +373,7 @@ internal fun WidgetEditOverlay(
             }
         }
         if (range.vertical) {
-            ResizeHandlePill((left + right) / 2f, bottom, heightLabel, bar = 1) { d ->
+            ResizeHandlePill((left + right) / 2f, bottom, heightLabel, bar = 1, edges = EDGE_B) { d ->
                 accY += d.y
                 val s = step(accY, cellH)
                 if (s != 0) {
@@ -359,7 +382,7 @@ internal fun WidgetEditOverlay(
                     accY = 0f
                 }
             }
-            ResizeHandlePill((left + right) / 2f, top, heightLabel, bar = 1) { d ->
+            ResizeHandlePill((left + right) / 2f, top, heightLabel, bar = 1, edges = EDGE_T) { d ->
                 accY += d.y
                 val s = step(accY, cellH)
                 if (s != 0) {
@@ -376,7 +399,7 @@ internal fun WidgetEditOverlay(
 
         // Corner Handles
         if (range.horizontal && range.vertical) {
-            ResizeHandlePill(left, top, "$widthLabel $heightLabel") { d ->
+            ResizeHandlePill(left, top, "$widthLabel $heightLabel", edges = EDGE_L or EDGE_T) { d ->
                 accX += d.x; accY += d.y
                 val sxStep = step(accX, cellW)
                 val syStep = step(accY, cellH)
@@ -399,7 +422,7 @@ internal fun WidgetEditOverlay(
                     showPreview(cx, cy, sx, sy)
                 }
             }
-            ResizeHandlePill(right, top, "$widthLabel $heightLabel") { d ->
+            ResizeHandlePill(right, top, "$widthLabel $heightLabel", edges = EDGE_R or EDGE_T) { d ->
                 accX += d.x; accY += d.y
                 val sxStep = step(accX, cellW)
                 val syStep = step(accY, cellH)
@@ -421,7 +444,7 @@ internal fun WidgetEditOverlay(
                     showPreview(cx, cy, sx, sy)
                 }
             }
-            ResizeHandlePill(left, bottom, "$widthLabel $heightLabel") { d ->
+            ResizeHandlePill(left, bottom, "$widthLabel $heightLabel", edges = EDGE_L or EDGE_B) { d ->
                 accX += d.x; accY += d.y
                 val sxStep = step(accX, cellW)
                 val syStep = step(accY, cellH)
@@ -443,7 +466,7 @@ internal fun WidgetEditOverlay(
                     showPreview(cx, cy, sx, sy)
                 }
             }
-            ResizeHandlePill(right, bottom, "$widthLabel $heightLabel") { d ->
+            ResizeHandlePill(right, bottom, "$widthLabel $heightLabel", edges = EDGE_R or EDGE_B) { d ->
                 accX += d.x; accY += d.y
                 val sxStep = step(accX, cellW)
                 val syStep = step(accY, cellH)
@@ -530,4 +553,29 @@ private fun EditBarButton(icon: Int, label: String, tint: Color, enabled: Boolea
             modifier = Modifier.size(20.dp),
         )
     }
+}
+
+private const val EDGE_L = 1
+private const val EDGE_T = 2
+private const val EDGE_R = 4
+private const val EDGE_B = 8
+
+/**
+ * The live frame [r] moved by the finger's [d] on its [edges], kept between the widget's smallest and
+ * largest size (in cells, [range]) and on the grid.
+ */
+private fun liveResized(
+    r: androidx.compose.ui.geometry.Rect, d: Offset, edges: Int, range: WidgetResizeRange,
+    cellW: Float, cellH: Float, columns: Int, rows: Int,
+): androidx.compose.ui.geometry.Rect {
+    val minW = range.minX * cellW * 0.75f
+    val maxW = range.maxX * cellW
+    val minH = range.minY * cellH * 0.75f
+    val maxH = range.maxY * cellH
+    var l = r.left; var t = r.top; var rt = r.right; var b = r.bottom
+    if (edges and EDGE_L != 0) l = (l + d.x).coerceIn(maxOf(0f, rt - maxW), rt - minW)
+    if (edges and EDGE_R != 0) rt = (rt + d.x).coerceIn(l + minW, minOf(columns * cellW, l + maxW))
+    if (edges and EDGE_T != 0) t = (t + d.y).coerceIn(maxOf(0f, b - maxH), b - minH)
+    if (edges and EDGE_B != 0) b = (b + d.y).coerceIn(t + minH, minOf(rows * cellH, t + maxH))
+    return androidx.compose.ui.geometry.Rect(l, t, rt, b)
 }

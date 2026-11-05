@@ -24,7 +24,7 @@ import kotlin.math.abs
  * without a hinge sensor. Read in a graphics layer so a hinge move redraws only that layer.
  */
 @Composable
-internal fun rememberHingeFold(enabled: Boolean): State<Float> {
+fun rememberHingeFold(enabled: Boolean): State<Float> {
     val context = LocalContext.current
     // Where the hinge is; the sensor reports only on change, so the spring below settles on it.
     val target = remember { mutableFloatStateOf(0f) }

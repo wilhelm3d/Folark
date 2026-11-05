@@ -157,6 +157,8 @@ fun Workspace(
     // A plain tap on a folder. Opens it by default; the host may launch its first app instead
     // (Settings ▸ Folders), in which case a still long-press is what opens the folder.
     onFolderTap: (PlacedFolder) -> Unit = onOpenFolder,
+    // An app tapped right on a folder's tile (Settings ▸ Folders ▸ Open apps from the tile).
+    onFolderAppTap: (AppItem) -> Unit = {},
     onLaunchShortcut: (PlacedShortcut) -> Unit,
     onRemoveShortcut: (Long) -> Unit,
     onCreateFolder: (target: AppItem, dropped: AppItem) -> Unit,
@@ -396,6 +398,7 @@ fun Workspace(
     val currentEmptyAreaDoubleTap by rememberUpdatedState(onEmptyAreaDoubleTap)
     val currentWidgetDrag by rememberUpdatedState(widgetDragController)
     val currentFolderTap by rememberUpdatedState(onFolderTap)
+    val currentFolderAppTap by rememberUpdatedState(onFolderAppTap)
     val currentOpenFolder by rememberUpdatedState(onOpenFolder)
     val currentLaunchShortcut by rememberUpdatedState(onLaunchShortcut)
     val currentRemoveShortcut by rememberUpdatedState(onRemoveShortcut)
@@ -812,6 +815,7 @@ fun Workspace(
         // Read at call time: the cells' gestures outlive compositions.
         currentFolderTap = { currentFolderTap(it) },
         currentOpenFolder = { currentOpenFolder(it) },
+        currentFolderAppTap = { currentFolderAppTap(it) },
         currentLaunchShortcut = { currentLaunchShortcut(it) },
         currentRemoveShortcut = { currentRemoveShortcut(it) },
         onRestorePendingWidget = onRestorePendingWidget,

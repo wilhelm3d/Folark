@@ -157,7 +157,18 @@ fun AppIcon(
                     shape = LocalIconShapes.current[appItem.key] ?: LocalIconShape.current,
                 ),
                 contentDescription = appItem.label,
-                modifier = nudge.size(iconSize),
+                modifier = nudge
+                    // A ring for a download, a timer or (if chosen) unread notifications.
+                    .let { m ->
+                        val rings = LocalIconRings.current
+                        if (rings == null) m else m.iconRing(
+                            rings.live[appItem.badgeKey],
+                            unread = badgeCount > 0,
+                            mode = rings.mode,
+                            accent = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    .size(iconSize),
             )
             
             if (appItem.isArchived) {

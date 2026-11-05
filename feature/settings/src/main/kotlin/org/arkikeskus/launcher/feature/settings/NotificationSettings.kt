@@ -8,6 +8,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
+import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.LocalBadgeStyle
@@ -54,6 +57,24 @@ internal fun NotificationsSection(
         ExpressiveRowDivider()
 
         NotificationDotStyleRows(s = s, viewModel = viewModel, screenType = screenType)
+        ExpressiveRowDivider()
+
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_icon_ring),
+            options = listOf(
+                LauncherSettings.RING_OFF to stringResource(R.string.settings_icon_ring_off),
+                LauncherSettings.RING_PROGRESS to stringResource(R.string.settings_icon_ring_progress),
+                LauncherSettings.RING_ALL to stringResource(R.string.settings_icon_ring_all),
+            ),
+            selected = s.icons.ring,
+            onSelect = viewModel::setIconRing,
+        )
+        Text(
+            text = stringResource(R.string.settings_icon_ring_desc),
+            color = LocalExpressivePalette.current.dim,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+        )
         ExpressiveRowDivider()
 
 

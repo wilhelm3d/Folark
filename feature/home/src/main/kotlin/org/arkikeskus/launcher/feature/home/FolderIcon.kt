@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.AppLabel
 import org.arkikeskus.launcher.ui.component.LiquidGlassContainer
@@ -40,6 +42,8 @@ data class FolderStyle(
     val preview: String = LauncherSettings.FOLDER_PREVIEW_GRID_2,
     val openColumns: Int = 4,
     val openSize: String = LauncherSettings.FOLDER_OPEN_MEDIUM,
+    /** The apps in the tile open with a tap on them (Settings ▸ Folders ▸ Open apps from the tile). */
+    val directApps: Boolean = false,
 )
 
 /** The folder style of the display in use; provided by HomeScreen from the settings. */
@@ -104,6 +108,8 @@ fun FolderIcon(
     glassBlurRadius: Float = 25f,
     glassDarkTint: Float = 0.45f,
     modifier: Modifier = Modifier,
+    /** Where each place of the tile is on screen (its index, bounds in the root), for a tap on an app. */
+    onSlotBounds: ((Int, androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
     val style = LocalFolderStyle.current
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -139,11 +145,27 @@ fun FolderIcon(
                     } else {
                         val perSide = if (style.preview == LauncherSettings.FOLDER_PREVIEW_GRID_3) 3 else 2
                         val mini = (size - inset * 2 - gap * (perSide - 1)) / perSide
+                        val slots = perSide * perSide
+                        // Apps open from the tile: with more apps than places, the last place says how
+                        // many more there are, and a tap there opens the folder.
+                        val more = if (style.directApps && apps.size > slots) apps.size - (slots - 1) else 0
                         Column(verticalArrangement = Arrangement.spacedBy(gap)) {
                             for (row in 0 until perSide) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                                     for (column in 0 until perSide) {
-                                        PreviewSlot(apps.getOrNull(row * perSide + column), mini)
+                                        val index = row * perSide + column
+                                        val place = if (onSlotBounds != null && style.directApps) {
+                                            Modifier.onGloballyPositioned { onSlotBounds(index, it.boundsInRoot()) }
+                                        } else {
+                                            Modifier
+                                        }
+                                        Box(place) {
+                                            if (more > 0 && index == slots - 1) {
+                                                MoreSlot(more, mini, folderContentColor(style.theme))
+                                            } else {
+                                                PreviewSlot(apps.getOrNull(index), mini)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -170,6 +192,26 @@ private fun PreviewSlot(app: AppItem?, size: Dp) {
             showLabel = false,
             iconSize = size,
             aquamorphicTouchEnabled = false,
+        )
+    }
+}
+
+/** The last place of a tile that opens apps directly: "+N" more apps, opening the folder. */
+@Composable
+private fun MoreSlot(count: Int, size: Dp, color: Color) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.16f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Text(
+            text = "+$count",
+            color = color,
+            fontSize = androidx.compose.ui.unit.TextUnit(size.value * 0.42f, androidx.compose.ui.unit.TextUnitType.Sp),
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            maxLines = 1,
         )
     }
 }

@@ -532,6 +532,7 @@ fun HomeScreen(
             preview = settings.folders.preview,
             openColumns = settings.folders.openColumns,
             openSize = settings.folders.openSize,
+            directApps = settings.folders.directApps,
         ),
         // Force the workspace left-to-right even in RTL locales (ar/he/fa/ur). The grid renders with
         // RTL-aware Modifier.offset {} but the drag/drop, drop-ring and popup-anchor math is all
@@ -724,6 +725,7 @@ fun HomeScreen(
                         openFolderId = folder.id
                     }
                 },
+                onFolderAppTap = { viewModel.launch(it) },
                 onLaunchShortcut = { viewModel.launchShortcut(it) },
                 onRemoveShortcut = { viewModel.removeShortcut(it) },
                 onCreateFolder = { target, dropped -> viewModel.createFolder(target, dropped, defaultFolderName) },

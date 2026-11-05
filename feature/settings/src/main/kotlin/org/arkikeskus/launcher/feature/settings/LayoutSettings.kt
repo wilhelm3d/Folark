@@ -404,6 +404,15 @@ internal fun FoldersCard(
             checked = s.folders.tapFirstApp,
             onCheckedChange = { viewModel.setFolderTapFirstApp(it, screenType) },
         )
+        if (s.folders.preview != LauncherSettings.FOLDER_PREVIEW_COVER) {
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_folder_direct_apps),
+                subtitle = stringResource(R.string.settings_folder_direct_apps_desc),
+                checked = s.folders.directApps,
+                onCheckedChange = { viewModel.setFolderDirectApps(it, screenType) },
+            )
+        }
     }
 }
 

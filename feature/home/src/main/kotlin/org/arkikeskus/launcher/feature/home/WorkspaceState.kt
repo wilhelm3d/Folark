@@ -55,6 +55,13 @@ internal class WorkspaceDragState {
 
     /** A widget shown at new bounds (row id to bounds) until the database catches up. */
     var widgetOptimistic by mutableStateOf<Pair<Long, WidgetBounds>?>(null)
+
+    /** A widget being resized: row id to its frame in grid pixels, following the finger (its
+     *  content is laid out at that size as it goes); null when no handle is held. */
+    /** Where the last tap on a grid item landed (in the item's own cell), e.g. which app of a folder tile. */
+    var lastTapLocal: Offset = Offset.Zero
+
+    var widgetLive by mutableStateOf<Pair<Long, androidx.compose.ui.geometry.Rect>?>(null)
 }
 
 /**

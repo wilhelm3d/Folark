@@ -223,6 +223,16 @@ internal fun HomeBackdropCard(
             onDragValue = { overrides?.homeBlur = it },
         )
         ExpressiveRowDivider()
+        if (hasHingeSensor(context)) {
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_wallpaper_hinge),
+                subtitle = stringResource(R.string.settings_wallpaper_hinge_desc),
+                checked = s.fold.wallpaperHinge,
+                onCheckedChange = viewModel::setWallpaperHinge,
+                shared = true,
+            )
+            ExpressiveRowDivider()
+        }
 
         ExpressiveActionItem(
             title = stringResource(R.string.settings_home_background),

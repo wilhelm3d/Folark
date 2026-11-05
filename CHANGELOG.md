@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Home screen
+- Live widget resize: while a resize handle is held the widget's frame follows the finger (not just whole cells) and the widget lays itself out at that size as it goes; it settles on the cells when let go.
+- Open apps from the folder tile (Settings ▸ Dock & folders ▸ Folders): a tap on an app in a 2×2 or 3×3 folder tile opens that app; the label, a free place or the "+N" place opens the folder.
+- Wallpaper follows the hinge (Settings ▸ Theme ▸ Home backdrop, phones with a hinge sensor): the home picture zooms in a little as the phone folds and back out as it opens; Android's own wallpaper too, where Android lets a launcher zoom it.
+- Ring around icons (Settings ▸ Icons & badges ▸ Notifications): a ring fills with a download's or upload's progress, ticks round with a running timer, spins for work without an end, and with "Progress & unread" circles apps with new notifications.
+
 ### Taskbar
 - Lock taskbar apps (Settings ▸ Taskbar ▸ Apps on the bar): nothing is added, removed or moved from the bar, the drawer, home or Recents; only the pinned-apps list in Settings changes it. Pins that followed the dock are kept as they are when locked.
 - Swipe down to hide (Settings ▸ Taskbar ▸ Pull handles, on by default): a swipe down on the bar tucks it away to the pull handles, as the hide button does.

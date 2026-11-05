@@ -255,6 +255,7 @@ class SettingsRepository @Inject constructor(
                 nudgeEffect = (p[Keys.ICON_NUDGE_EFFECT] ?: LauncherSettings.NUDGE_BOUNCE)
                     .let { if (it in LauncherSettings.NUDGE_EFFECTS) it else LauncherSettings.NUDGE_BOUNCE },
                 nudgeSoftness = (p[Keys.ICON_NUDGE_SOFTNESS] ?: 0.5f).coerceIn(0f, 1f),
+                ring = p[Keys.ICON_RING] ?: LauncherSettings.RING_PROGRESS,
             ),
             dots = LauncherSettings.Dots(
                 enabled = p[Keys.showNotificationDots(screenType)] ?: true,
@@ -277,6 +278,7 @@ class SettingsRepository @Inject constructor(
                 openSize = (p[Keys.folderOpenSize(screenType)] ?: LauncherSettings.FOLDER_OPEN_MEDIUM)
                     .let { if (it in LauncherSettings.FOLDER_OPEN_SIZES) it else LauncherSettings.FOLDER_OPEN_MEDIUM },
                 tapFirstApp = p[Keys.folderTapFirstApp(screenType)] ?: false,
+                directApps = p[Keys.folderDirectApps(screenType)] ?: false,
                 openAnimation = (p[Keys.FOLDER_OPEN_ANIMATION] ?: LauncherSettings.FOLDER_ANIM_SHEET)
                     .let { if (it in LauncherSettings.FOLDER_ANIMS) it else LauncherSettings.FOLDER_ANIM_SHEET },
             ),
@@ -340,6 +342,7 @@ class SettingsRepository @Inject constructor(
             fold = LauncherSettings.Fold(
                 halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
                 hingeTilt = p[Keys.HINGE_TILT] ?: true,
+                wallpaperHinge = p[Keys.WALLPAPER_HINGE] ?: false,
                 foldAction = (p[Keys.foldAction(screenType)] ?: LauncherSettings.ACTION_STAY).let {
                     if (it == LauncherSettings.ACTION_PAGE_0 || it == LauncherSettings.ACTION_LOCK) it else LauncherSettings.ACTION_STAY
                 },
@@ -1328,6 +1331,9 @@ class SettingsRepository @Inject constructor(
     suspend fun setSwipeUpAction(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.swipeUpAction(screenType)] = value }
     suspend fun setHalfOpenedModeEnabled(value: Boolean) = edit { it[Keys.HALF_OPENED_ENABLED] = value }
     suspend fun setHingeTilt(value: Boolean) = edit { it[Keys.HINGE_TILT] = value }
+    suspend fun setWallpaperHinge(value: Boolean) = edit { it[Keys.WALLPAPER_HINGE] = value }
+    suspend fun setIconRing(value: String) = edit { it[Keys.ICON_RING] = value }
+    suspend fun setFolderDirectApps(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.folderDirectApps(screenType)] = value }
     suspend fun setTaskbarHideFullScreen(value: Boolean) = edit { it[Keys.TASKBAR_HIDE_FULL_SCREEN] = value }
     suspend fun setTaskbarClearSystemInset(value: Boolean) = edit { it[Keys.TASKBAR_CLEAR_SYSTEM_INSET] = value }
     suspend fun setSplitLaunchEnabled(value: Boolean) = edit { it[Keys.SPLIT_LAUNCH_ENABLED] = value }

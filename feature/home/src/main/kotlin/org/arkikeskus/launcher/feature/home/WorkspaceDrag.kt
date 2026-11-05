@@ -127,7 +127,11 @@ this@workspaceEntryDrag.pointerInput(entry, rowId, cellW, cellH, columns, rows, 
                 if ((c.position - down.position).getDistance() > slop) { swiped = true; return@withTimeoutOrNull }
             }
         }
-        if (tapped) { onTap(); return@awaitEachGesture }
+        if (tapped) {
+            lastTapLocal = down.position
+            onTap()
+            return@awaitEachGesture
+        }
         if (swiped) return@awaitEachGesture
         // Desktop locked: long-press does nothing (no move/remove); tap (above) still opens.
         if (locked) return@awaitEachGesture

@@ -219,6 +219,9 @@ data class LauncherSettings(
         val nudgeEffect: String = NUDGE_BOUNCE,
         /** How soft Glow, Heartbeat and Colour are (0 = strong and sharp, 1 = gentle and wide). */
         val nudgeSoftness: Float = 0.5f,
+        /** A ring around the icon: progress of a download or upload, a running timer (RING_PROGRESS),
+         *  and also unread notifications (RING_ALL); one of RING_*. */
+        val ring: String = RING_PROGRESS,
     )
 
     /** Notification dots on icons. */
@@ -249,6 +252,9 @@ data class LauncherSettings(
         val openSize: String = FOLDER_OPEN_MEDIUM,
         /** Tap a folder → launch its first app; a long-press (without moving) opens the folder. */
         val tapFirstApp: Boolean = false,
+        /** The apps in a folder's 2×2 / 3×3 tile open with a tap on them; the last place opens the
+         *  folder when it holds more apps than the tile shows. */
+        val directApps: Boolean = false,
         /** How a home folder opens (one of FOLDER_ANIM_*). */
         val openAnimation: String = FOLDER_ANIM_SHEET,
     )
@@ -341,6 +347,9 @@ data class LauncherSettings(
         val halfOpenedModeEnabled: Boolean = false,
         /** Half folded: home leans with the hinge (needs the half-folded layout and a hinge sensor). */
         val hingeTilt: Boolean = true,
+        /** The home picture (and Android's wallpaper, where it lets a launcher) zooms with the hinge
+         *  as the phone opens and closes. */
+        val wallpaperHinge: Boolean = false,
         val foldAction: String = ACTION_STAY,
         val unfoldAction: String = ACTION_STAY,
         val transitionStyle: String = TRANSITION_BOOK_UNFOLD_SWEEP,
@@ -1334,6 +1343,9 @@ data class LauncherSettings(
          *  the progress, a light running round the rim, a gentle pulse, drifting colour, or none. */
         /** Icon nudge effects: a hop, a shake, a heartbeat, a halo, rings spreading, squash and stretch. */
         const val NUDGE_BOUNCE = "bounce"
+        const val RING_OFF = "off"
+        const val RING_PROGRESS = "progress"
+        const val RING_ALL = "all"
         const val NUDGE_WIGGLE = "wiggle"
         const val NUDGE_PULSE = "pulse"
         const val NUDGE_GLOW = "glow"

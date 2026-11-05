@@ -54,6 +54,8 @@ import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.feature.appdrawer.AppDrawerScreen
 import org.arkikeskus.launcher.feature.home.HomeScreen
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.ui.component.IconRing
+import org.arkikeskus.launcher.ui.component.IconRings
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalHomeCovered
 import org.arkikeskus.launcher.ui.component.LocalBatterySaver
@@ -269,6 +271,31 @@ fun LauncherShell(
             null
         }
     }
+    // Rings around icons (Settings ▸ Icons & badges): a download's progress, a running timer, and
+    // with "progress & unread" the apps with new notifications. Only what has something to show.
+    val ringMode = shellSettings.icons.ring
+    val iconRings = remember(ringMode, live) {
+        if (ringMode == LauncherSettings.RING_OFF) {
+            null
+        } else {
+            IconRings(
+                ringMode,
+                live.filter { it.progress != null || it.indeterminate || it.chronometerBase != 0L }
+                    .groupBy { "${it.packageName}/${it.userSerial}" }
+                    .mapValues { (_, items) ->
+                        // A determinate progress first (it says the most), else a timer, else busy.
+                        val a = items.firstOrNull { it.progress != null && !it.indeterminate }
+                            ?: items.firstOrNull { it.chronometerBase != 0L } ?: items.first()
+                        IconRing(
+                            progress = a.progress,
+                            indeterminate = a.indeterminate,
+                            chronometerBase = if (a.progress == null) a.chronometerBase else 0L,
+                            color = a.color,
+                        )
+                    },
+            )
+        }
+    }
     // Folark's taskbar staying on home (inner display): the dock and the drawer keep clear of it.
     val taskbarPx by TaskbarSpace.bottomPx.collectAsStateWithLifecycle()
     val navigationPx = WindowInsets.navigationBars.getBottom(density)
@@ -287,6 +314,7 @@ fun LauncherShell(
         LocalAppNotifications provides popupNotifications,
         LocalBadgeAvatars provides avatars,
         LocalIconNudges provides iconNudges,
+        org.arkikeskus.launcher.ui.component.LocalIconRings provides iconRings,
         LocalTaskbarInset provides taskbarInset,
     ) {
     Box(
@@ -299,19 +327,41 @@ fun LauncherShell(
         // wallpaper, which a launcher cannot swap per display without re-theming the whole system),
         // then the dim layer that keeps icons and labels readable on a busy wallpaper.
         val backgroundPath = shellSettings.home.backgroundImage
+        // Settings ▸ Theme ▸ Wallpaper follows the hinge: the picture zooms in a little as the phone
+        // folds (and back out as it opens), read in the picture's own layer only.
+        val wallpaperFold = org.arkikeskus.launcher.feature.home.rememberHingeFold(
+            enabled = shellSettings.fold.wallpaperHinge && !batterySaver && !homeCovered,
+        )
+        // Android's own wallpaper behind home (no picture of Folark's): zoomed the same way through
+        // WallpaperManager's zoom, where this Android build lets a launcher call it.
+        val shellView = androidx.compose.ui.platform.LocalView.current
+        if (shellSettings.fold.wallpaperHinge && backgroundPath.isBlank()) {
+            LaunchedEffect(shellView) {
+                try {
+                    androidx.compose.runtime.snapshotFlow { wallpaperFold.value }.collect { setSystemWallpaperZoom(shellView, it * WALLPAPER_ZOOM_OUT) }
+                } finally {
+                    setSystemWallpaperZoom(shellView, 0f)
+                }
+            }
+        }
+        val hingeZoom = Modifier.graphicsLayer {
+            val s = 1f + wallpaperFold.value * WALLPAPER_HINGE_ZOOM
+            scaleX = s
+            scaleY = s
+        }
         if (backgroundPath.isNotBlank() && isVideoBackground(backgroundPath)) {
             // A looping silent video, playing only while home is in view (VideoBackground.kt).
             VideoBackground(
                 path = backgroundPath,
                 playing = !homeCovered && !LocalBatterySaver.current,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().then(hingeZoom),
             )
         } else if (backgroundPath.isNotBlank()) {
             AsyncImage(
                 model = java.io.File(backgroundPath),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().then(hingeZoom),
             )
         }
         if (shellSettings.home.wallpaperDim > 0f) {
@@ -545,4 +595,20 @@ private fun rememberCameraClearance(): androidx.compose.ui.unit.Dp {
         rects.filter { it.top < limit && it.bottom < limit }.maxOfOrNull { it.bottom } ?: 0
     }
     return with(density) { maxOf(barTop, cutoutTop, holeBottom).toDp() }
+}
+
+/** How much the home picture grows with the phone folded to 90° (Settings ▸ Wallpaper follows the hinge). */
+private const val WALLPAPER_HINGE_ZOOM = 0.14f
+
+/** The same for Android's own wallpaper, as WallpaperManager's zoom (0 none, 1 the most). */
+private const val WALLPAPER_ZOOM_OUT = 0.8f
+
+/** Android's wallpaper zoom for the window of [view]; quietly nothing where Android won't allow it. */
+private fun setSystemWallpaperZoom(view: android.view.View, zoom: Float) {
+    val token = view.windowToken ?: return
+    runCatching {
+        val manager = android.app.WallpaperManager.getInstance(view.context)
+        manager.javaClass.getMethod("setWallpaperZoomOut", android.os.IBinder::class.java, Float::class.javaPrimitiveType)
+            .invoke(manager, token, zoom.coerceIn(0f, 1f))
+    }
 }
