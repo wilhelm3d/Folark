@@ -106,4 +106,23 @@
     <string name="settings_split_three_even">Three apps a third each</string>
     <string name="settings_split_three_even_desc">A third app joining a split makes three equal thirds (33 / 33 / 33) instead of Motorola\'s carousel, where one app shrinks to a strip (needs Folark\'s Vector module)</string>
     <string name="settings_divider_stops_desc" formatted="false">The split divider rests at 33 %, 50 % and 67 %, the sizes Motorola\'s split screen lays apps out at (needs Folark\'s Vector module; from the next split)</string>
+    <string name="pair_schedule_add">Schedule</string>
+    <string name="pair_schedule_edit">Edit schedule</string>
+    <string name="pair_schedule_row">Schedule:</string>
+    <string name="pair_schedule_title">Schedule "%s"</string>
+    <string name="pair_schedule_on">Come up at a set time</string>
+    <string name="pair_schedule_time">Time</string>
+    <string name="pair_schedule_days_hint">Choose the weekdays — none chosen means every day</string>
+    <string name="pair_schedule_every_day">Every day</string>
+    <string name="pair_schedule_mon">Mon</string>
+    <string name="pair_schedule_tue">Tue</string>
+    <string name="pair_schedule_wed">Wed</string>
+    <string name="pair_schedule_thu">Thu</string>
+    <string name="pair_schedule_fri">Fri</string>
+    <string name="pair_schedule_sat">Sat</string>
+    <string name="pair_schedule_sun">Sun</string>
+    <string name="pair_schedule_save">Save</string>
+    <string name="pair_schedule_cancel">Cancel</string>
+    <string name="pair_schedule_channel">Scheduled app pairs</string>
+    <string name="pair_schedule_due">Your scheduled pair is ready — tap to open it</string>
 </resources>

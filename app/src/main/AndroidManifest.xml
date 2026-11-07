@@ -5,6 +5,13 @@
     <!-- Open the notification shade with a swipe-down gesture. -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
+    <!-- Scheduled app pairs: exact alarms where Android allows them (a user grant on 12+; the
+         scheduler falls back to a ±10 min window otherwise), boot rescheduling, and the
+         heads-up notification that offers the pair when it cannot open it itself. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Optional: contacts in app-drawer search; requested at runtime, gated by a setting. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Search actions: "timer 10 min" and "alarm 7:30" hand the clock app a timer or alarm to
@@ -139,6 +146,29 @@
             android:excludeFromRecents="true"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|fontScale"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Scheduled app pairs: a translucent trampoline a schedule notification taps, which
+             launches the pair and is gone (PairScheduler.kt). -->
+        <activity
+            android:name=".pairs.PairLaunchActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Fires scheduled pairs, and re-lays their alarms after boot and time changes. Not
+             exported: only AlarmManager (explicit intents) and the system's protected broadcasts
+             reach it. -->
+        <receiver
+            android:name=".pairs.PairScheduleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.arkikeskus.launcher.pairs.RESCHEDULE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Folark's module for Vector (LSPosed): hands the system launcher's Recents over to Folark
              Recents. Only active if you install Vector and enable Folark for the launcher there. -->

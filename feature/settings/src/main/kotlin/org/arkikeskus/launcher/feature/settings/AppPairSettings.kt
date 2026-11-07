@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.data.PairSchedule
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.expressive.Accent
@@ -50,6 +52,8 @@ import java.util.UUID
 internal fun AppPairsManager(
     apps: List<AppItem>,
     appPairs: List<AppPair>,
+    schedules: Map<String, PairSchedule>,
+    onSetSchedule: (String, PairSchedule?) -> Unit,
     onSaveAppPair: (AppPair) -> Unit,
     onDeleteAppPair: (String) -> Unit,
     onLaunchAppPair: (AppPair) -> Unit,
@@ -64,6 +68,7 @@ internal fun AppPairsManager(
     val palette = LocalExpressivePalette.current
     var showCreator by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AppPair?>(null) }
+    var scheduling by remember { mutableStateOf<AppPair?>(null) }
 
     Surface(modifier = modifier, color = palette.bg) {
         Column(
@@ -103,10 +108,12 @@ internal fun AppPairsManager(
                     AppPairRow(
                         pair = pair,
                         apps = apps,
+                        schedule = schedules[pair.id],
                         onLaunch = { onLaunchAppPair(pair) },
                         onAddToHome = { onAddAppPairToHome(pair) },
                         onDelete = { onDeleteAppPair(pair.id) },
                         onEdit = { editing = pair },
+                        onSchedule = { scheduling = pair },
                         onTaskbar = { onToggleTaskbar(pair) },
                         onTaskbarPinned = pair.id in taskbarPairs,
                     )
@@ -154,6 +161,100 @@ internal fun AppPairsManager(
             },
         )
     }
+
+    scheduling?.let { pair ->
+        PairScheduleDialog(
+            pairName = pair.name,
+            initial = schedules[pair.id],
+            onDismiss = { scheduling = null },
+            onSave = { schedule ->
+                onSetSchedule(pair.id, schedule)
+                scheduling = null
+            },
+        )
+    }
+}
+
+/**
+ * The schedule dialog for one pair: on/off, a time (Material 3's [androidx.compose.material3.TimePicker])
+ * and the weekdays (none chosen = every day). Saving re-lays the alarms via the schedules flow.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PairScheduleDialog(
+    pairName: String,
+    initial: PairSchedule?,
+    onDismiss: () -> Unit,
+    onSave: (PairSchedule?) -> Unit,
+) {
+    val palette = LocalExpressivePalette.current
+    var on by remember { mutableStateOf(initial != null) }
+    // The picker state owns the time; the dialog reads it on save.
+    val pickerState = remember {
+        androidx.compose.material3.TimePickerState(
+            initialHour = initial?.hour ?: 8,
+            initialMinute = initial?.minute ?: 0,
+            is24Hour = true,
+        )
+    }
+    var days by remember { mutableStateOf(initial?.days?.toSet() ?: emptySet()) }
+    val dayLabels = listOf(
+        1 to stringResource(R.string.pair_schedule_mon), 2 to stringResource(R.string.pair_schedule_tue),
+        3 to stringResource(R.string.pair_schedule_wed), 4 to stringResource(R.string.pair_schedule_thu),
+        5 to stringResource(R.string.pair_schedule_fri), 6 to stringResource(R.string.pair_schedule_sat),
+        7 to stringResource(R.string.pair_schedule_sun),
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.pair_schedule_title, pairName)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.pair_schedule_on),
+                        color = palette.text,
+                        modifier = Modifier.weight(1f),
+                    )
+                    androidx.compose.material3.Switch(checked = on, onCheckedChange = { on = it })
+                }
+                if (on) {
+                    androidx.compose.material3.TimePicker(state = pickerState)
+                    // The chips are the weekday choice; none chosen means every day.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        dayLabels.forEach { (day, label) ->
+                            androidx.compose.material3.FilterChip(
+                                selected = day in days,
+                                onClick = { days = if (day in days) days - day else days + day },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            )
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.pair_schedule_days_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = palette.dim,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (!on) onSave(null)
+                    else onSave(PairSchedule(pickerState.hour, pickerState.minute, days))
+                },
+            ) { Text(stringResource(R.string.pair_schedule_save), color = Accent) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.pair_schedule_cancel)) }
+        },
+    )
 }
 
 /** What the scene dialog hands back. */
@@ -171,12 +272,14 @@ private class SceneDraft(
 private fun AppPairRow(
     pair: AppPair,
     apps: List<AppItem>,
+    schedule: PairSchedule? = null,
     onLaunch: () -> Unit,
     onAddToHome: () -> Unit,
     onDelete: () -> Unit,
     onTaskbar: () -> Unit = {},
     onTaskbarPinned: Boolean = false,
     onEdit: () -> Unit = {},
+    onSchedule: () -> Unit = {},
 ) {
     val palette = LocalExpressivePalette.current
     val context = LocalContext.current
@@ -207,6 +310,15 @@ private fun AppPairRow(
                         fontSize = 12.sp,
                         color = palette.faint,
                     )
+                    // The schedule as a second line, so it is visible without opening anything.
+                    schedule?.let {
+                        Text(
+                            text = stringResource(R.string.pair_schedule_row) + " " +
+                                "%02d:%02d".format(it.hour, it.minute) + " · " + scheduleDaysLabel(it.days),
+                            fontSize = 12.sp,
+                            color = Accent,
+                        )
+                    }
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -218,6 +330,12 @@ private fun AppPairRow(
                 }
                 TextButton(onClick = onEdit) {
                     Text(stringResource(R.string.settings_scene_edit), color = Accent)
+                }
+                TextButton(onClick = onSchedule) {
+                    Text(
+                        stringResource(if (schedule != null) R.string.pair_schedule_edit else R.string.pair_schedule_add),
+                        color = Accent,
+                    )
                 }
                 TextButton(onClick = onTaskbar) {
                     Text(
@@ -238,6 +356,19 @@ private fun layoutLabel(layout: String): Int = when (layout) {
     AppPair.LAYOUT_FIRST_TWO_THIRDS -> R.string.settings_scene_layout_two_thirds
     AppPair.LAYOUT_PEEK -> R.string.settings_app_pair_peek_short
     else -> R.string.settings_scene_layout_even
+}
+
+/** "Mon, Wed, Fri" or "Every day", for the row's schedule line. */
+@Composable
+private fun scheduleDaysLabel(days: Set<Int>): String {
+    if (days.isEmpty()) return stringResource(R.string.pair_schedule_every_day)
+    val names = mapOf(
+        1 to stringResource(R.string.pair_schedule_mon), 2 to stringResource(R.string.pair_schedule_tue),
+        3 to stringResource(R.string.pair_schedule_wed), 4 to stringResource(R.string.pair_schedule_thu),
+        5 to stringResource(R.string.pair_schedule_fri), 6 to stringResource(R.string.pair_schedule_sat),
+        7 to stringResource(R.string.pair_schedule_sun),
+    )
+    return days.sorted().mapNotNull { names[it] }.joinToString(", ")
 }
 
 /** One choice of several, as a row of chips under a title. */

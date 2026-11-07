@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,7 @@ import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.HomeLayoutRepository
 import org.arkikeskus.launcher.data.IconPackInfo
+import org.arkikeskus.launcher.data.PairSchedule
 import org.arkikeskus.launcher.data.IconPackRepository
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.AppItem
@@ -82,6 +84,20 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun saveAppPair(pair: AppPair) = appRepository.saveAppPair(pair)
+
+    /** Schedules per pair id (PairSchedules.kt), for the pairs manager's schedule dialog. */
+    val pairSchedules: StateFlow<Map<String, PairSchedule>> =
+        combine(appRepository.appPairs, repository.pairSchedules) { pairs, raw ->
+            raw.mapNotNull { (id, value) ->
+                val schedule = PairSchedule.parse(value) ?: return@mapNotNull null
+                if (pairs.none { it.id == id }) return@mapNotNull null
+                id to schedule
+            }.toMap()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    fun setPairSchedule(pairId: String, schedule: PairSchedule?) =
+        viewModelScope.launch { repository.setPairSchedule(pairId, schedule) }
+
     /** Deletes the pair and its shortcuts on both home screens (they would be dead cells). */
     fun deleteAppPair(id: String) {
         appRepository.deleteAppPair(id)

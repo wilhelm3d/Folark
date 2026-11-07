@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -505,6 +506,33 @@ class SettingsRepository @Inject constructor(
 
     val appPairs: Flow<List<AppPair>> = keyFlow(Keys.APP_PAIRS) { parseAppPairs(it) }
 
+    // --- App-pair schedules (PairSchedules.kt) ----------------------------------------------------
+    // One dynamic DataStore key per pair id ("pairsched:<id>"), so the map is read with a prefix
+    // filter rather than a fixed key.
+
+    /** Every stored pair schedule, pair id to its raw "HH:MM|days" value. */
+    val pairSchedules: Flow<Map<String, String>> = dataStore.data.map { prefs ->
+        prefs.asMap().entries
+            .filter { it.key.name.startsWith(PAIR_SCHEDULE_PREFIX) }
+            .associate { it.key.name.removePrefix(PAIR_SCHEDULE_PREFIX) to (it.value as? String).orEmpty() }
+    }
+
+    /** Pairs that have a schedule set, paired with their parsed schedule. */
+    val scheduledPairs: Flow<List<ScheduledPair>> = combine(appPairs, pairSchedules) { pairs, raw ->
+        pairs.map { ScheduledPair(it, PairSchedule.parse(raw[it.id])) }
+            .filter { it.schedule != null }
+    }
+
+    /** Reads one pair's schedule (null when none). */
+    suspend fun pairSchedule(pairId: String): PairSchedule? =
+        PairSchedule.parse(dataStore.data.first()[stringPreferencesKey(PAIR_SCHEDULE_PREFIX + pairId)])
+
+    /** Sets (or, with a null [schedule], clears) a pair's schedule. */
+    suspend fun setPairSchedule(pairId: String, schedule: PairSchedule?) = edit { p ->
+        val key = stringPreferencesKey(PAIR_SCHEDULE_PREFIX + pairId)
+        if (schedule == null) p.remove(key) else p[key] = schedule.serialize()
+    }
+
     suspend fun saveAppPair(pair: AppPair) = edit { p ->
         val current = parseAppPairs(p[Keys.APP_PAIRS]).toMutableList()
         val index = current.indexOfFirst { it.id == pair.id }
@@ -515,10 +543,11 @@ class SettingsRepository @Inject constructor(
     suspend fun deleteAppPair(id: String) = edit { p ->
         val current = parseAppPairs(p[Keys.APP_PAIRS])
         p[Keys.APP_PAIRS] = serializeAppPairs(current.filterNot { it.id == id })
-        // A deleted pair leaves the taskbar too.
+        // A deleted pair leaves the taskbar too, and takes its schedule with it.
         p[Keys.TASKBAR_PAIRS]?.let { raw ->
             p[Keys.TASKBAR_PAIRS] = raw.split("\n").filter { it.isNotEmpty() && it != id }.joinToString("\n")
         }
+        p.remove(stringPreferencesKey(PAIR_SCHEDULE_PREFIX + id))
     }
 
     private fun parseAppPairs(raw: String?): List<AppPair> =

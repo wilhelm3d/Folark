@@ -98,6 +98,19 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
         setPadding(pad, dp(6), pad, dp(6))
         clipChildren = false
         clipToPadding = false
+        // System drag-and-drop from other apps: drop shared text or files on an app's icon and
+        // that app opens with the content (shareDropTo in AppTaskbarShare.kt). Returning true to
+        // DRAG_STARTED accepts the drag for the whole bar; the icon under the drop decides.
+        setOnDragListener { view, event ->
+            when (event.action) {
+                android.view.DragEvent.ACTION_DRAG_STARTED -> true
+                android.view.DragEvent.ACTION_DROP -> {
+                    val icon = findIconUnder(view, event.x, event.y)
+                    if (icon != null) shareDropTo(icon, event.clipData) else false
+                }
+                else -> false
+            }
+        }
     }
     // More than fits (many recents, pairs…): the row scrolls sideways inside the bar's backdrop.
     val scroller = TaskbarScroller(context) {

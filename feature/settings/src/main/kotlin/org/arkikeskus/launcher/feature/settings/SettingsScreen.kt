@@ -374,6 +374,8 @@ fun SettingsScreen(
             AppPairsManager(
                 apps = allApps,
                 appPairs = appPairs,
+                schedules = viewModel.pairSchedules.collectAsStateWithLifecycle().value,
+                onSetSchedule = viewModel::setPairSchedule,
                 onSaveAppPair = viewModel::saveAppPair,
                 onDeleteAppPair = viewModel::deleteAppPair,
                 onLaunchAppPair = { viewModel.launchAppPair(it) },

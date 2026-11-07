@@ -99,5 +99,12 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                 org.arkikeskus.launcher.data.SplitSizes.remember(this@LauncherApplication, packages, fractions.toList())
             }
         }
+        // Scheduled app pairs: any schedule or scene change (and boot/time changes, via the
+        // receiver) re-lays the alarms.
+        appScope.launch {
+            settingsRepository.scheduledPairs.collect {
+                org.arkikeskus.launcher.pairs.PairScheduleReceiver.rescheduleAll(this@LauncherApplication)
+            }
+        }
     }
 }
