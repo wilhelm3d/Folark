@@ -10,6 +10,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.ResolveInfo
 import android.net.Uri
+import android.os.Looper
 import android.os.Process
 import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.NotificationListenerService.RankingMap
@@ -84,6 +85,11 @@ class NotificationDotListenerServiceTest {
         service.cancelNotification(notification.key)
         Shadow.extract<ShadowNotificationListenerService>(service).addActiveNotification(notification)
         service.onNotificationPosted(notification)
+        // The service coalesces rebuilds with handler.postDelayed (COALESCE_MS = 40): run the
+        // queued refresh now, so assertions see the post-coalesce state the device reaches 40 ms
+        // later. Exactly the coalesce window — further would also fire the (hour-away) batch
+        // delivery and deliver notifications still meant to be held.
+        shadowOf(Looper.getMainLooper()).idle(40L)
     }
 
     private fun sbn(notification: Notification) = StatusBarNotification(
