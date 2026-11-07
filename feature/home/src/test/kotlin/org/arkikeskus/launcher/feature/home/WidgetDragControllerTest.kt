@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.feature.home.widgets.*
+
 import androidx.compose.ui.geometry.Offset
 import com.google.common.truth.Truth.assertThat
 import org.arkikeskus.launcher.model.WidgetPlacement

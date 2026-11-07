@@ -226,7 +226,6 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         ExpressiveRowDivider()
         RestartSystemUiRow()
         ExpressiveRowDivider()
-        ModuleLogRow()
     }
 
     // While a slider is dragged the preview follows the finger (the saved value catches up after).
@@ -439,59 +438,6 @@ private fun RestartSystemUiRow() {
         },
         dismissButton = {
             TextButton(onClick = { asking = false }) { Text(stringResource(R.string.settings_cancel)) }
-        },
-    )
-}
-
-/** The module's own log lines (root), to see what it did or why a split didn't form. */
-@Composable
-private fun ModuleLogRow() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var text by remember { mutableStateOf<String?>(null) }
-    var running by remember { mutableStateOf(false) }
-    val noRoot = stringResource(R.string.settings_module_log_no_root)
-    val empty = stringResource(R.string.settings_module_log_empty)
-    ExpressiveActionItem(
-        title = stringResource(if (running) R.string.settings_root_working else R.string.settings_module_log),
-        description = stringResource(R.string.settings_module_log_desc),
-        onClick = {
-            if (!running) {
-                running = true
-                scope.launch {
-                    val log = withContext(Dispatchers.IO) { runCatching { ModuleTools.moduleLog() }.getOrNull() }
-                    text = when {
-                        log == null -> noRoot
-                        log.isEmpty() -> empty
-                        else -> log
-                    }
-                    running = false
-                }
-            }
-        },
-    )
-    val shown = text ?: return
-    AlertDialog(
-        onDismissRequest = { text = null },
-        title = { Text(stringResource(R.string.settings_module_log)) },
-        text = {
-            SelectionContainer {
-                Text(
-                    shown,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                context.getSystemService(android.content.ClipboardManager::class.java)
-                    ?.setPrimaryClip(android.content.ClipData.newPlainText("Folark module log", shown))
-            }) { Text(stringResource(R.string.settings_recents_check_copy)) }
-        },
-        dismissButton = {
-            TextButton(onClick = { text = null }) { Text(stringResource(R.string.settings_taskbar_done)) }
         },
     )
 }

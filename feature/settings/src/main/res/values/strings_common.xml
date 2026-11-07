@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared across pages (split from strings.xml) -->
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_set_default">Set as default launcher</string>
+    <string name="settings_default_current">Folark is your default launcher</string>
+    <string name="settings_default_tap">Tap to set Folark as your home app</string>
+    <string name="settings_no_results">No settings found</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_delete">Delete</string>
+    <string name="settings_choose_app">Choose app</string>
+</resources>

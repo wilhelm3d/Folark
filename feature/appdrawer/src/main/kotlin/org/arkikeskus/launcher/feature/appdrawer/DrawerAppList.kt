@@ -19,12 +19,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
@@ -65,9 +68,11 @@ internal fun AppListRow(
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem, Rect) -> Unit,
     dragController: HomeDragController,
+    sourceTab: Long?,
     onDragOutStart: () -> Unit,
     onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
     onDropOnDock: (AppItem) -> Unit,
+    onDropOnTab: (AppItem, Long?) -> Unit,
     haptics: HapticFeedback,
     locked: Boolean,
     modifier: Modifier = Modifier,
@@ -75,10 +80,14 @@ internal fun AppListRow(
     // Where the icon is, read when a long press or drag needs it (not on every scroll frame).
     val placedAt = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val bounds = { placedAt[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero }
+    // Keyboard navigation (D-pad, a hardware keyboard's arrows): the row is focusable through its
+    // click handling already; this draws where the focus sits and gives the list a soft glow.
+    var rowFocused by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .onFocusChanged { rowFocused = it.isFocused }
             .onPlaced { placedAt[0] = it }
             .pointerInput(app.key, locked) {
                 awaitEachGesture {
@@ -111,7 +120,7 @@ internal fun AppListRow(
                         2 -> return@awaitEachGesture
                     }
                     if (locked) return@awaitEachGesture
-                    dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position)
+                    dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position, sourceTab)
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     try {
                         val completed = drag(down.id) { change ->
@@ -121,22 +130,39 @@ internal fun AppListRow(
                                 onDragOutStart()
                             }
                             if (dragController.moving) {
-                                dragController.update(bounds().topLeft + change.position)
+                                val root = bounds().topLeft + change.position
+                                dragController.update(root)
+                                // The folder tab under the finger lights up while the drag moves.
+                                dragController.setHoverFolderTab(root)
                             }
                         }
                         if (completed && dragController.moving) {
                             val root = dragController.rootPosition
+                            // Dragged out of a folder tab: wherever it lands outside the drawer, it
+                            // also leaves the folder (a chip, the Remove pill, home, dock, split).
+                            val pullOut = dragController.dragFromTab != null
                             when {
+                                // Onto a folder chip over home: into that folder (the All chip pulls out).
+                                dragController.isOverFolderTab(root) ->
+                                    onDropOnTab(app, dragController.folderTabAt(root))
+                                // The Remove pill (a folder tab open): take the app out of its folder.
+                                dragController.isOverRemove(root) && pullOut ->
+                                    onDropOnTab(app, null)
                                 // The "split" target on home: the partner picker opens.
-                                dragController.dropOnSplit(app, root) -> Unit
+                                dragController.dropOnSplit(app, root) -> if (pullOut) onDropOnTab(app, null)
                                 // Onto the taskbar (shown on home): pin it there.
-                                org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(root.x, root.y) ->
+                                org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(root.x, root.y) -> {
                                     org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(app)
-                                dragController.isOverDock(root) && dragController.dockHasSpace ->
+                                    if (pullOut) onDropOnTab(app, null)
+                                }
+                                dragController.isOverDock(root) && dragController.dockHasSpace -> {
                                     onDropOnDock(app)
+                                    if (pullOut) onDropOnTab(app, null)
+                                }
                                 dragController.isOverGrid(root) -> {
                                     val (page, cx, cy) = dragController.cellAt(root)
                                     onDropOnHome(app, page, cx, cy)
+                                    if (pullOut) onDropOnTab(app, null)
                                 }
                             }
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -159,6 +185,11 @@ internal fun AppListRow(
             badgeCount = badgeCount,
             badgeShowCount = badgeShowCount,
             badgeScale = badgeScale,
+            modifier = Modifier.border(
+                width = 2.dp,
+                color = if (rowFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(18.dp),
+            ),
         )
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -290,8 +321,10 @@ internal fun LazyGridScope.appCells(
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem, Rect) -> Unit,
     dragController: HomeDragController,
+    sourceTab: Long?,
     onDragOutStart: () -> Unit,
     onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
+    onDropOnTab: (AppItem, Long?) -> Unit,
     onDropOnDock: (AppItem) -> Unit,
     haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
     locked: Boolean,
@@ -300,6 +333,8 @@ internal fun LazyGridScope.appCells(
         // Where the icon is, read when a long press or drag needs it (not on every scroll frame).
         val placedAt = remember { arrayOfNulls<LayoutCoordinates>(1) }
         val bounds = { placedAt[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero }
+        // Keyboard focus indicator (D-pad / hardware keyboard; the Lazy grid scrolls to it).
+        var cellFocused by remember { mutableStateOf(false) }
         AppIcon(
             appItem = app,
             labelColor = MaterialTheme.colorScheme.onSurface,
@@ -309,6 +344,12 @@ internal fun LazyGridScope.appCells(
             badgeShowCount = badgeShowCount,
             badgeScale = badgeScale,
             modifier = Modifier
+                .onFocusChanged { cellFocused = it.isFocused }
+                .border(
+                    width = 2.dp,
+                    color = if (cellFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = RoundedCornerShape(18.dp),
+                )
                 .onPlaced { placedAt[0] = it }
                 // One unified gesture (like Workspace/Dock) but non-consuming until the
                 // long-press fires, so a quick drag still scrolls the grid: quick tap
@@ -356,7 +397,7 @@ internal fun LazyGridScope.appCells(
                         // position. The drawer is hidden with alpha (not translated) during
                         // the drag, so its local coordinate space stays put and this stays
                         // accurate.
-                        dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position)
+                        dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position, sourceTab)
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         try {
                             val completed = drag(down.id) { change ->
@@ -371,22 +412,39 @@ internal fun LazyGridScope.appCells(
                                     onDragOutStart()
                                 }
                                 if (dragController.moving) {
-                                    dragController.update(bounds().topLeft + change.position)
+                                    val root = bounds().topLeft + change.position
+                                    dragController.update(root)
+                                    // The folder tab under the finger lights up while the drag moves.
+                                    dragController.setHoverFolderTab(root)
                                 }
                             }
                             if (completed && dragController.moving) {
                                 val root = dragController.rootPosition
+                                // Dragged out of a folder tab: wherever it lands outside the drawer,
+                                // it also leaves the folder (a chip, the Remove pill, home, dock, split).
+                                val pullOut = dragController.dragFromTab != null
                                 when {
+                                    // Onto a folder chip over home: into that folder (All pulls out).
+                                    dragController.isOverFolderTab(root) ->
+                                        onDropOnTab(app, dragController.folderTabAt(root))
+                                    // The Remove pill (a folder tab open): take the app out of its folder.
+                                    dragController.isOverRemove(root) && pullOut ->
+                                        onDropOnTab(app, null)
                                     // The "split" target on home: the partner picker opens.
-                                    dragController.dropOnSplit(app, root) -> Unit
+                                    dragController.dropOnSplit(app, root) -> if (pullOut) onDropOnTab(app, null)
                                     // Onto the taskbar (shown on home): pin it there.
-                                    org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(root.x, root.y) ->
+                                    org.arkikeskus.launcher.ui.TaskbarDropTarget.isOver(root.x, root.y) -> {
                                         org.arkikeskus.launcher.ui.TaskbarDropTarget.pin(app)
-                                    dragController.isOverDock(root) && dragController.dockHasSpace ->
+                                        if (pullOut) onDropOnTab(app, null)
+                                    }
+                                    dragController.isOverDock(root) && dragController.dockHasSpace -> {
                                         onDropOnDock(app)
+                                        if (pullOut) onDropOnTab(app, null)
+                                    }
                                     dragController.isOverGrid(root) -> {
                                         val (page, cx, cy) = dragController.cellAt(root)
                                         onDropOnHome(app, page, cx, cy)
+                                        if (pullOut) onDropOnTab(app, null)
                                     }
                                 }
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)

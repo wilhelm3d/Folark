@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CallToAction
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.HealthAndSafety
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Apps
@@ -45,7 +46,6 @@ import androidx.compose.material.icons.rounded.Dock
 import androidx.compose.material.icons.rounded.Gesture
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.GridOn
-import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Category
@@ -142,6 +142,7 @@ internal enum class SettingsCategory(
     SYSTEM(R.string.settings_cat_system, R.string.settings_cat_system_desc, Icons.Rounded.Tune, SettingsGroup.DEVICE, perDisplay = false),
     PERMISSIONS(R.string.settings_permissions, R.string.settings_category_permissions_desc, Icons.Rounded.Shield, SettingsGroup.DEVICE, perDisplay = false),
     ROOT(R.string.settings_root, R.string.settings_category_root_desc, Icons.Rounded.AdminPanelSettings, SettingsGroup.DEVICE, perDisplay = false),
+    SUPPORT(R.string.settings_support, R.string.settings_support_desc, Icons.Rounded.HealthAndSafety, SettingsGroup.DEVICE, perDisplay = false),
     BACKUP(R.string.settings_cat_backup, R.string.settings_cat_backup_desc, Icons.Rounded.SettingsBackupRestore, SettingsGroup.DEVICE, perDisplay = false),
 }
 
@@ -290,6 +291,7 @@ fun SettingsScreen(
                 onNotifAccess = { openNotificationAccess(context) },
             )
             SettingsCategory.ROOT -> RootSection(s = s, viewModel = viewModel)
+            SettingsCategory.SUPPORT -> SupportPage(s = s, viewModel = viewModel)
             SettingsCategory.BACKUP -> BackupSection()
         }
     }

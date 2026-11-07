@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Vector module's own resources: read by the hook code and by Folark (through
+     org.arkikeskus.launcher.hook.R). The manifest's xposedscope meta-data points at the
+     array here; xposed_description stays in :app next to the manifest entry. -->
+<resources>
+    <string name="split_native_paused">System UI restarted right after a split request, so Folark\'s native split is paused and the split commands are used instead. Settings ▸ Split screen &amp; peek can turn it back on, and it comes back by itself the next time System UI restarts.</string>
+    <string-array name="xposed_scope">
+        <item>com.motorola.launcher3</item>
+        <item>com.android.launcher3</item>
+        <item>com.google.android.apps.nexuslauncher</item>
+        <item>com.android.systemui</item>
+    </string-array>
+</resources>

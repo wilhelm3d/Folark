@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.feature.home.workspace.*
+
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 

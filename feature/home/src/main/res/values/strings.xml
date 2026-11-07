@@ -74,6 +74,7 @@
     <string name="onboarding_root_partly">%1$d of %2$d granted with root. Grant the rest below</string>
     <string name="home_remove">Remove from home</string>
     <string name="drag_remove">Remove</string>
+    <string name="drag_folder_all">All apps</string>
     <string name="dock_remove">Remove from dock</string>
     <string name="app_info">App info</string>
     <string name="uninstall">Uninstall</string>
@@ -185,6 +186,11 @@
     <string name="top_apps_widget_empty">The apps you use most will show up here</string>
     <string name="stats_widget_name">Device status</string>
     <string name="stats_widget_storage">Storage</string>
+    <string name="stats_widget_temp">Temp</string>
+    <string name="battery_full_in_min">Full in %d min</string>
+    <string name="battery_full_in_hm">Full in %1$d h %2$02d min</string>
+    <string name="notif_hide_channel">Hide this notification type from Folark</string>
+    <string name="note_checklist_hint">Start a line with \"[ ] \" to make it a checkbox — tap the box right on the widget.</string>
     <string name="stats_widget_memory">Memory</string>
     <string name="stats_widget_bluetooth_allow">Allow</string>
     <string name="note_widget_name">Quick note</string>

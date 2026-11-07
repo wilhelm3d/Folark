@@ -1,5 +1,9 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.feature.home.taskbar.*
+import org.arkikeskus.launcher.feature.home.widgets.*
+import org.arkikeskus.launcher.feature.home.workspace.*
+
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
@@ -858,6 +862,11 @@ fun HomeScreen(
             (dragController.source == DragSource.Home || dragController.source == DragSource.Dock)) ||
             dragController.localDragging
         val showSplitTarget = dragController.moving && settings.launch.splitEnabled
+        // Folder chips while an app is dragged out of the drawer and it has folder tabs: a chip
+        // takes the app into that folder, the All chip (with a folder tab open) pulls it out.
+        val showFolderChips = dragController.moving &&
+            dragController.source == DragSource.Drawer &&
+            dragController.folderTargets.isNotEmpty()
         // Unfolded: a pill per split drop zone that is on (Left / Right / Three); folded, or with
         // those three zones off: the single "Split" pill and its partner picker.
         val zones = settings.recents.dropZones
@@ -878,7 +887,11 @@ fun HomeScreen(
             if (!showSplitTarget || DropZones.THREE !in splitZones) dragController.splitThreeBounds = androidx.compose.ui.geometry.Rect.Zero
             if (!showSplitTarget || splitZones.isNotEmpty()) dragController.splitBounds = androidx.compose.ui.geometry.Rect.Zero
         }
-        if (showRemoveTarget || showSplitTarget) {
+        // Bounds of folder chips that aren't shown must never catch a drop.
+        LaunchedEffect(showFolderChips) {
+            if (!showFolderChips) dragController.drawerTabBounds = emptyMap()
+        }
+        if (showRemoveTarget || showSplitTarget || showFolderChips) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -901,8 +914,11 @@ fun HomeScreen(
                 }
                 // A tick on entering a drop target (Settings ▸ Recents ▸ Split screen ▸ Drop zones).
                 val zoneHaptics = LocalHapticFeedback.current
-                LaunchedEffect(overZone, overSplit, overRemove) {
-                    if (zones.haptics && (overZone != null || overSplit || overRemove)) {
+                val overFolder by remember(dragController) {
+                    derivedStateOf { dragController.isOverFolderTab(dragController.rootPosition) }
+                }
+                LaunchedEffect(overZone, overSplit, overRemove, overFolder) {
+                    if (zones.haptics && (overZone != null || overSplit || overRemove || overFolder)) {
                         zoneHaptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
                     }
                 }
@@ -944,6 +960,38 @@ fun HomeScreen(
                                     DropZones.RIGHT -> dragController.splitRightBounds = r
                                     else -> dragController.splitThreeBounds = r
                                 }
+                            },
+                        )
+                    }
+                }
+                // Folder chips (dragging out of the drawer, which has folder tabs): one per folder —
+                // dropping on it moves the app in — plus an All chip when the drag came out of a
+                // folder, which pulls the app out to All. Lights up under the finger like the pills.
+                if (showFolderChips) {
+                    val hoverTab = dragController.hoverFolderTab
+                    // The All chip first (a pull-out is the more common "put it back"), then the folders.
+                    if (dragController.dragFromTab != null) {
+                        DragTargetPill(
+                            icon = LauncherIcons.Folder,
+                            label = stringResource(R.string.drag_folder_all),
+                            active = hoverTab == null && dragController.isOverFolderTab(dragController.rootPosition),
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.onGloballyPositioned { c ->
+                                dragController.drawerTabBounds =
+                                    dragController.drawerTabBounds + (null to c.boundsInRoot())
+                            },
+                        )
+                    }
+                    dragController.folderTargets.forEach { (id, name) ->
+                        if (id == dragController.dragFromTab) return@forEach
+                        DragTargetPill(
+                            icon = LauncherIcons.Folder,
+                            label = name,
+                            active = hoverTab == id,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.onGloballyPositioned { c ->
+                                dragController.drawerTabBounds =
+                                    dragController.drawerTabBounds + (id to c.boundsInRoot())
                             },
                         )
                     }

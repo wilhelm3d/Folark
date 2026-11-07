@@ -82,12 +82,14 @@ class HomeDragController {
     fun isOverScrollableWidget(p: Offset): Boolean =
         scrollableWidgetRects.values.any { !it.isEmpty && it.contains(p) }
 
-    /** Lift [app] (long-press) — menu shows; not yet "moving". */
-    fun start(app: AppItem, from: DragSource, root: Offset) {
+    /** Lift [app] (long-press) — menu shows; not yet "moving". [fromTab]: the drawer folder tab the
+     *  drag started from, or null for the All tab (drawer drags only). */
+    fun start(app: AppItem, from: DragSource, root: Offset, fromTab: Long? = null) {
         draggedApp = app
         source = from
         rootPosition = root
         moving = false
+        dragFromTab = fromTab
     }
 
     fun update(root: Offset) {
@@ -102,6 +104,8 @@ class HomeDragController {
     fun stop() {
         draggedApp = null
         moving = false
+        hoverFolderTab = null
+        dragFromTab = null
     }
 
     fun isOverDock(p: Offset): Boolean = !dockBounds.isEmpty && dockBounds.contains(p)
@@ -157,6 +161,36 @@ class HomeDragController {
     }
 
     fun isOverSplit(p: Offset): Boolean = splitEnabled && !splitBounds.isEmpty && splitBounds.contains(p)
+
+    // Drawer folder tabs as drop targets. While an app is dragged out of the drawer the drawer
+    // itself slides away, so the targets are the folder chips in the drop bar over home (HomeScreen
+    // publishes their bounds here, the null key being the "All" tab). A drop moves the app into
+    // that folder; the All chip (or the Remove pill, or any home drop) pulls it out of its folder.
+    var drawerTabBounds by mutableStateOf<Map<Long?, Rect>>(emptyMap())
+    /** The tab/chip under the dragging finger, for its highlight (null while over none). */
+    var hoverFolderTab by mutableStateOf<Long?>(null)
+
+    /** The drawer folder tab the drag started from, or null for the "All" tab. Cleared in [stop]. */
+    var dragFromTab by mutableStateOf<Long?>(null)
+
+    /** The drawer's folder tabs (id to name), set by the drawer while it has them. */
+    var folderTargets by mutableStateOf<List<Pair<Long, String>>>(emptyList())
+
+    /** Moves [AppItem] into a folder (or, with a null tab, out of its folder) — the drawer's handler. */
+    var folderDrop: ((AppItem, Long?) -> Unit)? = null
+
+    /** Whether [p] (root coords) is over any folder chip — All included. */
+    fun isOverFolderTab(p: Offset): Boolean =
+        drawerTabBounds.values.any { !it.isEmpty && it.contains(p) }
+
+    /** The folder chip under [p], or null when over none (a null key means the All chip). */
+    fun folderTabAt(p: Offset): Long? =
+        drawerTabBounds.entries.firstOrNull { !it.value.isEmpty && it.value.contains(p) }?.key
+
+    /** Updates the hover highlight from the finger's root position. */
+    fun setHoverFolderTab(p: Offset) {
+        hoverFolderTab = if (isDragging && isOverFolderTab(p)) folderTabAt(p) else null
+    }
 
     /**
      * A drop of [app] at [p]: true when it landed on a split target — a zone pill ([splitSideRequest])

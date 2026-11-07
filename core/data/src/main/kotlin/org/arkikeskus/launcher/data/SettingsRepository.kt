@@ -1266,6 +1266,31 @@ class SettingsRepository @Inject constructor(
             if (i <= 0) null else line.substring(0, i) to line.substring(i + 1)
         }?.toMap() ?: emptyMap()
 
+    // --- Hidden notification channels -------------------------------------------------------------
+    // Per app (package name): the Android notification channels whose notifications Folark's own
+    // surfaces (dots, the status icons, the notification widgets) never show. One "pkg\tchannel"
+    // pair per line, same shape as the custom labels. Android's shade is untouched.
+
+    /** Hidden notification channels, package name to its channel ids. */
+    val hiddenChannels: Flow<Map<String, Set<String>>> = keyFlow(Keys.HIDDEN_CHANNELS) { parseHiddenChannels(it) }
+
+    /** Hides (or, with [hidden] false, unhides) one of an app's notification channels. */
+    suspend fun setChannelHidden(packageName: String, channelId: String, hidden: Boolean = true) = edit { p ->
+        val current = parseHiddenChannels(p[Keys.HIDDEN_CHANNELS]).toMutableMap()
+        val channels = current[packageName].orEmpty().toMutableSet()
+        if (hidden) channels += channelId else channels -= channelId
+        if (channels.isEmpty()) current.remove(packageName) else current[packageName] = channels
+        p[Keys.HIDDEN_CHANNELS] = current.entries.joinToString("\n") { (pkg, ids) ->
+            ids.joinToString("\n") { "$pkg\t$it" }
+        }
+    }
+
+    private fun parseHiddenChannels(raw: String?): Map<String, Set<String>> =
+        raw?.split("\n")?.filter { it.isNotEmpty() }?.mapNotNull { line ->
+            val i = line.indexOf('\t')
+            if (i <= 0) null else line.substring(0, i) to line.substring(i + 1)
+        }?.groupBy({ it.first }, { it.second })?.mapValues { it.value.toSet() } ?: emptyMap()
+
     // --- App-drawer folders ----------------------------------------------------------------------
     // Serialized one folder per line, tab-separated fields: "id\tname\tkey1\tkey2...". App keys
     // never contain a tab; folder names are normalized in serializeFolders, so a plain split

@@ -451,6 +451,7 @@ internal object Keys {
     val SWIPE_DOWN_NOTIF = booleanPreferencesKey("swipe_down_notif")
     val HIDDEN_APPS = stringPreferencesKey("hidden_apps")
     val CUSTOM_LABELS = stringPreferencesKey("custom_labels")
+    val HIDDEN_CHANNELS = stringPreferencesKey("hidden_channels")
     val DRAWER_FOLDERS = stringPreferencesKey("drawer_folders")
     val SHOW_DOCK_LABELS = booleanPreferencesKey("show_dock_labels")
     val SHOW_HOME_LABELS = booleanPreferencesKey("show_home_labels")

@@ -397,4 +397,18 @@ class AppDrawerViewModel @Inject constructor(
 
     fun removeAppFromDrawerFolder(id: Long, key: String) =
         viewModelScope.launch { settingsRepository.removeAppFromDrawerFolder(id, key) }
+
+    /**
+     * Drag-and-drop between folder tabs: the app came from the open tab ([target] null = the "All"
+     * tab, so it is pulled out of its folder; a folder id = it moves into that folder). Leaving the
+     * open folder first keeps the membership exact whichever way the drop went.
+     */
+    fun moveAppBetweenTabs(app: AppItem, target: Long?) {
+        val source = selectedTab.value
+        if (source == target) return
+        viewModelScope.launch {
+            if (source != null) settingsRepository.removeAppFromDrawerFolder(source, app.key)
+            if (target != null) settingsRepository.addAppsToDrawerFolder(target, listOf(app.key))
+        }
+    }
 }

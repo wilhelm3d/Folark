@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backup & restore (split from strings.xml) -->
+<resources>
+    <string name="settings_save">Save</string>
+    <!-- Backup & restore -->
+    <string name="settings_backup">Backup &amp; restore</string>
+    <string name="settings_backup_now">Back up now</string>
+    <string name="settings_backup_now_desc">Home screens, dock, folders, widgets and all settings of both displays, in one file you choose where to keep</string>
+    <string name="settings_backup_auto">Automatic backup</string>
+    <string name="settings_backup_auto_off">Off. Pick a folder and Folark keeps an up-to-date copy there every day.</string>
+    <string name="settings_backup_auto_on">Daily into %1$s · last: %2$s</string>
+    <string name="settings_backup_never">not yet</string>
+    <string name="settings_backup_auto_turn_off">Turn off automatic backup</string>
+    <string name="settings_backup_auto_turn_off_desc">The backup already in the folder stays there</string>
+    <string name="settings_restore">Restore from a backup</string>
+    <string name="settings_restore_desc">Replaces the home screens, dock, folders, widgets and settings with the ones in the backup</string>
+    <string name="settings_restore_confirm_title">Restore this backup?</string>
+    <string name="settings_restore_confirm_text">Everything you have set up now is replaced by the backup. Widgets from other apps may need a tap to set them up again.</string>
+    <string name="settings_restore_confirm">Restore</string>
+    <string name="settings_backup_working">Working…</string>
+    <string name="settings_backup_saved">Backup saved.</string>
+    <string name="settings_backup_save_failed">The backup could not be saved there. Try another place.</string>
+    <string name="settings_backup_auto_started">Automatic backup is on. The first copy is saved.</string>
+    <string name="settings_backup_auto_failed">That folder can\'t be written to. Pick another one.</string>
+    <string name="settings_restore_done">Restored. The home screen reloads when you go back to it.</string>
+    <string name="backup_not_a_backup">That file is not a Folark backup.</string>
+    <string name="backup_too_new">That backup was made by a newer Folark. Update the launcher first.</string>
+    <string name="backup_restore_failed">The backup could not be restored. Nothing was changed, or only partly; try again.</string>
+    <string name="settings_backup_share">Share setup</string>
+    <string name="settings_backup_share_desc">Send your whole setup to another phone (Quick Share, a message, mail); open it there with Restore</string>
+    <string name="settings_backup_share_failed">The setup couldn\'t be packed. Try again</string>
+</resources>

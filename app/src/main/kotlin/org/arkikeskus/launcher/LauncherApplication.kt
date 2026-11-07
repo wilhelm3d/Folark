@@ -33,6 +33,9 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        // The local crash log (Settings ▸ System ▸ Crash log): every uncaught exception lands in a
+        // small on-device file, so a crash never needs adb to be read.
+        org.arkikeskus.launcher.data.CrashLog.install(this)
         // Settings ▸ Root as plain values for the taskbar, gestures and accessibility service, and
         // the grants it keeps given back when Android took one away.
         appScope.launch {
@@ -40,6 +43,8 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                 RootFeatures.update(s)
                 // Settings ▸ Haptics, for every place that plays them (some without a view).
                 org.arkikeskus.launcher.data.Haptics.settings = s.motion
+                // The module's provider answers from memory (no binder-thread DataStore reads).
+                org.arkikeskus.launcher.xposed.HookStateCache.update(s)
                 RootGrants.restoreIfNeeded(this@LauncherApplication)
             }
         }
@@ -51,7 +56,7 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
-                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.RecentsHookState.STATE_URI, null) }
+                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.state, null) }
                 }
         }
         // The module in System UI keeps the status bar margins (Settings ▸ Motorola): tell it when they change.
@@ -61,7 +66,7 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
-                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.StatusBarPaddingHook.CHANGED_URI, null) }
+                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.statusBarPadding, null) }
                 }
         }
         // The module's divider stops (Settings ▸ Recents & split screen): tell it when they change.
@@ -71,14 +76,19 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
-                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.DividerStopsHook.CHANGED_URI, null) }
+                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.dividerStops, null) }
                 }
         }
         // Folark's taskbar in its own overlay windows, when "Display over other apps" is allowed
-        // (otherwise the accessibility service hosts it, if enabled).
-        runCatching { org.arkikeskus.launcher.feature.home.TaskbarHost.refresh(this) }
+        // (otherwise the accessibility service hosts it, if enabled). Deferred a moment: nothing
+        // can sit over the home screen until it is up anyway, LauncherActivity.onResume refreshes
+        // the host again, and this keeps a handler thread out of the cold start.
+        appScope.launch {
+            kotlinx.coroutines.delay(1_000)
+            runCatching { org.arkikeskus.launcher.feature.home.taskbar.TaskbarHost.refresh(this@LauncherApplication) }
+        }
         // Split screen: marks while a divider is dragged, the drag hint between panes (S5, S14).
-        org.arkikeskus.launcher.feature.home.SplitOverlays.start(this, appScope, settingsRepository.settings(ScreenType.INNER))
+        org.arkikeskus.launcher.feature.home.taskbar.SplitOverlays.start(this, appScope, settingsRepository.settings(ScreenType.INNER))
         // S1: where a split's divider rests is kept per set of apps (left to right).
         appScope.launch {
             org.arkikeskus.launcher.data.SplitEvents.layouts.collect { (tasks, fractions) ->

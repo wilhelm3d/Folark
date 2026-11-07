@@ -39,11 +39,11 @@ import org.arkikeskus.launcher.data.ClipboardHistoryRepository
 import org.arkikeskus.launcher.data.backup.BackupRepository
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
 import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
-import org.arkikeskus.launcher.feature.home.APPWIDGET_HOST_ID
-import org.arkikeskus.launcher.feature.home.LocalAppWidgetHost
-import org.arkikeskus.launcher.feature.home.LocalOrphanWidgetConfigResult
-import org.arkikeskus.launcher.feature.home.LocalWidgetConfigLauncher
-import org.arkikeskus.launcher.feature.home.LockAccessibilityService
+import org.arkikeskus.launcher.feature.home.widgets.APPWIDGET_HOST_ID
+import org.arkikeskus.launcher.feature.home.widgets.LocalAppWidgetHost
+import org.arkikeskus.launcher.feature.home.widgets.LocalOrphanWidgetConfigResult
+import org.arkikeskus.launcher.feature.home.widgets.LocalWidgetConfigLauncher
+import org.arkikeskus.launcher.feature.home.taskbar.LockAccessibilityService
 import org.arkikeskus.launcher.launcher.system.FoldStateMonitor
 import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.LauncherSettings
@@ -511,7 +511,7 @@ class LauncherActivity : ComponentActivity() {
         // A launcher is the device HOME — a host hiccup must never crash it.
         runCatching { appWidgetHost.startListening() }
         // "Display over other apps" may have been given or taken meanwhile: the taskbar's host follows.
-        runCatching { org.arkikeskus.launcher.feature.home.TaskbarHost.refresh(this) }
+        runCatching { org.arkikeskus.launcher.feature.home.taskbar.TaskbarHost.refresh(this) }
         LockAccessibilityService.setHomeVisible(true)
         keepAccessibilityServiceOn()
         // Back from Settings after a restore: rebuild the home screen from the restored layout.
@@ -533,6 +533,17 @@ class LauncherActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         wasForeground = true
+        // A corrupted settings store was reset to defaults (DataModule): say so once, so the
+        // launcher never just looks mysteriously empty.
+        val resetNotice = org.arkikeskus.launcher.data.di.SettingsResetNotice
+        if (resetNotice.reset && !resetNotice.shown) {
+            resetNotice.shown = true
+            runCatching {
+                android.widget.Toast.makeText(
+                    this, org.arkikeskus.launcher.R.string.settings_reset_notice, android.widget.Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
         // Settings ▸ Root ▸ keep: give back a grant Android took away (cheap unless one is missing).
         org.arkikeskus.launcher.data.root.RootGrants.restoreIfNeeded(this)
         val cap = org.arkikeskus.launcher.data.SystemControls.peakRefreshRate(this)

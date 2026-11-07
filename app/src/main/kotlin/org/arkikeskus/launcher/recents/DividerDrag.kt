@@ -3,7 +3,7 @@ package org.arkikeskus.launcher.recents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.root.RootShell
-import org.arkikeskus.launcher.feature.home.LockAccessibilityService
+import org.arkikeskus.launcher.feature.home.taskbar.LockAccessibilityService
 import kotlin.math.roundToInt
 
 /**

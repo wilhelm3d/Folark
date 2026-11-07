@@ -83,6 +83,7 @@ internal fun DrawerIndexBar(
     val currentOnLetter by rememberUpdatedState(onLetterSelected)
     val currentPosition by rememberUpdatedState(position)
     val currentActiveLetter by rememberUpdatedState(onActiveLetter)
+    val haptics = LocalHapticFeedback.current
     var selectedLetter by remember { mutableStateOf<Char?>(null) }
     var barSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -97,13 +98,15 @@ internal fun DrawerIndexBar(
         val idx = (fraction * count).toInt().coerceIn(0, count - 1)
         val char = alphabet[idx]
         if (selectedLetter != char) {
+            val wasMoving = selectedLetter != null
             selectedLetter = char
+            // A tick per letter crossed (like the split divider's zones), but not on the first touch.
+            if (wasMoving) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
             currentOnLetter(char)
         }
     }
 
     val currentFineScroll by rememberUpdatedState(onFineScroll)
-    val haptics = LocalHapticFeedback.current
     // Fine scroll: when the finger last moved, and whether the hold switched it to fine scrolling.
     var lastMoveAt by remember { mutableStateOf(0L) }
     var fine by remember { mutableStateOf(false) }

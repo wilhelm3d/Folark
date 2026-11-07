@@ -4,6 +4,7 @@ import android.app.BroadcastOptions
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
 import android.content.Intent
 import android.os.Build
 import android.os.Process
@@ -140,9 +141,11 @@ object SplitThree {
     }.getOrDefault(false)
 
     /** System UI's answer to request [request] ([value]: a number it sent back, if any). */
-    fun onResult(context: Context, request: String?, ok: Boolean, value: Int? = null, detail: String? = null) {
+    fun onResult(context: Context, request: String?, outcome: SplitOutcome) {
         request ?: return
-        if (value != null) values[request] = value
+        val ok = outcome.ok
+        val detail = outcome.detail
+        if (outcome is SplitOutcome.Done && outcome.value != null) values[request] = outcome.value
         val kind = kinds[request]
         // A size that System UI moved straight back: this phone keeps 50/50 only (the split drawer
         // stops offering the others). A size that held says the opposite.
@@ -404,4 +407,37 @@ object SplitThree {
 
     /** UserHandle.PER_USER_RANGE: a uid's user is uid / 100000. */
     private const val PER_USER_RANGE = 100_000
+}
+
+/**
+ * What the module answered to a split request: it worked (optionally with a number System UI sent
+ * back, and a detail line) or it did not (with a detail). The wire format stays a binder bundle
+ * ([EXTRA_OK]/[EXTRA_VALUE]/[EXTRA_DETAIL]); this types it in one place at each end of the bridge.
+ */
+sealed interface SplitOutcome {
+    val ok: Boolean
+    val detail: String?
+
+    /** The request worked; [value] is a number the module sent back, when it sends one. */
+    data class Done(val value: Int? = null, override val detail: String? = null) : SplitOutcome {
+        override val ok = true
+    }
+
+    /** The request did not work ([detail] says why, shown in Settings ▸ Split screen ▸ module log). */
+    data class Failed(override val detail: String? = null) : SplitOutcome {
+        override val ok = false
+    }
+
+    companion object {
+        /** Reads the module's answer bundle out of [SplitThree.onResult]'s extras. */
+        fun from(extras: Bundle?): SplitOutcome =
+            if (extras?.getBoolean(SplitThree.EXTRA_OK) == true) {
+                Done(
+                    value = extras.takeIf { it.containsKey(SplitThree.EXTRA_VALUE) }?.getInt(SplitThree.EXTRA_VALUE),
+                    detail = extras.getString(SplitThree.EXTRA_DETAIL),
+                )
+            } else {
+                Failed(extras?.getString(SplitThree.EXTRA_DETAIL))
+            }
+    }
 }

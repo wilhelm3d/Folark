@@ -1,7 +1,9 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.TaskbarVisibility.Facts
-import org.arkikeskus.launcher.feature.home.TaskbarVisibility.Mode
+import org.arkikeskus.launcher.feature.home.taskbar.*
+
+import org.arkikeskus.launcher.feature.home.taskbar.TaskbarVisibility.Facts
+import org.arkikeskus.launcher.feature.home.taskbar.TaskbarVisibility.Mode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

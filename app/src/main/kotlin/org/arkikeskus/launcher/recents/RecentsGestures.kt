@@ -9,6 +9,8 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,8 +55,28 @@ internal fun RecentsEnv.cardModifier(
     closeAxis: Orientation = Orientation.Vertical,
     sideSwipes: Boolean = closeAxis == Orientation.Horizontal,
 ): Modifier {
-    val scope = rememberCoroutineScope()
+    // Labels for the card's custom accessibility actions (the swipe equivalents), per action.
+    @Composable
+    fun actionLabel(action: String): String? = when (action) {
+        LauncherSettings.RECENTS_ACTION_CLOSE ->
+            stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_close)
+        LauncherSettings.RECENTS_ACTION_SPLIT ->
+            stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_split)
+        LauncherSettings.RECENTS_ACTION_POPUP ->
+            stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_popup)
+        LauncherSettings.RECENTS_ACTION_UNSPLIT ->
+            stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_unsplit)
+        LauncherSettings.RECENTS_ACTION_INFO ->
+            stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_info)
+        LauncherSettings.RECENTS_ACTION_OPEN ->
+            stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_open)
+        LauncherSettings.RECENTS_ACTION_PIN ->
+            stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_pin)
+        else -> null
+    }
+    val openLabel = actionLabel(LauncherSettings.RECENTS_ACTION_OPEN).orEmpty()
     val hapticContext = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     val offset = remember(card.key) { Animatable(0f) }
     val offsetX = remember(card.key) { Animatable(0f) }
     val dismissPx = with(LocalDensity.current) { 120.dp.toPx() }
@@ -88,6 +110,11 @@ internal fun RecentsEnv.cardModifier(
     val swipeRight = if (selecting || !sideSwipes) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeRightAction, card)
     val longPress = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(longPressAction, card)
     val doubleTap = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(doubleTapAction, card)
+    // Labels for the card's custom accessibility actions (the swipe equivalents), per action.
+    val upLabel = actionLabel(swipeUp)
+    val downLabel = actionLabel(swipeDown)
+    val leftLabel = actionLabel(swipeLeft)
+    val rightLabel = actionLabel(swipeRight)
     val canDrag = s.recents.dragDrop && !selecting && !card.isSplit
     val env = rememberUpdatedState(this)
 
@@ -124,7 +151,24 @@ internal fun RecentsEnv.cardModifier(
             scaleX = k; scaleY = k
             shadowElevation = 28f * lift
         }
-        .semantics { onClick { env.value.onTap(card); true } }
+        .semantics {
+            onClick { env.value.onTap(card); true }
+            // The swipes are the only way to act on a card by touch; screen readers get the same
+            // actions as named custom actions. "Nothing" and the long-press menu are left out
+            // (menu is reachable by double-tap-and-hold, which TalkBack already performs).
+            customActions = buildList {
+                fun action(label: String?, name: String, run: () -> Unit) {
+                    if (name != LauncherSettings.RECENTS_ACTION_NONE && label != null) {
+                        add(androidx.compose.ui.semantics.CustomAccessibilityAction(label) { run(); true })
+                    }
+                }
+                action(openLabel, LauncherSettings.RECENTS_ACTION_OPEN) { env.value.onTap(card) }
+                action(upLabel, swipeUp) { env.value.perform(swipeUp, card) }
+                action(downLabel, swipeDown) { env.value.perform(swipeDown, card) }
+                action(leftLabel, swipeLeft) { env.value.perform(swipeLeft, card) }
+                action(rightLabel, swipeRight) { env.value.perform(swipeRight, card) }
+            }
+        }
         .pointerInput(card.key, swipeUp, swipeDown, swipeLeft, swipeRight, longPress, doubleTap, canDrag, closeAxis) {
             val slop = viewConfiguration.touchSlop
             awaitEachGesture {

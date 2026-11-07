@@ -83,6 +83,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -301,6 +305,7 @@ fun AppDrawerScreen(
         onDragOutStart = onDragOutStart,
         onDropOnHome = { app, page, cellX, cellY -> viewModel.addToHomeAt(app, page, cellX, cellY) },
         onDropOnDock = { app -> viewModel.addToDock(app) },
+        onDropOnTab = viewModel::moveAppBetweenTabs,
         showLabels = uiState.showLabels,
         calc = uiState.calc,
         settingResults = uiState.settingResults,
@@ -314,6 +319,9 @@ fun AppDrawerScreen(
         tabs = uiState.tabs,
         selectedTab = uiState.selectedTab,
         onSelectTab = viewModel::selectTab,
+        onRenameTab = { id, name -> viewModel.renameDrawerFolder(id, name) },
+        onAddAppsToTab = { id, apps -> viewModel.addAppsToDrawerFolder(id, apps) },
+        onDeleteTab = { id -> viewModel.deleteDrawerFolder(id); viewModel.selectTab(null) },
         locked = uiState.desktopLocked,
         gridState = gridState,
         listState = listState,
@@ -498,6 +506,7 @@ private fun AppDrawerContent(
     onDragOutStart: () -> Unit,
     onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
     onDropOnDock: (AppItem) -> Unit,
+    onDropOnTab: (AppItem, Long?) -> Unit = { _, _ -> },
     showLabels: Boolean,
     calc: SearchResult.Calculation?,
     settingResults: List<SearchResult.Setting>,
@@ -512,6 +521,9 @@ private fun AppDrawerContent(
     tabs: List<Pair<Long, String>> = emptyList(),
     selectedTab: Long? = null,
     onSelectTab: (Long?) -> Unit = {},
+    onRenameTab: (Long, String) -> Unit = { _, _ -> },
+    onAddAppsToTab: (Long, List<String>) -> Unit = { _, _ -> },
+    onDeleteTab: (Long) -> Unit = {},
     locked: Boolean,
     gridState: LazyGridState,
     listState: LazyListState,
@@ -538,6 +550,16 @@ private fun AppDrawerContent(
     val haptics = LocalHapticFeedback.current
     val privateSpace = LocalPrivateSpace.current
     val flickClosePx = with(LocalDensity.current) { 2400.dp.toPx() }
+    // While an app is dragged out of the drawer, the folder tabs become the drop-target chips over
+    // home (the drawer itself slides away): what the chips are and where a drop on one lands.
+    androidx.compose.runtime.DisposableEffect(tabs) {
+        dragController.folderTargets = tabs
+        dragController.folderDrop = onDropOnTab
+        onDispose {
+            dragController.folderTargets = emptyList()
+            dragController.folderDrop = null
+        }
+    }
     val pullConnection = remember(onDrawerDrag, onDrawerSettle, drawerOpen, drawerFlickClose, onClose) {
         object : NestedScrollConnection {
             private var pulling = false
@@ -639,8 +661,18 @@ private fun AppDrawerContent(
                 .pointerInput(Unit) {},
         ) {
         DrawerPanelTheme(colors = colors, style = style) {
+            // Keyboard navigation (D-pad / hardware keyboard): the panel takes focus when the
+            // drawer opens, and the arrows then walk the app list (the focus indicator draws on
+            // the icons; the lazy lists scroll to whatever is focused). Touch is unaffected.
+            val kbGrab = remember { FocusRequester() }
+            val focusManager = LocalFocusManager.current
+            LaunchedEffect(drawerOpen) {
+                if (drawerOpen) kbGrab.requestFocus() else focusManager.clearFocus(force = true)
+            }
             Column(
                 modifier = Modifier
+                    .focusRequester(kbGrab)
+                    .focusable()
                     .fillMaxSize()
                     // A drawer that stops short of the top must not reserve the status bar's height
                     // above its handle (that was the empty band at the top of the panel).
@@ -664,7 +696,22 @@ private fun AppDrawerContent(
                 DrawerSearchField(query = query, onQueryChange = onQueryChange, colors = colors, style = style)
             }
             if (tabs.isNotEmpty() && query.isBlank() && !(twoPane && LocalScreenType.current == ScreenType.INNER)) {
-                DrawerTabRow(tabs = tabs, selected = selectedTab, onSelect = onSelectTab)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    DrawerTabRow(tabs = tabs, selected = selectedTab, onSelect = onSelectTab, modifier = Modifier.weight(1f))
+                    if (selectedTab != null) {
+                        val currentTabFolder = folders.firstOrNull { it.id == selectedTab }
+                        if (currentTabFolder != null) {
+                            TabFolderSettingsMenu(
+                                folder = currentTabFolder,
+                                candidateApps = apps.filter { app -> currentTabFolder.apps.none { it.key == app.key } },
+                                onRename = { onRenameTab(selectedTab, it) },
+                                onAddApps = { onAddAppsToTab(selectedTab, it) },
+                                onDelete = { onDeleteTab(selectedTab) },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+                    }
+                }
             }
             val context = LocalContext.current
             val searching = query.isNotBlank()
@@ -794,9 +841,11 @@ private fun AppDrawerContent(
                                     onAppClick = onAppClick,
                                     onAppLongClick = onAppLongClick,
                                     dragController = dragController,
+                                    sourceTab = selectedTab,
                                     onDragOutStart = onDragOutStart,
                                     onDropOnHome = onDropOnHome,
                                     onDropOnDock = onDropOnDock,
+                                    onDropOnTab = onDropOnTab,
                                     haptics = haptics,
                                     locked = locked,
                                 )
@@ -838,9 +887,11 @@ private fun AppDrawerContent(
                                         onAppClick = onAppClick,
                                         onAppLongClick = onAppLongClick,
                                         dragController = dragController,
+                                        sourceTab = selectedTab,
                                         onDragOutStart = onDragOutStart,
                                         onDropOnHome = onDropOnHome,
                                         onDropOnDock = onDropOnDock,
+                                        onDropOnTab = onDropOnTab,
                                         haptics = haptics,
                                         locked = locked,
                                     )
@@ -957,7 +1008,7 @@ private fun AppDrawerContent(
                                     }
                                 }
                                 appCells(runApps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
-                                    onAppLongClick, dragController, onDragOutStart, onDropOnHome, onDropOnDock, haptics, locked)
+                                    onAppLongClick, dragController, selectedTab, onDragOutStart, onDropOnHome, onDropOnTab, onDropOnDock, haptics, locked)
                             }
                             if (selectedTab == null) privateSpace?.let { privateSpaceCells(it, colors, showLabels, drawerIconSize) }
                         } else {
@@ -993,7 +1044,7 @@ private fun AppDrawerContent(
                                     }
                                 }
                                 appCells(apps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
-                                    onAppLongClick, dragController, onDragOutStart, onDropOnHome, onDropOnDock, haptics, locked)
+                                    onAppLongClick, dragController, selectedTab, onDragOutStart, onDropOnHome, onDropOnTab, onDropOnDock, haptics, locked)
                             }
                             if (settingResults.isNotEmpty()) {
                                 item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
@@ -1061,6 +1112,19 @@ private fun AppDrawerContent(
 
                 if (drawerIndexBarEnabled && !searching) {
                     val coroutineScope = rememberCoroutineScope()
+                    if (railTabs && selectedTab != null) {
+                        val currentTabFolder = folders.firstOrNull { it.id == selectedTab }
+                        if (currentTabFolder != null) {
+                            TabFolderSettingsMenu(
+                                folder = currentTabFolder,
+                                candidateApps = apps.filter { app -> currentTabFolder.apps.none { it.key == app.key } },
+                                onRename = { onRenameTab(selectedTab, it) },
+                                onAddApps = { onAddAppsToTab(selectedTab, it) },
+                                onDelete = { onDeleteTab(selectedTab) },
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                            )
+                        }
+                    }
                     val alignModifier = when (azIndexPosition) {
                         LauncherSettings.AZ_POSITION_VERTICAL_LEFT -> Modifier.align(Alignment.CenterStart)
                         LauncherSettings.AZ_POSITION_HORIZONTAL_TOP -> Modifier.align(Alignment.TopCenter)
@@ -1095,10 +1159,16 @@ private fun AppDrawerContent(
                             val targetIndex = (headerOffset + matchIdx + headingsBefore)
                                 .coerceIn(0, (headerOffset + apps.size + letterRuns.size).coerceAtLeast(0))
                             coroutineScope.launch {
+                                // Nearby: a short animated glide; far (A→Z while sliding): an instant
+                                // jump, which feels snappier than flying the whole list.
                                 if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) {
-                                    listState.scrollToItem(targetIndex)
+                                    val near = kotlin.math.abs(targetIndex - listState.firstVisibleItemIndex) <= 45
+                                    if (near) listState.animateScrollToItem(targetIndex)
+                                    else listState.scrollToItem(targetIndex)
                                 } else {
-                                    gridState.scrollToItem(targetIndex)
+                                    val near = kotlin.math.abs(targetIndex - gridState.firstVisibleItemIndex) <= 45
+                                    if (near) gridState.animateScrollToItem(targetIndex)
+                                    else gridState.scrollToItem(targetIndex)
                                 }
                             }
                         },

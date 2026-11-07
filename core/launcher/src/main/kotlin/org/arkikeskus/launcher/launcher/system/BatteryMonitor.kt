@@ -57,6 +57,51 @@ class BatteryMonitor @Inject constructor(
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
         val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
             status == BatteryManager.BATTERY_STATUS_FULL
-        return BatteryStatus(percent = percent, charging = charging)
+        val temperatureC = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
+            .takeIf { it != Int.MIN_VALUE }?.let { it / 10f }
+        return BatteryStatus(
+            percent = percent,
+            charging = charging,
+            temperatureC = temperatureC,
+            fullInMinutes = predictFullInMinutes(percent, charging),
+        )
+    }
+
+    // Charge prediction: the last few minutes of (time, percent) readings while charging give a
+    // charge rate; the missing percent at that rate is the estimate. In memory only — the broadcast
+    // ticks every few seconds while charging, so the history has depth within a minute.
+    private val chargeHistory = ArrayDeque<Pair<Long, Int>>()
+
+    private fun predictFullInMinutes(percent: Int, charging: Boolean): Int? {
+        if (!charging || percent < 0) {
+            chargeHistory.clear()
+            return null
+        }
+        val now = android.os.SystemClock.elapsedRealtime()
+        val last = chargeHistory.lastOrNull()
+        if (last == null || percent != last.second || now - last.first >= 5_000L) {
+            chargeHistory.addLast(now to percent)
+        }
+        while (chargeHistory.size > 2 && now - chargeHistory.first().first > HISTORY_MS) {
+            chargeHistory.removeFirst()
+        }
+        val first = chargeHistory.firstOrNull() ?: return null
+        val spanMs = now - first.first
+        if (chargeHistory.size < 2 || spanMs < 10_000L) return null
+        val gained = percent - first.second
+        if (gained <= 0) return null
+        val remaining = (100 - percent).coerceAtLeast(0)
+        if (remaining == 0) return 0
+        val minutes = (remaining / gained.toDouble() * spanMs / 60_000.0).toInt()
+        // A wildly optimistic rate (just plugged in) would promise minutes that never come; the
+        // cap keeps the line plausible until the history has real depth.
+        return minutes.takeIf { it in 1..FULL_CAP_MINUTES }
+    }
+
+    private companion object {
+        /** How much charging history the rate estimate looks at. */
+        const val HISTORY_MS = 10 * 60_000L
+        /** The estimate never claims more than this many minutes to full. */
+        const val FULL_CAP_MINUTES = 8 * 60
     }
 }

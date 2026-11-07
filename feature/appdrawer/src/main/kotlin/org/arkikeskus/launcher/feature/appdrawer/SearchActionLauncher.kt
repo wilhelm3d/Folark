@@ -16,6 +16,13 @@ import org.arkikeskus.launcher.model.SearchResult
  * false (after a short message) when no app on the phone can do it.
  */
 internal fun startSearchAction(context: Context, action: SearchResult.Action): Boolean {
+    // A clipboard-history hit: copied again, no app opened.
+    if (action.kind == SearchResult.Action.CLIPBOARD) {
+        val clip = context.getSystemService(android.content.ClipboardManager::class.java) ?: return false
+        runCatching { clip.setPrimaryClip(android.content.ClipData.newPlainText("clip", action.args["text"].orEmpty())) }
+        Toast.makeText(context, R.string.search_clip_copied, Toast.LENGTH_SHORT).show()
+        return true
+    }
     val a = action.args
     val intents: List<Intent> = when (action.kind) {
         SearchResult.Action.TIMER -> listOf(

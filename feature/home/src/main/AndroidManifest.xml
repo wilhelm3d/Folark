@@ -12,7 +12,7 @@
              changes only while taskbar per-app rules or "Replace Android's Recents" need them — see
              the service class + lock_accessibility_service.xml. -->
         <service
-            android:name="org.arkikeskus.launcher.feature.home.LockAccessibilityService"
+            android:name="org.arkikeskus.launcher.feature.home.taskbar.LockAccessibilityService"
             android:exported="false"
             android:label="@string/lock_service_label"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

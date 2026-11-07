@@ -1,5 +1,9 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.feature.home.taskbar.*
+import org.arkikeskus.launcher.feature.home.widgets.*
+import org.arkikeskus.launcher.feature.home.workspace.*
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Dialog

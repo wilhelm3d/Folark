@@ -20,8 +20,8 @@ android {
 
     defaultConfig {
         applicationId = "org.arkikeskus.launcher"
-        versionCode = 223
-        versionName = "2.2.3"
+        versionCode = 224
+        versionName = "2.2.4"
     }
 
     // English only: also drops the translations that come with libraries, so no screen mixes languages.
@@ -94,12 +94,10 @@ if (!keystorePropsFile.exists()) {
 }
 
 dependencies {
-    // Vector (LSPosed) supplies the real Xposed classes inside the hooked launcher.
-    // Xposed API: a compile-only JAR, the canonical LSPosed-module pattern. It must NOT be packaged
-    // into the APK — at runtime Vector provides the real de.robv.android.xposed classes, and a second
-    // copy bundled here would make RecentsHook implement the wrong interface ("Failed to load class").
-    // A project() compileOnly dep leaked the stub into classes.dex; files() never does.
-    compileOnly(files("libs/xposed-api-stub.jar"))
+    // The Vector (LSPosed) module ships inside this APK: it compiles in :hook (its Xposed API
+    // dependency is compile-only there, never packaged — at runtime Vector provides the real
+    // de.robv.android.xposed classes), and :app carries it into the APK.
+    implementation(project(":hook"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:data"))
     implementation(project(":core:model"))

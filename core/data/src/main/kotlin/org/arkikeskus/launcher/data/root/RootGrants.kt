@@ -25,7 +25,7 @@ object RootGrants {
     val ALL = listOf(DUMP, USAGE, SECURE_SETTINGS, NOTIFICATIONS, ACCESSIBILITY, WIDGETS)
 
     private const val LISTENER = "org.arkikeskus.launcher.notifications.NotificationDotListenerService"
-    private const val ACCESSIBILITY_SERVICE = "org.arkikeskus.launcher.feature.home.LockAccessibilityService"
+    private const val ACCESSIBILITY_SERVICE = "org.arkikeskus.launcher.feature.home.taskbar.LockAccessibilityService"
     private const val HOME = "org.arkikeskus.launcher.LauncherActivity"
 
     /** Whether [grant] is in place now (no root needed to look). Null when Android can't tell. */

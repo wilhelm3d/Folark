@@ -5,6 +5,7 @@
     <string name="rename_label">Name</string>
     <string name="rename_save">Save</string>
     <string name="rename_cancel">Cancel</string>
+    <string name="folder_name_label">Folder name</string>
     <string name="rename_reset">Reset to default</string>
     <string name="shortcut_pin">Pin to home screen</string>
     <string name="app_info_unavailable">Could not open the app\'s details</string>

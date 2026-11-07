@@ -82,9 +82,11 @@ class ParallaxSensorManager(context: Context) {
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
-        // Request UI delay (approx 16ms/60fps) but allow the hardware to batch events up to 33ms.
-        // This wakes the CPU half as often, saving battery without impacting visual smoothness.
-        sensorManager?.registerListener(listener, s, SensorManager.SENSOR_DELAY_UI, 33_000)
+        // Request UI delay (approx 16ms/60fps) but let the sensor hub batch events for 66ms
+        // (about 15 deliveries a second): half the hub-to-CPU wakeups again, and the wallpaper
+        // shift cannot tell the difference — the value is spring-eased, and a resting phone
+        // stops updating anyway (the stationary pause above).
+        sensorManager?.registerListener(listener, s, SensorManager.SENSOR_DELAY_UI, 66_000)
         return listener
     }
 

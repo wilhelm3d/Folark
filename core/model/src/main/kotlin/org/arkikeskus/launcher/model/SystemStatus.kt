@@ -5,6 +5,11 @@ enum class WifiBand { GHZ_2_4, GHZ_5, GHZ_6, UNKNOWN }
 data class BatteryStatus(
     val percent: Int,
     val charging: Boolean,
+    /** Battery temperature in °C, from the sticky battery broadcast; null when unreported. */
+    val temperatureC: Float? = null,
+    /** While charging: the estimated minutes until full (from the recent charge rate), or null
+     *  when there is not enough history yet (or the battery is not charging). */
+    val fullInMinutes: Int? = null,
 )
 
 data class WifiStatus(

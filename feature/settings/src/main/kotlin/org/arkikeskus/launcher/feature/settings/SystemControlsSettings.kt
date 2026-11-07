@@ -13,8 +13,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.arkikeskus.launcher.data.SystemControls
 import kotlin.math.abs
@@ -85,6 +87,8 @@ internal fun SystemControlsSection() {
             },
         )
 
+        // The crash log lives on its own page now (Phone & system ▸ Support).
+
         if (maxHz > REFRESH_STANDARD + 1f) {
             ExpressiveRowDivider()
             val top = maxHz.roundToInt()
@@ -129,4 +133,4 @@ internal fun SystemControlsSection() {
 }
 
 /** Folark's accessibility service (taskbar and screen lock). */
-internal const val LOCK_SERVICE_CLASS = "org.arkikeskus.launcher.feature.home.LockAccessibilityService"
+internal const val LOCK_SERVICE_CLASS = "org.arkikeskus.launcher.feature.home.taskbar.LockAccessibilityService"

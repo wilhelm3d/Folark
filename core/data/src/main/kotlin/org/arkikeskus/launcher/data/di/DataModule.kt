@@ -32,8 +32,21 @@ private val Context.settingsDataStore by preferencesDataStore(
     // A corrupted preferences file (interrupted write, power loss) otherwise throws
     // CorruptionException on every read — for the HOME app that's an unrecoverable crash loop.
     // Resetting to defaults loses only settings; the Room-backed home layout is untouched.
-    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+    corruptionHandler = ReplaceFileCorruptionHandler {
+        // The reset itself is silent; the app tells the user once (SettingsResetNotice).
+        SettingsResetNotice.reset = true
+        emptyPreferences()
+    },
 )
+
+/**
+ * Set when the settings store had to be reset to defaults (see above): the home activity checks
+ * it once and says so, so a reset never passes as a mysteriously empty launcher.
+ */
+object SettingsResetNotice {
+    @Volatile var reset: Boolean = false
+    @Volatile var shown: Boolean = false
+}
 
 internal val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {

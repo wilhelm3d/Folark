@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.arkikeskus.launcher.data.AppRepository
+import org.arkikeskus.launcher.data.AppRepositoryImpl
 import org.arkikeskus.launcher.data.AppUsageRepository
 import org.arkikeskus.launcher.data.HomeLayoutRepository
 import org.arkikeskus.launcher.data.IconPackRepository
@@ -73,7 +74,7 @@ class SettingsViewModelTest {
         val appUsageRepo = AppUsageRepository(dataStore)
         val appsSource = LauncherAppsSource(context, iconPackRepo,
             Provider { ImageLoader.Builder(context).build() })
-        val appRepo = AppRepository(appsSource, settingsRepo, appUsageRepo, testScope)
+        val appRepo = AppRepositoryImpl(context, appsSource, settingsRepo, appUsageRepo, testScope)
 
         return SettingsViewModel(
             repository = settingsRepo,

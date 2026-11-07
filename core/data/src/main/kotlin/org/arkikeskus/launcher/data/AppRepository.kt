@@ -24,14 +24,77 @@ import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * What the launcher asks the app list for: the apps themselves, Private Space, and every way of
+ * opening one (normally, as a scene/split, beside the current app, floating). An interface so
+ * ViewModel tests can stand in a fake; bound to [AppRepositoryImpl] in `RepositoryModule`.
+ */
+interface AppRepository {
+    /** Every app outside Private Space: what home, the drawer, search, widgets and the taskbar show. */
+    val apps: Flow<List<AppItem>>
+
+    /** Private Space apps (none while it is locked), for the drawer's Private section only. */
+    val privateApps: Flow<List<AppItem>>
+
+    /** See [LauncherAppsSource.privateSpace]. */
+    val privateSpace: StateFlow<PrivateSpaceState?>
+
+    /** See [LauncherAppsSource.packageEvents]. */
+    val packageEvents: Flow<String>
+
+    /** See [LauncherAppsSource.packageRemovals]. */
+    val packageRemovals: Flow<Pair<String, Long>>
+
+    /** The saved app scenes (pairs), as settings keep them. */
+    val appPairs: Flow<List<AppPair>>
+
+    fun setPrivateSpaceLocked(locked: Boolean): Boolean
+
+    fun privateSpaceInstallSender(): android.content.IntentSender?
+
+    /** Opens a Private Space app; unlike [launch] it is not counted for "most used". */
+    fun launchPrivate(appItem: AppItem): Result<Unit>
+
+    /** Persists a custom label for [componentName] in DataStore. */
+    fun setCustomAppLabel(componentName: String, label: String): kotlinx.coroutines.Job
+
+    /** See [LauncherAppsSource.isAppInstalled] (fail-safe: unknown → true). */
+    fun isAppInstalled(packageName: String, userSerial: Long): Boolean
+
+    /** Invalidates icon/layout caches across the launcher. */
+    fun invalidateCaches()
+
+    /** See [LauncherAppsSource.launchClassName]. */
+    fun launchClassName(packageName: String, user: UserHandle): String?
+
+    /** Opens [appItem]; [haptic]: with the launch click (off where another haptic follows, a split). */
+    fun launch(appItem: AppItem, haptic: Boolean = true): Result<Unit>
+
+    fun saveAppPair(pair: AppPair): kotlinx.coroutines.Job
+
+    fun deleteAppPair(id: String): kotlinx.coroutines.Job
+
+    /** Opens the scene [pair] (first app, second beside it, third pane or floating — see impl). */
+    fun launchAppPair(pair: AppPair): Result<Unit>
+
+    /** Opens [first] and, once it is in front, [second] beside it as a split screen. */
+    fun launchSplit(first: AppItem, second: AppItem): Result<Unit>
+
+    /** Opens [appItem] as a split half beside whatever app is in front (the taskbar's drag-to-split). */
+    fun launchBeside(appItem: AppItem): Result<Unit>
+
+    /** Opens [appItem] in a floating window (see [LauncherAppsSource.launchFloating]). */
+    fun launchFloating(appItem: AppItem): Result<Unit>
+}
+
 @Singleton
-open class AppRepository @Inject constructor(
+class AppRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val source: LauncherAppsSource,
     private val settingsRepository: SettingsRepository,
     private val appUsageRepository: AppUsageRepository,
     @ApplicationScope private val scope: CoroutineScope,
-) {
+) : AppRepository {
     /**
      * All launchable apps, sorted by (effective) label, updating on install/remove/change. Any
      * user-chosen custom label (see [SettingsRepository.customLabels]) is applied over the system
@@ -63,47 +126,47 @@ open class AppRepository @Inject constructor(
     }.flowOn(Dispatchers.Default).shareIn(scope, SharingStarted.Eagerly, replay = 1)
 
     /** Every app outside Private Space: what home, the drawer, search, widgets and the taskbar show. */
-    val apps: Flow<List<AppItem>> = allApps
+    override val apps: Flow<List<AppItem>> = allApps
         .map { list -> if (list.none { it.privateProfile }) list else list.filterNot { it.privateProfile } }
         .shareIn(scope, SharingStarted.Eagerly, replay = 1)
 
     /** Private Space apps (none while it is locked), for the drawer's Private section only. */
-    val privateApps: Flow<List<AppItem>> = allApps.map { list -> list.filter { it.privateProfile } }
+    override val privateApps: Flow<List<AppItem>> = allApps.map { list -> list.filter { it.privateProfile } }
 
     /** See [LauncherAppsSource.privateSpace]. */
-    val privateSpace: StateFlow<PrivateSpaceState?> get() = source.privateSpace
+    override val privateSpace: StateFlow<PrivateSpaceState?> get() = source.privateSpace
 
-    fun setPrivateSpaceLocked(locked: Boolean): Boolean = source.setPrivateSpaceLocked(locked)
+    override fun setPrivateSpaceLocked(locked: Boolean): Boolean = source.setPrivateSpaceLocked(locked)
 
-    fun privateSpaceInstallSender() = source.privateSpaceInstallSender()
+    override fun privateSpaceInstallSender() = source.privateSpaceInstallSender()
 
     /** Opens a Private Space app; unlike [launch] it is not counted for "most used". */
-    fun launchPrivate(appItem: AppItem): Result<Unit> = source.launch(appItem, cachedOpenAnimation, cachedAnimationSpeed)
+    override fun launchPrivate(appItem: AppItem): Result<Unit> = source.launch(appItem, cachedOpenAnimation, cachedAnimationSpeed)
 
     /** Persists a custom label for [componentName] in DataStore. */
-    fun setCustomAppLabel(componentName: String, label: String) = scope.launch {
+    override fun setCustomAppLabel(componentName: String, label: String) = scope.launch {
         settingsRepository.setCustomAppLabel(componentName, label)
     }
 
     /** See [LauncherAppsSource.packageEvents]. */
-    val packageEvents: Flow<String> get() = source.packageEvents
+    override val packageEvents: Flow<String> get() = source.packageEvents
 
     /** See [LauncherAppsSource.packageRemovals]. */
-    val packageRemovals: Flow<Pair<String, Long>> get() = source.packageRemovals
+    override val packageRemovals: Flow<Pair<String, Long>> get() = source.packageRemovals
 
     /** See [LauncherAppsSource.isAppInstalled] (fail-safe: unknown → true). */
-    fun isAppInstalled(packageName: String, userSerial: Long): Boolean =
+    override fun isAppInstalled(packageName: String, userSerial: Long): Boolean =
         source.isAppInstalled(packageName, userSerial)
 
     /** Invalidates icon/layout caches across the launcher. */
-    fun invalidateCaches() = source.invalidateCachesAndReload()
+    override fun invalidateCaches() = source.invalidateCachesAndReload()
 
     /** Launches [appItem]; on success, records the launch for the "most used" ranking (fire-and-forget). */
     /** See [LauncherAppsSource.launchClassName]. */
-    fun launchClassName(packageName: String, user: UserHandle): String? = source.launchClassName(packageName, user)
+    override fun launchClassName(packageName: String, user: UserHandle): String? = source.launchClassName(packageName, user)
 
     /** Opens [appItem]; [haptic]: with the launch click (off where another haptic follows, a split). */
-    fun launch(appItem: AppItem, haptic: Boolean = true): Result<Unit> {
+    override fun launch(appItem: AppItem, haptic: Boolean): Result<Unit> {
         val result = source.launch(appItem, cachedOpenAnimation, cachedAnimationSpeed)
         if (result.isSuccess) {
             if (haptic) Haptics.play(context, Haptics.Event.LAUNCH)
@@ -112,18 +175,18 @@ open class AppRepository @Inject constructor(
         return result
     }
 
-    val appPairs: Flow<List<AppPair>> = settingsRepository.appPairs
+    override val appPairs: Flow<List<AppPair>> = settingsRepository.appPairs
 
-    fun saveAppPair(pair: AppPair) = scope.launch { settingsRepository.saveAppPair(pair) }
+    override fun saveAppPair(pair: AppPair) = scope.launch { settingsRepository.saveAppPair(pair) }
 
-    fun deleteAppPair(id: String) = scope.launch { settingsRepository.deleteAppPair(id) }
+    override fun deleteAppPair(id: String) = scope.launch { settingsRepository.deleteAppPair(id) }
 
     /**
      * Opens the scene [pair]: the first app normally, the second beside it, in the scene's layout
      * (half and half, a third, two thirds, peek), and the third app as a third pane or floating.
      * On the cover screen a scene set to "first app only" just opens its first app.
      */
-    fun launchAppPair(pair: AppPair): Result<Unit> {
+    override fun launchAppPair(pair: AppPair): Result<Unit> {
         val result = source.launchAppPair(pair)
         if (result.isSuccess && pair.coverMode == AppPair.COVER_FIRST && !Screens.innerShowing(context)) {
             scope.launch { appUsageRepository.recordLaunches(listOf(pair.app1Key)) }
@@ -183,7 +246,7 @@ open class AppRepository @Inject constructor(
     }
 
     /** Opens [first] and, once it is in front, [second] beside it as a split screen. */
-    fun launchSplit(first: AppItem, second: AppItem): Result<Unit> {
+    override fun launchSplit(first: AppItem, second: AppItem): Result<Unit> {
         val result = source.launch(first)
         if (result.isSuccess) {
             scope.launch {
@@ -212,7 +275,7 @@ open class AppRepository @Inject constructor(
     }
 
     /** Opens [appItem] as a split half beside whatever app is in front (the taskbar's drag-to-split). */
-    fun launchBeside(appItem: AppItem): Result<Unit> {
+    override fun launchBeside(appItem: AppItem): Result<Unit> {
         val result = source.launchAdjacent(appItem)
         if (result.isSuccess) {
             scope.launch {
@@ -224,7 +287,7 @@ open class AppRepository @Inject constructor(
     }
 
     /** Opens [appItem] in a floating window (see [LauncherAppsSource.launchFloating]). */
-    fun launchFloating(appItem: AppItem): Result<Unit> {
+    override fun launchFloating(appItem: AppItem): Result<Unit> {
         val result = source.launchFloating(appItem, cachedFloatingSize)
         if (result.isSuccess) scope.launch { appUsageRepository.recordLaunch(appItem.key) }
         return result

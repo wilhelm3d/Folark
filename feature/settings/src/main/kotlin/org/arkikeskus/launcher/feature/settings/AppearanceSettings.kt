@@ -1,7 +1,6 @@
 package org.arkikeskus.launcher.feature.settings
 
 import android.os.Build
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Palette
@@ -9,21 +8,12 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.ViewCarousel
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.data.IconPackInfo
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.LocalScreenType
-import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import kotlin.math.roundToInt
 
 // The cards of the Look pages (Theme, Icons, Motion) and of the Home screen page, one function each.

@@ -37,6 +37,7 @@ import org.arkikeskus.launcher.data.BatchSchedule
 import org.arkikeskus.launcher.data.MessageHeuristics
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
 import org.arkikeskus.launcher.data.PeopleGrouping
+import org.arkikeskus.launcher.data.runSuspendCatching
 import org.arkikeskus.launcher.data.PersonEntry
 import org.arkikeskus.launcher.data.PersonEventKind
 import org.arkikeskus.launcher.data.ReplyAction
@@ -92,6 +93,9 @@ class NotificationDotListenerService : NotificationListenerService() {
      *  so the app being a mail client is the signal. Re-read on connect and package changes. */
     @Volatile private var mailPackages: Set<String> = emptySet()
 
+    /** Notification channels hidden per package (the widget's mute action); read at each snapshot. */
+    @Volatile private var hiddenChannels: Map<String, Set<String>> = emptyMap()
+
     /** Local delivery deadlines, including legacy snoozes made by earlier beta versions. */
     private val heldUntil = HashMap<String, Long>()
     private var heldLoaded = false
@@ -118,6 +122,11 @@ class NotificationDotListenerService : NotificationListenerService() {
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             appLabels.clear()
+            // An uninstalled app's held notifications would sit in the map (and the settings
+            // store) forever: forget them.
+            if (intent?.action == Intent.ACTION_PACKAGE_REMOVED) {
+                intent.data?.schemeSpecificPart?.let { pruneHeldFor(it) }
+            }
             refreshMailPackages()
         }
     }
@@ -138,6 +147,9 @@ class NotificationDotListenerService : NotificationListenerService() {
         )
 
         const val TAG = "NotifDots"
+
+        /** Cap on the held-notification map (and the settings store it persists to). */
+        const val HELD_MAX = 300
         const val MAX_SNAPSHOT_RETRIES = 2
         const val SNAPSHOT_RETRY_DELAY_MS = 500L
 
@@ -229,9 +241,13 @@ class NotificationDotListenerService : NotificationListenerService() {
         }
         mailPackages = queryMailPackages()
         settingsJob?.cancel()
+        // Hidden notification channels (the widget's mute action): kept current for the snapshot filter.
+        scope.launch {
+            settingsRepository.hiddenChannels.collect { hiddenChannels = it }
+        }
         settingsJob = scope.launch {
             if (!heldLoaded) {
-                val saved = runCatching { settingsRepository.heldNotifications.first() }.getOrDefault(emptyMap())
+                val saved = runSuspendCatching { settingsRepository.heldNotifications.first() }.getOrDefault(emptyMap())
                 for ((k, v) in saved) heldUntil.putIfAbsent(k, v)
                 heldLoaded = true
             }
@@ -359,7 +375,20 @@ class NotificationDotListenerService : NotificationListenerService() {
             entry, previous, now, batchEnabled, vipKeys, BatchSchedule.nextDelivery(now, batchTimes),
         )
         if (until == null) heldUntil.remove(sbn.key) else heldUntil[sbn.key] = until
+        // A cap keeps a pathological app (thousands of notifications held at once) from growing
+        // the map and the settings store without end: the soonest-expiring entries go first.
+        while (heldUntil.size > HELD_MAX) {
+            heldUntil.entries.minByOrNull { it.value }?.let { heldUntil.remove(it.key) } ?: break
+        }
         if (until != previous) persistHeld()
+    }
+
+    /** Notification keys are "user|package|id|tag": forget the held ones for an uninstalled [pkg]. */
+    private fun pruneHeldFor(pkg: String) {
+        val gone = heldUntil.keys.filter { it.substringAfter('|').substringBefore('|') == pkg }
+        if (gone.isEmpty()) return
+        gone.forEach(heldUntil::remove)
+        persistHeld()
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
@@ -416,6 +445,9 @@ class NotificationDotListenerService : NotificationListenerService() {
             if (sbn == null) continue
             val serial = runCatching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
             val key = "${sbn.packageName}/$serial"
+            // A channel hidden for this app (the notification widget's mute action): none of Folark's
+            // surfaces show it — dots, status icons, widgets, people tiles. Android's shade is untouched.
+            if (sbn.notification?.channelId in (hiddenChannels[sbn.packageName] ?: emptySet())) continue
             // People tiles: conversation-like notifications reduced to sender + text + actions; any
             // other real (icon-worthy, not ongoing) notification becomes an app-grouped entry.
             val person = runCatching { personEntry(sbn, serial, ranking, tmp) }.getOrNull()
@@ -457,6 +489,7 @@ class NotificationDotListenerService : NotificationListenerService() {
                     text = text,
                     color = color,
                     actions = actions,
+                    channelId = sbn.notification?.channelId,
                 )
                 
                 val isSilent = if (ranking != null && ranking.getRanking(sbn.key, tmp)) {

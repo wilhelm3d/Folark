@@ -69,7 +69,7 @@ import org.arkikeskus.launcher.ui.component.rememberKeyboardShown
 import androidx.compose.foundation.layout.ime
 import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
 import org.arkikeskus.launcher.model.ScreenType
-import org.arkikeskus.launcher.feature.home.TaskbarSpace
+import org.arkikeskus.launcher.feature.home.taskbar.TaskbarSpace
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.input.pointer.pointerInput

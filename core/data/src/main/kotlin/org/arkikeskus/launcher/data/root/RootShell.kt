@@ -157,7 +157,11 @@ object RootShell {
         fun exec(command: String, timeoutMs: Long): ByteArray? {
             val marker = "__folark_" + UUID.randomUUID().toString().replace("-", "") + "__"
             synchronized(signal) { buffer.reset() }
-            val script = "( $command\n) </dev/null; __rc=\$?; echo; echo \"$marker:\$__rc\"\n"
+            // The command itself is capped by `timeout` (toybox, Android 7+): even if the shell or
+            // this session lingers past [timeoutMs], the command dies and frees the pipe. Its exit
+            // code (124 on its own timeout) arrives through __rc and is treated as any failure.
+            val seconds = ((timeoutMs + 999) / 1000).coerceAtLeast(1)
+            val script = "( timeout $seconds $command\n) </dev/null; __rc=\$?; echo; echo \"$marker:\$__rc\"\n"
             try {
                 input.write(script.toByteArray())
                 input.flush()
@@ -197,8 +201,21 @@ object RootShell {
 
         fun destroy() {
             alive = false
+            // Close the pipe first: a command still writing dies of a broken pipe on its own.
             runCatching { input.close() }
-            process.destroy()
+            // SIGTERM, then SIGKILL after a grace: SIGKILL cannot be ignored by userspace, so the
+            // only process that survives it is one the kernel can't stop either — and every
+            // command is `</dev/null` inside a `timeout` anyway (see [exec]), so nothing is left
+            // holding Folark's pipe.
+            runCatching { process.destroy() }
+            val killer = Thread({
+                runCatching {
+                    Thread.sleep(500)
+                    process.destroyForcibly()
+                }
+            }, "folark-root-kill")
+            killer.isDaemon = true
+            killer.start()
         }
 
         companion object {

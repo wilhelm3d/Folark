@@ -218,6 +218,11 @@ class ClipboardHistoryRepository @Inject constructor(
         deleteUnusedImages()
     }
 
+    /** Reads the stored history once, without starting the clipboard listener (the search reads
+     *  [clips] even when no clipboard widget is on any home screen to have loaded it). */
+    @Synchronized
+    fun ensureLoaded() = load()
+
     private fun load() {
         if (loaded) return
         loaded = true

@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.feature.home.widgets.*
+
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed

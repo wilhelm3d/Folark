@@ -2,6 +2,7 @@ package org.arkikeskus.launcher.feature.appdrawer
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,8 +51,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -262,29 +267,10 @@ internal fun DrawerFolderSheet(
     }
 }
 
-/** Rename dialog opened from the folder's settings cog. */
+/** Rename for drawer folders: the shared dialog (core/ui FolderNameDialog). */
 @Composable
 private fun FolderRenameDialog(initial: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.rename)) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                label = { Text(stringResource(R.string.folder_name_label)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) {
-                Text(stringResource(R.string.folder_save))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.folder_cancel)) } },
-    )
+    org.arkikeskus.launcher.ui.FolderNameDialog(initial = initial, onConfirm = onConfirm, onDismiss = onDismiss)
 }
 
 /** Multi-select picker of apps to add to a drawer folder. */
@@ -333,14 +319,20 @@ private fun AddAppsDialog(apps: List<AppItem>, onConfirm: (List<String>) -> Unit
     )
 }
 
-/** The drawer's folders as a row of tabs: "All" plus one per folder; the open one is filled. */
+/** The drawer's folders as a row of tabs: "All" plus one per folder; the open one is filled with
+ *  the accent, which slides softly between tabs. (While an app is dragged out of the drawer the
+ *  drawer slides away with it — the drop targets then are the folder chips over home.) */
 @Composable
-internal fun DrawerTabRow(tabs: List<Pair<Long, String>>, selected: Long?, onSelect: (Long?) -> Unit) {
+internal fun DrawerTabRow(
+    tabs: List<Pair<Long, String>>,
+    selected: Long?,
+    onSelect: (Long?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val palette = LocalExpressivePalette.current
     val accent = LocalAccent.current
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -349,13 +341,20 @@ internal fun DrawerTabRow(tabs: List<Pair<Long, String>>, selected: Long?, onSel
             listOf<Pair<Long?, String>>(null to stringResource(R.string.drawer_tab_all)) + tabs
         all.forEach { (id, name) ->
             val isSelected = id == selected
+            val fill by androidx.compose.animation.animateColorAsState(
+                targetValue = if (isSelected) accent else palette.btn,
+                animationSpec = androidx.compose.animation.core.tween(180),
+                label = "tabFill",
+            )
             Text(
                 text = name,
                 color = if (isSelected) Color.White else palette.text,
                 fontSize = 14.sp,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
-                    .background(if (isSelected) accent else palette.btn, RoundedCornerShape(50))
+                    .widthIn(max = 180.dp)
+                    .background(fill, RoundedCornerShape(50))
                     .clickable { onSelect(id) }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )
@@ -406,5 +405,53 @@ internal fun DrawerTabRail(tabs: List<Pair<Long, String>>, selected: Long?, onSe
                     .padding(horizontal = 14.dp, vertical = 11.dp),
             )
         }
+    }
+}
+
+/** Settings cog for a folder when viewed as a tab. */
+@Composable
+internal fun TabFolderSettingsMenu(
+    folder: DrawerFolderUi,
+    candidateApps: List<AppItem>,
+    onRename: (String) -> Unit,
+    onAddApps: (List<String>) -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    var showAdd by remember { mutableStateOf(false) }
+    var showRename by remember { mutableStateOf(false) }
+
+    Box(modifier) {
+        IconButton(onClick = { menuOpen = true }) {
+            Icon(
+                Icons.Rounded.Settings,
+                contentDescription = stringResource(R.string.folder_options),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.rename)) }, onClick = { menuOpen = false; showRename = true })
+            DropdownMenuItem(text = { Text(stringResource(R.string.folder_add_apps)) }, onClick = { menuOpen = false; showAdd = true })
+            DropdownMenuItem(text = { Text(stringResource(R.string.folder_delete), color = MaterialTheme.colorScheme.error) }, onClick = { menuOpen = false; onDelete() })
+        }
+    }
+
+    if (showAdd) {
+        AddAppsDialog(
+            apps = candidateApps,
+            onConfirm = {
+                onAddApps(it)
+                showAdd = false
+            },
+            onDismiss = { showAdd = false },
+        )
+    }
+    if (showRename) {
+        FolderRenameDialog(
+            initial = folder.name,
+            onConfirm = { onRename(it); showRename = false },
+            onDismiss = { showRename = false },
+        )
     }
 }

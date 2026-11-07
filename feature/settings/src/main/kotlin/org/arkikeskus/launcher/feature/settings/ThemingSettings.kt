@@ -282,17 +282,17 @@ internal fun TypographySection(
     // Which fonts this phone can show (the Motorola ones are files on the phone), checked once.
     val phoneFonts = remember { LauncherSettings.FONT_FAMILIES.associateWith { LauncherFontFamily.isAvailable(it) } }
     ExpressiveCategoryContainer(
-        title = "Typography & Fonts",
+        title = stringResource(R.string.settings_typography),
         icon = Icons.Rounded.AutoAwesome,
-        subtitle = "Font family, bold weights and size scaling per display",
+        subtitle = stringResource(R.string.settings_typography_desc),
     ) {
         val fontOptions = listOf(
-            LauncherSettings.FONT_FAMILY_DEFAULT to "Default",
-            LauncherSettings.FONT_FAMILY_NDOT to "Nothing NDot 57",
-            LauncherSettings.FONT_FAMILY_NTYPE to "Nothing NType 82",
-            LauncherSettings.FONT_FAMILY_SPACE_GROTESK to "Space Grotesk",
-            LauncherSettings.FONT_FAMILY_SERIF to "Serif",
-            LauncherSettings.FONT_FAMILY_MONOSPACE to "Monospace",
+            LauncherSettings.FONT_FAMILY_DEFAULT to stringResource(R.string.settings_font_default),
+            LauncherSettings.FONT_FAMILY_NDOT to stringResource(R.string.settings_font_ndot),
+            LauncherSettings.FONT_FAMILY_NTYPE to stringResource(R.string.settings_font_ntype),
+            LauncherSettings.FONT_FAMILY_SPACE_GROTESK to stringResource(R.string.settings_font_space_grotesk),
+            LauncherSettings.FONT_FAMILY_SERIF to stringResource(R.string.settings_font_serif),
+            LauncherSettings.FONT_FAMILY_MONOSPACE to stringResource(R.string.settings_font_monospace),
             LauncherSettings.FONT_FAMILY_CONDENSED to stringResource(R.string.settings_font_condensed),
             LauncherSettings.FONT_FAMILY_LIGHT to stringResource(R.string.settings_font_light),
             LauncherSettings.FONT_FAMILY_MEDIUM to stringResource(R.string.settings_font_medium),
@@ -305,7 +305,7 @@ internal fun TypographySection(
             LauncherSettings.FONT_FAMILY_MOTO_ROBOTO_SLAB to stringResource(R.string.settings_font_moto_roboto_slab),
         ).filter { (key, _) -> phoneFonts.getValue(key) }
         ExpressiveSegmentedControl(
-            title = "Font Family",
+            title = stringResource(R.string.settings_font_family),
             options = fontOptions,
             selected = s.appearance.fontFamily,
             onSelect = { viewModel.setAppFontFamily(it, screenType) },
@@ -324,15 +324,15 @@ internal fun TypographySection(
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
-            title = "Bold Font Style",
-            subtitle = "Apply bold font weight across launcher labels and titles",
+            title = stringResource(R.string.settings_font_bold),
+            subtitle = stringResource(R.string.settings_font_bold_desc),
             checked = s.appearance.fontBold,
             onCheckedChange = { viewModel.setAppFontBold(it, screenType) },
         )
         ExpressiveRowDivider()
 
         ExpressiveSliderRow(
-            title = "Font Size Scale",
+            title = stringResource(R.string.settings_font_size_scale),
             value = s.appearance.fontSizeScale,
             onValueChange = { viewModel.setAppFontSizeScale(it, screenType) },
             valueRange = 0.7f..1.4f,
@@ -405,8 +405,8 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveRowDivider()
 
         ExpressiveSwitchRow(
-            title = "Glass Card Effect",
-            subtitle = "Render a frosted liquid glass card behind clock digits",
+            title = stringResource(R.string.settings_clock_glass),
+            subtitle = stringResource(R.string.settings_clock_glass_desc),
             checked = s.widgets.clockGlassEffect,
             onCheckedChange = viewModel::setClockWidgetGlassEffect,
         )

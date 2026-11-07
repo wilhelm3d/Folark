@@ -59,6 +59,7 @@ sealed interface SearchResult {
             const val MAP = "map"
             const val EMAIL = "email"
             const val NOTE = "note"
+    const val CLIPBOARD = "clipboard"
             const val CALL = "call"
             const val MESSAGE = "message"
         }

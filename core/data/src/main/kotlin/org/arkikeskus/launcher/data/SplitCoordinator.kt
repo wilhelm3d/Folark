@@ -45,7 +45,7 @@ class SplitCoordinator @Inject constructor(
 
     /** The way a split can be made now (see [SplitRoute]); also gets System UI's split events going. */
     private suspend fun route(): SplitRoute = withContext(Dispatchers.IO) {
-        val engine = runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.splitEngine }
+        val engine = runSuspendCatching { settingsRepository.settings(ScreenType.INNER).first().recents.splitEngine }
             .getOrDefault(LauncherSettings.SPLIT_ENGINE_INTENT_ROUTING)
         SplitRoute.resolve(context, engine).also { connectEvents() }
     }
@@ -79,7 +79,7 @@ class SplitCoordinator @Inject constructor(
     /** A split was just made with [keep] the app that was there first; offered as undo, if switched on. */
     suspend fun offerUndo(keep: SplitApp?) {
         if (keep == null) return
-        val on = runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.splitUndo }.getOrDefault(true)
+        val on = runSuspendCatching { settingsRepository.settings(ScreenType.INNER).first().recents.splitUndo }.getOrDefault(true)
         if (on) _undoOffer.value = UndoOffer(keep)
     }
 
@@ -136,7 +136,7 @@ class SplitCoordinator @Inject constructor(
     /** S1: [packages] (left to right) back at their last sizes, when remembered (and not half and half). */
     private suspend fun restoreSizes(packages: List<String>) {
         if (!SplitThree.ready(context)) return
-        val on = runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.rememberSplitSize }.getOrDefault(true)
+        val on = runSuspendCatching { settingsRepository.settings(ScreenType.INNER).first().recents.rememberSplitSize }.getOrDefault(true)
         if (!on) return
         val sizes = SplitSizes.of(context, packages) ?: return
         if (SplitSizes.isEven(sizes)) return
@@ -230,7 +230,7 @@ class SplitCoordinator @Inject constructor(
                 // Motorola starts three apps as its carousel (one a 10 % strip): a third each instead.
                 // [even]: asked for (the split drawer's 33/33/33), whatever the setting.
                 // [peek]: Motorola's three-app peek instead (the middle app big, the others at the edges).
-                val thirds = !peek && (even || runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.threeEven }.getOrDefault(true))
+                val thirds = !peek && (even || runSuspendCatching { settingsRepository.settings(ScreenType.INNER).first().recents.threeEven }.getOrDefault(true))
                 if (peek) SplitThree.snap(context, SplitThree.SNAP_THREE_PEEK)
                 else if (thirds) SplitThree.snap(context, SplitThree.SNAP_THREE_EVEN)
                 return true
@@ -337,7 +337,7 @@ class SplitCoordinator @Inject constructor(
      */
     fun opened(app: AppItem) {
         scope.launch {
-            val on = runCatching { settingsRepository.settings(ScreenType.INNER).first().recents.openWith }.getOrDefault(false)
+            val on = runSuspendCatching { settingsRepository.settings(ScreenType.INNER).first().recents.openWith }.getOrDefault(false)
             if (!on || !Screens.innerShowing(context)) return@launch
             val partnerPackage = SplitHistory.suggestion(context, app.packageName) ?: return@launch
             val apps = appRepository.apps.first()

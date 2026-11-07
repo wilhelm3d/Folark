@@ -365,8 +365,7 @@ private fun RecentsMoreCards(s: LauncherSettings, viewModel: SettingsViewModel, 
             )
         }
         SettingsAdvanced {
-            RecentsCheckRow()
-                ExpressiveRowDivider()
+            // Check screenshots moved to Phone & system ▸ Support (with the other diagnostics).
             ExpressiveActionItem(
                 title = stringResource(
                     when (root) {
@@ -388,55 +387,6 @@ private fun copyToClipboard(context: android.content.Context, text: String) {
     android.widget.Toast.makeText(context, R.string.settings_recents_copied, android.widget.Toast.LENGTH_SHORT).show()
 }
 
-/** Settings ▸ Recents ▸ Check screenshots: runs each step and shows what it answered. */
-@androidx.compose.runtime.Composable
-private fun RecentsCheckRow() {
-    val context = LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var report by remember { mutableStateOf<String?>(null) }
-    var running by remember { mutableStateOf(false) }
-    ExpressiveActionItem(
-        title = stringResource(if (running) R.string.settings_root_working else R.string.settings_recents_check),
-        description = stringResource(R.string.settings_recents_check_desc),
-        onClick = {
-            if (!running) {
-                running = true
-                scope.launch {
-                    report = withContext(Dispatchers.IO) {
-                        runCatching { org.arkikeskus.launcher.data.root.RootTasks.diagnose(context) }
-                            .getOrElse { "Check failed: ${it.javaClass.simpleName}: ${it.message}" }
-                    }
-                    running = false
-                }
-            }
-        },
-    )
-    val text = report ?: return
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = { report = null },
-        title = { androidx.compose.material3.Text(stringResource(R.string.settings_recents_check)) },
-        text = {
-            androidx.compose.foundation.text.selection.SelectionContainer {
-                androidx.compose.material3.Text(
-                    text,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
-                    modifier = androidx.compose.ui.Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
-                )
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = { copyToClipboard(context, text) }) {
-                androidx.compose.material3.Text(stringResource(R.string.settings_recents_check_copy))
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = { report = null }) {
-                androidx.compose.material3.Text(stringResource(R.string.settings_taskbar_done))
-            }
-        },
-    )
-}
 
 /** Split screen started from Recents (a card dragged to an edge, three-app splits). */
 @Composable
