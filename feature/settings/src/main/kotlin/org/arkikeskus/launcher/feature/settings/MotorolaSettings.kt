@@ -53,6 +53,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import java.io.File
+import org.arkikeskus.launcher.model.catching
 
 /** Appearance card: the shape of app icons (both displays), as tiles drawn in each shape. */
 @Composable
@@ -229,7 +230,7 @@ private fun WallpaperThumb(file: File, onClick: () -> Unit) {
     }
 }
 
-private fun decodeThumb(file: File): ImageBitmap? = runCatching {
+private fun decodeThumb(file: File): ImageBitmap? = catching {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.absolutePath, bounds)
     var sample = 1

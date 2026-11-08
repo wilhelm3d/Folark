@@ -1,6 +1,7 @@
 package org.arkikeskus.launcher.data
 
 import android.content.Context
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The last few app pairs put side by side (packages only), newest first, for the split picker's
@@ -30,7 +31,7 @@ object SplitHistory {
     /** [a] and [b] were just put side by side. */
     fun record(context: Context, a: String, b: String, now: Long = System.currentTimeMillis()) {
         if (a == b || !SAFE.matches(a) || !SAFE.matches(b)) return
-        runCatching {
+        catching {
             val p = context.getSharedPreferences(PREFS, 0)
             val entry = entry(a, b)
             val kept = read(p.getString(PAIRS, null)).filterNot { it == entry }
@@ -46,7 +47,7 @@ object SplitHistory {
     }
 
     /** The packages [packageName] was last paired with, newest first. */
-    fun partners(context: Context, packageName: String): List<String> = runCatching {
+    fun partners(context: Context, packageName: String): List<String> = catching {
         read(context.getSharedPreferences(PREFS, 0).getString(PAIRS, null))
             .mapNotNull { e -> other(e, packageName) }
             .distinct()
@@ -57,7 +58,7 @@ object SplitHistory {
      * [SUGGEST_MIN_TIMES] times in the last [SUGGEST_WINDOW_MS], and not passed over
      * [SUGGEST_MAX_IGNORED] times since.
      */
-    fun suggestion(context: Context, packageName: String, now: Long = System.currentTimeMillis()): String? = runCatching {
+    fun suggestion(context: Context, packageName: String, now: Long = System.currentTimeMillis()): String? = catching {
         val p = context.getSharedPreferences(PREFS, 0)
         val pairs = read(p.getString(PAIRS, null))
         pick(
@@ -70,7 +71,7 @@ object SplitHistory {
 
     /** The suggestion of [a] and [b] went by without a tap. */
     fun ignored(context: Context, a: String, b: String) {
-        runCatching {
+        catching {
             val p = context.getSharedPreferences(PREFS, 0)
             val key = IGNORED + entry(a, b)
             p.edit().putInt(key, p.getInt(key, 0) + 1).apply()
@@ -79,12 +80,12 @@ object SplitHistory {
 
     /** The suggestion of [a] and [b] was taken: it may be offered again from now on. */
     fun accepted(context: Context, a: String, b: String) {
-        runCatching { context.getSharedPreferences(PREFS, 0).edit().remove(IGNORED + entry(a, b)).apply() }
+        catching { context.getSharedPreferences(PREFS, 0).edit().remove(IGNORED + entry(a, b)).apply() }
     }
 
     /** Forgets every pair (Settings ▸ Recents ▸ Split picker ▸ Forget paired apps). */
     fun clear(context: Context) {
-        runCatching { context.getSharedPreferences(PREFS, 0).edit().clear().apply() }
+        catching { context.getSharedPreferences(PREFS, 0).edit().clear().apply() }
     }
 
     /**

@@ -36,6 +36,7 @@ import org.arkikeskus.launcher.data.backup.BackupRepository
 import org.arkikeskus.launcher.data.backup.RestoreResult
 import java.util.Date
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 /** What the backup card says under its rows after the last action. */
 enum class BackupMessage { WORKING, SAVED, SAVE_FAILED, SHARE_FAILED, AUTO_ON, AUTO_FAILED, RESTORED, NOT_A_BACKUP, TOO_NEW, RESTORE_FAILED }
@@ -92,7 +93,7 @@ class BackupSettingsViewModel @Inject constructor(
 }
 
 /** "primary:Documents/Folark" → "Documents/Folark", for showing where automatic backups go. */
-private fun folderLabel(uri: String): String = runCatching {
+private fun folderLabel(uri: String): String = catching {
     val id = DocumentsContract.getTreeDocumentId(Uri.parse(uri))
     id.substringAfter(':').ifEmpty { id }
 }.getOrDefault(uri)
@@ -126,7 +127,7 @@ internal fun BackupSection(viewModel: BackupSettingsViewModel = hiltViewModel())
             description = stringResource(R.string.settings_backup_now_desc),
             onClick = {
                 val day = DateFormat.format("yyyy-MM-dd", Date()).toString()
-                runCatching { createFile.launch("Folark-backup-$day.zip") }
+                catching { createFile.launch("Folark-backup-$day.zip") }
             },
         )
         ExpressiveRowDivider()
@@ -141,7 +142,7 @@ internal fun BackupSection(viewModel: BackupSettingsViewModel = hiltViewModel())
                         .setType(BackupRepository.MIME_TYPE)
                         .putExtra(android.content.Intent.EXTRA_STREAM, uri)
                         .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    runCatching {
+                    catching {
                         context.startActivity(
                             android.content.Intent.createChooser(send, context.getString(R.string.settings_backup_share)),
                         )
@@ -165,7 +166,7 @@ internal fun BackupSection(viewModel: BackupSettingsViewModel = hiltViewModel())
         ExpressiveActionItem(
             title = stringResource(R.string.settings_backup_auto),
             description = autoDescription,
-            onClick = { runCatching { pickFolder.launch(null) } },
+            onClick = { catching { pickFolder.launch(null) } },
         )
         if (autoFolder.isNotEmpty()) {
             ExpressiveRowDivider()
@@ -180,7 +181,7 @@ internal fun BackupSection(viewModel: BackupSettingsViewModel = hiltViewModel())
         ExpressiveActionItem(
             title = stringResource(R.string.settings_restore),
             description = stringResource(R.string.settings_restore_desc),
-            onClick = { runCatching { pickBackup.launch(arrayOf(BackupRepository.MIME_TYPE, "application/octet-stream", "*/*")) } },
+            onClick = { catching { pickBackup.launch(arrayOf(BackupRepository.MIME_TYPE, "application/octet-stream", "*/*")) } },
         )
         ExpressiveRowDivider()
 

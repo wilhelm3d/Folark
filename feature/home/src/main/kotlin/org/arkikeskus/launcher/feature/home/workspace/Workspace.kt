@@ -101,6 +101,7 @@ import org.arkikeskus.launcher.ui.component.labelFontFactor
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The paged home workspace: a [HorizontalPager] of cell grids with a floating drag overlay.
@@ -504,11 +505,11 @@ fun Workspace(
         val stackFront = stacks.firstOrNull { it.rowId == item.rowId }?.items?.firstOrNull()
         val previewWidgetId = item.appWidgetId ?: (stackFront as? PlacedWidget)?.appWidgetId
         val bitmap = previewWidgetId?.let { id ->
-            widgetViews[id]?.let { view -> runCatching { view.drawToBitmap() }.getOrNull() }
+            widgetViews[id]?.let { view -> catching { view.drawToBitmap() }.getOrNull() }
         }
         val builtin = builtins.firstOrNull { it.rowId == item.rowId } ?: (stackFront as? PlacedBuiltin)
         val choice = builtin?.let { WidgetChoice.Builtin(it.type) } ?: previewWidgetId?.let { id ->
-            runCatching { AppWidgetManager.getInstance(context).getAppWidgetInfo(id) }.getOrNull()
+            catching { AppWidgetManager.getInstance(context).getAppWidgetInfo(id) }.getOrNull()
                 ?.let { WidgetChoice.App(it) }
         }
         widgetDragController.start(
@@ -782,7 +783,7 @@ fun Workspace(
         if (overscrollPx > 60f && pagerState.currentPage == 0 && !pagerState.isScrollInProgress) {
             when (minusOneScreen) {
                 LauncherSettings.MINUS_ONE_GOOGLE -> {
-                    runCatching {
+                    catching {
                         context.startActivity(
                             android.content.Intent("com.google.android.googlequicksearchbox.TEXT_ASSIST")
                                 .setPackage("com.google.android.googlequicksearchbox")
@@ -791,7 +792,7 @@ fun Workspace(
                     }
                 }
                 LauncherSettings.MINUS_ONE_SMART_FEED -> {
-                    runCatching {
+                    catching {
                         context.startActivity(
                             android.content.Intent("com.motorola.smartfeed.action.START")
                                 .setPackage("com.motorola.smartfeed")

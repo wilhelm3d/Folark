@@ -27,6 +27,7 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** Current conditions for the smartspace widget's weather slot. */
 data class CurrentWeather(
@@ -118,7 +119,7 @@ class WeatherRepository @Inject constructor(
         scope.launch {
             // A failure handles one change of place, not the whole watch.
             settingsRepository.weatherLocation.collect { raw ->
-                runCatching {
+                catching {
                     val chosen = WeatherPlace.parse(raw)
                     if (chosen != place) {
                         place = chosen
@@ -139,7 +140,7 @@ class WeatherRepository @Inject constructor(
         context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    private fun isBatterySaverActive(): Boolean = runCatching {
+    private fun isBatterySaverActive(): Boolean = catching {
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
         powerManager?.isPowerSaveMode == true
     }.getOrDefault(false)
@@ -162,7 +163,7 @@ class WeatherRepository @Inject constructor(
             try {
                 val fixed = startedFor
                 if (fixed != null) {
-                    val fetched = runCatching { fetch(fixed.latitude, fixed.longitude) }
+                    val fetched = catching { fetch(fixed.latitude, fixed.longitude) }
                         .onFailure { Log.w(TAG, "Weather fetch failed: ${it.javaClass.simpleName}") }
                         .getOrNull()
                     noteResult(fetched != null)
@@ -183,7 +184,7 @@ class WeatherRepository @Inject constructor(
                 val exactLon = location.longitude
                 val lat = Math.round(exactLat * 100) / 100.0
                 val lon = Math.round(exactLon * 100) / 100.0
-                val fetched = runCatching { fetch(lat, lon) }
+                val fetched = catching { fetch(lat, lon) }
                     .onFailure { Log.w(TAG, "Weather fetch failed: ${it.javaClass.simpleName}") }
                     .getOrNull()
                 noteResult(fetched != null)
@@ -212,14 +213,14 @@ class WeatherRepository @Inject constructor(
         // Newest fix wins regardless of provider — provider order alone let a stale network fix
         // beat a fresh GPS one and pin the weather to a previous town.
         return providers
-            .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+            .mapNotNull { catching { lm.getLastKnownLocation(it) }.getOrNull() }
             .maxByOrNull { it.time }
     }
 
     /** App-identifying User-Agent WITHOUT device details — Android's default Dalvik UA names the
      *  device model and OS build, which has no business going to third-party weather services. */
     private val userAgent: String by lazy {
-        val version = runCatching {
+        val version = catching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull() ?: "?"
         "Folark/$version"
@@ -232,7 +233,7 @@ class WeatherRepository @Inject constructor(
     private fun readBody(connection: HttpURLConnection): String {
         val code = connection.responseCode
         if (code !in 200..299) {
-            runCatching { connection.errorStream?.close() }
+            catching { connection.errorStream?.close() }
             throw java.io.IOException("HTTP $code from ${connection.url.host}")
         }
         return connection.inputStream.bufferedReader().use { it.readText() }
@@ -263,7 +264,7 @@ class WeatherRepository @Inject constructor(
                 city = null,
                 fetchedAt = System.currentTimeMillis(),
                 // The forecast is a bonus: a reply without it still gives the current conditions.
-                forecast = runCatching { parseForecast(root, current) }.getOrNull(),
+                forecast = catching { parseForecast(root, current) }.getOrNull(),
             )
         } finally {
             connection.disconnect()
@@ -275,7 +276,7 @@ class WeatherRepository @Inject constructor(
      * when nothing matches or the network fails. Only the typed text and the interface language are sent.
      */
     suspend fun findPlace(query: String): WeatherPlace? = withContext(Dispatchers.IO) {
-        runCatching {
+        catching {
             val url = URL(
                 "https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&language=%s&name=%s"
                     .format(Locale.US, Locale.getDefault().language, URLEncoder.encode(query.trim(), "UTF-8")),
@@ -286,7 +287,7 @@ class WeatherRepository @Inject constructor(
                 connection.connectTimeout = 10_000
                 connection.readTimeout = 10_000
                 val body = readBody(connection)
-                val first = JSONObject(body).optJSONArray("results")?.optJSONObject(0) ?: return@runCatching null
+                val first = JSONObject(body).optJSONArray("results")?.optJSONObject(0) ?: return@catching null
                 WeatherPlace(
                     name = first.getString("name").replace('\t', ' '),
                     latitude = first.getDouble("latitude"),

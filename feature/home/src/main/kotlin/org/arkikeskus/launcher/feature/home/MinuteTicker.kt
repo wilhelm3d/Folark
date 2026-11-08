@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Calls [onTick] now and then at the exact start of every minute using Android's system broadcast, 
@@ -36,7 +37,7 @@ internal fun MinuteTicker(onTick: (Long) -> Unit) {
         currentOnTick(System.currentTimeMillis())
 
         onDispose {
-            runCatching { context.unregisterReceiver(receiver) }
+            catching { context.unregisterReceiver(receiver) }
         }
     }
 }

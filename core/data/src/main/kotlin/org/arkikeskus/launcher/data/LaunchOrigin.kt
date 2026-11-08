@@ -4,6 +4,7 @@ import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
 import java.lang.ref.WeakReference
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Where the app about to open was tapped, so it can grow out of that spot. Folark's screens record
@@ -43,7 +44,7 @@ object LaunchOrigin {
      */
     fun takeOptions(reveal: Boolean = false): android.os.Bundle? {
         val (view, r) = take() ?: return null
-        return runCatching {
+        return catching {
             val at = IntArray(2)
             view.getLocationOnScreen(at)
             val x = r.left - at[0]

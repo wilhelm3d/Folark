@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.SplitEvents
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Split screen's helpers drawn over everything (they need "Display over other apps"; without it
@@ -62,7 +63,7 @@ object SplitOverlays {
         }
     }
 
-    private fun allowed(context: Context) = runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
+    private fun allowed(context: Context) = catching { Settings.canDrawOverlays(context) }.getOrDefault(false)
 
     private fun params(width: Int, height: Int) = WindowManager.LayoutParams(
         width, height,
@@ -83,14 +84,14 @@ object SplitOverlays {
     private fun showMarks(context: Context, panes: Int) {
         if (marks != null || !allowed(context)) return
         val view = MarksView(context, if (panes >= 3) floatArrayOf(0.25f, 1f / 3, 0.5f, 2f / 3, 0.75f) else floatArrayOf(1f / 3, 0.5f, 2f / 3))
-        runCatching { wm(context).addView(view, params(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)) }
+        catching { wm(context).addView(view, params(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)) }
             .onSuccess { marks = view }
     }
 
     private fun hideMarks(context: Context) {
         val view = marks ?: return
         marks = null
-        view.animate().alpha(0f).setDuration(160).withEndAction { runCatching { wm(context).removeView(view) } }.start()
+        view.animate().alpha(0f).setDuration(160).withEndAction { catching { wm(context).removeView(view) } }.start()
     }
 
     private class MarksView(context: Context, private val at: FloatArray) : View(context) {
@@ -132,27 +133,27 @@ object SplitOverlays {
                 }
             }
         }
-        runCatching { wm(context).addView(view, params(1, 1)) }.onSuccess { probe = view }
+        catching { wm(context).addView(view, params(1, 1)) }.onSuccess { probe = view }
     }
 
     private fun hideProbe(context: Context) {
         hideHint(context)
         val view = probe ?: return
         probe = null
-        runCatching { wm(context).removeView(view) }
+        catching { wm(context).removeView(view) }
     }
 
     private fun showHint(context: Context) {
         if (hint != null) return
         val view = HintView(context, lastFractions)
-        runCatching { wm(context).addView(view, params(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)) }
+        catching { wm(context).addView(view, params(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)) }
             .onSuccess { hint = view }
     }
 
     private fun hideHint(context: Context) {
         val view = hint ?: return
         hint = null
-        view.animate().alpha(0f).setDuration(160).withEndAction { runCatching { wm(context).removeView(view) } }.start()
+        view.animate().alpha(0f).setDuration(160).withEndAction { catching { wm(context).removeView(view) } }.start()
     }
 
     private class HintView(context: Context, fractions: IntArray) : View(context) {

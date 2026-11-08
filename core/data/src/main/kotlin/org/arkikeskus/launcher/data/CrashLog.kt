@@ -5,6 +5,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.arkikeskus.launcher.model.catching
 
 /**
  * A local, on-device crash log: an uncaught-exception handler appends to a small file, and
@@ -19,7 +20,7 @@ object CrashLog {
     fun install(context: Context) {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            runCatching { append(context, thread, throwable) }
+            catching { append(context, thread, throwable) }
             previous?.uncaughtException(thread, throwable)
         }
     }
@@ -29,7 +30,7 @@ object CrashLog {
 
     /** Empties the log. */
     fun clear(context: Context) {
-        runCatching { file(context).delete() }
+        catching { file(context).delete() }
     }
 
     private fun file(context: Context) = File(context.filesDir, FILE)

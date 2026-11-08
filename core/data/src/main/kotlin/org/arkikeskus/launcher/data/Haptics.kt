@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.data
 
+import org.arkikeskus.launcher.model.MotionSettings
+
 import android.content.Context
 import android.os.Build
 import android.os.VibrationAttributes
@@ -8,6 +10,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.View
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Folark's haptic feedback, one place for every action so each kind of moment always feels the
@@ -41,7 +44,7 @@ object Haptics {
 
     /** The current settings, kept up to date by the app (LauncherApplication). */
     @Volatile
-    var settings: LauncherSettings.Motion = LauncherSettings.Motion()
+    var settings: MotionSettings = MotionSettings()
 
     /** Whether [event] plays with the current settings. */
     fun enabled(event: Event): Boolean {
@@ -67,7 +70,7 @@ object Haptics {
             else -> 0.72f
         }
         val effect = composition(vibrator, event, scale) ?: fallback(event)
-        runCatching {
+        catching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 // As touch feedback: the phone's own touch-feedback switch and strength apply.
                 vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
@@ -94,7 +97,7 @@ object Haptics {
     private fun composition(vibrator: Vibrator, event: Event, scale: Float): VibrationEffect? {
         fun supported(vararg ids: Int) = ids.all { id ->
             // Asked once per primitive: the answer can't change while the app runs.
-            primitiveSupport.getOrPut(id) { runCatching { vibrator.areAllPrimitivesSupported(id) }.getOrDefault(false) }
+            primitiveSupport.getOrPut(id) { catching { vibrator.areAllPrimitivesSupported(id) }.getOrDefault(false) }
         }
         val parts: List<Triple<Int, Float, Int>> = when (event) {
             Event.LAUNCH -> listOf(Triple(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.8f, 0))
@@ -107,7 +110,7 @@ object Haptics {
             Event.DROP -> listOf(Triple(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.6f, 0))
         }
         if (!supported(*parts.map { it.first }.toIntArray())) return null
-        return runCatching {
+        return catching {
             val composition = VibrationEffect.startComposition()
             parts.forEach { (id, strength, delay) -> composition.addPrimitive(id, (strength * scale).coerceIn(0f, 1f), delay) }
             composition.compose()

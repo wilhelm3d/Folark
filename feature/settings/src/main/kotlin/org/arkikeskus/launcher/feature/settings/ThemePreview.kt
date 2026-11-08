@@ -67,6 +67,7 @@ import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /** A few installed apps, for the icons in the previews (provided by the settings screen). */
 internal val LocalPreviewApps = staticCompositionLocalOf<List<AppItem>> { emptyList() }
@@ -352,7 +353,7 @@ private fun rememberBackdrop(path: String): ImageBitmap? {
 /** Decoded pictures by path (a settings session shows one or two). */
 private val backdropCache = java.util.concurrent.ConcurrentHashMap<String, ImageBitmap>()
 
-private fun loadPicture(context: Context, path: String): ImageBitmap? = runCatching {
+private fun loadPicture(context: Context, path: String): ImageBitmap? = catching {
     val file = File(path)
     if (!file.exists()) return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -366,7 +367,7 @@ private const val PREVIEW_PICTURE_PX = 600
 
 @Composable
 private fun previewDate(): String = remember {
-    runCatching { LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM")) }.getOrDefault("")
+    catching { LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM")) }.getOrDefault("")
 }
 
 /** A widget card: the stack corner radius, and the widget background (tonal or dark, its opacity). */

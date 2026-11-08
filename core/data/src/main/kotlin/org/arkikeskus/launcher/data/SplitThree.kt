@@ -13,6 +13,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Real three-app split screen, asked of Folark's Vector module in SystemUI (its SplitThreeHook):
@@ -117,7 +118,7 @@ object SplitThree {
      * Folark's requests: the module's split requests are paused from now on ([paused]) and the
      * caller tells the person so.
      */
-    fun onReady(context: Context): Boolean = runCatching {
+    fun onReady(context: Context): Boolean = catching {
         val p = prefs(context)
         val now = System.currentTimeMillis()
         val lastAt = p.getLong(LAST_REQUEST_AT, 0L)
@@ -150,11 +151,11 @@ object SplitThree {
         // A size that System UI moved straight back: this phone keeps 50/50 only (the split drawer
         // stops offering the others). A size that held says the opposite.
         if (kind == "snap" && snapRequests.remove(request) == true) {
-            runCatching { prefs(context).edit().putBoolean(SIZES_HOLD, ok || detail?.contains("went back") != true).apply() }
+            catching { prefs(context).edit().putBoolean(SIZES_HOLD, ok || detail?.contains("went back") != true).apply() }
         }
         kinds.remove(request)
         if (kind != null) {
-            runCatching {
+            catching {
                 prefs(context).edit()
                     // LAST_REQUEST_AT stays: WM Shell can still throw on its own thread after answering.
                     .putString(
@@ -168,7 +169,7 @@ object SplitThree {
     }
 
     /** The module is running in System UI (it said so since System UI last started, give or take). */
-    fun running(context: Context): Boolean = Build.VERSION.SDK_INT >= 34 && runCatching {
+    fun running(context: Context): Boolean = Build.VERSION.SDK_INT >= 34 && catching {
         val at = prefs(context).getLong(READY_AT, 0L)
         at > 0L && System.currentTimeMillis() - at < READY_FOR_MS
     }.getOrDefault(false)
@@ -177,7 +178,7 @@ object SplitThree {
      * Whether the divider stays at 30 / 70 % on this phone: false once System UI moved it straight
      * back to half and half, true once one held; null until a size was tried.
      */
-    fun sizesHold(context: Context): Boolean? = runCatching {
+    fun sizesHold(context: Context): Boolean? = catching {
         val p = prefs(context)
         if (p.contains(SIZES_HOLD)) p.getBoolean(SIZES_HOLD, true) else null
     }.getOrNull()
@@ -192,7 +193,7 @@ object SplitThree {
     fun paused(context: Context): Boolean = pausedInfo(context) != null
 
     /** When the crash guard paused them, and after which request (for Settings), or null. */
-    fun pausedInfo(context: Context): Pair<Long, String?>? = runCatching {
+    fun pausedInfo(context: Context): Pair<Long, String?>? = catching {
         val p = prefs(context)
         val at = p.getLong(PAUSED_AT, 0L)
         // A pause lasts until the phone restarts: one from before this boot no longer counts.
@@ -202,14 +203,14 @@ object SplitThree {
 
     /** Lets the module be asked again (Settings ▸ Recents ▸ Split screen). */
     fun resume(context: Context) {
-        runCatching { prefs(context).edit().remove(PAUSED_AT).remove(PAUSED_AFTER).apply() }
+        catching { prefs(context).edit().remove(PAUSED_AT).remove(PAUSED_AFTER).apply() }
     }
 
     /** System UI's last answer ("startTasks ok at <ms>"), for the split screen check. */
-    fun lastAnswer(context: Context): String? = runCatching { prefs(context).getString(LAST_ANSWER, null) }.getOrNull()
+    fun lastAnswer(context: Context): String? = catching { prefs(context).getString(LAST_ANSWER, null) }.getOrNull()
 
     /** When the module last said it started in System UI (0: never). */
-    fun readyAt(context: Context): Long = runCatching { prefs(context).getLong(READY_AT, 0L) }.getOrDefault(0L)
+    fun readyAt(context: Context): Long = catching { prefs(context).getLong(READY_AT, 0L) }.getOrDefault(0L)
 
     /**
      * Asks the module to attach its split listener (if it isn't) and to send the split state now,
@@ -373,13 +374,13 @@ object SplitThree {
         waiting[request] = answer
         if (kind != null) {
             kinds[request] = kind
-            runCatching {
+            catching {
                 prefs(context).edit().putLong(LAST_REQUEST_AT, System.currentTimeMillis()).putString(LAST_REQUEST_KIND, kind).apply()
             }
         }
         val intent = Intent(ACTION).setPackage(SYSTEMUI).putExtra(EXTRA_REQUEST, request)
         intent.fill(request)
-        val sent = runCatching {
+        val sent = catching {
             val options = BroadcastOptions.makeBasic().setShareIdentityEnabled(true).toBundle()
             context.sendBroadcast(intent, null, options)
         }.isSuccess
@@ -393,7 +394,7 @@ object SplitThree {
         snapRequests.remove(request)
         // No answer at all: say so in the split check (line 9), not an old answer.
         if (ok == null && kinds.remove(request) != null) {
-            runCatching {
+            catching {
                 prefs(context).edit()
                     .putString(LAST_ANSWER, "$kind: no answer from System UI within ${TIMEOUT_MS / 1000.0} s at ${System.currentTimeMillis()}")
                     .apply()

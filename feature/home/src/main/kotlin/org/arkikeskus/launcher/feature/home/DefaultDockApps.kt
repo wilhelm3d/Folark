@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.provider.Telephony
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The first-run default dock, in the user-chosen order: phone, messages, system Settings,
@@ -25,7 +26,7 @@ fun resolveDefaultDockKeys(context: Context, apps: List<AppItem>): List<String> 
 
     val slots = listOf(
         defaultPackageFor(Intent(Intent.ACTION_DIAL)),
-        runCatching { Telephony.Sms.getDefaultSmsPackage(context) }.getOrNull(),
+        catching { Telephony.Sms.getDefaultSmsPackage(context) }.getOrNull(),
         defaultPackageFor(Intent(Settings.ACTION_SETTINGS)),
         defaultPackageFor(Intent(Intent.ACTION_VIEW, Uri.parse("http://www.example.com"))),
         defaultPackageFor(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)),

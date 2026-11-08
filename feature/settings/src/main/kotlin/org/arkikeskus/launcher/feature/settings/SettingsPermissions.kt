@@ -24,6 +24,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import org.arkikeskus.launcher.model.catching
 
 // Permissions: the rows that ask for them, the toggles that need them, and the Permissions section (split out of SettingsScreen.kt).
 
@@ -75,7 +76,7 @@ internal fun lockServiceEnabled(context: Context): Boolean {
 }
 
 private fun openAppDetailsSettings(context: Context) {
-    runCatching {
+    catching {
         context.startActivity(
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -84,7 +85,7 @@ private fun openAppDetailsSettings(context: Context) {
 }
 
 internal fun isNotificationAccessGranted(context: Context): Boolean =
-    runCatching {
+    catching {
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     }.getOrDefault(false)
 
@@ -96,9 +97,9 @@ internal fun openNotificationAccess(context: Context) {
     val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
         .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, component.flattenToString())
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    val opened = runCatching { context.startActivity(detail) }.isSuccess
+    val opened = catching { context.startActivity(detail) }.isSuccess
     if (!opened) {
-        runCatching {
+        catching {
             context.startActivity(
                 Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -160,9 +161,9 @@ internal fun TaskbarToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
     fun openOverlaySettings() {
         val exact = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", context.packageName, null))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val opened = runCatching { context.startActivity(exact) }.isSuccess
+        val opened = catching { context.startActivity(exact) }.isSuccess
         if (!opened) {
-            runCatching {
+            catching {
                 context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
         }
@@ -186,7 +187,7 @@ internal fun TaskbarToggle(enabled: Boolean, onSetEnabled: (Boolean) -> Unit) {
 }
 
 internal fun canDrawOverlays(context: Context): Boolean =
-    runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
+    catching { Settings.canDrawOverlays(context) }.getOrDefault(false)
 
 @Composable
 internal fun PermissionsSection(

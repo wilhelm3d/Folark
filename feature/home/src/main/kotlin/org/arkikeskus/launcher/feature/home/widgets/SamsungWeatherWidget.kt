@@ -32,6 +32,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Category Card Interface inspired Weather & Briefing Card Widget:
@@ -67,7 +68,7 @@ fun SamsungWeatherWidget(
 
     WidgetSurface(
         modifier = modifier.clickable(interactionSource = noIndication, indication = null) {
-            runCatching {
+            catching {
                 val intent = Intent(Intent.ACTION_VIEW).setData(CalendarContract.CONTENT_URI)
                 context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }

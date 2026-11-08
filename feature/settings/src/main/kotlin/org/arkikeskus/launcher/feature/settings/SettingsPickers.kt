@@ -47,6 +47,7 @@ import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.data.MotoLinks
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
+import org.arkikeskus.launcher.model.catching
 
 // Small shared pickers and labels used by several settings sections (split out of SettingsScreen.kt).
 
@@ -96,7 +97,7 @@ internal fun DoubleTapActionRow(s: LauncherSettings, viewModel: SettingsViewMode
         onPauseOrDispose { }
     }
     fun openAccessibilitySettings() {
-        runCatching {
+        catching {
             context.startActivity(
                 Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

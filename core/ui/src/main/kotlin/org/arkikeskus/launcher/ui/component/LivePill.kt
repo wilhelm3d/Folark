@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.LiveActivity
+import org.arkikeskus.launcher.model.catching
 
 /**
  * One live activity as a pill: the app's status icon, the few characters that matter (a ticking
@@ -137,7 +138,7 @@ fun LivePill(
     }
 }
 
-private fun Icon.bitmap(context: android.content.Context): ImageBitmap? = runCatching {
+private fun Icon.bitmap(context: android.content.Context): ImageBitmap? = catching {
     loadDrawable(context)?.squareBitmap(48)?.asImageBitmap()
 }.getOrNull()
 

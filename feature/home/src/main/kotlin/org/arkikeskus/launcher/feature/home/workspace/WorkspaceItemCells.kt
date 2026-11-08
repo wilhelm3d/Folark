@@ -101,6 +101,7 @@ import org.arkikeskus.launcher.ui.component.labelFontFactor
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 // Folders, shortcuts, widgets, placeholders and widget stacks on the home grid (split out of Workspace.kt).
 
@@ -383,7 +384,7 @@ internal fun WorkspacePendingWidgetCell(
                         .firstOrNull { it.provider == pending.provider }
                     val label = info?.loadLabel(ctxP.packageManager)
                         ?: pending.provider.packageName
-                    val icon = runCatching {
+                    val icon = catching {
                         (info?.loadIcon(ctxP, ctxP.resources.displayMetrics.densityDpi)
                             ?: ctxP.packageManager.getApplicationIcon(pending.provider.packageName))
                             .toBitmap().asImageBitmap()

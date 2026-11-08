@@ -10,6 +10,7 @@ import android.os.HandlerThread
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import org.arkikeskus.launcher.model.catching
 
 /**
  * In System UI (WM Shell): the split divider's stops at ⅓, ½ and ⅔ (Settings ▸ Recents & split
@@ -117,13 +118,13 @@ internal object DividerStopsHook {
         this.log = log
         var hooked = 0
         for (name in CLASSES) {
-            val cls = runCatching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
+            val cls = catching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
             // After every rebuild of the stops (the constructor calls it too).
-            hooked += runCatching {
+            hooked += catching {
                 XposedBridge.hookAllMethods(cls, "updateTargets", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         ask()
-                        if (on) runCatching { addStops(param.thisObject) }.onFailure { log("divider stops: left as they are ($it)") }
+                        if (on) catching { addStops(param.thisObject) }.onFailure { log("divider stops: left as they are ($it)") }
                     }
                 }).size
             }.getOrDefault(0)
@@ -149,13 +150,13 @@ internal object DividerStopsHook {
      */
     private fun hookFree(loader: ClassLoader) {
         var hooked = 0
-        val algorithm = CLASSES.firstNotNullOfOrNull { runCatching { XposedHelpers.findClass(it, loader) }.getOrNull() }
+        val algorithm = CLASSES.firstNotNullOfOrNull { catching { XposedHelpers.findClass(it, loader) }.getOrNull() }
         if (algorithm != null) {
-            hooked += runCatching {
+            hooked += catching {
                 XposedBridge.hookAllMethods(algorithm, "getSplitStateByDividerPositions", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         if (!free || motoMoving()) return
-                        runCatching {
+                        catching {
                             val result = param.result as? Int ?: return
                             if (result == -1) return
                             val position = param.args.getOrNull(0) as? Int ?: return
@@ -164,11 +165,11 @@ internal object DividerStopsHook {
                     }
                 }).size
             }.getOrDefault(0)
-            hooked += runCatching {
+            hooked += catching {
                 XposedBridge.hookAllMethods(algorithm, "calculateNearestSplitSnapPosition", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         if (!free || motoMoving()) return
-                        runCatching {
+                        catching {
                             val result = param.result as? Int ?: return
                             if (result != 6 && result != 7 && result != 21) return
                             val a = param.args.getOrNull(0) as? Int ?: return
@@ -179,8 +180,8 @@ internal object DividerStopsHook {
                 }).size
             }.getOrDefault(0)
         }
-        runCatching { XposedHelpers.findClass(LAYOUT_2, loader) }.getOrNull()?.let { cls ->
-            hooked += runCatching {
+        catching { XposedHelpers.findClass(LAYOUT_2, loader) }.getOrNull()?.let { cls ->
+            hooked += catching {
                 XposedBridge.hookAllMethods(cls, "onDividerFinishMoving", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         dragEnded()
@@ -188,9 +189,9 @@ internal object DividerStopsHook {
                         val layout = param.thisObject
                         val velocity = (param.args[1] as? Float) ?: 0f
                         var position = param.args[2] as Int
-                        runCatching { if (flingClosesPeek(layout, position, velocity)) { param.result = null; return } }
+                        catching { if (flingClosesPeek(layout, position, velocity)) { param.result = null; return } }
                         if (!free) return
-                        runCatching {
+                        catching {
                             position = magnet(layout, position)
                             if (stayTwo(layout, position)) param.result = null
                         }.onFailure { log("free divider: Motorola's snap kept ($it)") }
@@ -200,13 +201,13 @@ internal object DividerStopsHook {
                 }).size
             }.getOrDefault(0)
         }
-        runCatching { XposedHelpers.findClass(LAYOUT_3, loader) }.getOrNull()?.let { cls ->
-            hooked += runCatching {
+        catching { XposedHelpers.findClass(LAYOUT_3, loader) }.getOrNull()?.let { cls ->
+            hooked += catching {
                 XposedBridge.hookAllMethods(cls, "onDividerFinishMoving", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         dragEnded()
                         if (!free || param.args.size != 3) return
-                        runCatching {
+                        catching {
                             val layout = param.thisObject
                             if (stayThree(layout, param.args[0] as Int, magnet(layout, param.args[2] as Int, three = true))) param.result = null
                         }.onFailure { log("free divider: Motorola's snap kept ($it)") }
@@ -218,14 +219,14 @@ internal object DividerStopsHook {
         }
         // Motorola's own divider animations (any not started by Folark's free divider).
         for (name in listOf(LAYOUT_2, LAYOUT_3)) {
-            val cls = runCatching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
+            val cls = catching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
             // A snap to one of Folark's layouts (⅓ / ⅔, three apps all on screen) is Folark's own,
             // whoever asked for it (the free divider, the size buttons, 33/33/33).
-            hooked += runCatching {
+            hooked += catching {
                 XposedBridge.hookAllMethods(cls, "snapToTarget", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val targets = param.args.filter { it != null && it !is Int && it !is android.view.animation.Interpolator }
-                        val snaps = targets.map { field(it!!, "snapPosition") as? Int }
+                        val snaps = targets.mapNotNull { target -> target?.let { field(it, "snapPosition") as? Int } }
                         val mine = snaps.isNotEmpty() && snaps.all { it in FOLARK_SNAPS } && !ours
                         snapSetOurs.set(mine)
                         if (mine) ours = true
@@ -239,7 +240,7 @@ internal object DividerStopsHook {
             }.getOrDefault(0)
             val names = cls.declaredMethods.map { it.name }.filter { it.startsWith("flingDividerPosition") }.toSet()
             for (name in names) {
-                hooked += runCatching {
+                hooked += catching {
                     XposedBridge.hookAllMethods(cls, name, object : XC_MethodHook() {
                         override fun beforeHookedMethod(param: MethodHookParam) {
                             if (!ours) motoUntil = android.os.SystemClock.uptimeMillis() + MOTO_WINDOW_MS
@@ -257,10 +258,10 @@ internal object DividerStopsHook {
     private fun hookDragAndLock(loader: ClassLoader): Int {
         var hooked = 0
         for (name in listOf(LAYOUT_2, LAYOUT_3)) {
-            val cls = runCatching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
+            val cls = catching { XposedHelpers.findClass(name, loader) }.getOrNull() ?: continue
             val three = name == LAYOUT_3
             // S13: a locked divider counts as one Motorola doesn't let move (its own check).
-            hooked += runCatching {
+            hooked += catching {
                 XposedBridge.hookAllMethods(cls, "isNotMovableDivider", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         if (lock == "all" || (lock == "two" && !three) || (lock == "three" && three)) param.result = true
@@ -268,19 +269,19 @@ internal object DividerStopsHook {
                 }).size
             }.getOrDefault(0)
             // S5 / S6: the drag starts (Folark shows its marks) and passes ⅓, ½, ⅔ (a tick).
-            hooked += runCatching {
+            hooked += catching {
                 XposedBridge.hookAllMethods(cls, "onDividerMoving", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        runCatching { onDragMove(param.thisObject, param.args[0] as Int, param.args[1] as Int, three) }
+                        catching { onDragMove(param.thisObject, param.args[0] as Int, param.args[1] as Int, three) }
                     }
                 }).size
             }.getOrDefault(0)
             // S7: Motorola puts the divider back on one of its fixed stops after a turn or fold.
-            hooked += runCatching {
+            hooked += catching {
                 XposedBridge.hookAllMethods(cls, "initDividerPositionByRatio", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         if (!keep || !free || motoMoving()) return
-                        runCatching {
+                        catching {
                             val kept = if (three) keepThree(param.thisObject, param.args[0] as Rect, param.args[1] as Boolean)
                             else keepTwo(param.thisObject, param.args[0] as Rect, param.args[1] as Boolean)
                             if (kept) {
@@ -321,7 +322,7 @@ internal object DividerStopsHook {
         SplitThreeHook.reportDrag(false, 0)
     }
 
-    private fun dividerView(layout: Any, index: Int, three: Boolean): android.view.View? = runCatching {
+    private fun dividerView(layout: Any, index: Int, three: Boolean): android.view.View? = catching {
         val manager = if (three) (field(layout, "mSplitWindowManagers") as? Array<*>)?.getOrNull(index) else field(layout, "mSplitWindowManager")
         manager?.let { field(it, "mDividerView") } as? android.view.View
     }.getOrNull()
@@ -404,7 +405,7 @@ internal object DividerStopsHook {
 
     /** After a divider rests: its place goes to Folark (S1: each set of apps remembers its sizes). */
     private fun reportLayoutSoon() {
-        worker.postDelayed({ runCatching { SplitThreeHook.reportLayout() } }, REPORT_AFTER_MS)
+        worker.postDelayed({ catching { SplitThreeHook.reportLayout() } }, REPORT_AFTER_MS)
     }
 
     /**
@@ -498,7 +499,10 @@ internal object DividerStopsHook {
     /** Motorola's per-frame resizing data (StageUISpecs) cleared, so surfaces follow the bounds. */
     private fun clearSpecs(manager: Any?) {
         manager ?: return
-        runCatching { (field(field(manager, "mImmersiveSurfaceEffectPolicy")!!, "mStageUISpecs") as? MutableCollection<*>)?.clear() }
+        catching {
+            val policy = field(manager, "mImmersiveSurfaceEffectPolicy") ?: return@catching
+            (field(policy, "mStageUISpecs") as? MutableCollection<*>)?.clear()
+        }
     }
 
     /** The screen's length along the split (width side by side, else height), or null. */
@@ -585,13 +589,13 @@ internal object DividerStopsHook {
      * Motorola's own layouts stay Motorola's.
      */
     private fun hookTwoAppBounds(loader: ClassLoader) {
-        val cls = runCatching { XposedHelpers.findClass(LAYOUT_MANAGER, loader) }.getOrNull() ?: return
-        val hooked = runCatching {
+        val cls = catching { XposedHelpers.findClass(LAYOUT_MANAGER, loader) }.getOrNull() ?: return
+        val hooked = catching {
             XposedBridge.hookAllMethods(cls, "updateBoundsWithSnapPositionStageUISpec", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     if ((!on && !free) || motoMoving()) return
                     val state = param.args.getOrNull(0) as? Int ?: return
-                    runCatching {
+                    catching {
                         when {
                             param.args.size == 7 && (state == SNAP_FIRST_THIRD || state == SNAP_SECOND_THIRD) ->
                                 if (plainBounds(param.thisObject, param.args)) param.result = null
@@ -720,13 +724,13 @@ internal object DividerStopsHook {
 
     private fun ask() {
         if (asked) return
-        val app = runCatching {
+        val app = catching {
             Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as? Context
         }.getOrNull() ?: return
         asked = true
         worker.post {
             fetch(app)
-            runCatching {
+            catching {
                 app.contentResolver.registerContentObserver(CHANGED_URI, false, object : ContentObserver(worker) {
                     override fun onChange(selfChange: Boolean) = fetch(app)
                 })
@@ -735,7 +739,7 @@ internal object DividerStopsHook {
     }
 
     private fun fetch(context: Context) {
-        val answer: Bundle = runCatching {
+        val answer: Bundle = catching {
             context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), METHOD, null, null)
         }.getOrNull() ?: return
         on = answer.getBoolean(EXTRA_ON, false)

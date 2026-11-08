@@ -14,6 +14,7 @@ import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Searches the app shortcuts every installed app publishes ("New tab", "Compose", "Scan code") by
@@ -34,7 +35,7 @@ class ShortcutSearchProvider @Inject constructor(
         val q = query.trim().lowercase()
         if (q.length < MIN_QUERY_LENGTH) return@withContext emptyList()
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return@withContext emptyList()
-        if (!runCatching { launcherApps.hasShortcutHostPermission() }.getOrDefault(false)) {
+        if (!catching { launcherApps.hasShortcutHostPermission() }.getOrDefault(false)) {
             return@withContext emptyList()
         }
         val packageManager = context.packageManager
@@ -43,7 +44,7 @@ class ShortcutSearchProvider @Inject constructor(
         for (entry in snapshot.entries) {
             if (!entry.lowerLabel.contains(q)) continue
             val appLabel = snapshot.appLabels.getOrPut(entry.packageName) {
-                runCatching {
+                catching {
                     packageManager.getApplicationLabel(packageManager.getApplicationInfo(entry.packageName, 0)).toString()
                 }.getOrDefault(entry.packageName)
             }
@@ -74,11 +75,11 @@ class ShortcutSearchProvider @Inject constructor(
         val now = SystemClock.elapsedRealtime()
         snapshot?.let { if (now - it.at < CACHE_MS) return it }
         val userManager = context.getSystemService(UserManager::class.java)
-        val profiles = runCatching { userManager?.userProfiles }.getOrNull() ?: listOf(Process.myUserHandle())
+        val profiles = catching { userManager?.userProfiles }.getOrNull() ?: listOf(Process.myUserHandle())
         val entries = ArrayList<ShortcutEntry>()
         for (user in profiles) {
-            val serial = runCatching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
-            val shortcuts = runCatching {
+            val serial = catching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
+            val shortcuts = catching {
                 launcherApps.getShortcuts(LauncherApps.ShortcutQuery().setQueryFlags(QUERY_FLAGS), user)
             }.getOrNull().orEmpty()
             for (info in shortcuts) {

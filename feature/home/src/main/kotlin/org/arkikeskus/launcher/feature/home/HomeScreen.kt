@@ -61,7 +61,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
@@ -118,9 +117,9 @@ import org.arkikeskus.launcher.ui.component.LocalHomeCovered
 import org.arkikeskus.launcher.ui.component.LocalIconPack
 import org.arkikeskus.launcher.data.MotoLinks
 import org.arkikeskus.launcher.ui.component.LocalIconShape
-import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Home screen: a paged [Workspace] of app shortcuts + the dock. All home gestures (icon drag, swipe
@@ -204,6 +203,8 @@ fun HomeScreen(
     // The single Pixel-style long-press menu, anchored to the long-pressed icon.
     var menuTarget by remember { mutableStateOf<AppMenuTarget?>(null) }
     var renameTarget by remember { mutableStateOf<AppItem?>(null) }
+    // The app whose "Add to folder" is open: the non-drag way into a home folder.
+    var folderTarget by remember { mutableStateOf<AppItem?>(null) }
     var openFolderId by remember { mutableStateOf<Long?>(null) }
     // Empty-area long-press options popup (anchor + whether it flips above the press point).
     var homeOptions by remember { mutableStateOf<Pair<IntOffset, Boolean>?>(null) }
@@ -255,7 +256,7 @@ fun HomeScreen(
             if (widgetViews[id] == null) {
                 val info = appWidgetManager.getAppWidgetInfo(id)
                 if (info != null) {
-                    runCatching {
+                    catching {
                         // Mark the widget as living on the HOME screen up front — some providers
                         // (WhatsApp's chat list) won't populate until the host category is set.
                         appWidgetManager.updateAppWidgetOptions(
@@ -290,10 +291,10 @@ fun HomeScreen(
     // runs is absent from the snapshot and can never be swept; an in-flight bind's id is excluded too.
     LaunchedEffect(widgetHost) {
         val host = widgetHost ?: return@LaunchedEffect
-        val hostIds = runCatching { host.appWidgetIds }.getOrNull() ?: return@LaunchedEffect
+        val hostIds = catching { host.appWidgetIds }.getOrNull() ?: return@LaunchedEffect
         val dbIds = viewModel.boundWidgetIds()
         hostIds.forEach { id ->
-            if (id !in dbIds && id != pendingWidget?.appWidgetId) runCatching { host.deleteAppWidgetId(id) }
+            if (id !in dbIds && id != pendingWidget?.appWidgetId) catching { host.deleteAppWidgetId(id) }
         }
         // The reverse direction: DB rows bound to ids this host never allocated — what a Google Auto
         // Backup / device-transfer restore leaves behind (the Room DB carries the OLD device's ids).
@@ -308,7 +309,7 @@ fun HomeScreen(
             // The allocated id and the layout row must reach a consistent state even if the Activity
             // is destroyed while Room is writing. Process death is recovered by the saved bind state.
             withContext(NonCancellable) {
-                val saved = runCatching {
+                val saved = catching {
                     if (bind.restoreRowId != null) {
                         viewModel.bindRestoredWidget(bind.restoreRowId, bind.appWidgetId)
                     } else if (bind.stackId != null) {
@@ -316,12 +317,12 @@ fun HomeScreen(
                             bind.stackId, bind.appWidgetId, bind.provider.provider.flattenToString(),
                         )
                     } else {
-                        val target = bind.placement ?: return@runCatching false
+                        val target = bind.placement ?: return@catching false
                         viewModel.addWidgetAt(bind.appWidgetId, bind.provider.provider.flattenToString(), null, target)
                     }
                 }.getOrDefault(false)
                 if (!saved) {
-                    runCatching { widgetHost?.deleteAppWidgetId(bind.appWidgetId) }
+                    catching { widgetHost?.deleteAppWidgetId(bind.appWidgetId) }
                     widgetMessage(R.string.widget_add_failed)
                 }
                 if (pendingWidget?.appWidgetId == bind.appWidgetId) pendingWidget = null
@@ -376,14 +377,14 @@ fun HomeScreen(
         // so one whose result never arrives would otherwise refuse every later add, silently, forever.
         if (pendingWidget != null && pendingWidget?.appWidgetId == liveBindId) return
         val host = widgetHost ?: return
-        val id = runCatching { host.allocateAppWidgetId() }.getOrElse {
+        val id = catching { host.allocateAppWidgetId() }.getOrElse {
             widgetMessage(R.string.widget_add_failed)
             return
         }
         val bind = PendingWidgetBind(id, provider, restoreRowId, placement, stackId)
         liveBindId = id
         pendingWidget = bind
-        val bound = runCatching { appWidgetManager.bindAppWidgetIdIfAllowed(id, provider.profile, provider.provider, null) }.getOrDefault(false)
+        val bound = catching { appWidgetManager.bindAppWidgetIdIfAllowed(id, provider.profile, provider.provider, null) }.getOrDefault(false)
         if (bound) {
             configureOrFinish(bind)
         } else {
@@ -393,7 +394,7 @@ fun HomeScreen(
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, provider.provider)
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER_PROFILE, provider.profile)
             }
-            runCatching { bindLauncher.launch(intent) }
+            catching { bindLauncher.launch(intent) }
                 .onFailure { host.deleteAppWidgetId(id); pendingWidget = null }
         }
     }
@@ -404,7 +405,7 @@ fun HomeScreen(
         when (choice) {
             is WidgetChoice.App -> startBind(choice.provider, restoreRowId = null, placement = placement)
             is WidgetChoice.Builtin -> widgetScope.launch {
-                val ok = runCatching { viewModel.addWidgetAt(null, null, choice.type, placement) }.getOrDefault(false)
+                val ok = catching { viewModel.addWidgetAt(null, null, choice.type, placement) }.getOrDefault(false)
                 if (!ok) widgetMessage(R.string.widget_add_failed)
             }
         }
@@ -745,7 +746,7 @@ fun HomeScreen(
                 },
                 onRemoveFromWidgetStack = { stackId, itemRowId ->
                     viewModel.removeFromWidgetStack(stackId, itemRowId) { freedId ->
-                        runCatching { widgetHost?.deleteAppWidgetId(freedId) }
+                        catching { widgetHost?.deleteAppWidgetId(freedId) }
                     }
                 },
                 onEmptyAreaMenu = { anchor, above -> homeOptions = anchor to above },
@@ -762,7 +763,7 @@ fun HomeScreen(
                     appWidgetId?.let { widgetHost?.deleteAppWidgetId(it) }
                     viewModel.removeWidget(rowId) { freed ->
                         freed.filter { it != appWidgetId }.forEach { id ->
-                            runCatching { widgetHost?.deleteAppWidgetId(id) }
+                            catching { widgetHost?.deleteAppWidgetId(id) }
                         }
                     }
                 },
@@ -774,7 +775,7 @@ fun HomeScreen(
                     val info = appWidgetManager.getAppWidgetInfo(id)
                     val configure = info?.configure
                     if (configure != null) {
-                        runCatching {
+                        catching {
                             reconfigureLauncher.launch(
                                 android.content.Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
                                     .setComponent(configure)
@@ -1028,7 +1029,7 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(20.dp))
                     Button(onClick = {
-                        runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) }
+                        catching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) }
                     }) {
                         Text(stringResource(R.string.onboarding_set_default))
                     }
@@ -1148,6 +1149,15 @@ fun HomeScreen(
                 } else {
                     null
                 },
+                // A folder belongs to a screen: on home this only offers home folders. A dock item
+                // is not on home, so filing it would do nothing — hence the source check.
+                if (menu.source != DragSource.Dock) {
+                    PopupAction(stringResource(R.string.home_add_to_folder), LauncherIcons.Add) {
+                        folderTarget = menu.app
+                    }
+                } else {
+                    null
+                },
                 PopupAction(
                     stringResource(if (menu.source == DragSource.Dock) R.string.dock_remove else R.string.home_remove),
                     LauncherIcons.Close,
@@ -1178,7 +1188,7 @@ fun HomeScreen(
                     onOpenSettings()
                 })
                 add(IconMenuItem(R.drawable.ic_wallpaper, stringResource(R.string.home_options_wallpaper)) {
-                    runCatching {
+                    catching {
                         context.startActivity(
                             Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), null)
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -1248,6 +1258,22 @@ fun HomeScreen(
             onConfirm = { viewModel.setCustomAppLabel(app.key, it) },
             onReset = { viewModel.setCustomAppLabel(app.key, "") },
             onDismiss = { renameTarget = null },
+        )
+    }
+
+    // "Add to folder" in a home app's menu: home folders only. Folders that already hold the app
+    // are left out (it would be a no-op), and a new folder needs a second app from this screen.
+    folderTarget?.let { app ->
+        HomeAddToFolderDialog(
+            app = app,
+            folders = uiState.entries.filterIsInstance<PlacedFolder>()
+                .filter { folder -> folder.apps.none { it.key == app.key } },
+            companions = uiState.entries.filterIsInstance<PlacedApp>()
+                .map { it.app }
+                .filter { it.key != app.key },
+            onPick = { id -> viewModel.addToFolder(app, id) },
+            onNew = { other -> viewModel.createFolder(app, other, defaultFolderName) },
+            onDismiss = { folderTarget = null },
         )
     }
 

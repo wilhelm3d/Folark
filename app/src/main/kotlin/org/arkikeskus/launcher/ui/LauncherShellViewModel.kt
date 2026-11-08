@@ -34,6 +34,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import android.content.Context
+import org.arkikeskus.launcher.model.catching
 
 /** The app-icon style (icon pack + themed), so the shell's floating drag icon matches the surfaces. */
 data class IconStyle(val iconPack: String = "", val themed: Boolean = false, val shape: String = "")
@@ -109,7 +110,7 @@ class LauncherShellViewModel @Inject constructor(
             val cacheKey = "${entry.key}@${entry.postTime}"
             used += cacheKey
             val bitmap = avatarCache.getOrPut(cacheKey) {
-                runCatching { entry.personIcon?.loadDrawable(context)?.toBitmap(AVATAR_PX, AVATAR_PX)?.asImageBitmap() }.getOrNull()
+                catching { entry.personIcon?.loadDrawable(context)?.toBitmap(AVATAR_PX, AVATAR_PX)?.asImageBitmap() }.getOrNull()
             }
             if (bitmap != null) out[badgeKey] = bitmap
         }

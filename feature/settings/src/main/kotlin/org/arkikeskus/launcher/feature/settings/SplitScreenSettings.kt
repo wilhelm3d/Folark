@@ -72,6 +72,7 @@ import org.arkikeskus.launcher.model.DropZones
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.SplitPickerLook
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Settings ▸ Recents ▸ Split screen: how two apps are put side by side (the engine), and how the
@@ -457,7 +458,7 @@ private fun SplitCheckRow(engine: Int) {
                 running = true
                 scope.launch {
                     report = withContext(Dispatchers.IO) {
-                        runCatching { SplitDiagnostics.report(context, engine) }
+                        catching { SplitDiagnostics.report(context, engine) }
                             .getOrElse { "Check failed: ${it.javaClass.simpleName}: ${it.message}" }
                     }
                     running = false

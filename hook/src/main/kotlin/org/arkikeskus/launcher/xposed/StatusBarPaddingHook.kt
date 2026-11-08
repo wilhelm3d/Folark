@@ -13,6 +13,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import java.util.Collections
 import java.util.WeakHashMap
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Settings ▸ Motorola ▸ Status bar margins: keeps at least some room at the left and right ends of
@@ -53,19 +54,19 @@ internal object StatusBarPaddingHook {
     fun install(loader: ClassLoader, log: (String) -> Unit) {
         this.log = log
         var hooked = 0
-        val bar = runCatching { XposedHelpers.findClass(STATUS_BAR, loader) }.getOrNull()
+        val bar = catching { XposedHelpers.findClass(STATUS_BAR, loader) }.getOrNull()
         if (bar != null) {
             // Where Android sets the side padding; on builds without it, after insets and config changes.
             val exact = bar.declaredMethods.any { it.name == "updateSafeInsets" }
             val methods = if (exact) listOf("updateSafeInsets") else listOf("onApplyWindowInsets", "onConfigurationChanged", "onAttachedToWindow")
             methods.forEach { name ->
-                hooked += runCatching { XposedBridge.hookAllMethods(bar, name, after { v -> laidOut(v, fresh = exact) }).size }.getOrDefault(0)
+                hooked += catching { XposedBridge.hookAllMethods(bar, name, after { v -> laidOut(v, fresh = exact) }).size }.getOrDefault(0)
             }
         }
-        val cover = runCatching { XposedHelpers.findClass(MOTO_COVER_BAR, loader) }.getOrNull()
+        val cover = catching { XposedHelpers.findClass(MOTO_COVER_BAR, loader) }.getOrNull()
         if (cover != null) {
             listOf("onFinishInflate", "onCliDensityOrFontScaleChanged").forEach { name ->
-                hooked += runCatching { XposedBridge.hookAllMethods(cover, name, after { v -> laidOut(v, fresh = name == "onFinishInflate", cover = true) }).size }.getOrDefault(0)
+                hooked += catching { XposedBridge.hookAllMethods(cover, name, after { v -> laidOut(v, fresh = name == "onFinishInflate", cover = true) }).size }.getOrDefault(0)
             }
         }
         log("status bar margins: hooked $hooked method(s)")
@@ -74,7 +75,7 @@ internal object StatusBarPaddingHook {
     private fun after(block: (View) -> Unit) = object : XC_MethodHook() {
         override fun afterHookedMethod(param: MethodHookParam) {
             val v = param.thisObject as? View ?: return
-            runCatching { block(v) }.onFailure { log("status bar margins failed: $it") }
+            catching { block(v) }.onFailure { log("status bar margins failed: $it") }
         }
     }
 
@@ -113,7 +114,7 @@ internal object StatusBarPaddingHook {
         val app = context.applicationContext ?: context
         worker.post {
             fetch(app)
-            runCatching {
+            catching {
                 app.contentResolver.registerContentObserver(CHANGED_URI, false, object : ContentObserver(worker) {
                     override fun onChange(selfChange: Boolean) = fetch(app)
                 })
@@ -122,13 +123,13 @@ internal object StatusBarPaddingHook {
     }
 
     private fun fetch(context: Context) {
-        val answer: Bundle = runCatching {
+        val answer: Bundle = catching {
             context.contentResolver.call(Uri.parse("content://${RecentsHook.STATE_AUTHORITY}"), METHOD, null, null)
         }.getOrNull() ?: return
         on = answer.getBoolean(EXTRA_ON, false)
         innerDp = answer.getInt(EXTRA_INNER, 0)
         coverDp = answer.getInt(EXTRA_COVER, 0)
         // Every bar again, on the main thread (turning it off gives Android's padding back).
-        main.post { bars.keys.toList().forEach { v -> runCatching { apply(v) } } }
+        main.post { bars.keys.toList().forEach { v -> catching { apply(v) } } }
     }
 }

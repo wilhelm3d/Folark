@@ -59,6 +59,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.arkikeskus.launcher.model.catching
 
 private const val MIXER_LISTENER_CLASS = "org.arkikeskus.launcher.notifications.NotificationDotListenerService"
 
@@ -115,22 +116,22 @@ internal class MediaMixerWatcher(private val context: Context) {
 
     fun stop() {
         if (listening) {
-            runCatching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
+            catching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
             listening = false
         }
         use(emptyList())
     }
 
     private fun use(next: List<MediaController>) {
-        controllers.forEach { runCatching { it.unregisterCallback(callback) } }
+        controllers.forEach { catching { it.unregisterCallback(callback) } }
         controllers = next
-        next.forEach { runCatching { it.registerCallback(callback) } }
+        next.forEach { catching { it.registerCallback(callback) } }
         publish()
     }
 
     private fun publish() {
         sessions = controllers.mapNotNull { c ->
-            runCatching {
+            catching {
                 val metadata = c.metadata
                 val info = c.playbackInfo
                 MixerSession(
@@ -161,15 +162,15 @@ internal class MediaMixerWatcher(private val context: Context) {
 
     /** Only a remote session (Cast) has a volume of its own; local playback shares the media volume. */
     fun setVolume(session: MixerSession, volume: Int) {
-        runCatching { controller(session)?.setVolumeTo(volume, 0) }
+        catching { controller(session)?.setVolumeTo(volume, 0) }
     }
 
     fun open(session: MixerSession) {
         val c = controller(session) ?: return
-        val activity = runCatching { c.sessionActivity }.getOrNull()
+        val activity = catching { c.sessionActivity }.getOrNull()
         val opened = activity != null && sendNotificationIntent(context, activity)
         if (!opened) {
-            runCatching {
+            catching {
                 context.packageManager.getLaunchIntentForPackage(session.packageName)
                     ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     ?.let(context::startActivity)
@@ -206,17 +207,17 @@ fun MediaMixerWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
                 mediaVolume = audio?.getStreamVolume(AudioManager.STREAM_MUSIC)?.toFloat() ?: mediaVolume
             }
         }
-        runCatching {
+        catching {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                 context.registerReceiver(receiver, IntentFilter(VOLUME_CHANGED), Context.RECEIVER_NOT_EXPORTED)
             } else {
                 context.registerReceiver(receiver, IntentFilter(VOLUME_CHANGED))
             }
         }
-        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+        onDispose { catching { context.unregisterReceiver(receiver) } }
     }
     val motoPerApp = remember(context) {
-        runCatching { context.packageManager.getActivityInfo(MOTO_PER_APP_VOLUME, 0) }.isSuccess
+        catching { context.packageManager.getActivityInfo(MOTO_PER_APP_VOLUME, 0) }.isSuccess
     }
 
     FolarkWidgetSurface(theme = widgets.mediaTheme, modifier = modifier) { ink ->
@@ -237,7 +238,7 @@ fun MediaMixerWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
                             .clickable {
-                                runCatching {
+                                catching {
                                     context.startActivity(
                                         Intent().setComponent(MOTO_PER_APP_VOLUME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                                     )
@@ -256,7 +257,7 @@ fun MediaMixerWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
                         modifier = Modifier
                             .align(Alignment.Center)
                             .clickable {
-                                runCatching {
+                                catching {
                                     context.startActivity(
                                         Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                                     )
@@ -292,7 +293,7 @@ fun MediaMixerWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
                     value = mediaVolume,
                     onValueChange = { v ->
                         mediaVolume = v
-                        runCatching { audio?.setStreamVolume(AudioManager.STREAM_MUSIC, v.toInt(), 0) }
+                        catching { audio?.setStreamVolume(AudioManager.STREAM_MUSIC, v.toInt(), 0) }
                     },
                     valueRange = 0f..maxVolume.toFloat(),
                     colors = SliderDefaults.colors(thumbColor = ink, activeTrackColor = ink, inactiveTrackColor = ink.copy(alpha = 0.25f)),
@@ -363,11 +364,11 @@ private fun MixerButton(icon: Int, description: Int, tint: Color, size: Dp, onCl
     }
 }
 
-private fun appIcon(context: Context, packageName: String): ImageBitmap? = runCatching {
+private fun appIcon(context: Context, packageName: String): ImageBitmap? = catching {
     context.packageManager.getApplicationIcon(packageName).toBitmap(96, 96).asImageBitmap()
 }.getOrNull()
 
-private fun appLabel(context: Context, packageName: String): String = runCatching {
+private fun appLabel(context: Context, packageName: String): String = catching {
     val pm = context.packageManager
     pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
 }.getOrDefault(packageName)

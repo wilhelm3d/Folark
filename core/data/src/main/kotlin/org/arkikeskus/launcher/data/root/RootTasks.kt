@@ -1,6 +1,7 @@
 package org.arkikeskus.launcher.data.root
 
 import android.content.Context
+import org.arkikeskus.launcher.model.catching
 
 /**
  * What root adds to Folark's Recents: Android's own saved screenshot of each open app (the one the
@@ -41,7 +42,7 @@ object RootTasks {
         val result = HashMap<Int, ByteArray>()
         for (id in wanted.keys) {
             val file = java.io.File(dir, id.toString())
-            runCatching { if (file.length() > MIN_JPEG_BYTES) result[id] = file.readBytes() }
+            catching { if (file.length() > MIN_JPEG_BYTES) result[id] = file.readBytes() }
             file.delete()
         }
         return result
@@ -73,7 +74,7 @@ object RootTasks {
         val out = HashMap<Int, ByteArray>()
         for (id in ids) {
             val file = java.io.File(dir, "$id.jpg")
-            runCatching { if (file.length() > MIN_JPEG_BYTES) out[id] = file.readBytes() }
+            catching { if (file.length() > MIN_JPEG_BYTES) out[id] = file.readBytes() }
             file.delete()
         }
         return out
@@ -106,7 +107,7 @@ object RootTasks {
         appendLine("4. File for #${first.taskId}: " + (file?.let { "${it.size} bytes" } ?: "none"))
         val fromSystem = snapshotsFromSystem(context, listOf(first.taskId))
         appendLine("5. From the task manager: " + (fromSystem[first.taskId]?.let { "${it.size} bytes" } ?: "none"))
-        val log = runCatching { java.io.File(java.io.File(context.cacheDir, "recents_shots"), "helper.log").readText() }.getOrNull()
+        val log = catching { java.io.File(java.io.File(context.cacheDir, "recents_shots"), "helper.log").readText() }.getOrNull()
         if (!log.isNullOrBlank()) appendLine("   helper said:\n" + log.trim().lines().take(12).joinToString("\n") { "   $it" })
         val decoded = (file ?: fromSystem[first.taskId])?.let {
             android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)

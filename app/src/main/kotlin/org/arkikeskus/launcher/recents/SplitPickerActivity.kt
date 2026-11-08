@@ -32,6 +32,7 @@ import org.arkikeskus.launcher.feature.appdrawer.SHARE_THREE
 import org.arkikeskus.launcher.feature.appdrawer.SplitPickerDrawer
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.SplitPickerLook
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The split picker: Folark's drawer in the half of the screen beside the app that was dragged to an
@@ -187,7 +188,7 @@ class SplitPickerActivity : ComponentActivity() {
      * fades in over the grown icon (which stays put); Fade: it fades in as the picker fades out;
      * Off: Android's own opening animation.
      */
-    private fun launchInThisStage(app: AppItem, openAnim: String): Boolean = runCatching {
+    private fun launchInThisStage(app: AppItem, openAnim: String): Boolean = catching {
         val launchIntent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)
             .setComponent(app.componentName)
@@ -197,7 +198,7 @@ class SplitPickerActivity : ComponentActivity() {
     }.getOrDefault(false)
 
     /** An app of another profile (work, Private Space) can only be opened through [LauncherApps]. */
-    private fun launchOtherProfileHere(app: AppItem, openAnim: String): Boolean = runCatching {
+    private fun launchOtherProfileHere(app: AppItem, openAnim: String): Boolean = catching {
         getSystemService(LauncherApps::class.java).startMainActivity(app.componentName, app.user, null, openOptions(openAnim))
         true
     }.getOrDefault(false)

@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.model.HomeSettings
+
 import org.arkikeskus.launcher.feature.home.workspace.*
 
 import com.google.common.truth.Truth.assertThat
@@ -11,7 +13,7 @@ import org.junit.Test
 
 class WorkspacePageOperationsTest {
     private class Store(home: Int = 0, count: Int = 0, pages: Set<Int> = emptySet()) {
-        var settings = LauncherSettings(home = LauncherSettings.Home(page = home, pageCount = count))
+        var settings = LauncherSettings(home = HomeSettings(page = home, pageCount = count))
         var occupied = pages
         var beforeInsert: suspend () -> Unit = {}
         var beforeSave: suspend () -> Unit = {}

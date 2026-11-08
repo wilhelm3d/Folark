@@ -15,6 +15,7 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Folark's module for Vector (LSPosed): runs inside the system launcher (Motorola's, or Android's
@@ -118,7 +119,7 @@ class RecentsHook : IXposedHookLoadPackage {
             // between Launcher3 versions; whichever exists and comes first opens Recents.
             var settled = 0
             for (name in SETTLED_METHODS) {
-                settled += runCatching {
+                settled += catching {
                     XposedBridge.hookAllMethods(swipe, name, object : XC_MethodHook() {
                         override fun afterHookedMethod(param: MethodHookParam) {
                             val open = pendingRecents ?: return
@@ -156,7 +157,7 @@ class RecentsHook : IXposedHookLoadPackage {
     }
 
     private fun find(name: String, loader: ClassLoader): Class<*>? =
-        runCatching { XposedHelpers.findClass(name, loader) }.getOrNull()
+        catching { XposedHelpers.findClass(name, loader) }.getOrNull()
 
     // Lazy, NOT a plain field initializer: Vector instantiates this module class very early during
     // bootstrap (XposedInit.initModule), and building a Handler in the constructor there throws and
@@ -188,7 +189,7 @@ class RecentsHook : IXposedHookLoadPackage {
     private val worker by lazy { Handler(HandlerThread("folark-state").apply { start() }.looper) }
 
     private fun fetch(context: Context) {
-        val bundle = runCatching {
+        val bundle = catching {
             context.contentResolver.call(
                 Uri.parse("content://$STATE_AUTHORITY"), "state", null,
                 Bundle().apply { putInt(EXTRA_COMPAT, compat) },
@@ -221,7 +222,7 @@ class RecentsHook : IXposedHookLoadPackage {
     /** Folark tells the launcher when one of its switches changes (see LauncherApplication). */
     private fun observe(context: Context) {
         if (observing) return
-        observing = runCatching {
+        observing = catching {
             context.contentResolver.registerContentObserver(
                 Uri.parse("content://$STATE_AUTHORITY/state"), false,
                 object : ContentObserver(worker) {
@@ -247,7 +248,7 @@ class RecentsHook : IXposedHookLoadPackage {
     }
 
     private fun openFolarkSearch(context: Context) {
-        runCatching {
+        catching {
             context.startActivity(
                 Intent()
                     .setComponent(ComponentName(FOLARK, "$FOLARK.LauncherActivity"))
@@ -260,7 +261,7 @@ class RecentsHook : IXposedHookLoadPackage {
     }
 
     private fun openFolarkRecents(context: Context, toggle: Boolean) {
-        runCatching {
+        catching {
             context.startActivity(
                 Intent()
                     .setComponent(ComponentName(FOLARK, "$FOLARK.recents.RecentsActivity"))
@@ -276,7 +277,7 @@ class RecentsHook : IXposedHookLoadPackage {
      * Recents neither waits on a fast phone nor covers a slow animation half-way.
      */
     private fun afterHomeMs(context: Context): Long {
-        val scale = runCatching {
+        val scale = catching {
             android.provider.Settings.Global.getFloat(
                 context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
             )
@@ -284,12 +285,12 @@ class RecentsHook : IXposedHookLoadPackage {
         return (AFTER_HOME_MS * scale).toLong().coerceAtLeast(MIN_AFTER_HOME_MS)
     }
 
-    private fun appContext(): Context? = runCatching {
+    private fun appContext(): Context? = catching {
         Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as? Context
     }.getOrNull()
 
     private fun log(text: String) {
-        runCatching { XposedBridge.log("Folark: $text") }
+        catching { XposedBridge.log("Folark: $text") }
     }
 
     companion object {

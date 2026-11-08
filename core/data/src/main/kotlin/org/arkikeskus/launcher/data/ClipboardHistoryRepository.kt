@@ -18,6 +18,7 @@ import org.json.JSONObject
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** One thing that was copied, and when Folark first saw it. [image]: a copied picture, kept as
  *  this file name in Folark's private clips folder ([text] is then empty). */
@@ -87,7 +88,7 @@ class ClipboardHistoryRepository @Inject constructor(
 
     /** A link other apps can open a copied picture by (Folark's file provider; read-only). */
     fun imageUri(entry: ClipEntry): android.net.Uri? = imageFile(entry)?.let {
-        runCatching { androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}$PROVIDER_SUFFIX", it) }.getOrNull()
+        catching { androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}$PROVIDER_SUFFIX", it) }.getOrNull()
     }
 
     private val _clips = MutableStateFlow<List<ClipEntry>>(emptyList())
@@ -107,7 +108,7 @@ class ClipboardHistoryRepository @Inject constructor(
         widgets++
         if (widgets == 1) {
             load()
-            runCatching { clipboard?.addPrimaryClipChangedListener(listener) }
+            catching { clipboard?.addPrimaryClipChangedListener(listener) }
         }
         capture()
     }
@@ -116,14 +117,14 @@ class ClipboardHistoryRepository @Inject constructor(
     @Synchronized
     fun detach() {
         widgets = (widgets - 1).coerceAtLeast(0)
-        if (widgets == 0) runCatching { clipboard?.removePrimaryClipChangedListener(listener) }
+        if (widgets == 0) catching { clipboard?.removePrimaryClipChangedListener(listener) }
     }
 
     /** Adds the current clip, if it is new text and not sensitive. Call when Folark is in front. */
     fun capture() {
         if (widgets == 0) return
         val cm = clipboard ?: return
-        runCatching {
+        catching {
             val description = cm.primaryClipDescription ?: return
             val stamp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) description.timestamp else 0L
             if (stamp != 0L && stamp == lastSeen) return
@@ -145,7 +146,7 @@ class ClipboardHistoryRepository @Inject constructor(
     /** Puts [entry] back on the clipboard (ready to paste anywhere) and at the top of the list. */
     fun copy(entry: ClipEntry) {
         val cm = clipboard ?: return
-        runCatching {
+        catching {
             val clip = if (entry.image != null) {
                 ClipData.newUri(context.contentResolver, CLIP_LABEL, imageUri(entry) ?: return)
             } else {
@@ -172,17 +173,17 @@ class ClipboardHistoryRepository @Inject constructor(
     }
 
     /** Reads the picture at [uri] (while Android allows it) into a small private JPEG; its name. */
-    private fun saveImage(uri: android.net.Uri): String? = runCatching {
+    private fun saveImage(uri: android.net.Uri): String? = catching {
         val resolver = context.contentResolver
         val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
         val edge = maxOf(bounds.outWidth, bounds.outHeight)
-        if (edge <= 0) return@runCatching null
+        if (edge <= 0) return@catching null
         var sample = 1
         while (edge / (sample * 2) >= IMAGE_MAX_EDGE) sample *= 2
         val bitmap = resolver.openInputStream(uri)?.use {
             android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: return@runCatching null
+        } ?: return@catching null
         imageDir.mkdirs()
         val name = "clip_${System.currentTimeMillis()}.jpg"
         File(imageDir, name).outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
@@ -203,7 +204,7 @@ class ClipboardHistoryRepository @Inject constructor(
             val keep = _clips.value.mapNotNull { it.image }.toSet()
             // A picture saved a moment ago may not be in the list yet: those are left alone.
             val settled = System.currentTimeMillis() - FRESH_MS
-            imageDir.listFiles()?.filter { it.name !in keep && it.lastModified() < settled }?.forEach { runCatching { it.delete() } }
+            imageDir.listFiles()?.filter { it.name !in keep && it.lastModified() < settled }?.forEach { catching { it.delete() } }
         }
     }
 
@@ -226,8 +227,8 @@ class ClipboardHistoryRepository @Inject constructor(
     private fun load() {
         if (loaded) return
         loaded = true
-        val stored = runCatching {
-            if (!file.exists()) return@runCatching emptyList()
+        val stored = catching {
+            if (!file.exists()) return@catching emptyList()
             val array = JSONArray(file.readText())
             (0 until array.length()).map { i ->
                 val o = array.getJSONObject(i)
@@ -241,7 +242,7 @@ class ClipboardHistoryRepository @Inject constructor(
     private fun save() {
         scope.launch(Dispatchers.IO) {
             // The newest list at write time: saves that run late or out of order never undo a change.
-            runCatching {
+            catching {
                 synchronized(file) { write(_clips.value) }
             }
         }

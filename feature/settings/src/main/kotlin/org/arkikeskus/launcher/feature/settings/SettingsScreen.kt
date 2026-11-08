@@ -95,6 +95,7 @@ import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.DarkExpressivePalette
 import org.arkikeskus.launcher.ui.expressive.LightExpressivePalette
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
+import org.arkikeskus.launcher.model.catching
 
 /** Minimum window width (dp) for the two-pane settings layout — the large-screen breakpoint. */
 private const val TWO_PANE_MIN_WIDTH_DP = 600
@@ -225,7 +226,7 @@ fun SettingsScreen(
                 viewModel = viewModel,
                 isDefaultLauncher = isDefaultLauncher,
                 notifAccessGranted = notifAccessGranted,
-                onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
+                onSetDefault = { catching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
                 onNotifAccess = { openNotificationAccess(context) },
                 onOpen = { target ->
                     selectedTabletCategory = target
@@ -287,7 +288,7 @@ fun SettingsScreen(
             SettingsCategory.PERMISSIONS -> PermissionsSection(
                 isDefaultLauncher = isDefaultLauncher,
                 notifAccessGranted = notifAccessGranted,
-                onSetDefault = { runCatching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
+                onSetDefault = { catching { setDefaultLauncher.launch(DefaultLauncher.requestIntent(context)) } },
                 onNotifAccess = { openNotificationAccess(context) },
             )
             SettingsCategory.ROOT -> RootSection(s = s, viewModel = viewModel)
@@ -591,7 +592,11 @@ fun SettingsScreen(
                             }
                         } else {
                             // Phone Category Subpage View
-                            val activeCategory = selectedOuterCategory!!
+                            // Reached only from a category tap; the check keeps a corrupted state
+                            // from becoming a bare NPE with no clue where it came from.
+                            val activeCategory = checkNotNull(selectedOuterCategory) {
+                                "settings subpage opened without a category"
+                            }
                             BackHandler { selectedOuterCategory = null }
 
                             Row(

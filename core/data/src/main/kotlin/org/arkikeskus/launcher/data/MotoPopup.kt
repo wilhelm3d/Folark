@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import org.arkikeskus.launcher.model.catching
 
 /** Motorola's pop-up windows (package com.motorola.freeform), on phones that have them. */
 object MotoPopup {
@@ -12,13 +13,13 @@ object MotoPopup {
     private val GESTURE_URI: Uri = Uri.parse("content://com.motorola.freeform.settings/touch_gesture_enable")
     private const val GESTURE_COLUMN = "touch_gesture_enable"
 
-    fun isAvailable(context: Context): Boolean = runCatching {
+    fun isAvailable(context: Context): Boolean = catching {
         context.packageManager.getPackageInfo(PACKAGE, 0)
         true
     }.getOrDefault(false)
 
     /** Whether Motorola's pop-up gesture is on; null if Motorola's setting can't be read. */
-    fun gestureEnabled(context: Context): Boolean? = runCatching {
+    fun gestureEnabled(context: Context): Boolean? = catching {
         context.contentResolver.query(GESTURE_URI, null, null, null, null)?.use { cursor ->
             val column = cursor.getColumnIndex(GESTURE_COLUMN)
             if (column < 0) return@use null
@@ -34,7 +35,7 @@ object MotoPopup {
         val intent = SETTINGS_ACTIONS
             .map { Intent(it).setPackage(PACKAGE) }
             .firstOrNull { candidate ->
-                runCatching { pm.resolveActivity(candidate, PackageManager.MATCH_DEFAULT_ONLY) != null }.getOrDefault(false)
+                catching { pm.resolveActivity(candidate, PackageManager.MATCH_DEFAULT_ONLY) != null }.getOrDefault(false)
             }
             ?: Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + PACKAGE))
         return intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

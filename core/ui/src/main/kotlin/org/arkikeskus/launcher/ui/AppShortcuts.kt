@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.catching
 
 /**
  * App shortcuts (static + dynamic "deep shortcuts", e.g. a browser's "New tab") shown in the
@@ -42,7 +43,7 @@ object AppShortcuts {
     fun query(context: Context, appItem: AppItem): List<Item> {
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return emptyList()
         val userManager = context.getSystemService(UserManager::class.java)
-        return runCatching {
+        return catching {
             val query = LauncherApps.ShortcutQuery()
                 .setPackage(appItem.packageName)
                 .setQueryFlags(ALL_FLAGS)
@@ -64,7 +65,7 @@ object AppShortcuts {
 
     fun start(context: Context, item: Item) {
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return
-        runCatching {
+        catching {
             launcherApps.startShortcut(item.packageName, item.id, null, null, item.user)
         }
     }
@@ -73,7 +74,7 @@ object AppShortcuts {
     fun startById(context: Context, packageName: String, shortcutId: String, userSerial: Long) {
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return
         val user = userForSerial(context, userSerial) ?: return
-        runCatching {
+        catching {
             launcherApps.startShortcut(packageName, shortcutId, null, null, user)
         }
     }
@@ -84,7 +85,7 @@ object AppShortcuts {
      *  shortcut the system actually pinned (a failed pin would otherwise leave a dead home cell). */
     suspend fun pin(context: Context, item: Item): Boolean = withContext(Dispatchers.IO) {
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return@withContext false
-        runCatching {
+        catching {
             val pinned = launcherApps.getShortcuts(
                 LauncherApps.ShortcutQuery()
                     .setPackage(item.packageName)
@@ -107,20 +108,20 @@ object AppShortcuts {
     ): Unit = withContext(Dispatchers.IO) {
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return@withContext
         val user = userForSerial(context, userSerial) ?: return@withContext
-        runCatching { launcherApps.pinShortcuts(packageName, shortcutIds, user) }
+        catching { launcherApps.pinShortcuts(packageName, shortcutIds, user) }
     }
 
     /** Resolves a pinned shortcut's current label + icon (rasterized). Null if it no longer exists. */
     fun resolve(context: Context, packageName: String, shortcutId: String, userSerial: Long): Resolved? {
         val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return null
         val user = userForSerial(context, userSerial) ?: return null
-        return runCatching {
+        return catching {
             val query = LauncherApps.ShortcutQuery()
                 .setPackage(packageName)
                 .setShortcutIds(listOf(shortcutId))
                 .setQueryFlags(ALL_FLAGS)
             val info = launcherApps.getShortcuts(query, user).orEmpty().firstOrNull()
-                ?: return@runCatching null
+                ?: return@catching null
             val label = (info.longLabel ?: info.shortLabel)?.toString() ?: shortcutId
             val density = context.resources.displayMetrics.densityDpi
             val drawable = launcherApps.getShortcutIconDrawable(info, density)
@@ -137,6 +138,6 @@ object AppShortcuts {
 
     private fun userForSerial(context: Context, serial: Long): UserHandle? {
         val userManager = context.getSystemService(UserManager::class.java) ?: return null
-        return runCatching { userManager.getUserForSerialNumber(serial) }.getOrNull()
+        return catching { userManager.getUserForSerialNumber(serial) }.getOrNull()
     }
 }

@@ -7,6 +7,7 @@ import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.format.TextStyle
 import java.util.Locale
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Turns what was typed into the drawer's search into things to do: "timer 10 min", "alarm 7:30",
@@ -167,7 +168,7 @@ object SearchActions {
             DAY_MONTH.find(rest)?.let { hit ->
                 val day = hit.groupValues[1].toInt()
                 val month = hit.groupValues[2].toInt()
-                runCatching { LocalDate.of(now.year, month, day) }.getOrNull()?.let { d ->
+                catching { LocalDate.of(now.year, month, day) }.getOrNull()?.let { d ->
                     date = if (d.isBefore(now.toLocalDate())) d.plusYears(1) else d
                     rest = rest.removeRange(hit.range).trim()
                 }
@@ -231,11 +232,11 @@ object SearchActions {
 
     private fun navigation(original: String, lower: String): SearchResult.Action? {
         NAVIGATE.find(lower)?.let { m ->
-            val place = original.substring(m.groups[1]!!.range.first).trim()
+            val place = original.substring(m.groups[1]?.range?.first ?: return null).trim()
             return SearchResult.Action(SearchResult.Action.NAVIGATE, "Directions to $place", "Start navigation", mapOf("place" to place))
         }
         MAP.find(lower)?.let { m ->
-            val place = original.substring(m.groups[1]!!.range.first).trim()
+            val place = original.substring(m.groups[1]?.range?.first ?: return null).trim()
             return SearchResult.Action(SearchResult.Action.MAP, "Show $place on the map", "Open maps", mapOf("place" to place))
         }
         return null
@@ -248,7 +249,7 @@ object SearchActions {
 
     private fun email(original: String, lower: String): SearchResult.Action? {
         val m = EMAIL.find(lower) ?: return null
-        val rest = original.substring(m.groups[1]!!.range.first).trim()
+        val rest = original.substring(m.groups[1]?.range?.first ?: return null).trim()
         val first = rest.substringBefore(' ')
         return if (ADDRESS.matches(first)) {
             val subject = rest.substringAfter(' ', "").trim()
@@ -267,7 +268,7 @@ object SearchActions {
 
     private fun note(original: String, lower: String): SearchResult.Action? {
         val m = NOTE.find(lower) ?: return null
-        val text = original.substring(m.groups[1]!!.range.first).trim()
+        val text = original.substring(m.groups[1]?.range?.first ?: return null).trim()
         return SearchResult.Action(SearchResult.Action.NOTE, "Note: $text", "Save as a note", mapOf("text" to text))
     }
 
@@ -277,7 +278,7 @@ object SearchActions {
 
     private fun phone(original: String, lower: String): List<SearchResult.Action> {
         val m = NUMBER.find(lower) ?: return emptyList()
-        val raw = original.substring(m.groups[1]!!.range.first).trim()
+        val raw = original.substring(m.groups[1]?.range?.first ?: return emptyList()).trim()
         val digits = raw.count { it.isDigit() }
         // Not a calculation ("12-3") and long enough to be a number someone dials.
         if (digits < 3 || CALC_LIKE.matches(raw)) return emptyList()

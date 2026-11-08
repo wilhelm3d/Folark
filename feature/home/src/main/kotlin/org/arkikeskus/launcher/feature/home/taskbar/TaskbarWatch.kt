@@ -15,7 +15,10 @@ internal object TaskbarWatch {
     /** Cap while the bar is not shown (handles only, hidden here): nobody is watching, and
      *  checkNow() (screen on, unfold, a handle touch) returns to the fast pace before anything
      *  could be late. Saves a usage-history query every few seconds while the user is in an app. */
-    const val HIDDEN_MS = 10_000L
+    const val HIDDEN_MS = 30_000L
+    /** Cap while the accessibility service hears switches itself: this only catches a missed event
+     *  (a service killed mid-session), and the dots are current without any polling at all. */
+    const val SAFETY_MS = 20_000L
 
     /**
      * The delay until the next tick: back to [FAST_MS] after a change, otherwise easing ×1.5 from
@@ -24,6 +27,14 @@ internal object TaskbarWatch {
     fun nextDelay(changed: Boolean, current: Long, cap: Long): Long =
         if (changed) FAST_MS else minOf(cap, current * 3 / 2)
 
-    /** The cap for this tick: the short one while the bar shows, the long one while it does not. */
-    fun cap(barShown: Boolean): Long = if (barShown) SLOW_MS else HIDDEN_MS
+    /**
+     * The cap for this tick: the short one while the bar shows (its running dots must keep up), the
+     * long one while it does not, and the safety-net pace when [heard] — the accessibility service
+     * subscribes to TYPE_WINDOW_STATE_CHANGED and reports every switch faster than a poll could.
+     */
+    fun cap(barShown: Boolean, heard: Boolean): Long = when {
+        heard -> SAFETY_MS
+        barShown -> SLOW_MS
+        else -> HIDDEN_MS
+    }
 }

@@ -57,6 +57,7 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 @HiltViewModel
 class InteractiveNotificationWidgetViewModel @Inject constructor(
@@ -77,7 +78,7 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
     fun openInSplit(notification: StatusNotification, context: Context) {
         val intent = notification.contentIntent ?: return invokeAction(null, notification.packageName, context)
         viewModelScope.launch {
-            val userId = runCatching {
+            val userId = catching {
                 context.getSystemService(android.os.UserManager::class.java)?.getUserForSerialNumber(notification.userSerial)?.hashCode()
             }.getOrNull() ?: (android.os.Process.myUid() / 100_000)
             if (!splitCoordinator.openBeside(intent, notification.packageName, userId)) {
@@ -118,7 +119,7 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
             val sent = if (context != null) {
                 sendNotificationIntent(context, pendingIntent)
             } else {
-                runCatching { pendingIntent.send() }.isSuccess
+                catching { pendingIntent.send() }.isSuccess
             }
             if (!sent) launchFallback(packageName, context)
         } else {

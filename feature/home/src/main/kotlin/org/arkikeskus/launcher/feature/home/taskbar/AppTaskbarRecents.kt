@@ -18,6 +18,7 @@ import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.RECENT_
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.USAGE_OVERLAP_MS
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.hasUsageAccess
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.homeVisible
+import org.arkikeskus.launcher.model.catching
 
 // The taskbar's recent and running apps: Android's task list or usage history (split out of AppTaskbar.kt; extension functions on [AppTaskbar]).
 
@@ -121,7 +122,7 @@ internal fun AppTaskbar.recentApps(s: TaskbarSetup): List<AppItem> {
  * events recorded late), so each call is a small system call.
  */
 @Synchronized
-internal fun AppTaskbar.usageHistory(): List<String>? = runCatching {
+internal fun AppTaskbar.usageHistory(): List<String>? = catching {
     val now = System.currentTimeMillis()
     val manager = context.getSystemService(UsageStatsManager::class.java) ?: return null
     val windowStart = now - RECENT_WINDOW_MS

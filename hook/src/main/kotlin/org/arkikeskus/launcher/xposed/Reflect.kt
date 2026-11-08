@@ -4,6 +4,7 @@ import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Reflection for the module's hooks, looked up once per class and kept (E1–E3). The hooks run
@@ -31,20 +32,20 @@ internal object Reflect {
     }
 
     fun get(target: Any, name: String): Any? =
-        field(target.javaClass, name)?.let { runCatching { it.get(target) }.getOrNull() }
+        field(target.javaClass, name)?.let { catching { it.get(target) }.getOrNull() }
 
     fun set(target: Any, name: String, value: Any?): Boolean =
-        field(target.javaClass, name)?.let { runCatching { it.set(target, value) }.isSuccess } ?: false
+        field(target.javaClass, name)?.let { catching { it.set(target, value) }.isSuccess } ?: false
 
     /** Every method of [cls] and its superclasses (declared ones, accessible). */
     fun methods(cls: Class<*>): List<Method> = methods.getOrPut(cls) {
         generateSequence(cls) { it.superclass }
             .flatMap { it.declaredMethods.asSequence() }
-            .onEach { runCatching { it.isAccessible = true } }
+            .onEach { catching { it.isAccessible = true } }
             .toList()
     }
 
     fun constructors(cls: Class<*>): List<Constructor<*>> = constructors.getOrPut(cls) {
-        cls.declaredConstructors.toList().onEach { runCatching { it.isAccessible = true } }
+        cls.declaredConstructors.toList().onEach { catching { it.isAccessible = true } }
     }
 }

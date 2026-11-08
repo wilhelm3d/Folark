@@ -26,6 +26,7 @@ import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.supportsWindowBlur
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.data.createDrawerFolder
 
 // The App drawer section and its colour presets (split out of SettingsScreen.kt).
 

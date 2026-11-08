@@ -7,6 +7,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Root through the phone's `su` (KernelSU, Magisk and the like), for the few things only root can
@@ -49,7 +50,7 @@ object RootShell {
         val cached = known
         if (!recheck && !prompt && cached != null && now - checkedAt < RECHECK_MS) return cached
         val timeout = if (prompt) PROMPT_TIMEOUT_MS else CHECK_TIMEOUT_MS
-        val ok = runCatching { run("id", timeout)?.contains("uid=0") == true }.getOrDefault(false)
+        val ok = catching { run("id", timeout)?.contains("uid=0") == true }.getOrDefault(false)
         known = ok
         checkedAt = now
         return ok
@@ -128,7 +129,7 @@ object RootShell {
         init {
             Thread({
                 val chunk = ByteArray(64 * 1024)
-                runCatching {
+                catching {
                     process.inputStream.use { stream ->
                         while (true) {
                             val n = stream.read(chunk)
@@ -146,7 +147,7 @@ object RootShell {
                 }
             }, "folark-root-out").apply { isDaemon = true }.start()
             // Nothing reads Android's warnings; drain them so the shell never stalls on a full pipe.
-            Thread({ runCatching { process.errorStream.use { it.copyTo(NullOutput) } } }, "folark-root-err")
+            Thread({ catching { process.errorStream.use { it.copyTo(NullOutput) } } }, "folark-root-err")
                 .apply { isDaemon = true }.start()
         }
 
@@ -202,14 +203,14 @@ object RootShell {
         fun destroy() {
             alive = false
             // Close the pipe first: a command still writing dies of a broken pipe on its own.
-            runCatching { input.close() }
+            catching { input.close() }
             // SIGTERM, then SIGKILL after a grace: SIGKILL cannot be ignored by userspace, so the
             // only process that survives it is one the kernel can't stop either — and every
             // command is `</dev/null` inside a `timeout` anyway (see [exec]), so nothing is left
             // holding Folark's pipe.
-            runCatching { process.destroy() }
+            catching { process.destroy() }
             val killer = Thread({
-                runCatching {
+                catching {
                     Thread.sleep(500)
                     process.destroyForcibly()
                 }
@@ -219,7 +220,7 @@ object RootShell {
         }
 
         companion object {
-            fun start(): Session? = runCatching {
+            fun start(): Session? = catching {
                 Session(ProcessBuilder(binary).redirectErrorStream(false).start())
             }.getOrNull()
 

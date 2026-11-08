@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.ui.component.squareBitmap
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
+import org.arkikeskus.launcher.model.catching
 
 /** One of an app's notifications, as the long-press menu shows it. */
 class PopupNotification(
@@ -62,7 +63,7 @@ internal fun PopupNotificationRow(notification: PopupNotification, onOpened: () 
     val context = LocalContext.current
     val palette = LocalExpressivePalette.current
     val icon: ImageBitmap? = remember(notification.key, notification.postTime) {
-        runCatching { notification.icon?.loadDrawable(context)?.squareBitmap(40)?.asImageBitmap() }.getOrNull()
+        catching { notification.icon?.loadDrawable(context)?.squareBitmap(40)?.asImageBitmap() }.getOrNull()
     }
     Row(
         verticalAlignment = Alignment.Top,

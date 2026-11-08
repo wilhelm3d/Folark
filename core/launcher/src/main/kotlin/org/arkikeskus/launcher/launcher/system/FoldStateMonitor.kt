@@ -23,6 +23,7 @@ import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Monitors the device posture using [WindowInfoTracker] to distinguish between the folded (outer screen)
@@ -183,12 +184,12 @@ class FoldStateMonitor @Inject constructor() {
      * split screen), against the panel sizes seen with a folding feature and the large-screen
      * breakpoint.
      */
-    internal fun isOnInnerPanel(activity: Activity): Boolean = runCatching {
+    internal fun isOnInnerPanel(activity: Activity): Boolean = catching {
         val bounds = activity.windowManager.maximumWindowMetrics.bounds
         val width = bounds.width()
         val height = bounds.height()
-        if (width <= 0 || height <= 0) return@runCatching false
-        if (sizeKey(width, height) in knownInnerSizes) return@runCatching true
+        if (width <= 0 || height <= 0) return@catching false
+        if (sizeKey(width, height) in knownInnerSizes) return@catching true
         val density = activity.resources.displayMetrics.density
         density > 0f && minOf(width, height) / density >= INNER_MIN_SHORT_SIDE_DP
     }.getOrDefault(false)

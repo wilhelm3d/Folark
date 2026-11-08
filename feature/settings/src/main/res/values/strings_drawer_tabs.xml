@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_drawer_tab_order">Tab order</string>
+    <string name="settings_drawer_tab_order_desc">Drag a tab by its handle to move it. This is the order the tabs appear in the drawer.</string>
+    <string name="settings_drawer_tab_order_empty">No tabs yet — make a folder in the drawer, then arrange it here.</string>
+    <string name="settings_drawer_tabs_lock">Lock the tab order</string>
+    <string name="settings_drawer_tabs_lock_desc">The tabs stay where they are: dragging one in the drawer (or a handle here) does nothing until this is off.</string>
+</resources>

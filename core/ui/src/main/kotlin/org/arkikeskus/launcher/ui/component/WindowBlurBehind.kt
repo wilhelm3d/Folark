@@ -14,12 +14,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /** Whether this device can blur what is behind a window (Android 12+ with blur enabled by the
  *  system — battery saver and some vendor builds switch it off). */
 fun supportsWindowBlur(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
-    return runCatching {
+    return catching {
         context.getSystemService(WindowManager::class.java)?.isCrossWindowBlurEnabled == true
     }.getOrDefault(false)
 }
@@ -66,7 +67,7 @@ private const val BLUR_STEP_PX = 4
  */
 private fun android.view.Window.setBlurBehind(radiusPx: Int) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-    runCatching {
+    catching {
         val params = attributes
         val flag = WindowManager.LayoutParams.FLAG_BLUR_BEHIND
         val flags = if (radiusPx > 0) params.flags or flag else params.flags and flag.inv()

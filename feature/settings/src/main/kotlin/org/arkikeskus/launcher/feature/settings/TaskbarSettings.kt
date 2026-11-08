@@ -74,6 +74,7 @@ import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /** Usage access, the same check the taskbar itself makes (an app-op, or the permission by default). */
 private fun usageAccessGranted(context: Context): Boolean = ShellSplit.hasUsageAccess(context)
@@ -84,8 +85,8 @@ private fun openUsageAccess(context: Context) {
     // Straight to Folark's own switch where the system supports it, else the list of apps.
     val direct = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.fromParts("package", context.packageName, null))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (runCatching { context.startActivity(direct) }.isFailure) {
-        runCatching {
+    if (catching { context.startActivity(direct) }.isFailure) {
+        catching {
             context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
@@ -678,7 +679,7 @@ internal fun TaskbarSplitCard(s: LauncherSettings, viewModel: SettingsViewModel)
             onClick = {
                 if (!splitReady) {
                     val clipboard = context.getSystemService(ClipboardManager::class.java)
-                    runCatching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", grantCommand)) }
+                    catching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", grantCommand)) }
                     Toast.makeText(context, R.string.settings_taskbar_split_copied, Toast.LENGTH_SHORT).show()
                 }
             },

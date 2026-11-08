@@ -41,6 +41,8 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SplitPickerLook
 import javax.inject.Inject
+import org.arkikeskus.launcher.data.drawerFolders
+import org.arkikeskus.launcher.model.catching
 
 /** Backs [SplitPickerActivity]: what the drawer shows (as set in Settings) and building the split. */
 @HiltViewModel
@@ -135,7 +137,7 @@ class SplitPickerViewModel @Inject constructor(
         }
     }
 
-    private fun decodeSmall(bytes: ByteArray): ImageBitmap? = runCatching {
+    private fun decodeSmall(bytes: ByteArray): ImageBitmap? = catching {
         val opts = BitmapFactory.Options().apply {
             inSampleSize = 4
             inPreferredConfig = android.graphics.Bitmap.Config.RGB_565

@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.data.root.RootTasks
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.catching
 
 // Open apps on the bar as pictures of the app, as Recents shows them (Settings ▸ Taskbar ▸ Open apps
 // as previews; extension functions on [AppTaskbar]). The pictures are Android's own task snapshots,
@@ -97,11 +98,11 @@ internal fun AppTaskbar.showPreview(view: ImageView, app: AppItem, picture: Bitm
 }
 
 /** The picture, scaled down to about [edge] pixels on its long side as it is read. */
-private fun decodePreview(bytes: ByteArray, edge: Int): Bitmap? = runCatching {
+private fun decodePreview(bytes: ByteArray, edge: Int): Bitmap? = catching {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     val long = maxOf(bounds.outWidth, bounds.outHeight)
-    if (long <= 0) return@runCatching null
+    if (long <= 0) return@catching null
     var sample = 1
     while (long / (sample * 2) >= edge) sample *= 2
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })

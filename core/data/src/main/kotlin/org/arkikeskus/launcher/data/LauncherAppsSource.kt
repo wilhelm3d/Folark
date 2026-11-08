@@ -51,6 +51,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** ActivityOptions' bundle key for the launch windowing mode, and WindowConfiguration's freeform value. */
 private const val KEY_LAUNCH_WINDOWING_MODE = "android.activity.windowingMode"
@@ -121,18 +122,18 @@ class LauncherAppsSource @Inject constructor(
      *  The default launcher may do this; the app list follows through the profile broadcasts. */
     fun setPrivateSpaceLocked(locked: Boolean): Boolean {
         val space = _privateSpace.value ?: return false
-        return runCatching { userManager?.requestQuietModeEnabled(locked, space.user) == true }.getOrDefault(false)
+        return catching { userManager?.requestQuietModeEnabled(locked, space.user) == true }.getOrDefault(false)
     }
 
     /** Opens the app store inside Private Space, to install apps there (Android 15+). */
     fun privateSpaceInstallSender(): IntentSender? {
         val space = _privateSpace.value ?: return null
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return null
-        return runCatching { launcherApps.getAppMarketActivityIntent(null, space.user) }.getOrNull()
+        return catching { launcherApps.getAppMarketActivityIntent(null, space.user) }.getOrNull()
     }
 
     private fun isPrivateProfile(user: UserHandle): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && runCatching {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && catching {
             launcherApps.getLauncherUserInfo(user)?.userType == UserManager.USER_TYPE_PROFILE_PRIVATE
         }.getOrDefault(false)
 
@@ -141,8 +142,8 @@ class LauncherAppsSource @Inject constructor(
      *  a transient Binder error must never wipe real items). */
     fun isAppInstalled(packageName: String, userSerial: Long): Boolean {
         val um = userManager ?: return true
-        return installVerdict(runCatching { um.getUserForSerialNumber(userSerial) }) { user ->
-            runCatching { launcherApps.getApplicationInfo(packageName, 0, user) }
+        return installVerdict(catching { um.getUserForSerialNumber(userSerial) }) { user ->
+            catching { launcherApps.getApplicationInfo(packageName, 0, user) }
         }
     }
 
@@ -151,7 +152,7 @@ class LauncherAppsSource @Inject constructor(
         appColors.evictAll()
         _iconEpochs.update { it.bumpGlobal() }
         iconPacks.clearCache()
-        runCatching { imageLoader.get().memoryCache?.clear() }
+        catching { imageLoader.get().memoryCache?.clear() }
     }
 
     fun appsFlow(): Flow<List<AppItem>> = callbackFlow {
@@ -182,7 +183,7 @@ class LauncherAppsSource @Inject constructor(
             // bump the global generation (re-keys all icons) and drop the now-dead cache entries.
             if (packageNames.any { iconPacks.invalidate(it) }) {
                 _iconEpochs.update { it.bumpGlobal() }
-                runCatching { imageLoader.get().memoryCache?.clear() }
+                catching { imageLoader.get().memoryCache?.clear() }
             }
             reload()
         }
@@ -190,7 +191,7 @@ class LauncherAppsSource @Inject constructor(
         val callback = object : LauncherApps.Callback() {
             override fun onPackageAdded(packageName: String, user: UserHandle) = packageEvent(packageName)
             override fun onPackageRemoved(packageName: String, user: UserHandle) {
-                val serial = runCatching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
+                val serial = catching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
                 _packageRemovals.tryEmit(packageName to serial)
                 packageEvent(packageName)
             }
@@ -207,7 +208,7 @@ class LauncherAppsSource @Inject constructor(
             override fun onReceive(c: Context, intent: Intent) = reload()
         }
         val profileFilter = IntentFilter().apply { PROFILE_ACTIONS.forEach { addAction(it) } }
-        val profileRegistered = runCatching {
+        val profileRegistered = catching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.registerReceiver(profileReceiver, profileFilter, Context.RECEIVER_NOT_EXPORTED)
             } else {
@@ -219,27 +220,27 @@ class LauncherAppsSource @Inject constructor(
         reload()
         awaitClose {
             launcherApps.unregisterCallback(callback)
-            if (profileRegistered) runCatching { context.unregisterReceiver(profileReceiver) }
+            if (profileRegistered) catching { context.unregisterReceiver(profileReceiver) }
         }
     }
 
     private fun queryApps(): List<AppItem> {
         // LauncherApps' profiles include Private Space (Android 15+, for the default launcher that
         // holds ACCESS_HIDDEN_PROFILES); UserManager's list leaves it out.
-        val profiles = runCatching { launcherApps.profiles }.getOrNull()?.takeIf { it.isNotEmpty() }
-            ?: runCatching { userManager?.userProfiles }.getOrNull()
+        val profiles = catching { launcherApps.profiles }.getOrNull()?.takeIf { it.isNotEmpty() }
+            ?: catching { userManager?.userProfiles }.getOrNull()
             ?: listOf(Process.myUserHandle())
         var privateSpace: PrivateSpaceState? = null
         val apps = profiles.flatMap { user ->
             val isPrivate = isPrivateProfile(user)
             if (isPrivate) {
-                val locked = runCatching { userManager?.isQuietModeEnabled(user) }.getOrNull() ?: true
+                val locked = catching { userManager?.isQuietModeEnabled(user) }.getOrNull() ?: true
                 privateSpace = PrivateSpaceState(user, locked)
                 // Locked: none of its apps are listed, not even their names.
                 if (locked) return@flatMap emptyList()
             }
-            val serial = runCatching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
-            val list = runCatching {
+            val serial = catching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
+            val list = catching {
                 launcherApps.getActivityList(null, user)
             }.getOrElse { emptyList() }
             val userApps = list.map { info ->
@@ -254,7 +255,7 @@ class LauncherAppsSource @Inject constructor(
                 )
             }.toMutableList()
             if (!isPrivate && user == Process.myUserHandle()) {
-                runCatching {
+                catching {
                     val pInfo = context.packageManager.getPackageInfo("com.motorola.smartmode", 0)
                     if (pInfo.applicationInfo?.enabled == true) {
                         userApps.add(
@@ -285,7 +286,7 @@ class LauncherAppsSource @Inject constructor(
         appItem: AppItem,
         animation: String = LauncherSettings.APP_OPEN_SYSTEM,
         speed: Float = 1f,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = catching {
         val fromIcon = animation == LauncherSettings.APP_OPEN_ICON || animation == LauncherSettings.APP_OPEN_REVEAL
         val origin = if (fromIcon) LaunchOrigin.take() else null
         val options = if (origin != null) {
@@ -293,7 +294,7 @@ class LauncherAppsSource @Inject constructor(
         } else {
             openOptions(animation, speed)
         }
-        runCatching {
+        catching {
             launcherApps.startMainActivity(appItem.componentName, appItem.user, origin?.second, options)
         }.getOrElse {
             val intent = context.packageManager.getLaunchIntentForPackage(appItem.packageName)
@@ -305,7 +306,7 @@ class LauncherAppsSource @Inject constructor(
 
     /** The app's window grows out of the icon at [bounds] (on screen), measured from [view]; with
      *  [reveal] it is uncovered from there instead (a clip that widens to the full window). */
-    private fun fromIconOptions(view: android.view.View, bounds: Rect, reveal: Boolean = false): Bundle? = runCatching {
+    private fun fromIconOptions(view: android.view.View, bounds: Rect, reveal: Boolean = false): Bundle? = catching {
         val at = IntArray(2)
         view.getLocationOnScreen(at)
         val x = bounds.left - at[0]
@@ -356,7 +357,7 @@ class LauncherAppsSource @Inject constructor(
     fun launchFloating(
         appItem: AppItem,
         size: String = LauncherSettings.FLOATING_SIZE_MEDIUM,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = catching {
         launcherApps.startMainActivity(appItem.componentName, appItem.user, null, floatingOptions(size))
     }
 
@@ -427,7 +428,7 @@ class LauncherAppsSource @Inject constructor(
      */
     private fun currentScreenSize(): Point {
         val size = Point()
-        runCatching {
+        catching {
             val display = context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
             @Suppress("DEPRECATION")
             display?.getRealSize(size)
@@ -471,7 +472,7 @@ class LauncherAppsSource @Inject constructor(
     suspend fun snapSplit(snap: Int, forTask: Int = -1): Boolean = SplitThree.ready(context) && SplitThree.snap(context, snap, forTask)
 
     /** Opens the optional third app of [pair] in a floating window over the split pair. */
-    fun launchAppPairThird(pair: AppPair, size: String): Result<Unit> = runCatching {
+    fun launchAppPairThird(pair: AppPair, size: String): Result<Unit> = catching {
         launcherApps.startMainActivity(
             pair.app3ComponentName, userForSerial(pair.app3UserSerial), null, floatingOptions(size),
         )
@@ -482,7 +483,7 @@ class LauncherAppsSource @Inject constructor(
      * screen (FLAG_ACTIVITY_LAUNCH_ADJACENT — Android 12L+ enters split screen for it; older or
      * unsupported systems just open the app normally).
      */
-    fun launchAdjacent(appItem: AppItem): Result<Unit> = runCatching {
+    fun launchAdjacent(appItem: AppItem): Result<Unit> = catching {
         startAdjacent(appItem.componentName, appItem.user)
     }
 
@@ -506,15 +507,15 @@ class LauncherAppsSource @Inject constructor(
     }
 
     private fun userForSerial(serial: Long): UserHandle =
-        runCatching { userManager?.getUserForSerialNumber(serial) }.getOrNull() ?: Process.myUserHandle()
+        catching { userManager?.getUserForSerialNumber(serial) }.getOrNull() ?: Process.myUserHandle()
 
     /** Starts the first app of [pair]; [launchAppPairSecond] then puts the second one beside it. */
-    fun launchAppPair(pair: AppPair): Result<Unit> = runCatching {
+    fun launchAppPair(pair: AppPair): Result<Unit> = catching {
         launcherApps.startMainActivity(pair.app1ComponentName, userForSerial(pair.app1UserSerial), null, null)
     }
 
     /** Opens the second app of [pair] as the other half of a split screen (see [launchAdjacent]). */
-    fun launchAppPairSecond(pair: AppPair): Result<Unit> = runCatching {
+    fun launchAppPairSecond(pair: AppPair): Result<Unit> = catching {
         startAdjacent(pair.app2ComponentName, userForSerial(pair.app2UserSerial))
     }
 
@@ -524,7 +525,7 @@ class LauncherAppsSource @Inject constructor(
      * [LauncherApps] so work-profile packages resolve in their own profile. Null when the package has
      * no launcher entry or the profile is unavailable.
      */
-    fun launchClassName(packageName: String, user: UserHandle): String? = runCatching {
+    fun launchClassName(packageName: String, user: UserHandle): String? = catching {
         launcherApps.getActivityList(packageName, user).firstOrNull()?.componentName?.className
     }.getOrNull()
 
@@ -543,25 +544,25 @@ class LauncherAppsSource @Inject constructor(
         dark: Boolean = false,
         iconPack: String = "",
         customIcon: String = "",
-    ): Drawable? = runCatching {
+    ): Drawable? = catching {
         // The user's own pick for this app ("pack|drawable") wins over the pack-wide and themed
         // styles; if its pack or drawable is gone, the normal resolution below still applies.
         if (customIcon.isNotBlank()) {
             val pack = customIcon.substringBefore('|')
             val name = customIcon.substringAfter('|', "")
-            if (name.isNotEmpty()) iconPacks.get(pack)?.getDrawable(name)?.let { return@runCatching it }
+            if (name.isNotEmpty()) iconPacks.get(pack)?.getDrawable(name)?.let { return@catching it }
         }
         val info = launcherApps.getActivityList(appItem.packageName, appItem.user)
             .firstOrNull { it.componentName.className == appItem.className }
-            ?: return@runCatching null
+            ?: return@catching null
         // A selected icon pack overrides themed icons: use the pack's drawable if it maps this app,
         // otherwise fall through to the normal icon below.
         if (iconPack.isNotBlank()) {
-            iconPacks.get(iconPack)?.getIcon(appItem.componentName)?.let { return@runCatching it }
+            iconPacks.get(iconPack)?.getIcon(appItem.componentName)?.let { return@catching it }
         } else if (themed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            themedIcon(info, dark)?.let { return@runCatching it }
+            themedIcon(info, dark)?.let { return@catching it }
             // Settings ▸ Theme all icons: an app without a themed icon gets one made from its own.
-            if (forceThemedIcons) forcedThemedIcon(info, dark)?.let { return@runCatching it }
+            if (forceThemedIcons) forcedThemedIcon(info, dark)?.let { return@catching it }
         }
         info.getBadgedIcon(0)
     }.getOrNull()
@@ -764,10 +765,10 @@ class LauncherAppsSource @Inject constructor(
 
     private fun appColor(key: String, icon: Drawable): Int? {
         appColors.get(key)?.let { return if (it == NO_APP_COLOR) null else it }
-        val saved = runCatching { if (savedColors.contains(key)) savedColors.getInt(key, NO_APP_COLOR) else null }.getOrNull()
+        val saved = catching { if (savedColors.contains(key)) savedColors.getInt(key, NO_APP_COLOR) else null }.getOrNull()
         val color = if (saved != null) saved.takeIf { it != NO_APP_COLOR } else IconColors.dominant(icon)
         appColors.put(key, color ?: NO_APP_COLOR)
-        if (saved == null) runCatching {
+        if (saved == null) catching {
             // Old keys (apps updated or removed) pile up: start over now and then.
             val edit = savedColors.edit()
             if (savedColors.all.size > APP_COLOR_SAVED_MAX) edit.clear()

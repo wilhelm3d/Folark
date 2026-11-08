@@ -76,6 +76,7 @@ import org.arkikeskus.launcher.data.ClipboardHistoryRepository
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 @HiltViewModel
 class DrawerClipboardViewModel @Inject constructor(
@@ -220,8 +221,8 @@ private fun ClipAction(icon: ImageVector, label: Int, tint: androidx.compose.ui.
 private fun rememberClipPicture(repository: ClipboardHistoryRepository, clip: ClipEntry): ImageBitmap? {
     val picture by produceState<ImageBitmap?>(null, clip.image) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
-                val file = repository.imageFile(clip) ?: return@runCatching null
+            catching {
+                val file = repository.imageFile(clip) ?: return@catching null
                 BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = 2 })?.asImageBitmap()
             }.getOrNull()
         }
@@ -242,7 +243,7 @@ private fun share(context: Context, clip: ClipEntry, repository: ClipboardHistor
 }
 
 private fun start(context: Context, intent: Intent) {
-    runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    catching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }
 
 private fun kindIcon(kind: ClipKind): ImageVector = when (kind) {

@@ -21,6 +21,7 @@ import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.SUGGEST
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.UNDO_ABOVE_BAR_DP
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.UNDO_MS
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.homeVisible
+import org.arkikeskus.launcher.model.catching
 
 // Opening apps from the taskbar: launch, split, beside, a third pane, and the undo / suggestion pills (split out of AppTaskbar.kt; extension functions on [AppTaskbar]).
 
@@ -76,7 +77,7 @@ internal fun AppTaskbar.openSplitPick(app: AppItem, right: Boolean, three: Boole
 internal fun AppTaskbar.openBeside(intent: android.app.PendingIntent, packageName: String, userSerial: Long) {
     val coordinator = split
     scope.launch {
-        val userId = runCatching {
+        val userId = catching {
             context.getSystemService(android.os.UserManager::class.java)?.getUserForSerialNumber(userSerial)?.hashCode()
         }.getOrNull() ?: (Process.myUid() / 100_000)
         val ok = coordinator != null && coordinator.openBeside(intent, packageName, userId)
@@ -114,7 +115,7 @@ internal fun AppTaskbar.showSuggestion(offer: SplitCoordinator.Suggestion) {
         translationY = dpf(12f)
     }
     val params = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, systemBottomInset() + dp(UNDO_ABOVE_BAR_DP))
-    if (runCatching { windowManager.addView(pill, params) }.isSuccess) {
+    if (catching { windowManager.addView(pill, params) }.isSuccess) {
         suggestionWindow = pill
         pill.animate().alpha(1f).translationY(0f).setDuration(160).start()
         handler.postDelayed(suggestionTimeout, SUGGEST_MS)
@@ -125,7 +126,7 @@ internal fun AppTaskbar.hideSuggestion() {
     handler.removeCallbacks(suggestionTimeout)
     val pill = suggestionWindow ?: return
     suggestionWindow = null
-    runCatching { windowManager.removeView(pill) }
+    catching { windowManager.removeView(pill) }
 }
 
 // ------------------------------------------------------------------ undo split
@@ -158,7 +159,7 @@ internal fun AppTaskbar.showUndo() {
         translationY = dpf(12f)
     }
     val params = params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, systemBottomInset() + dp(UNDO_ABOVE_BAR_DP))
-    if (runCatching { windowManager.addView(pill, params) }.isSuccess) {
+    if (catching { windowManager.addView(pill, params) }.isSuccess) {
         undoWindow = pill
         pill.animate().alpha(1f).translationY(0f).setDuration(160).start()
         handler.postDelayed(undoTimeout, UNDO_MS)
@@ -169,7 +170,7 @@ internal fun AppTaskbar.hideUndo() {
     handler.removeCallbacks(undoTimeout)
     val pill = undoWindow ?: return
     undoWindow = null
-    runCatching { windowManager.removeView(pill) }
+    catching { windowManager.removeView(pill) }
 }
 
 /** Adds [app] as the third pane of the two-app split showing now (Android's own three-way split). */

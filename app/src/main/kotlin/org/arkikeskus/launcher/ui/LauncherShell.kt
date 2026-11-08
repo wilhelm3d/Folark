@@ -89,6 +89,7 @@ import android.os.Build
 import android.content.Context
 import android.app.PendingIntent
 import android.app.ActivityOptions
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Hosts the launcher surface: the home screen with the app drawer as a **finger-following** slide-up
@@ -577,7 +578,7 @@ fun LauncherShell(
 private const val LIVE_CARD_IDLE_MS = 10_000L
 
 private fun openNotificationIntent(context: Context, intent: PendingIntent) {
-    runCatching {
+    catching {
         val options = org.arkikeskus.launcher.data.PendingIntents.foregroundStartOptions()
         intent.send(context, 0, null, null, null, null, options.toBundle())
     }
@@ -598,7 +599,7 @@ private fun rememberCameraClearance(): androidx.compose.ui.unit.Dp {
     val cutoutTop = WindowInsets.displayCutout.getTop(density)
     val holeBottom = remember(cutoutTop, barTop, config.screenWidthDp, config.screenHeightDp, config.orientation) {
         // The camera hole itself (Android's safe inset can be a little shorter than the hole).
-        val rects = runCatching { view.rootWindowInsets?.displayCutout?.boundingRects }.getOrNull().orEmpty()
+        val rects = catching { view.rootWindowInsets?.displayCutout?.boundingRects }.getOrNull().orEmpty()
         val limit = view.rootView.height.takeIf { it > 0 }?.div(4) ?: Int.MAX_VALUE
         rects.filter { it.top < limit && it.bottom < limit }.maxOfOrNull { it.bottom } ?: 0
     }
@@ -613,7 +614,7 @@ private const val WALLPAPER_ZOOM_OUT = 0.8f
 
 /** WallpaperManager's zoom call, looked up once (it runs on every frame of a hinge move); null where hidden. */
 private val wallpaperZoomMethod: java.lang.reflect.Method? by lazy {
-    runCatching {
+    catching {
         android.app.WallpaperManager::class.java.getMethod("setWallpaperZoomOut", android.os.IBinder::class.java, Float::class.javaPrimitiveType)
     }.getOrNull()
 }
@@ -622,5 +623,5 @@ private val wallpaperZoomMethod: java.lang.reflect.Method? by lazy {
 private fun setSystemWallpaperZoom(view: android.view.View, zoom: Float) {
     val token = view.windowToken ?: return
     val method = wallpaperZoomMethod ?: return
-    runCatching { method.invoke(android.app.WallpaperManager.getInstance(view.context), token, zoom.coerceIn(0f, 1f)) }
+    catching { method.invoke(android.app.WallpaperManager.getInstance(view.context), token, zoom.coerceIn(0f, 1f)) }
 }

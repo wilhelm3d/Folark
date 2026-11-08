@@ -19,6 +19,7 @@ import android.view.View
 import androidx.core.graphics.drawable.toBitmap
 import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.ui.component.LivePillPainter
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The live-activity pill on the taskbar: the same look and effect as on home ([LivePillPainter]),
@@ -53,7 +54,7 @@ internal class TaskbarLivePill(
             field = value
             if (value != null && value.key != iconKey) {
                 iconKey = value.key
-                icon = runCatching { value.icon?.loadDrawable(context)?.toBitmap(48, 48) }.getOrNull()
+                icon = catching { value.icon?.loadDrawable(context)?.toBitmap(48, 48) }.getOrNull()
             }
             contentDescription = value?.let { "${it.title} ${it.shortText(System.currentTimeMillis())}" }
             if (desiredWidth() != oldWidth) requestLayout()

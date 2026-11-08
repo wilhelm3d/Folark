@@ -44,6 +44,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.AppShortcuts
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 /** How long the themed status bar stays blanked after a heads-up post; SystemUI auto-dismisses a
  *  heads-up notification after ~5 s (its default decay) plus a hide animation, and we have no
@@ -328,10 +329,11 @@ class HomeViewModel @Inject constructor(
                     // A floating or app-pair shortcut is the launcher's own: the system has nothing to resolve.
                     !HomeItemEntity.isLauncherShortcutId(row.shortcutId)
                 ) {
-                    val k = "${row.packageName}/${row.shortcutId}/${row.userSerial}"
+                    val shortcutId = row.shortcutId ?: continue
+                    val k = "${row.packageName}/$shortcutId/${row.userSerial}"
                     if (!shortcutCache.containsKey(k)) {
                         withContext(Dispatchers.IO) {
-                            AppShortcuts.resolve(context, row.packageName, row.shortcutId!!, row.userSerial)
+                            AppShortcuts.resolve(context, row.packageName, shortcutId, row.userSerial)
                         }?.let { shortcutCache[k] = it }
                     }
                 }
@@ -345,7 +347,7 @@ class HomeViewModel @Inject constructor(
                                 when {
                                     child.isBuiltin && child.builtinType != HomeItemEntity.BUILTIN_WIDGET_STACK -> PlacedBuiltin(
                                         rowId = child.id,
-                                        type = child.builtinType!!,
+                                        type = child.builtinType ?: return@mapNotNull null,
                                         page = child.page, cellX = child.cellX, cellY = child.cellY,
                                         spanX = child.spanX, spanY = child.spanY,
                                     )
@@ -353,7 +355,7 @@ class HomeViewModel @Inject constructor(
                                         ComponentName.unflattenFromString(child.widgetProvider.orEmpty())?.let { provider ->
                                             PlacedWidget(
                                                 rowId = child.id,
-                                                appWidgetId = child.appWidgetId!!,
+                                                appWidgetId = child.appWidgetId ?: return@mapNotNull null,
                                                 provider = provider,
                                                 page = child.page, cellX = child.cellX, cellY = child.cellY,
                                                 spanX = child.spanX, spanY = child.spanY,
@@ -386,7 +388,7 @@ class HomeViewModel @Inject constructor(
                         }
                         row.isBuiltin -> PlacedBuiltin(
                             rowId = row.id,
-                            type = row.builtinType!!,
+                            type = row.builtinType ?: return@mapNotNull null,
                             page = row.page, cellX = row.cellX, cellY = row.cellY,
                             spanX = row.spanX, spanY = row.spanY,
                         )
@@ -410,7 +412,7 @@ class HomeViewModel @Inject constructor(
                                     PlacedShortcut(
                                         rowId = row.id,
                                         packageName = row.packageName,
-                                        shortcutId = row.shortcutId!!,
+                                        shortcutId = row.shortcutId ?: return@mapNotNull null,
                                         userSerial = row.userSerial,
                                         label = pair.name,
                                         icon = null,
@@ -431,7 +433,7 @@ class HomeViewModel @Inject constructor(
                                     PlacedShortcut(
                                         rowId = row.id,
                                         packageName = row.packageName,
-                                        shortcutId = row.shortcutId!!,
+                                        shortcutId = row.shortcutId ?: return@mapNotNull null,
                                         userSerial = row.userSerial,
                                         label = app.label,
                                         icon = null,
@@ -447,7 +449,7 @@ class HomeViewModel @Inject constructor(
                                     PlacedShortcut(
                                         rowId = row.id,
                                         packageName = row.packageName,
-                                        shortcutId = row.shortcutId!!,
+                                        shortcutId = row.shortcutId ?: return@mapNotNull null,
                                         userSerial = row.userSerial,
                                         label = r.label,
                                         icon = r.icon,
@@ -462,7 +464,7 @@ class HomeViewModel @Inject constructor(
                             ComponentName.unflattenFromString(row.widgetProvider.orEmpty())?.let { provider ->
                                 PlacedWidget(
                                     rowId = row.id,
-                                    appWidgetId = row.appWidgetId!!,
+                                    appWidgetId = row.appWidgetId ?: return@mapNotNull null,
                                     provider = provider,
                                     page = row.page, cellX = row.cellX, cellY = row.cellY,
                                     spanX = row.spanX, spanY = row.spanY,
@@ -572,7 +574,7 @@ class HomeViewModel @Inject constructor(
         val cacheKey = "$pack|$drawable"
         // Scrolling the grid back and forth re-asks for the same icons; decode each one once.
         iconPickerCache.get(cacheKey)?.let { return@withContext it }
-        runCatching {
+        catching {
             iconPackRepository.get(pack)?.getDrawable(drawable)?.let { icon ->
                 val bitmap = android.graphics.Bitmap.createBitmap(
                     ICON_PICKER_PX, ICON_PICKER_PX, android.graphics.Bitmap.Config.ARGB_8888,
@@ -938,7 +940,7 @@ class HomeViewModel @Inject constructor(
                 if (!state.settings.home.autoRemoveEmptyPages || before == null || before.first != type) return@collect
                 val emptied = (before.second - shown).filter { it in 0 until state.pageCount }.maxOrNull()
                 if (emptied != null && state.pageCount > 1) {
-                    val removed = runCatching { removeEmptyPage(emptied) }.getOrNull()
+                    val removed = catching { removeEmptyPage(emptied) }.getOrNull()
                     if (removed != null && removed != PAGE_FAILED) skipNext = true
                 }
             }

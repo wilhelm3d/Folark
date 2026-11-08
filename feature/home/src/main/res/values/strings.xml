@@ -85,6 +85,11 @@
     <string name="save">Save</string>
     <string name="folder_default_name">Folder</string>
     <string name="folder_name_label">Folder name</string>
+    <string name="home_add_to_folder">Add to folder</string>
+    <string name="home_folder_none">No home folders yet. Make the first one with the button below.</string>
+    <string name="home_folder_apps">%1$d apps</string>
+    <string name="home_folder_new">New folder with…</string>
+    <string name="home_folder_new_pick">Choose another app on this screen</string>
     <string name="home_options_widgets">Widgets</string>
     <string name="home_options_settings">Launcher</string>
     <string name="home_options_wallpaper">Wallpaper</string>

@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
+import org.arkikeskus.launcher.model.WidgetSettings
+
 import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
 
@@ -89,6 +91,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 /** What the device-status widget shows besides the battery (which has its own live stream). */
 data class DeviceStats(
@@ -113,10 +116,10 @@ class FolarkWidgetsViewModel @Inject constructor(
 
     /** The widgets' themes and options are stored once for both displays, so either profile reads them. */
     // Only the widgets' part: any other setting changing doesn't redraw these widgets.
-    val widgets: StateFlow<LauncherSettings.Widgets> = settingsRepository.settings(ScreenType.OUTER)
+    val widgets: StateFlow<WidgetSettings> = settingsRepository.settings(ScreenType.OUTER)
         .map { it.widgets }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LauncherSettings.Widgets())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), WidgetSettings())
 
     val battery: StateFlow<BatteryStatus?> = batteryMonitor.status
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), null)
@@ -157,14 +160,14 @@ class FolarkWidgetsViewModel @Inject constructor(
         val receiver = object : BroadcastReceiver() {
             @SuppressLint("MissingPermission")
             override fun onReceive(receiverContext: Context?, intent: Intent?) {
-                val device = runCatching {
+                val device = catching {
                     @Suppress("DEPRECATION")
                     intent?.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                 }.getOrNull() ?: return
-                val address = runCatching { device.address }.getOrNull() ?: return
+                val address = catching { device.address }.getOrNull() ?: return
                 val level = intent?.getIntExtra(EXTRA_BLUETOOTH_BATTERY, -1) ?: -1
                 if (intent?.action == ACTION_BLUETOOTH_BATTERY && level in 0..100) {
-                    val name = runCatching { device.alias ?: device.name }.getOrNull() ?: "Bluetooth"
+                    val name = catching { device.alias ?: device.name }.getOrNull() ?: "Bluetooth"
                     announcedLevels[address] = name to level
                 } else {
                     // Disconnected, or the level is no longer known.
@@ -178,14 +181,14 @@ class FolarkWidgetsViewModel @Inject constructor(
             addAction(ACTION_BLUETOOTH_BATTERY)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         }
-        val registered = runCatching {
+        val registered = catching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
             } else {
                 context.registerReceiver(receiver, filter)
             }
         }.isSuccess
-        awaitClose { if (registered) runCatching { context.unregisterReceiver(receiver) } }
+        awaitClose { if (registered) catching { context.unregisterReceiver(receiver) } }
     }
 
     /** Re-read the device stats now (after the Bluetooth permission was answered). */
@@ -215,7 +218,7 @@ class FolarkWidgetsViewModel @Inject constructor(
     private fun readDeviceStats(): DeviceStats {
         val clock = SystemClock.elapsedRealtime()
         if (storageReadAt == 0L || clock - storageReadAt >= STORAGE_INTERVAL_MS) {
-            cachedStorage = runCatching {
+            cachedStorage = catching {
                 val stat = StatFs(Environment.getDataDirectory().path)
                 val total = stat.totalBytes.toFloat()
                 if (total <= 0f) 0f else 1f - stat.availableBytes / total
@@ -223,7 +226,7 @@ class FolarkWidgetsViewModel @Inject constructor(
             storageReadAt = clock
         }
         val storage = cachedStorage
-        val memory = runCatching {
+        val memory = catching {
             val info = ActivityManager.MemoryInfo()
             context.getSystemService(ActivityManager::class.java)?.getMemoryInfo(info)
             if (info.totalMem <= 0L) 0f else 1f - info.availMem.toFloat() / info.totalMem
@@ -259,17 +262,17 @@ class FolarkWidgetsViewModel @Inject constructor(
      * lookup only the announced levels are shown.
      */
     @SuppressLint("MissingPermission")
-    private fun readDirectLevels(): Map<String, Pair<String, Int>> = runCatching {
+    private fun readDirectLevels(): Map<String, Pair<String, Int>> = catching {
         val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
         if (adapter == null || !adapter.isEnabled) {
             announcedLevels.clear()
-            return@runCatching emptyMap()
+            return@catching emptyMap()
         }
         val levels = LinkedHashMap<String, Pair<String, Int>>()
         adapter.bondedDevices.orEmpty().forEach { device ->
-            val level = runCatching { device.javaClass.getMethod("getBatteryLevel").invoke(device) as? Int }
+            val level = catching { device.javaClass.getMethod("getBatteryLevel").invoke(device) as? Int }
                 .getOrNull() ?: -1
-            val connected = runCatching { device.javaClass.getMethod("isConnected").invoke(device) as? Boolean }
+            val connected = catching { device.javaClass.getMethod("isConnected").invoke(device) as? Boolean }
                 .getOrNull() ?: (level >= 0)
             if (connected && level in 0..100) levels[device.address] = (device.alias ?: device.name ?: "Bluetooth") to level
         }

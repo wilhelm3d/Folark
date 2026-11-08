@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import org.arkikeskus.launcher.data.root.RootActions
 import org.arkikeskus.launcher.data.root.RootFeatures
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Double-tap-to-lock, a few system actions, and the fallback host of the taskbar.
@@ -90,7 +91,7 @@ class LockAccessibilityService : AccessibilityService() {
 
     /** "package/class" of Android's Recents, from the system's own configuration. */
     private val systemRecents: ComponentName? by lazy {
-        runCatching {
+        catching {
             val res = android.content.res.Resources.getSystem()
             val id = res.getIdentifier("config_recentsComponentName", "string", "android")
             if (id == 0) null else ComponentName.unflattenFromString(res.getString(id))
@@ -126,7 +127,7 @@ class LockAccessibilityService : AccessibilityService() {
         }, RECENTS_SETTLE_MS)
     }
 
-    private fun keyboardPackage(): String? = runCatching {
+    private fun keyboardPackage(): String? = catching {
         Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
             ?.let { ComponentName.unflattenFromString(it)?.packageName }
     }.getOrNull()
@@ -148,6 +149,9 @@ class LockAccessibilityService : AccessibilityService() {
 
         /** Whether the service is enabled and connected now. */
         val isRunning: Boolean get() = instance != null
+
+        /** Connected AND subscribed to TYPE_WINDOW_STATE_CHANGED, so it hears every app switch. */
+        val reportsForeground: Boolean get() = instance != null && watchWanted
 
         /** Folark's overlay host takes the taskbar: the service gives its own up. */
         fun releaseTaskbar() {
@@ -217,7 +221,7 @@ class LockAccessibilityService : AccessibilityService() {
             // A zero-length path (start == end) makes StrokeDescription throw, so nudge the end a
             // pixel when the two points coincide; the whole build+dispatch is guarded regardless so
             // a bad gesture can never escape as an uncaught exception.
-            return runCatching {
+            return catching {
                 val ex = if (x1 == x0 && y1 == y0) x1 + 1f else x1
                 val path = android.graphics.Path().apply {
                     moveTo(x0, y0)
@@ -234,7 +238,7 @@ class LockAccessibilityService : AccessibilityService() {
         fun watchApps(on: Boolean) {
             watchWanted = on
             val service = instance ?: return
-            runCatching {
+            catching {
                 val info = service.serviceInfo ?: return
                 val types = if (on) AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED else 0
                 if (info.eventTypes == types) return

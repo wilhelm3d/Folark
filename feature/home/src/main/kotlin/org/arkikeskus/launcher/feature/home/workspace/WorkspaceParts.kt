@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.WidgetPlacement
+import org.arkikeskus.launcher.model.catching
 
 // Small workspace helpers: drop-target cache, widget size reporting, page dots (split out of Workspace.kt).
 
@@ -66,7 +67,7 @@ internal fun pushWidgetSize(view: android.appwidget.AppWidgetHostView, wDp: Int,
     if (sentWidgetSizes[view] == packed) return
     sentWidgetSizes[view] = packed
     val opts = widgetSizeOptions(wDp, hDp)
-    runCatching {
+    catching {
         if (android.os.Build.VERSION.SDK_INT >= 31) {
             view.updateAppWidgetSize(opts, listOf(android.util.SizeF(wDp.toFloat(), hDp.toFloat())))
         } else {

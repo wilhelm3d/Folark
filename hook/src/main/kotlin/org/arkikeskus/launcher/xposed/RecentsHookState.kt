@@ -19,6 +19,7 @@ import org.arkikeskus.launcher.data.SplitEvents
 import org.arkikeskus.launcher.data.SplitOutcome
 import org.arkikeskus.launcher.data.SplitThree
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Answers Folark's Vector module ([RecentsHook]) in the system launcher: is Settings ▸ Recents ▸
@@ -58,12 +59,12 @@ class RecentsHookState : ContentProvider() {
     private fun state(extras: Bundle?): Bundle? {
         val context = context ?: return null
         // Only the launchers in the module's scope ask this (anyone else could fake "module active").
-        val allowed = runCatching { context.resources.getStringArray(org.arkikeskus.launcher.hook.R.array.xposed_scope).toSet() }
+        val allowed = catching { context.resources.getStringArray(org.arkikeskus.launcher.hook.R.array.xposed_scope).toSet() }
             .getOrDefault(emptySet())
         if (callingPackage !in allowed) return null
         // Record that the module is alive first, so Folark shows it active even if the settings
         // below are briefly not ready (the launcher may call this very early).
-        runCatching {
+        catching {
             val edit = context.getSharedPreferences(PREFS, 0).edit()
                 .putLong(SEEN_AT, System.currentTimeMillis())
             // Which gesture hooks this launcher build allowed (RecentsHook.HOOK_*); shown in Settings.
@@ -134,7 +135,7 @@ class RecentsHookState : ContentProvider() {
                 bySwipe = extras.getBoolean(SystemUnlock.EXTRA_SWIPE),
             ),
         )
-        runCatching {
+        catching {
             context.getSharedPreferences(PREFS, 0).edit().putLong(UNLOCK_SEEN_AT, System.currentTimeMillis()).apply()
         }
         return null
@@ -148,7 +149,7 @@ class RecentsHookState : ContentProvider() {
     private fun ensureCache() {
         if (HookStateCache.replaceRecents != null) return
         val context = context ?: return
-        runCatching {
+        catching {
             runBlocking { kotlinx.coroutines.withTimeoutOrNull(PROVIDER_WAIT_MS) {
                 HookStateCache.update(
                     EntryPointAccessors.fromApplication(context, Deps::class.java)

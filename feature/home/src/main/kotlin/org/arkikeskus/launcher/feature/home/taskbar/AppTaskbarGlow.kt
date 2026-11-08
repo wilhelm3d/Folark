@@ -23,6 +23,7 @@ import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import kotlin.math.pow
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.catching
 
 // The glow when an app is started from the taskbar (split out of AppTaskbar.kt; extension
 // functions on [AppTaskbar]).
@@ -72,8 +73,8 @@ internal fun AppTaskbar.playLaunchGlow(icon: View) {
     val kept = glowView as? GlowView
     val glow = kept ?: GlowView(context)
     glow.prepare(color, iconRadius = maxOf(icon.width, icon.height) / 2f)
-    val placed = if (kept != null) runCatching { windowManager.updateViewLayout(glow, params) }.isSuccess
-    else runCatching { windowManager.addView(glow, params) }.isSuccess
+    val placed = if (kept != null) catching { windowManager.updateViewLayout(glow, params) }.isSuccess
+    else catching { windowManager.addView(glow, params) }.isSuccess
     if (!placed) {
         releaseGlow()
         return
@@ -108,7 +109,7 @@ internal fun AppTaskbar.releaseGlow() {
     handler.removeCallbacks(glowRelease)
     glowAnimator?.cancel()
     glowAnimator = null
-    glowView?.let { runCatching { windowManager.removeViewImmediate(it) } }
+    glowView?.let { catching { windowManager.removeViewImmediate(it) } }
     glowView = null
 }
 

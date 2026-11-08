@@ -12,10 +12,13 @@ import org.arkikeskus.launcher.data.root.RootFeatures
 import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.SettingsRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.CoroutineScope
+import org.arkikeskus.launcher.model.catching
 
 @HiltAndroidApp
 class LauncherApplication : Application(), SingletonImageLoader.Factory {
@@ -36,10 +39,18 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // The local crash log (Settings ▸ System ▸ Crash log): every uncaught exception lands in a
         // small on-device file, so a crash never needs adb to be read.
         org.arkikeskus.launcher.data.CrashLog.install(this)
+
+        // FIX #4: share one upstream DataStore flow instead of opening four independent subscriptions.
+        // Each settingsRepository.settings() call was a separate DataStore collector, meaning every
+        // settings write triggered 4× the deserialisation work. One hot, eagerly-started shared flow
+        // serves all collectors from a single DataStore read.
+        val innerSettings = settingsRepository.settings(ScreenType.INNER)
+            .shareIn(appScope, SharingStarted.Eagerly, replay = 1)
+
         // Settings ▸ Root as plain values for the taskbar, gestures and accessibility service, and
         // the grants it keeps given back when Android took one away.
         appScope.launch {
-            settingsRepository.settings(ScreenType.INNER).collect { s ->
+            innerSettings.collect { s ->
                 RootFeatures.update(s)
                 // Settings ▸ Haptics, for every place that plays them (some without a view).
                 org.arkikeskus.launcher.data.Haptics.settings = s.motion
@@ -51,32 +62,32 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // The Vector module in the system launcher keeps Folark's answer for Replace Android's
         // Recents and the gesture handle's search: tell it when either changes.
         appScope.launch {
-            settingsRepository.settings(ScreenType.INNER)
+            innerSettings
                 .map { (it.recents.enabled && it.recents.replaceSystem) to it.recents.navHandleOpensSearch }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
-                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.state, null) }
+                    catching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.state, null) }
                 }
         }
         // The module in System UI keeps the status bar margins (Settings ▸ Motorola): tell it when they change.
         appScope.launch {
-            settingsRepository.settings(ScreenType.INNER)
+            innerSettings
                 .map { Triple(it.statusBar.systemPadding, it.statusBar.systemPaddingInner, it.statusBar.systemPaddingCover) }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
-                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.statusBarPadding, null) }
+                    catching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.statusBarPadding, null) }
                 }
         }
         // The module's divider stops (Settings ▸ Recents & split screen): tell it when they change.
         appScope.launch {
-            settingsRepository.settings(ScreenType.INNER)
+            innerSettings
                 .map { r -> with(r.recents) { listOf(dividerStops, freeDivider, dividerLock, dividerMarks, dividerHaptics, keepSplitSize, peekFlingClose) } }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect {
-                    runCatching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.dividerStops, null) }
+                    catching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.dividerStops, null) }
                 }
         }
         // Folark's taskbar in its own overlay windows, when "Display over other apps" is allowed
@@ -85,10 +96,10 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // the host again, and this keeps a handler thread out of the cold start.
         appScope.launch {
             kotlinx.coroutines.delay(1_000)
-            runCatching { org.arkikeskus.launcher.feature.home.taskbar.TaskbarHost.refresh(this@LauncherApplication) }
+            catching { org.arkikeskus.launcher.feature.home.taskbar.TaskbarHost.refresh(this@LauncherApplication) }
         }
         // Split screen: marks while a divider is dragged, the drag hint between panes (S5, S14).
-        org.arkikeskus.launcher.feature.home.taskbar.SplitOverlays.start(this, appScope, settingsRepository.settings(ScreenType.INNER))
+        org.arkikeskus.launcher.feature.home.taskbar.SplitOverlays.start(this, appScope, innerSettings)
         // S1: where a split's divider rests is kept per set of apps (left to right).
         appScope.launch {
             org.arkikeskus.launcher.data.SplitEvents.layouts.collect { (tasks, fractions) ->

@@ -24,14 +24,21 @@ class TaskbarWatchTest {
     @Test
     fun `the cap holds however quiet it has been`() {
         assertThat(TaskbarWatch.nextDelay(changed = false, current = 5_000, cap = TaskbarWatch.SLOW_MS)).isEqualTo(3_000)
-        // 9_000 would ease to 13_500; the hidden cap holds it at 10_000.
-        assertThat(TaskbarWatch.nextDelay(changed = false, current = 9_000, cap = TaskbarWatch.HIDDEN_MS)).isEqualTo(10_000)
+        // 9_000 would ease to 13_500; the hidden cap is far enough away to let it grow that far.
+        assertThat(TaskbarWatch.nextDelay(changed = false, current = 9_000, cap = TaskbarWatch.HIDDEN_MS)).isEqualTo(13_500)
     }
 
     @Test
     fun `the bar shown takes the short cap, hidden the long one`() {
-        assertThat(TaskbarWatch.cap(barShown = true)).isEqualTo(TaskbarWatch.SLOW_MS)
-        assertThat(TaskbarWatch.cap(barShown = false)).isEqualTo(TaskbarWatch.HIDDEN_MS)
+        assertThat(TaskbarWatch.cap(barShown = true, heard = false)).isEqualTo(TaskbarWatch.SLOW_MS)
+        assertThat(TaskbarWatch.cap(barShown = false, heard = false)).isEqualTo(TaskbarWatch.HIDDEN_MS)
+    }
+
+    @Test
+    fun `a service hearing switches takes the safety net pace, shown or not`() {
+        // It reports every app switch itself: polling only catches a service killed mid-session.
+        assertThat(TaskbarWatch.cap(barShown = true, heard = true)).isEqualTo(TaskbarWatch.SAFETY_MS)
+        assertThat(TaskbarWatch.cap(barShown = false, heard = true)).isEqualTo(TaskbarWatch.SAFETY_MS)
     }
 
     @Test

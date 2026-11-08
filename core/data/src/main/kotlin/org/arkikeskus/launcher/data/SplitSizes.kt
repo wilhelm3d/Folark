@@ -1,6 +1,7 @@
 package org.arkikeskus.launcher.data
 
 import android.content.Context
+import org.arkikeskus.launcher.model.catching
 
 /**
  * S1: the sizes each set of apps last had in split screen, so they open the same way next time.
@@ -17,7 +18,7 @@ object SplitSizes {
     /** System UI reported a rest: [packages] left to right at divider places [fractions]. */
     fun remember(context: Context, packages: List<String>, fractions: List<Int>) {
         if (packages.size !in 2..3 || fractions.size != packages.size - 1) return
-        runCatching {
+        catching {
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val edit = p.edit()
             if (p.all.size > MAX) edit.clear()
@@ -26,7 +27,7 @@ object SplitSizes {
     }
 
     /** The divider places [packages] (left to right) had last time, or null. */
-    fun of(context: Context, packages: List<String>): List<Int>? = runCatching {
+    fun of(context: Context, packages: List<String>): List<Int>? = catching {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(key(packages), null)
             ?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == packages.size - 1 }
     }.getOrNull()

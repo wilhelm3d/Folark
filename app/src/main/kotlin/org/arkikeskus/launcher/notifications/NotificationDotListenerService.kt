@@ -46,6 +46,7 @@ import org.arkikeskus.launcher.data.StatusNotification
 import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Streams notification-dot counts into [NotificationBadgeRepository]. On every connect/post/remove we
@@ -103,7 +104,7 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     private fun persistHeld() {
         val snapshot = HashMap(heldUntil)
-        scope.launch { runCatching { settingsRepository.setHeldNotifications(snapshot) } }
+        scope.launch { catching { settingsRepository.setHeldNotifications(snapshot) } }
     }
 
     private val userManager by lazy { getSystemService(UserManager::class.java) }
@@ -158,6 +159,10 @@ class NotificationDotListenerService : NotificationListenerService() {
         /** Updates of an ongoing notification already shown: at most one rebuild a second. */
         const val QUIET_UPDATE_MS = 1_000L
 
+        /** Floor between full snapshot rebuilds: a sustained stream of posts (a mail sync, a group
+         *  chat) is not an ongoing update, so it would otherwise rebuild up to 25 times a second. */
+        const val MIN_FULL_REBUILD_MS = 250L
+
         /** Grace period for legacy snoozes to reappear before deleting stale bookkeeping. */
         const val RELEASE_SLACK_MS = 60_000L
     }
@@ -180,12 +185,21 @@ class NotificationDotListenerService : NotificationListenerService() {
      * and done once. A steady stream still refreshes every [COALESCE_MS], never later.
      */
     private fun scheduleRefresh(delayMs: Long = COALESCE_MS) {
+        // A full rebuild supersedes any pending live-only update.
+        if (liveRefreshQueued) {
+            handler.removeCallbacks(liveRefreshRunnable)
+            liveRefreshQueued = false
+        }
+        // A full rebuild is deferred to the floor, never dropped: nothing is lost, it is only
+        // gathered (the snapshot read copies every active notification over Binder).
+        val sinceLast = android.os.SystemClock.uptimeMillis() - lastFullRefreshAt
+        val wait = maxOf(delayMs, MIN_FULL_REBUILD_MS - sinceLast)
         // Already coming at least as soon: nothing to do. A slow one waiting is brought forward.
-        if (refreshQueued && queuedDelay <= delayMs) return
+        if (refreshQueued && queuedDelay <= wait) return
         handler.removeCallbacks(coalescedRefresh)
         refreshQueued = true
-        queuedDelay = delayMs
-        handler.postDelayed(coalescedRefresh, delayMs)
+        queuedDelay = wait
+        handler.postDelayed(coalescedRefresh, wait)
     }
 
     /**
@@ -205,6 +219,9 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     private var queuedDelay = 0L
     private var refreshQueued = false
+
+    /** When the last full snapshot began (uptime millis): see [MIN_FULL_REBUILD_MS]. */
+    private var lastFullRefreshAt = 0L
     private val coalescedRefresh = Runnable {
         refreshQueued = false
         refreshWithRetries()
@@ -215,9 +232,9 @@ class NotificationDotListenerService : NotificationListenerService() {
         Log.d(TAG, "listener connected")
         connected = true
         settingsReady = false
-        badgeRepository.registerCanceller { key -> runCatching { cancelNotification(key) } }
+        badgeRepository.registerCanceller { key -> catching { cancelNotification(key) } }
         badgeRepository.registerAllCanceller { excludeKeys -> 
-            runCatching {
+            catching {
                 val activeKeys = activeNotifications.map { it.key }
                 val toCancel = activeKeys.filter { it !in excludeKeys }
                 toCancel.forEach { cancelNotification(it) }
@@ -273,7 +290,9 @@ class NotificationDotListenerService : NotificationListenerService() {
         handler.removeCallbacks(retryRefresh)
         handler.removeCallbacks(deliverBatch)
         handler.removeCallbacks(coalescedRefresh)
+        handler.removeCallbacks(liveRefreshRunnable)
         refreshQueued = false
+        liveRefreshQueued = false
         stopPackageRefresh()
         settingsJob?.cancel()
         settingsJob = null
@@ -288,7 +307,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         // Aggressive OEM battery managers (Samsung, Xiaomi, …) can unbind the listener; ask the system
         // to rebind so dots + status-bar icons come back on their own instead of the user having to
         // re-toggle notification access. No-op if the system declines.
-        runCatching { requestRebind(ComponentName(this, NotificationDotListenerService::class.java)) }
+        catching { requestRebind(ComponentName(this, NotificationDotListenerService::class.java)) }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -297,8 +316,53 @@ class NotificationDotListenerService : NotificationListenerService() {
         // as an inset, so this is the only app-observable signal — see the audit note in StatusBar).
         if (sbn != null && isHeadsUpWorthy(sbn) && shouldAlert(sbn)) badgeRepository.notifyHeadsUp()
         if (sbn != null && settingsReady) holdForBatch(sbn)
-        if (sbn != null) runCatching { maybeNudge(sbn) }
-        scheduleRefresh(if (sbn != null && isQuietUpdate(sbn)) QUIET_UPDATE_MS else COALESCE_MS)
+        if (sbn != null) catching { maybeNudge(sbn) }
+        // FIX #3: for quiet updates (ongoing notifications whose progress/time changed — timers,
+        // navigation, music, downloads) only the live pill needs to change. Avoid a full snapshot
+        // rebuild (Binder IPC + badge/people/icon re-sort) up to 60 times a minute by updating
+        // only the live list. A full rebuild is still issued when a genuinely new or removed
+        // notification arrives (COALESCE_MS path).
+        if (sbn != null && isQuietUpdate(sbn)) {
+            scheduleLiveRefresh()
+        } else {
+            scheduleRefresh()
+        }
+    }
+
+    /** Handler runnable for the lightweight live-only update. */
+    private val liveRefreshRunnable = Runnable { refreshLiveOnly() }
+    private var liveRefreshQueued = false
+
+    /**
+     * Schedules a lightweight live-pill-only refresh, coalesced like the full refresh.
+     * Cancelled and superseded whenever a full [scheduleRefresh] is queued (a full rebuild
+     * already updates the live list too).
+     */
+    private fun scheduleLiveRefresh() {
+        if (refreshQueued || liveRefreshQueued) return
+        liveRefreshQueued = true
+        handler.postDelayed(liveRefreshRunnable, QUIET_UPDATE_MS)
+    }
+
+    /**
+     * Lightweight refresh that updates only [badgeRepository.setLive]: iterates active
+     * notifications to recompute live-activity entries (progress values, elapsed times) without
+     * touching badge counts, status-bar icons, or people tiles. Used for ongoing-notification
+     * quiet updates (timers, downloads, navigation) where only the live pill changes.
+     */
+    private fun refreshLiveOnly() {
+        liveRefreshQueued = false
+        if (!connected || !heldLoaded) return
+        val active = catching { activeNotifications }.getOrNull() ?: return
+        val ranking = catching { currentRanking }.getOrNull()
+        val tmp = Ranking()
+        val live = ArrayList<LiveActivity>()
+        for (sbn in active) {
+            if (sbn == null) continue
+            val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
+            catching { liveEntry(sbn, serial) }.getOrNull()?.let(live::add)
+        }
+        badgeRepository.setLive(live.sortedWith(compareByDescending<LiveActivity> { livePriority(it) }.thenByDescending { it.postTime }))
     }
 
     /** Notifications that already nudged their app's icon (a silent update must not nudge again). */
@@ -307,6 +371,10 @@ class NotificationDotListenerService : NotificationListenerService() {
     /**
      * A new notification someone would want to notice: its app's icon nudges on home and on the
      * taskbar. Not for ongoing ones, silent ones, ones held for the batch, or quiet updates.
+     *
+     * FIX #2: the icon-colour bitmap decode (createBitmap + draw + getPixels) used to run on the
+     * NLS main thread. All gate checks still run on main for thread-safety (nudgedKeys, heldUntil);
+     * only the bitmap work is dispatched to Default when the notification itself carries no colour.
      */
     private fun maybeNudge(sbn: StatusBarNotification) {
         val n = sbn.notification ?: return
@@ -314,21 +382,36 @@ class NotificationDotListenerService : NotificationListenerService() {
         if (sbn.key in heldUntil) return
         val first = nudgedKeys.add(sbn.key)
         if (!first && (n.flags and Notification.FLAG_ONLY_ALERT_ONCE) != 0) return
-        val ranking = runCatching { currentRanking }.getOrNull()
+        val ranking = catching { currentRanking }.getOrNull()
         val tmp = Ranking()
         if (!isBadgeWorthy(sbn, ranking, tmp)) return
         if (ranking?.getRanking(sbn.key, tmp) == true && tmp.importance < NotificationManager.IMPORTANCE_DEFAULT) return
-        val serial = runCatching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
-        val color = n.color.takeIf { it != Notification.COLOR_DEFAULT && it != 0 } ?: iconColor(sbn.packageName)
-        badgeRepository.nudge("${sbn.packageName}/$serial", color)
+        val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
+        val notifColor = n.color.takeIf { it != Notification.COLOR_DEFAULT && it != 0 }
+        val pkg = sbn.packageName
+        val badgeKey = "${pkg}/$serial"
+        if (notifColor != null) {
+            // Fast path: the notification itself supplies a colour; no bitmap work needed.
+            badgeRepository.nudge(badgeKey, notifColor)
+        } else {
+            // Slow path: decode the app icon to find its brand colour off the main thread.
+            scope.launch(Dispatchers.Default) {
+                badgeRepository.nudge(badgeKey, iconColorOffMain(pkg))
+            }
+        }
     }
 
     /** Icon colours by "package:lastUpdateTime", so an app update (a new icon) is coloured afresh. */
     private val iconColors = HashMap<String, Int?>()
 
-    /** The most vivid colour of an app's icon (its brand colour, usually), or null for a grey one. */
-    private fun iconColor(pkg: String): Int? {
-        val updated = runCatching { packageManager.getPackageInfo(pkg, 0).lastUpdateTime }.getOrDefault(0L)
+    /**
+     * The most vivid colour of an app's icon (its brand colour, usually), or null for a grey one.
+     * Safe to call from any thread; synchronised so the cache HashMap is not mutated concurrently
+     * when multiple notifications arrive back-to-back for different packages.
+     */
+    @Synchronized
+    private fun iconColorOffMain(pkg: String): Int? {
+        val updated = catching { packageManager.getPackageInfo(pkg, 0).lastUpdateTime }.getOrDefault(0L)
         val key = "$pkg:$updated"
         if (iconColors.containsKey(key)) return iconColors[key]
         // An older entry of the same app is stale now.
@@ -336,8 +419,11 @@ class NotificationDotListenerService : NotificationListenerService() {
         return computeIconColor(pkg).also { iconColors[key] = it }
     }
 
+    /** Kept for any remaining internal call sites; delegates to the synchronised version. */
+    private fun iconColor(pkg: String): Int? = iconColorOffMain(pkg)
+
     private fun computeIconColor(pkg: String): Int? =
-        runCatching {
+        catching {
             val drawable = packageManager.getApplicationIcon(pkg)
             val size = 24
             val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
@@ -370,7 +456,7 @@ class NotificationDotListenerService : NotificationListenerService() {
     private fun holdForBatch(sbn: StatusBarNotification) {
         val now = System.currentTimeMillis()
         val previous = heldUntil[sbn.key]
-        val entry = runCatching { personEntry(sbn, 0L, currentRanking, Ranking()) }.getOrNull()
+        val entry = catching { personEntry(sbn, 0L, currentRanking, Ranking()) }.getOrNull()
         val until = BatchDelivery.holdUntil(
             entry, previous, now, batchEnabled, vipKeys, BatchSchedule.nextDelivery(now, batchTimes),
         )
@@ -412,7 +498,8 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     private fun refresh() {
         if (!connected || !heldLoaded) return
-        val active = runCatching { activeNotifications }.getOrNull()
+        lastFullRefreshAt = android.os.SystemClock.uptimeMillis()
+        val active = catching { activeNotifications }.getOrNull()
         if (active == null) {
             // A transient Binder failure: keep the last good snapshot (a stale removal self-heals on
             // the next post/remove callback) but leave a trail so a persistent failure is visible.
@@ -423,7 +510,7 @@ class NotificationDotListenerService : NotificationListenerService() {
             }
             return
         }
-        val ranking = runCatching { currentRanking }.getOrNull()
+        val ranking = catching { currentRanking }.getOrNull()
         val tmp = Ranking()
         val counts = HashMap<String, Int>()
         val iconCounts = HashMap<String, Int>()
@@ -443,21 +530,21 @@ class NotificationDotListenerService : NotificationListenerService() {
         }
         for (sbn in active) {
             if (sbn == null) continue
-            val serial = runCatching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
+            val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
             val key = "${sbn.packageName}/$serial"
             // A channel hidden for this app (the notification widget's mute action): none of Folark's
             // surfaces show it — dots, status icons, widgets, people tiles. Android's shade is untouched.
             if (sbn.notification?.channelId in (hiddenChannels[sbn.packageName] ?: emptySet())) continue
             // People tiles: conversation-like notifications reduced to sender + text + actions; any
             // other real (icon-worthy, not ongoing) notification becomes an app-grouped entry.
-            val person = runCatching { personEntry(sbn, serial, ranking, tmp) }.getOrNull()
+            val person = catching { personEntry(sbn, serial, ranking, tmp) }.getOrNull()
             when {
                 person != null -> people.add(person.copy(heldUntil = heldUntil[sbn.key] ?: 0L))
                 isIconWorthy(sbn) && (sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) == 0 ->
-                    runCatching { appEntry(sbn, serial) }.getOrNull()?.let(people::add)
+                    catching { appEntry(sbn, serial) }.getOrNull()?.let(people::add)
             }
             // Live pill: what is going on right now (never held: it is about this moment).
-            runCatching { liveEntry(sbn, serial) }.getOrNull()?.let(live::add)
+            catching { liveEntry(sbn, serial) }.getOrNull()?.let(live::add)
             // Only launcher surfaces wait. Android's shade, sound and heads-up remain unchanged.
             if (sbn.key in heldUntil) continue
             // Dots: strict badge-worthy filter (meaningful home-icon badges).
@@ -529,13 +616,13 @@ class NotificationDotListenerService : NotificationListenerService() {
         // Migration: earlier betas snoozed in Android. Those existing snoozes cannot be released
         // through the public listener API; keep showing them until Android delivers them.
         if (heldUntil.isNotEmpty()) {
-            val snoozed = runCatching { snoozedNotifications }.getOrNull().orEmpty().filterNotNull()
+            val snoozed = catching { snoozedNotifications }.getOrNull().orEmpty().filterNotNull()
             val snoozedKeys = snoozed.map { it.key }.toSet()
             for (sbn in snoozed) {
                 if (sbn.key in activeKeys) continue
                 val until = heldUntil[sbn.key] ?: continue
-                val serial = runCatching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
-                val entry = runCatching { personEntry(sbn, serial, ranking, tmp) }.getOrNull() ?: continue
+                val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
+                val entry = catching { personEntry(sbn, serial, ranking, tmp) }.getOrNull() ?: continue
                 people.add(entry.copy(heldUntil = until))
             }
             // Forget entries whose notification is gone for good (delivered and then dismissed, or
@@ -588,7 +675,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         var uri: String? = null
         var sender: String? = null
         // A chat app's large icon is the contact's or group's picture; a dialer's, the caller's.
-        val largeIcon = runCatching { n.getLargeIcon() }.getOrNull()
+        val largeIcon = catching { n.getLargeIcon() }.getOrNull()
         val kind: PersonEventKind
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
         when {
@@ -615,7 +702,7 @@ class NotificationDotListenerService : NotificationListenerService() {
                 // Dialers disagree on which field carries the caller: Google's "Missed call" / "Mikko"
                 // vs. Samsung's "Mikko" / "Missed call". The people list settles it when present;
                 // otherwise the field that reads like the generic label is the label.
-                val person = runCatching {
+                val person = catching {
                     @Suppress("DEPRECATION")
                     extras.getParcelableArrayList<android.app.Person>(Notification.EXTRA_PEOPLE_LIST)?.firstOrNull()
                 }.getOrNull()
@@ -685,7 +772,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         val text = if (title != null && body != null) body.removePrefix(title).trim().ifEmpty { body } else body
         if (title == null && text == null) return null
         val label = appLabels.getOrPut(sbn.packageName) {
-            runCatching {
+            catching {
                 packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
             }.getOrDefault(sbn.packageName)
         }
@@ -732,13 +819,14 @@ class NotificationDotListenerService : NotificationListenerService() {
     override fun onDestroy() {
         connected = false
         handler.removeCallbacksAndMessages(null)
+        liveRefreshQueued = false
         stopPackageRefresh()
         scope.cancel()
         super.onDestroy()
     }
 
     /** The installed apps that offer to compose mail (handle mailto:), i.e. the mail clients. */
-    private fun queryMailPackages(): Set<String> = runCatching {
+    private fun queryMailPackages(): Set<String> = catching {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:someone@example.com"))
         packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL)
             .map { it.activityInfo.packageName }
@@ -780,7 +868,7 @@ class NotificationDotListenerService : NotificationListenerService() {
     private fun isHeadsUpWorthy(sbn: StatusBarNotification): Boolean {
         val n = sbn.notification ?: return false
         val r = Ranking()
-        val ranked = runCatching { currentRanking?.getRanking(sbn.key, r) == true }.getOrDefault(false)
+        val ranked = catching { currentRanking?.getRanking(sbn.key, r) == true }.getOrDefault(false)
         val importance = if (ranked) r.importance else NotificationManager.IMPORTANCE_DEFAULT
         val peekSuppressed = ranked &&
             (r.suppressedVisualEffects and NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK) != 0
@@ -832,7 +920,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         val category = n.category
         val live = promoted || chronometer || max > 0 || indeterminate || category in LIVE_CATEGORIES
         if (!live) return null
-        val critical = if (Build.VERSION.SDK_INT >= 36) runCatching { n.shortCriticalText }.getOrNull() else null
+        val critical = if (Build.VERSION.SDK_INT >= 36) catching { n.shortCriticalText }.getOrNull() else null
         val title = extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() }
             ?: appLabel(sbn.packageName)
         return LiveActivity(
@@ -879,7 +967,7 @@ class NotificationDotListenerService : NotificationListenerService() {
     private val labels = HashMap<String, String>()
 
     private fun appLabel(pkg: String): String = labels.getOrPut(pkg) {
-        runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }
+        catching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }
             .getOrDefault(pkg)
     }
 

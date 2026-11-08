@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Android's own taskbar, as the system launcher draws it (Motorola's on the Razr; the launcher that
@@ -18,14 +19,14 @@ object SystemTaskbar {
 
     /** The system launcher's package (the one that is Android's Recents and gesture engine). */
     fun launcherPackage(): String =
-        runCatching {
+        catching {
             val res = Resources.getSystem()
             val id = res.getIdentifier("config_recentsComponentName", "string", "android")
             if (id == 0) null else ComponentName.unflattenFromString(res.getString(id))?.packageName
         }.getOrNull() ?: "com.motorola.launcher3"
 
     /** Opens Motorola's own taskbar settings page; false where there is none. */
-    fun openSettings(context: Context): Boolean = runCatching {
+    fun openSettings(context: Context): Boolean = catching {
         context.startActivity(
             Intent()
                 .setComponent(ComponentName(launcherPackage(), "com.android.launcher3.taskbar.TaskbarSettings"))

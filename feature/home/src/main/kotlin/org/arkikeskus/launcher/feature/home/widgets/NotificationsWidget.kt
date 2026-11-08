@@ -76,9 +76,9 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
-import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.NotificationBadge
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -107,7 +107,7 @@ class NotificationsWidgetViewModel @Inject constructor(
         hasAccess.value = isAccessGranted()
     }
 
-    private fun isAccessGranted(): Boolean = runCatching {
+    private fun isAccessGranted(): Boolean = catching {
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     }.getOrDefault(false)
 
@@ -151,10 +151,10 @@ class NotificationsWidgetViewModel @Inject constructor(
         val channelSettings = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, pkg)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (runCatching { context.startActivity(channelSettings); true }.getOrDefault(false)) return
+        if (catching { context.startActivity(channelSettings); true }.getOrDefault(false)) return
         val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(details) }
+        catching { context.startActivity(details) }
     }
 }
 
@@ -324,9 +324,9 @@ internal fun openNotificationListenerSettings(context: Context) {
     val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
         .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, component.flattenToString())
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    val opened = runCatching { context.startActivity(detail) }.isSuccess
+    val opened = catching { context.startActivity(detail) }.isSuccess
     if (!opened) {
-        runCatching {
+        catching {
             context.startActivity(
                 Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )

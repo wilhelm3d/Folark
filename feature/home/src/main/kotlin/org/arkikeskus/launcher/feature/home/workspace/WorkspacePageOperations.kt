@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.HomeLayoutRepository
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.catching
 
 /** Serializes the page menu, including reads from storage. UI flows may lag behind a write. */
 internal class WorkspacePageOperations(
@@ -35,7 +36,7 @@ internal class WorkspacePageOperations(
             try {
                 save(if (home >= index) home + 1 else home, explicitPageCountAfterInsert(s.home.pageCount, index))
             } catch (e: Exception) {
-                runCatching { removeRows(index, false) }
+                catching { removeRows(index, false) }
                 throw e
             }
         }
@@ -63,7 +64,7 @@ internal class WorkspacePageOperations(
                 )
             } catch (e: Exception) {
                 // Reopen the gap so the rows match the counters that were never written.
-                runCatching { insertRows(page) }
+                catching { insertRows(page) }
                 throw e
             }
             target

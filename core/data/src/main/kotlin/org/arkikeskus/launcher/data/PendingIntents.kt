@@ -4,6 +4,7 @@ import android.app.ActivityOptions
 import android.app.PendingIntent
 import android.content.Context
 import android.os.Build
+import org.arkikeskus.launcher.model.catching
 
 /** Sending other apps' PendingIntents (a notification's tap action) the way the shade does. */
 object PendingIntents {
@@ -12,7 +13,7 @@ object PendingIntents {
      * that by itself); Folark is in front (or its taskbar is) when this is used. False when the
      * send failed (a cancelled PendingIntent, typically).
      */
-    fun sendFromForeground(context: Context, intent: PendingIntent): Boolean = runCatching {
+    fun sendFromForeground(context: Context, intent: PendingIntent): Boolean = catching {
         intent.send(context, 0, null, null, null, null, foregroundStartOptions().toBundle())
     }.isSuccess
 
@@ -21,7 +22,7 @@ object PendingIntents {
      * [sendFromForeground], Folark's right to start an activity passed on: some apps open a
      * screen after a reply or an action. False when the send failed.
      */
-    fun sendFillIn(context: Context, intent: PendingIntent, fillIn: android.content.Intent): Boolean = runCatching {
+    fun sendFillIn(context: Context, intent: PendingIntent, fillIn: android.content.Intent): Boolean = catching {
         intent.send(context, 0, fillIn, null, null, null, foregroundStartOptions().toBundle())
     }.isSuccess
 

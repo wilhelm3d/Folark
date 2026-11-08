@@ -77,6 +77,7 @@ import org.arkikeskus.launcher.ui.component.LocalScreenType
 import kotlin.math.roundToInt
 import java.util.Date
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 @HiltViewModel
 class SmartspaceViewModel @Inject constructor(
@@ -191,27 +192,29 @@ fun SmartspaceWidget(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(timeText, color = ink, style = MaterialTheme.typography.headlineMedium,
                     maxLines = 1, modifier = Modifier.clickable {
-                        runCatching { context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
+                        catching { context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
                     })
                 Column(Modifier.weight(1f)) {
                     Text(dateText, color = ink, style = MaterialTheme.typography.bodySmall,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.clickable {
                             val uri = CalendarContract.CONTENT_URI.buildUpon()
                                 .appendPath("time").appendPath(now.toString()).build()
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                            catching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                         })
                     val event = nextEvent
                     val detail = when {
                         !hasPermission -> stringResource(R.string.smartspace_allow_calendar)
                         event != null -> event.title.ifBlank { stringResource(R.string.smartspace_no_title) }
-                        weather != null -> weather!!.temperatureC.roundToInt().toString() + "° " + WeatherCodes.emoji(weather!!.weatherCode)
+                        weather != null -> weather?.let { w ->
+                            w.temperatureC.roundToInt().toString() + "° " + WeatherCodes.emoji(w.weatherCode)
+                        }
                         else -> null
                     }
                     if (detail != null) Text(detail, color = ink.copy(alpha = 0.85f),
                         style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.clickable(enabled = !hasPermission || event != null) {
                             if (!hasPermission) permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
-                            else if (event != null) runCatching {
+                            else if (event != null) catching {
                                 context.startActivity(Intent(Intent.ACTION_VIEW,
                                     ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.eventId))
                                     .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.begin)
@@ -242,7 +245,7 @@ fun SmartspaceWidget(
             style = TextStyle(fontSize = (46 * scale).sp, fontWeight = FontWeight.Medium, shadow = shadow),
             maxLines = 1,
             modifier = Modifier.clickable(interactionSource = noIndication, indication = null) {
-                runCatching { context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
+                catching { context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
             },
         )
         val w = weather
@@ -271,11 +274,11 @@ fun SmartspaceWidget(
         val openCalendarDay = {
             val uri = CalendarContract.CONTENT_URI.buildUpon()
                 .appendPath("time").appendPath(now.toString()).build()
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+            catching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
             Unit
         }
         val openAlarms = {
-            runCatching { context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
+            catching { context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
             Unit
         }
         // The bottom line (the calendar event, or its tap-to-grant prompt) is what the compact
@@ -410,7 +413,7 @@ fun SmartspaceWidget(
                         .padding(top = 2.dp)
                         .clickable(interactionSource = noIndication, indication = null) {
                             val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.eventId)
-                            runCatching {
+                            catching {
                                 context.startActivity(
                                     Intent(Intent.ACTION_VIEW, uri)
                                         .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.begin)

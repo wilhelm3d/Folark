@@ -8,13 +8,14 @@ import android.os.Process
 import android.provider.Settings
 import android.widget.Toast
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.catching
 
 /**
  * System app actions reachable from the long-press menus, targeted at the app's own user profile.
  *
  * A package can be installed in several profiles (personal, work, Private Space); a bare package
  * name doesn't identify which one, so these take the full [AppItem] and route through the
- * profile-aware [LauncherApps] APIs. Every call is wrapped in `runCatching` because an OS-blocked
+ * profile-aware [LauncherApps] APIs. Every call is wrapped in `catching` because an OS-blocked
  * profile action must never crash the launcher (it is the device's HOME).
  */
 object AppActions {
@@ -22,14 +23,14 @@ object AppActions {
     /** Opens the OS app-details screen for [appItem] in its own profile. */
     fun openAppInfo(context: Context, appItem: AppItem) {
         val launcherApps = context.getSystemService(LauncherApps::class.java)
-        var opened = launcherApps != null && runCatching {
+        var opened = launcherApps != null && catching {
             launcherApps.startAppDetailsActivity(appItem.componentName, appItem.user, null, null)
         }.isSuccess
         // Fallback for the personal profile ONLY: a bare package intent always resolves in the
         // launcher's own profile, so for a work / Private Space app it would open (and offer to
         // uninstall) the personal copy of the same package instead.
         if (!opened && appItem.user == Process.myUserHandle()) {
-            opened = runCatching {
+            opened = catching {
                 context.startActivity(
                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                         .setData(Uri.fromParts("package", appItem.packageName, null))
@@ -38,7 +39,7 @@ object AppActions {
             }.isSuccess
         }
         if (!opened) {
-            runCatching { Toast.makeText(context, R.string.app_info_unavailable, Toast.LENGTH_SHORT).show() }
+            catching { Toast.makeText(context, R.string.app_info_unavailable, Toast.LENGTH_SHORT).show() }
         }
     }
 
@@ -55,7 +56,7 @@ object AppActions {
         if (appItem.user != Process.myUserHandle()) return false
         val known = aspectPage
         if (known != null) return known
-        val found = runCatching {
+        val found = catching {
             context.packageManager.resolveActivity(aspectRatioIntent(appItem.packageName), 0) != null
         }.getOrDefault(false)
         aspectPage = found
@@ -64,8 +65,8 @@ object AppActions {
 
     /** Opens Android's aspect ratio page for [appItem] (full screen, 16:9, 4:3… set by the phone maker). */
     fun openAspectRatio(context: Context, appItem: AppItem) {
-        val opened = runCatching { context.startActivity(aspectRatioIntent(appItem.packageName)) }.isSuccess
-        if (!opened) runCatching { Toast.makeText(context, R.string.app_aspect_ratio_unavailable, Toast.LENGTH_SHORT).show() }
+        val opened = catching { context.startActivity(aspectRatioIntent(appItem.packageName)) }.isSuccess
+        if (!opened) catching { Toast.makeText(context, R.string.app_aspect_ratio_unavailable, Toast.LENGTH_SHORT).show() }
     }
 
     private fun aspectRatioIntent(packageName: String) = Intent(ACTION_ASPECT_RATIO)
@@ -80,7 +81,7 @@ object AppActions {
      */
     fun uninstall(context: Context, appItem: AppItem) {
         if (appItem.user == Process.myUserHandle()) {
-            val started = runCatching {
+            val started = catching {
                 context.startActivity(
                     Intent(Intent.ACTION_DELETE)
                         .setData(Uri.fromParts("package", appItem.packageName, null))

@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import org.arkikeskus.launcher.model.catching
 
 /**
  * True while Folark's battery saver is in effect (Settings ▸ Battery saver: always, or together
@@ -40,11 +41,11 @@ fun rememberSystemPowerSave(): Boolean {
             }
         }
         // A protected system broadcast, so no export flag is needed.
-        val registered = runCatching {
+        val registered = catching {
             context.registerReceiver(receiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED))
         }.isSuccess
         on = power?.isPowerSaveMode == true
-        onDispose { if (registered) runCatching { context.unregisterReceiver(receiver) } }
+        onDispose { if (registered) catching { context.unregisterReceiver(receiver) } }
     }
     return on
 }
@@ -70,9 +71,9 @@ fun rememberBatteryLow(thresholdPercent: Int): Boolean {
             override fun onReceive(c: Context?, intent: Intent?) = eval(intent)
         }
         // ACTION_BATTERY_CHANGED is sticky and a protected broadcast (no export flag needed).
-        val sticky = runCatching { context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }.getOrNull()
+        val sticky = catching { context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }.getOrNull()
         eval(sticky)
-        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+        onDispose { catching { context.unregisterReceiver(receiver) } }
     }
     return low
 }
@@ -94,9 +95,9 @@ fun rememberDeviceHot(): Boolean {
         val listener = PowerManager.OnThermalStatusChangedListener { status ->
             hot = status >= PowerManager.THERMAL_STATUS_MODERATE
         }
-        val added = runCatching { power.addThermalStatusListener(listener); true }.getOrDefault(false)
-        hot = runCatching { power.currentThermalStatus >= PowerManager.THERMAL_STATUS_MODERATE }.getOrDefault(false)
-        onDispose { if (added) runCatching { power.removeThermalStatusListener(listener) } }
+        val added = catching { power.addThermalStatusListener(listener); true }.getOrDefault(false)
+        hot = catching { power.currentThermalStatus >= PowerManager.THERMAL_STATUS_MODERATE }.getOrDefault(false)
+        onDispose { if (added) catching { power.removeThermalStatusListener(listener) } }
     }
     return hot
 }

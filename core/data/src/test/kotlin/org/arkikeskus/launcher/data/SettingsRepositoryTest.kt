@@ -233,6 +233,46 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `moving an app into another folder takes it out of the first and drops the empty one`() = runTest {
+        val repo = newRepository()
+        val first = repo.createDrawerFolder("First")
+        val second = repo.createDrawerFolder("Second")
+        repo.addAppsToDrawerFolder(first, listOf("com.a/A/0"))
+
+        repo.moveAppsIntoDrawerFolder(second, listOf("com.a/A/0"))
+
+        val folders = repo.drawerFolders.first()
+        assertThat(folders.map { it.name }).containsExactly("Second")
+        assertThat(folders.single().appKeys).containsExactly("com.a/A/0")
+    }
+
+    @Test
+    fun `a move leaves folders it did not touch alone, empty ones included`() = runTest {
+        val repo = newRepository()
+        val holder = repo.createDrawerFolder("Holder")
+        repo.createDrawerFolder("Empty")
+        val target = repo.createDrawerFolder("Target")
+        repo.addAppsToDrawerFolder(holder, listOf("com.a/A/0", "com.b/B/0"))
+
+        repo.moveAppsIntoDrawerFolder(target, listOf("com.a/A/0"))
+
+        val folders = repo.drawerFolders.first()
+        assertThat(folders.map { it.name }).containsExactly("Holder", "Empty", "Target")
+        assertThat(folders.first { it.name == "Holder" }.appKeys).containsExactly("com.b/B/0")
+        assertThat(folders.first { it.name == "Empty" }.appKeys).isEmpty()
+    }
+
+    @Test
+    fun `removing an app reports how many are left in the folder`() = runTest {
+        val repo = newRepository()
+        val id = repo.createDrawerFolder("Pair")
+        repo.addAppsToDrawerFolder(id, listOf("com.a/A/0", "com.b/B/0"))
+
+        assertThat(repo.removeAppFromDrawerFolder(id, "com.a/A/0")).isEqualTo(1)
+        assertThat(repo.removeAppFromDrawerFolder(id, "com.b/B/0")).isEqualTo(0)
+    }
+
+    @Test
     fun `twoLineHomeLabels defaults to false and round-trips`() = runTest {
         val repo = newRepository()
         assertThat(repo.settings.first().home.twoLineLabels).isFalse()

@@ -18,6 +18,7 @@ import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.Drawable
 import androidx.core.graphics.PathParser
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.catching
 
 /**
  * App icon shapes (Settings ▸ Appearance ▸ Icon shape). The outlines are Motorola's icon-shape
@@ -60,7 +61,7 @@ object IconShapes {
     /** The outline of [shape] scaled to a [size]×[size] square, for drawing it (settings tiles). */
     fun path(shape: String, size: Float): Path? {
         val data = pathData(shape) ?: return null
-        val path = runCatching { PathParser.createPathFromPathData(data) }.getOrNull() ?: return null
+        val path = catching { PathParser.createPathFromPathData(data) }.getOrNull() ?: return null
         path.transform(Matrix().apply { setScale(size / MASK_SIZE, size / MASK_SIZE) })
         return path
     }
@@ -76,18 +77,18 @@ object IconShapes {
             ?: (if (plateOthers) onPlate(drawable) else null)
             ?: return drawable
         val data = PATHS[shape] ?: return drawable
-        val mask = runCatching { PathParser.createPathFromPathData(data) }.getOrNull() ?: return drawable
+        val mask = catching { PathParser.createPathFromPathData(data) }.getOrNull() ?: return drawable
         return ShapedIconDrawable(adaptive, mask)
     }
 
     /** A plain icon as an adaptive one: a pale plate of its own colour, the picture inset on it. */
-    private fun onPlate(drawable: Drawable): AdaptiveIconDrawable? = runCatching {
+    private fun onPlate(drawable: Drawable): AdaptiveIconDrawable? = catching {
         val color = IconColors.dominant(drawable)
         val plate = if (color == null) Color.WHITE else IconColors.tone(color, 0.10f, 0.98f)
         AdaptiveIconDrawable(ColorDrawable(plate), InsetDrawable(drawable, PLATE_INSET))
     }.getOrNull()
 
-    private fun systemMask(): String? = runCatching {
+    private fun systemMask(): String? = catching {
         val resources = Resources.getSystem()
         val id = resources.getIdentifier("config_icon_mask", "string", "android")
         if (id != 0) resources.getString(id) else null

@@ -69,6 +69,7 @@ import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.WindowBlurBehind
 import org.arkikeskus.launcher.ui.drawer.DrawerColors
 import org.arkikeskus.launcher.ui.drawer.rememberDrawerColors
+import org.arkikeskus.launcher.model.catching
 
 private data class WidgetGroup(
     val packageName: String,
@@ -108,16 +109,16 @@ fun WidgetPickerScreen(
 
     val groups by produceState<List<WidgetGroup>?>(null, context) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
+            catching {
                 val pm = context.packageManager
                 AppWidgetManager.getInstance(context).installedProviders
                     .filter { it.widgetCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN != 0 }
                     .groupBy { it.provider.packageName }
                     .map { (pkg, providers) ->
-                        val label = runCatching {
+                        val label = catching {
                             pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
                         }.getOrDefault(pkg)
-                        val icon = runCatching {
+                        val icon = catching {
                             pm.getApplicationIcon(pkg).toBitmap(96, 96)
                         }.getOrNull()
                         WidgetGroup(
@@ -125,10 +126,10 @@ fun WidgetPickerScreen(
                             label,
                             icon,
                             providers.map { provider ->
-                                val widgetIcon = runCatching { provider.loadIcon(context, 0)?.toBitmap(96, 96) }.getOrNull() ?: icon
+                                val widgetIcon = catching { provider.loadIcon(context, 0)?.toBitmap(96, 96) }.getOrNull() ?: icon
                                 WidgetOption(
                                     WidgetChoice.App(provider),
-                                    runCatching { provider.loadLabel(pm) }.getOrDefault(label),
+                                    catching { provider.loadLabel(pm) }.getOrDefault(label),
                                     widgetIcon,
                                 )
                             }.sortedBy { it.label.lowercase() },
@@ -929,15 +930,15 @@ internal fun WidgetPreview(
     val preview by produceState(WidgetPreviewData(), provider) {
         if (provider == null) return@produceState
         value = withContext(Dispatchers.IO) {
-            val generated = if (Build.VERSION.SDK_INT >= 35) runCatching {
+            val generated = if (Build.VERSION.SDK_INT >= 35) catching {
                 AppWidgetManager.getInstance(context).getWidgetPreview(
                     provider.provider, provider.profile, AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN,
                 )
             }.getOrNull() else null
             val remote = generated ?: if (Build.VERSION.SDK_INT >= 31 && provider.previewLayout != 0 &&
                 provider.profile == Process.myUserHandle()
-            ) runCatching { RemoteViews(provider.provider.packageName, provider.previewLayout) }.getOrNull() else null
-            val bitmap = runCatching {
+            ) catching { RemoteViews(provider.provider.packageName, provider.previewLayout) }.getOrNull() else null
+            val bitmap = catching {
                 val d = provider.loadPreviewImage(context, 0) ?: provider.loadIcon(context, 0)
                 val w = d.intrinsicWidth.coerceAtLeast(1)
                 val h = d.intrinsicHeight.coerceAtLeast(1)
@@ -972,11 +973,14 @@ internal fun WidgetPreview(
             modifier = modifier,
         )
         preview.bitmap != null -> {
-            Image(
-                bitmap = preview.bitmap!!.asImageBitmap(),
-                contentDescription = null,
-                modifier = modifier,
-            )
+            val bitmap = preview.bitmap
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = modifier,
+                )
+            }
             SideEffect { onSnapshot { preview.bitmap } }
         }
         else -> {
@@ -1042,7 +1046,7 @@ internal class WidgetPreviewContainer(context: Context) : FrameLayout(context) {
         }
     }
 
-    fun capture(): Bitmap? = runCatching {
+    fun capture(): Bitmap? = catching {
         if (measuredWidth <= 0 || measuredHeight <= 0) null else drawToBitmap()
     }.getOrNull()
 }

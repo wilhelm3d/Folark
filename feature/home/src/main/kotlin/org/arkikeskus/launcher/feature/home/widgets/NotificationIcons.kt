@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Small notification icons, kept once drawn. An app's icon is usually a resource in its own APK:
@@ -41,7 +42,7 @@ internal fun rememberNotificationIcon(icon: Icon?, id: String, px: Int): ImageBi
     if (bitmap == null) {
         LaunchedEffect(cacheKey) {
             val loaded = withContext(Dispatchers.IO) {
-                runCatching { icon.loadDrawable(context)?.toBitmap(width = px, height = px)?.asImageBitmap() }.getOrNull()
+                catching { icon.loadDrawable(context)?.toBitmap(width = px, height = px)?.asImageBitmap() }.getOrNull()
             }
             if (loaded != null) notificationIconCache.put(cacheKey, loaded)
             bitmap = loaded

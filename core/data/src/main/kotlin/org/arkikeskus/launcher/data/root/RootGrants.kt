@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
 import org.arkikeskus.launcher.data.ShellSplit
+import org.arkikeskus.launcher.model.catching
 
 /**
  * What root can do once instead of a computer and ADB, or instead of a trip to Android's settings
@@ -93,11 +94,11 @@ object RootGrants {
     )
 
     /** Folark's own "dangerous" (asked-for) permissions, as declared in its manifest. */
-    private fun runtimePermissions(context: Context): List<String> = runCatching {
+    private fun runtimePermissions(context: Context): List<String> = catching {
         val pm = context.packageManager
         val info = pm.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         info.requestedPermissions.orEmpty().filter { name ->
-            val p = runCatching { pm.getPermissionInfo(name, 0) }.getOrNull() ?: return@filter false
+            val p = catching { pm.getPermissionInfo(name, 0) }.getOrNull() ?: return@filter false
             p.protection == android.content.pm.PermissionInfo.PROTECTION_DANGEROUS
         }
     }.getOrDefault(emptyList())
@@ -129,7 +130,7 @@ object RootGrants {
     fun allowOverlay(context: Context): Boolean {
         val pkg = context.packageName
         if (!SAFE.matches(pkg)) return false
-        if (runCatching { android.provider.Settings.canDrawOverlays(context) }.getOrDefault(false)) return true
+        if (catching { android.provider.Settings.canDrawOverlays(context) }.getOrDefault(false)) return true
         return RootShell.available() && RootShell.run("appops set $pkg SYSTEM_ALERT_WINDOW allow") != null
     }
 
@@ -170,7 +171,7 @@ object RootGrants {
         context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
     private fun secureList(context: Context, key: String): List<String> =
-        runCatching { Settings.Secure.getString(context.contentResolver, key) }.getOrNull()
+        catching { Settings.Secure.getString(context.contentResolver, key) }.getOrNull()
             ?.split(':')?.filter { it.isNotBlank() }.orEmpty()
 
     private val SAFE = Regex("^[A-Za-z0-9_.]+$")

@@ -85,11 +85,11 @@ class NotificationDotListenerServiceTest {
         service.cancelNotification(notification.key)
         Shadow.extract<ShadowNotificationListenerService>(service).addActiveNotification(notification)
         service.onNotificationPosted(notification)
-        // The service coalesces rebuilds with handler.postDelayed (COALESCE_MS = 40): run the
-        // queued refresh now, so assertions see the post-coalesce state the device reaches 40 ms
-        // later. Exactly the coalesce window — further would also fire the (hour-away) batch
-        // delivery and deliver notifications still meant to be held.
-        shadowOf(Looper.getMainLooper()).idle(40L)
+        // The service coalesces rebuilds with handler.postDelayed and floors them at
+        // MIN_FULL_REBUILD_MS (250): run the queued refresh now, so assertions see the state the
+        // device reaches one floor later. Still short of the 500 ms snapshot retry and the 1 s
+        // quiet-update refresh, and far short of the (hour-away) batch delivery.
+        shadowOf(Looper.getMainLooper()).idle(300L)
     }
 
     private fun sbn(notification: Notification) = StatusBarNotification(
@@ -98,11 +98,11 @@ class NotificationDotListenerServiceTest {
 
     private fun person(notification: StatusBarNotification): PersonEntry? = ReflectionHelpers.callInstanceMethod(
         service, "personEntry", from(StatusBarNotification::class.java, notification),
-        from(Long::class.javaPrimitiveType!!, 0L), from(RankingMap::class.java, null), from(Ranking::class.java, Ranking()),
+        from(Long::class.java, 0L), from(RankingMap::class.java, null), from(Ranking::class.java, Ranking()),
     )
 
     private fun app(notification: StatusBarNotification): PersonEntry? = ReflectionHelpers.callInstanceMethod(
-        service, "appEntry", from(StatusBarNotification::class.java, notification), from(Long::class.javaPrimitiveType!!, 0L),
+        service, "appEntry", from(StatusBarNotification::class.java, notification), from(Long::class.java, 0L),
     )
 
     private fun chat(vararg incoming: Boolean): StatusBarNotification {

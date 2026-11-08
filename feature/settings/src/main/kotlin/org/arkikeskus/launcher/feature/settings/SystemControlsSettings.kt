@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.arkikeskus.launcher.data.SystemControls
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 private const val REFRESH_STANDARD = 60f
 private val ANIMATION_SCALES = listOf(0f, 0.5f, 1f, 1.5f, 2f)
@@ -62,7 +63,7 @@ internal fun SystemControlsSection() {
             onClick = {
                 if (!granted) {
                     val clipboard = context.getSystemService(ClipboardManager::class.java)
-                    runCatching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", command)) }
+                    catching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", command)) }
                     Toast.makeText(context, R.string.settings_taskbar_split_copied, Toast.LENGTH_SHORT).show()
                 }
             },

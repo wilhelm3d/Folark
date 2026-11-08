@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Active media sessions, read through the notification-listener grant Folark already uses, so a
@@ -32,8 +33,8 @@ internal class RecentsAudio {
 
     fun toggle(packageName: String) {
         val controller = controllers[packageName] ?: return
-        if (playing(packageName)) runCatching { controller.transportControls.pause() }
-        else runCatching { controller.transportControls.play() }
+        if (playing(packageName)) catching { controller.transportControls.pause() }
+        else catching { controller.transportControls.play() }
     }
 
     internal fun refresh(list: List<MediaController>) {
@@ -55,7 +56,7 @@ internal fun rememberRecentsAudio(enabled: Boolean): RecentsAudio {
         val component = ComponentName(context.packageName, LISTENER_CLASS)
         val callbacks = mutableListOf<Pair<MediaController, MediaController.Callback>>()
         fun watch(list: List<MediaController>?) {
-            callbacks.forEach { (c, cb) -> runCatching { c.unregisterCallback(cb) } }
+            callbacks.forEach { (c, cb) -> catching { c.unregisterCallback(cb) } }
             callbacks.clear()
             val ctrls = list.orEmpty()
             ctrls.forEach { c ->
@@ -63,21 +64,21 @@ internal fun rememberRecentsAudio(enabled: Boolean): RecentsAudio {
                     override fun onPlaybackStateChanged(s: PlaybackState?) = audio.refresh(ctrls)
                     override fun onSessionDestroyed() = audio.refresh(ctrls)
                 }
-                runCatching { c.registerCallback(cb) }
+                catching { c.registerCallback(cb) }
                 callbacks += c to cb
             }
             audio.refresh(ctrls)
         }
         val listener = MediaSessionManager.OnActiveSessionsChangedListener { watch(it) }
         // Needs the notification-listener grant; without it getActiveSessions throws and no badge shows.
-        val ok = runCatching {
+        val ok = catching {
             manager?.addOnActiveSessionsChangedListener(listener, component)
             watch(manager?.getActiveSessions(component))
             true
         }.getOrDefault(false)
         onDispose {
-            if (ok) runCatching { manager?.removeOnActiveSessionsChangedListener(listener) }
-            callbacks.forEach { (c, cb) -> runCatching { c.unregisterCallback(cb) } }
+            if (ok) catching { manager?.removeOnActiveSessionsChangedListener(listener) }
+            callbacks.forEach { (c, cb) -> catching { c.unregisterCallback(cb) } }
             callbacks.clear()
         }
     }

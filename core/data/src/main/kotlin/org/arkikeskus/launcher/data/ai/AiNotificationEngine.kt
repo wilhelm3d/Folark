@@ -13,6 +13,7 @@ import org.arkikeskus.launcher.data.StatusNotification
 import java.time.ZonedDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 @Singleton
 class AiNotificationEngine @Inject constructor(
@@ -26,7 +27,7 @@ class AiNotificationEngine @Inject constructor(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@withContext emptyList()
         val text = notification.text ?: return@withContext emptyList()
 
-        runCatching {
+        catching {
             val tcm = context.getSystemService(TextClassificationManager::class.java)
             val classifier = tcm?.textClassifier ?: return@withContext emptyList()
 

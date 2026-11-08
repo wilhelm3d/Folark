@@ -68,6 +68,7 @@ internal fun AppListRow(
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem, Rect) -> Unit,
     dragController: HomeDragController,
+    folderDrag: DrawerFolderDrag,
     sourceTab: Long?,
     onDragOutStart: () -> Unit,
     onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
@@ -80,6 +81,11 @@ internal fun AppListRow(
     // Where the icon is, read when a long press or drag needs it (not on every scroll frame).
     val placedAt = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val bounds = { placedAt[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero }
+    // A row another app can be dropped on: it makes a folder of the two.
+    val dropTarget = folderDrag.overApp?.key == app.key
+    androidx.compose.runtime.DisposableEffect(app.key) {
+        onDispose { folderDrag.appBounds.remove(app.key) }
+    }
     // Keyboard navigation (D-pad, a hardware keyboard's arrows): the row is focusable through its
     // click handling already; this draws where the focus sits and gives the list a soft glow.
     var rowFocused by remember { mutableStateOf(false) }
@@ -88,7 +94,10 @@ internal fun AppListRow(
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged { rowFocused = it.isFocused }
-            .onPlaced { placedAt[0] = it }
+            .onPlaced {
+                placedAt[0] = it
+                folderDrag.appBounds[app.key] = app to it.boundsInRoot()
+            }
             .pointerInput(app.key, locked) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -122,22 +131,46 @@ internal fun AppListRow(
                     if (locked) return@awaitEachGesture
                     dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position, sourceTab)
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    // Set once the finger leaves the app area: only then does the drawer step aside.
+                    var leftPanel = false
                     try {
                         val completed = drag(down.id) { change ->
                             change.consume()
                             if (!dragController.moving && (change.position - down.position).getDistance() > slop) {
                                 dragController.beginMove()
-                                onDragOutStart()
+                                folderDrag.begin(app)
                             }
                             if (dragController.moving) {
                                 val root = bounds().topLeft + change.position
                                 dragController.update(root)
+                                // Refresh the hover first: a tab in the header is a drop target too,
+                                // so "still in the drawer" is not just the app area.
+                                folderDrag.move(root)
+                                // Near an edge the list keeps scrolling, so a folder above the fold
+                                // stays reachable while something is being carried.
+                                folderDrag.autoScroll(root, 3.dp.toPx(), 72.dp.toPx())
+                                val grid = folderDrag.gridBounds
+                                val onTarget = folderDrag.overApp != null || folderDrag.overFolder != null
+                                if (!(grid.isEmpty || grid.contains(root) || onTarget)) {
+                                    if (!leftPanel) {
+                                        leftPanel = true
+                                        folderDrag.cancel()
+                                        onDragOutStart()
+                                    }
+                                    folderDrag.clearHover()
+                                }
                                 // The folder tab under the finger lights up while the drag moves.
                                 dragController.setHoverFolderTab(root)
                             }
                         }
                         if (completed && dragController.moving) {
                             val root = dragController.rootPosition
+                            // Dropped on a folder: onto another app (a folder of the two) or onto a
+                            // folder tile or tab (into it). drop() only claims a real target.
+                            if (folderDrag.drop()) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                return@awaitEachGesture
+                            }
                             // Dragged out of a folder tab: wherever it lands outside the drawer, it
                             // also leaves the folder (a chip, the Remove pill, home, dock, split).
                             val pullOut = dragController.dragFromTab != null
@@ -170,6 +203,7 @@ internal fun AppListRow(
                             onAppLongClick(app, bounds())
                         }
                     } finally {
+                        folderDrag.cancel()
                         dragController.stop()
                     }
                 }
@@ -186,8 +220,8 @@ internal fun AppListRow(
             badgeShowCount = badgeShowCount,
             badgeScale = badgeScale,
             modifier = Modifier.border(
-                width = 2.dp,
-                color = if (rowFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                width = if (dropTarget) 3.dp else 2.dp,
+                color = if (rowFocused || dropTarget) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(18.dp),
             ),
         )
@@ -253,6 +287,8 @@ internal fun DragHandle(width: Dp = 36.dp, arrow: Boolean = false, progress: () 
 internal fun FrequentAppsCard(
     apps: List<AppItem>,
     columns: Int,
+    // Nullable so the card can be reused where there is no folder drag (it simply takes no drops).
+    drag: DrawerFolderDrag? = null,
     badges: Map<String, Int>,
     badgeShowCount: Boolean,
     badgeScale: Float,
@@ -293,7 +329,11 @@ internal fun FrequentAppsCard(
                         badgeScale = badgeScale,
                         modifier = Modifier
                             .weight(1f)
-                            .onPlaced { placedAt[0] = it }
+                            .onPlaced {
+                                placedAt[0] = it
+                                // A quick-access icon is an app like any other: it takes a drop.
+                                if (drag != null) drag.appBounds[app.key] = app to it.boundsInRoot()
+                            }
                             .combinedClickable(
                                 onClick = { onAppClick(app) },
                                 onLongClick = { onAppLongClick(app, bounds()) },
@@ -321,6 +361,7 @@ internal fun LazyGridScope.appCells(
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem, Rect) -> Unit,
     dragController: HomeDragController,
+    folderDrag: DrawerFolderDrag,
     sourceTab: Long?,
     onDragOutStart: () -> Unit,
     onDropOnHome: (AppItem, Int, Int, Int) -> Unit,
@@ -333,6 +374,12 @@ internal fun LazyGridScope.appCells(
         // Where the icon is, read when a long press or drag needs it (not on every scroll frame).
         val placedAt = remember { arrayOfNulls<LayoutCoordinates>(1) }
         val bounds = { placedAt[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero }
+        // While an icon is dragged inside the drawer this cell is a place to drop it — a folder of
+        // the two. It publishes where it is, and forgets again once it scrolls out of the panel.
+        val dropTarget = folderDrag.overApp?.key == app.key
+        androidx.compose.runtime.DisposableEffect(app.key) {
+            onDispose { folderDrag.appBounds.remove(app.key) }
+        }
         // Keyboard focus indicator (D-pad / hardware keyboard; the Lazy grid scrolls to it).
         var cellFocused by remember { mutableStateOf(false) }
         AppIcon(
@@ -346,11 +393,14 @@ internal fun LazyGridScope.appCells(
             modifier = Modifier
                 .onFocusChanged { cellFocused = it.isFocused }
                 .border(
-                    width = 2.dp,
-                    color = if (cellFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    width = if (dropTarget) 3.dp else 2.dp,
+                    color = if (cellFocused || dropTarget) MaterialTheme.colorScheme.primary else Color.Transparent,
                     shape = RoundedCornerShape(18.dp),
                 )
-                .onPlaced { placedAt[0] = it }
+                .onPlaced {
+                    placedAt[0] = it
+                    folderDrag.appBounds[app.key] = app to it.boundsInRoot()
+                }
                 // One unified gesture (like Workspace/Dock) but non-consuming until the
                 // long-press fires, so a quick drag still scrolls the grid: quick tap
                 // launches; a still long-press lifts → drag out to home/dock, or with no
@@ -399,6 +449,9 @@ internal fun LazyGridScope.appCells(
                         // accurate.
                         dragController.start(app, DragSource.Drawer, bounds().topLeft + down.position, sourceTab)
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        // Set once the finger leaves the panel: only then does the drawer step aside
+                        // (and the home targets come into play).
+                        var leftPanel = false
                         try {
                             val completed = drag(down.id) { change ->
                                 change.consume()
@@ -409,11 +462,29 @@ internal fun LazyGridScope.appCells(
                                     (change.position - down.position).getDistance() > slop
                                 ) {
                                     dragController.beginMove()
-                                    onDragOutStart()
+                                    folderDrag.begin(app)
                                 }
                                 if (dragController.moving) {
                                     val root = bounds().topLeft + change.position
                                     dragController.update(root)
+                                    // The hover comes first: a tab in the header is a drop target too,
+                                    // so leaving the apps is not the same as leaving the drawer.
+                                    folderDrag.move(root)
+                                    // Near an edge the list keeps scrolling, so a folder above the
+                                    // fold stays reachable while something is being carried.
+                                    folderDrag.autoScroll(root, 3.dp.toPx(), 72.dp.toPx())
+                                    val grid = folderDrag.gridBounds
+                                    val onTarget = folderDrag.overApp != null || folderDrag.overFolder != null
+                                    if (!(grid.isEmpty || grid.contains(root) || onTarget)) {
+                                        if (!leftPanel) {
+                                            leftPanel = true
+                                            // Out of the app area: the drawer steps aside and the
+                                            // home targets take over, exactly as before.
+                                            folderDrag.cancel()
+                                            onDragOutStart()
+                                        }
+                                        folderDrag.clearHover()
+                                    }
                                     // The folder tab under the finger lights up while the drag moves.
                                     dragController.setHoverFolderTab(root)
                                 }
@@ -422,6 +493,13 @@ internal fun LazyGridScope.appCells(
                                 val root = dragController.rootPosition
                                 // Dragged out of a folder tab: wherever it lands outside the drawer,
                                 // it also leaves the folder (a chip, the Remove pill, home, dock, split).
+                                // Dropped on a folder: onto another app (a folder of the two) or
+                                // onto a folder tile or tab (into it). drop() only claims a real
+                                // target, so empty space still falls through to the home logic.
+                                if (folderDrag.drop()) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    return@awaitEachGesture
+                                }
                                 val pullOut = dragController.dragFromTab != null
                                 when {
                                     // Onto a folder chip over home: into that folder (All pulls out).

@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.backup.BackupRepository
 import org.arkikeskus.launcher.data.backup.RestoreResult
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 /** Restoring a backup from the first-run intro: idle, working, or how it ended. */
 sealed interface IntroRestoreState {
@@ -87,7 +88,7 @@ internal fun IntroRestoreButton(
         } else {
             OutlinedButton(
                 onClick = {
-                    runCatching {
+                    catching {
                         pick.launch(arrayOf(BackupRepository.MIME_TYPE, "application/octet-stream", "*/*"))
                     }
                 },

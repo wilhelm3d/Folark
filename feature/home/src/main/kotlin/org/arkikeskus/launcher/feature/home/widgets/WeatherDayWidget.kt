@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
+import org.arkikeskus.launcher.model.WidgetSettings
+
 import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
 
@@ -90,6 +92,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import org.arkikeskus.launcher.model.catching
 
 @HiltViewModel
 class WeatherDayViewModel @Inject constructor(
@@ -100,10 +103,10 @@ class WeatherDayViewModel @Inject constructor(
     val hasPermission = MutableStateFlow(weatherRepository.hasPermission())
     val unavailable: StateFlow<Boolean> = weatherRepository.unavailable
     /** Only the widget settings: a change elsewhere in Settings doesn't redraw this widget. */
-    val widgets: StateFlow<LauncherSettings.Widgets> = settingsRepository.settings(ScreenType.OUTER)
+    val widgets: StateFlow<WidgetSettings> = settingsRepository.settings(ScreenType.OUTER)
         .map { it.widgets }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LauncherSettings.Widgets())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), WidgetSettings())
 
     /** Re-checks the permission and asks for fresh weather (the repository rate-limits itself;
      *  [force] is for a tap, which tries again even right after a failed attempt). */
@@ -226,11 +229,11 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
             .border(1.dp, Color.White.copy(alpha = 0.28f * tint), WeatherShape)
             .clickable(interactionSource = noIndication, indication = null) {
                 if (!hasPermission) {
-                    runCatching { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }
+                    catching { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }
                 } else if (current == null) {
                     viewModel.refresh(force = true)
                 } else if (!(widgets.motoWeatherTap && MotoLinks.open(context, MotoLinks.WEATHER))) {
-                    runCatching {
+                    catching {
                         val query = Uri.encode("weather " + current.city.orEmpty())
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$query"))
@@ -423,7 +426,7 @@ private fun TemperatureCurve(hours: List<HourForecast>, modifier: Modifier) {
 @Composable
 private fun DayRow(day: DayForecast, today: Boolean, rangeLow: Double, rangeHigh: Double, low: String, high: String) {
     val name = if (today) stringResource(R.string.weather_today) else remember(day.date) {
-        runCatching {
+        catching {
             LocalDate.parse(day.date).dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())
         }.getOrDefault(day.date.takeLast(5))
     }

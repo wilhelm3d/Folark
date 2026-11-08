@@ -128,6 +128,7 @@ import org.arkikeskus.launcher.ui.component.NotificationBadge
 import javax.inject.Inject
 import java.util.Date
 import kotlin.math.abs
+import org.arkikeskus.launcher.model.catching
 
 /** How long a fresh tile takes to fade from full color to its pale "still unread" tint. */
 private const val FADE_MS = 2 * 60 * 60 * 1000L
@@ -197,7 +198,7 @@ class PeopleWidgetViewModel @Inject constructor(
         hasAccess.value = isAccessGranted()
     }
 
-    private fun isAccessGranted(): Boolean = runCatching {
+    private fun isAccessGranted(): Boolean = catching {
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     }.getOrDefault(false)
 
@@ -258,7 +259,7 @@ class PeopleWidgetViewModel @Inject constructor(
         if (pending.isEmpty()) return
         viewModelScope.launch {
             val found = pending.associate { tile ->
-                val matches = runCatching { contacts.search(tile.name, 3) }.getOrDefault(emptyList())
+                val matches = catching { contacts.search(tile.name, 3) }.getOrDefault(emptyList())
                 tile.key to (matches.firstOrNull { it.name.equals(tile.name, ignoreCase = true) } ?: matches.singleOrNull())
             }
             contactCache.value = contactCache.value + found
@@ -349,7 +350,7 @@ class PeopleWidgetViewModel @Inject constructor(
     fun unlink(tile: Tile) = viewModelScope.launch { settingsRepository.unlinkPerson(tile.key) }
 
     private fun start(intent: Intent): Boolean =
-        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
+        catching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
 }
 
 /**
@@ -761,7 +762,7 @@ private fun rememberAvatarBitmap(entry: org.arkikeskus.launcher.data.PersonEntry
     LaunchedEffect(entry.key, entry.postTime, px) {
         val icon = entry.personIcon
         bitmap = withContext(Dispatchers.IO) {
-            runCatching { icon?.loadDrawable(context)?.toBitmap(width = px, height = px)?.asImageBitmap() }.getOrNull()
+            catching { icon?.loadDrawable(context)?.toBitmap(width = px, height = px)?.asImageBitmap() }.getOrNull()
         }
     }
     return bitmap

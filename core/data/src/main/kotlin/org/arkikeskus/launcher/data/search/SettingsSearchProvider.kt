@@ -9,6 +9,7 @@ import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** A curated, localizable settings page entry. */
 data class SettingItem(
@@ -46,7 +47,7 @@ class SettingsSearchProvider @Inject constructor(
     /** The pages this phone actually has (some makers leave pages out), worked out once. */
     private val available: List<Quad> by lazy {
         CURATED.filter { q ->
-            runCatching { context.packageManager.resolveActivity(android.content.Intent(q.action), 0) != null }
+            catching { context.packageManager.resolveActivity(android.content.Intent(q.action), 0) != null }
                 .getOrDefault(true)
         }
     }

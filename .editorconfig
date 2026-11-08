@@ -1,0 +1,24 @@
+root = true
+
+# One style for the whole repository, so editors stop reindenting and re-wrapping differently.
+# Kotlin is 4 spaces (the code already is); everything data-shaped is 2.
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json,toml,md,properties,conf}]
+indent_size = 2
+
+[*.xml]
+indent_size = 4
+
+[*.{kt,kts}]
+max_line_length = 130
+
+[*.md]
+trim_trailing_whitespace = false

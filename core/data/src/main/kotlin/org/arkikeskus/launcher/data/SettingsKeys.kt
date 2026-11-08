@@ -147,6 +147,7 @@ internal object Keys {
     val THREE_APP_SPLIT = booleanPreferencesKey("three_app_split")
     val THREE_APP_NATIVE = booleanPreferencesKey("three_app_native")
     val DRAWER_TABS_EXCLUSIVE = booleanPreferencesKey("drawer_tabs_exclusive")
+    val DRAWER_TABS_LOCKED = booleanPreferencesKey("drawer_tabs_locked")
     val TASKBAR_PAIRS = stringPreferencesKey("taskbar_pairs")
     val SEARCH_SHORTCUTS = booleanPreferencesKey("search_shortcuts")
     val SEARCH_WEB = booleanPreferencesKey("search_web")

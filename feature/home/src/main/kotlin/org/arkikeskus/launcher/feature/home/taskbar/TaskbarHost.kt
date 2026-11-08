@@ -16,6 +16,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.Display
 import android.view.WindowManager
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Where Folark's taskbar ([AppTaskbar]) lives.
@@ -47,7 +48,7 @@ object TaskbarHost {
     val overlayRunning: Boolean get() = overlayBar != null
 
     /** Whether Folark may display over other apps (the overlay host can run). */
-    fun canUseOverlay(context: Context): Boolean = runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
+    fun canUseOverlay(context: Context): Boolean = catching { Settings.canDrawOverlays(context) }.getOrDefault(false)
 
     /** Starts or stops the overlay host to match the permission; hands the bar over between hosts.
      *  Main thread only — callers from other threads are forwarded (the window context creation and
@@ -72,9 +73,9 @@ object TaskbarHost {
 
     private fun startOverlay(app: Context) {
         val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        val windowContext = runCatching {
+        val windowContext = catching {
             val display = app.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
-                ?: return@runCatching null
+                ?: return@catching null
             app.createDisplayContext(display).createWindowContext(type, null)
         }.getOrNull() ?: return
         val bar = AppTaskbar(windowContext, type)
@@ -89,7 +90,7 @@ object TaskbarHost {
             @Deprecated("Required by ComponentCallbacks")
             override fun onLowMemory() = Unit
         }
-        runCatching { windowContext.registerComponentCallbacks(callbacks) }
+        catching { windowContext.registerComponentCallbacks(callbacks) }
         overlayContext = windowContext
         overlayCallbacks = callbacks
         overlayBar = bar
@@ -101,7 +102,7 @@ object TaskbarHost {
         val bar = overlayBar ?: return
         stopWatching()
         bar.stop()
-        overlayCallbacks?.let { cb -> runCatching { overlayContext?.unregisterComponentCallbacks(cb) } }
+        overlayCallbacks?.let { cb -> catching { overlayContext?.unregisterComponentCallbacks(cb) } }
         overlayBar = null
         overlayContext = null
         overlayCallbacks = null
@@ -120,6 +121,10 @@ object TaskbarHost {
      * directly when it is on; without it, the overlay host reads Android's usage events (Usage
      * access) about once a second after a switch, easing off to every 3 s while nothing changes, and only
      * while there are rules and the screen is on.
+     *
+     * The thread stays up whenever the bar needs the app in front at all: [TaskbarWatch] decides the
+     * pace from whether the service is already hearing switches. Stopping it on `isRunning` left the
+     * dots stale whenever the service was connected but not subscribed to window-state events.
      */
     fun watchApps(context: Context, on: Boolean) {
         val main = Looper.getMainLooper()
@@ -128,8 +133,7 @@ object TaskbarHost {
             return
         }
         wantWatch = on
-        if (on && overlayBar != null && !LockAccessibilityService.isRunning) startWatching(context.applicationContext)
-        else stopWatching()
+        if (on && overlayBar != null) startWatching(context.applicationContext) else stopWatching()
     }
 
     /** The accessibility service saw [packageName] come to the front. */
@@ -162,7 +166,7 @@ object TaskbarHost {
      * The app most recently brought to the front, read once from usage events (Usage access), for
      * when no watch is running yet. Not on the main thread. Null if unknown.
      */
-    fun foregroundNow(context: Context): String? = runCatching {
+    fun foregroundNow(context: Context): String? = catching {
         val usage = context.getSystemService(UsageStatsManager::class.java) ?: return null
         val now = System.currentTimeMillis()
         val events = usage.queryEvents(now - FOREGROUND_LOOK_BACK_MS, now) ?: return null
@@ -202,7 +206,7 @@ object TaskbarHost {
                 if (usage != null) {
                     val now = System.currentTimeMillis()
                     var newest: String? = null
-                    runCatching {
+                    catching {
                         val events = usage.queryEvents(lastEventAt, now)
                         val event = UsageEvents.Event()
                         while (events.hasNextEvent()) {
@@ -227,7 +231,7 @@ object TaskbarHost {
                 // brings it back to the fast pace. With the bar itself not shown (handles only,
                 // hidden here) nobody is watching the running dots, so it may rest far longer;
                 // checkNow() (screen on, unfold, a handle touch) wakes it at once. See TaskbarWatch.
-                val cap = TaskbarWatch.cap(current?.barShown == true)
+                val cap = TaskbarWatch.cap(current?.barShown == true, LockAccessibilityService.reportsForeground)
                 watchDelay = TaskbarWatch.nextDelay(changed, watchDelay, cap)
                 handler.postDelayed(this, watchDelay)
             }

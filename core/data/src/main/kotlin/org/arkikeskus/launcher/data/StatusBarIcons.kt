@@ -3,6 +3,7 @@ package org.arkikeskus.launcher.data
 import android.content.Context
 import android.provider.Settings
 import org.arkikeskus.launcher.data.root.RootShell
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Hiding some of Android's own status bar icons (VPN key, NFC, alarm...). Android's SystemUI keeps a
@@ -41,7 +42,7 @@ object StatusBarIcons {
     private val slotNames = SLOTS.map { it.first }.toSet()
 
     /** Everything in Android's hidden-icons list right now. */
-    fun hidden(context: Context): Set<String> = runCatching {
+    fun hidden(context: Context): Set<String> = catching {
         Settings.Secure.getString(context.contentResolver, KEY).orEmpty()
             .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
     }.getOrDefault(emptySet())
@@ -61,7 +62,7 @@ object StatusBarIcons {
     private fun write(context: Context, slots: Set<String>): Boolean {
         val value = slots.joinToString(",")
         if (SystemControls.canWrite(context)) {
-            return runCatching {
+            return catching {
                 Settings.Secure.putString(context.contentResolver, KEY, value.ifEmpty { null })
             }.getOrDefault(false)
         }

@@ -11,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import org.xmlpull.v1.XmlPullParser
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** An installed icon pack, for the settings picker. */
 data class IconPackInfo(val packageName: String, val label: String)
@@ -35,7 +36,7 @@ class IconPack(
     fun getDrawable(name: String): Drawable? {
         // getIdentifier is a slow lookup by name; each name is looked up once.
         val id = ids.getOrPut(name) { res.getIdentifier(name, "drawable", packageName) }.takeIf { it != 0 } ?: return null
-        return runCatching { ResourcesCompat.getDrawable(res, id, null) }.getOrNull()
+        return catching { ResourcesCompat.getDrawable(res, id, null) }.getOrNull()
     }
 
     private val ids = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -65,11 +66,11 @@ open class IconPackRepository @Inject constructor(
         val intents = THEME_ACTIONS.map { Intent(it) } +
             THEME_CATEGORIES.map { Intent(Intent.ACTION_MAIN).addCategory(it) }
         for (intent in intents) {
-            val list = runCatching { pm.queryIntentActivities(intent, 0) }.getOrElse { emptyList() }
+            val list = catching { pm.queryIntentActivities(intent, 0) }.getOrElse { emptyList() }
             list.forEach { packages.add(it.activityInfo.packageName) }
         }
         return packages.mapNotNull { pkg ->
-            runCatching {
+            catching {
                 IconPackInfo(pkg, pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString())
             }.getOrNull()
         }.sortedBy { it.label.lowercase() }
@@ -96,7 +97,7 @@ open class IconPackRepository @Inject constructor(
     fun get(pkg: String): IconPack? {
         if (pkg.isBlank()) return null
         if (cache.containsKey(pkg)) return cache[pkg]
-        val pack = runCatching { load(pkg) }
+        val pack = catching { load(pkg) }
             .onFailure { android.util.Log.w("IconPack", "load($pkg) failed: $it") }
             .getOrNull()
         cache[pkg] = pack
@@ -130,7 +131,7 @@ open class IconPackRepository @Inject constructor(
                 event = parser.next()
             }
         } finally {
-            runCatching { closeable.close() }
+            catching { closeable.close() }
         }
         return IconPack(packageName = pkg, res = res, componentMap = map)
     }

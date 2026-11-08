@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.ColorSpace
 import android.hardware.HardwareBuffer
 import java.io.File
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Runs as root through `app_process` (see [RootTasks]), outside the app, so it may ask Android's
@@ -18,7 +19,7 @@ class RootMain {
 
         @JvmStatic
         fun main(args: Array<String>) {
-            val result = runCatching {
+            val result = catching {
                 when (args.getOrNull(0)) {
                     "remove-task" -> {
                         val taskId = args.getOrNull(1)?.toIntOrNull() ?: error("no task")
@@ -31,7 +32,7 @@ class RootMain {
                         val manager = taskManager()
                         val remove = manager.javaClass.getMethod("removeTask", Int::class.javaPrimitiveType)
                         val ids = args.drop(1).mapNotNull { it.toIntOrNull() }
-                        val removed = ids.count { id -> runCatching { remove.invoke(manager, id) == true }.getOrDefault(false) }
+                        val removed = ids.count { id -> catching { remove.invoke(manager, id) == true }.getOrDefault(false) }
                         "$OK $removed"
                     }
                     "snapshots" -> {
@@ -39,7 +40,7 @@ class RootMain {
                         dir.mkdirs()
                         var saved = 0
                         for (id in args.drop(2).mapNotNull { it.toIntOrNull() }) {
-                            val ok = runCatching { saveSnapshot(id, File(dir, "$id.jpg")) }
+                            val ok = catching { saveSnapshot(id, File(dir, "$id.jpg")) }
                                 .onFailure { System.err.println("task $id: ${it.javaClass.name}: ${it.message} ${(it.cause ?: it).stackTrace.take(3).joinToString(" | ")}") }
                                 .getOrDefault(false)
                             if (ok) saved++ else System.err.println("task $id: no picture")
@@ -70,7 +71,7 @@ class RootMain {
             val sources = mutableListOf(manager)
             val getter = manager.javaClass.methods.firstOrNull { it.name == "getTaskSnapshotManager" && it.parameterTypes.isEmpty() }
             if (getter != null) {
-                val got = runCatching { getter.invoke(manager) }.getOrNull()
+                val got = catching { getter.invoke(manager) }.getOrNull()
                 val service = if (got is android.os.IBinder) asInterface(got) else got
                 if (service != null) sources.add(0, service)
             }
@@ -78,7 +79,7 @@ class RootMain {
         }
 
         /** An AIDL binder as its interface (`<descriptor>$Stub.asInterface`). */
-        private fun asInterface(binder: android.os.IBinder): Any? = runCatching {
+        private fun asInterface(binder: android.os.IBinder): Any? = catching {
             val descriptor = binder.interfaceDescriptor ?: return null
             Class.forName("$descriptor\$Stub").getMethod("asInterface", android.os.IBinder::class.java).invoke(null, binder)
         }.getOrNull()
@@ -110,7 +111,7 @@ class RootMain {
                             else -> null
                         } as Any?
                     }
-                    val result = runCatching { method.invoke(source, *params.toTypedArray()) }
+                    val result = catching { method.invoke(source, *params.toTypedArray()) }
                         .onFailure { lastError = (it as? java.lang.reflect.InvocationTargetException)?.targetException ?: it }
                         .getOrNull()
                     if (result != null) return result
@@ -133,7 +134,7 @@ class RootMain {
                 return false
             }
             val buffer = snap.javaClass.getMethod("getHardwareBuffer").invoke(snap) as? HardwareBuffer ?: return false
-            val space = runCatching { snap.javaClass.getMethod("getColorSpace").invoke(snap) as? ColorSpace }.getOrNull()
+            val space = catching { snap.javaClass.getMethod("getColorSpace").invoke(snap) as? ColorSpace }.getOrNull()
                 ?: ColorSpace.get(ColorSpace.Named.SRGB)
             val hardware = Bitmap.wrapHardwareBuffer(buffer, space) ?: return false
             val bitmap = hardware.copy(Bitmap.Config.ARGB_8888, false) ?: return false

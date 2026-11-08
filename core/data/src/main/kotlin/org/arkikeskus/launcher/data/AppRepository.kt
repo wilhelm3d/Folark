@@ -23,6 +23,7 @@ import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /**
  * What the launcher asks the app list for: the apps themselves, Private Space, and every way of
@@ -313,7 +314,7 @@ class AppRepositoryImpl @Inject constructor(
         scope.launch {
             // A failure handles one settings change, not the whole watch (it ended for good before).
             settingsRepository.settings(ScreenType.OUTER).collect {
-                runCatching {
+                catching {
                     cachedFloatingSize = it.launch.floatingWindowSize
                     cachedThreeAppSplit = it.launch.threeAppSplit
                     cachedOpenAnimation = it.motion.appOpenAnimation

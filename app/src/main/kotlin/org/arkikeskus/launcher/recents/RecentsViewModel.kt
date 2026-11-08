@@ -1,7 +1,9 @@
 package org.arkikeskus.launcher.recents
 
 import android.app.ActivityManager
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -42,6 +44,7 @@ import javax.inject.Inject
 import org.arkikeskus.launcher.data.LaunchOrigin
 import org.arkikeskus.launcher.data.Haptics
 import org.arkikeskus.launcher.data.SplitSizes
+import org.arkikeskus.launcher.model.catching
 
 /** One card in Folark's Recents: an open app, or the apps sharing a split screen. */
 data class RecentsCard(
@@ -97,6 +100,25 @@ class RecentsViewModel @Inject constructor(
     val thumbnails: StateFlow<Map<Int, ImageBitmap>> = _thumbnails.asStateFlow()
 
     private var loadJob: Job? = null
+
+    // FIX #5: register a ComponentCallbacks2 listener so the LruCache proactively releases
+    // thumbnails when Android signals memory pressure, instead of holding the full budget until
+    // the ViewModel is destroyed. This prevents the launcher from competing for RAM during
+    // low-memory situations (e.g. while gaming or during multitasking on low-RAM devices).
+    private val memoryCallbacks = object : ComponentCallbacks2 {
+        override fun onTrimMemory(level: Int) {
+            when {
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> cache.evictAll()
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> cache.trimToSize(cache.maxSize() / 2)
+            }
+        }
+        override fun onConfigurationChanged(newConfig: Configuration) = Unit
+        override fun onLowMemory() = cache.evictAll()
+    }
+
+    init {
+        context.registerComponentCallbacks(memoryCallbacks)
+    }
 
     /** Memory in use per package (KB), with root and Settings ▸ Recents ▸ Memory use on cards. */
     private val _memory = MutableStateFlow<Map<String, Long>>(emptyMap())
@@ -175,7 +197,7 @@ class RecentsViewModel @Inject constructor(
                     cards += RecentsCard(
                         tasks = pair,
                         apps = pairApps,
-                        label = pairApps.joinToString(" + ") { it!!.label },
+                        label = pairApps.filterNotNull().joinToString(" + ") { it.label },
                         inactiveMs = pair.mapNotNull { it.inactiveMs }.minOrNull(),
                         pinned = pair.all { pinKey(it) in s.recents.pinned },
                     )
@@ -263,11 +285,11 @@ class RecentsViewModel @Inject constructor(
         _thumbnails.value = cache.snapshot()
     }
 
-    private fun decode(bytes: ByteArray): ImageBitmap? = runCatching {
+    private fun decode(bytes: ByteArray): ImageBitmap? = catching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val edge = maxOf(bounds.outWidth, bounds.outHeight)
-        if (edge <= 0) return@runCatching null
+        if (edge <= 0) return@catching null
         var sample = 1
         while (edge / (sample * 2) >= THUMB_MAX_EDGE) sample *= 2
         val options = BitmapFactory.Options().apply {
@@ -278,6 +300,7 @@ class RecentsViewModel @Inject constructor(
     }.getOrNull()
 
     override fun onCleared() {
+        context.unregisterComponentCallbacks(memoryCallbacks)
         cache.evictAll()
         super.onCleared()
     }
@@ -287,7 +310,7 @@ class RecentsViewModel @Inject constructor(
     private fun openSingleTask(task: OpenTask, app: AppItem?) {
         // The app grows out of its card (when the card's place was recorded on the tap).
         val options = LaunchOrigin.takeOptions()
-        val moved = runCatching {
+        val moved = catching {
             context.getSystemService(ActivityManager::class.java).moveTaskToFront(task.taskId, 0, options)
         }.isSuccess
         if (moved) Haptics.play(context, Haptics.Event.LAUNCH)
@@ -408,7 +431,7 @@ class RecentsViewModel @Inject constructor(
         val layout = if (c == null) SplitThree.layoutForSnap(SplitThree.currentSnap(context, firstTask)) else AppPair.LAYOUT_EVEN
         return AppPair(
             id = java.util.UUID.randomUUID().toString(),
-            name = apps.joinToString(" + ") { it!!.label },
+            name = apps.filterNotNull().joinToString(" + ") { it.label },
             app1Key = a.key, app1Package = a.packageName, app1ClassName = a.className, app1UserSerial = a.userSerial,
             app2Key = b.key, app2Package = b.packageName, app2ClassName = b.className, app2UserSerial = b.userSerial,
             app3Key = c?.key.orEmpty(), app3Package = c?.packageName.orEmpty(),
@@ -470,7 +493,7 @@ class RecentsViewModel @Inject constructor(
 
     fun appInfo(card: RecentsCard) {
         val app = card.apps.firstOrNull() ?: return
-        runCatching {
+        catching {
             context.getSystemService(android.content.pm.LauncherApps::class.java)
                 .startAppDetailsActivity(app.componentName, app.user, null, null)
         }

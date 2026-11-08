@@ -11,6 +11,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items as lazyItems
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -42,6 +52,7 @@ import org.arkikeskus.launcher.ui.component.CommitWhenIdle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.component.AppIcon
@@ -189,5 +200,131 @@ fun FolderDialog(
                 content(RoundedCornerShape(28.dp))
             }
         }
+    }
+}
+
+/**
+ * "Add to folder" from a home app's long-press menu — the way into a folder without a drag.
+ *
+ * A folder belongs to the screen it sits on, so this only ever offers or makes *home* folders: the
+ * drawer's folders are a separate set, reached from the drawer's own menu. A home folder needs two
+ * apps (one alone would just be the icon again), so "New folder" asks for the second app among the
+ * apps already placed on the home screen.
+ */
+@Composable
+fun HomeAddToFolderDialog(
+    app: AppItem,
+    folders: List<PlacedFolder>,
+    companions: List<AppItem>,
+    onPick: (Long) -> Unit,
+    onNew: (AppItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var choosingCompanion by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+
+    if (!choosingCompanion) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.home_add_to_folder)) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    if (folders.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.home_folder_none),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                        )
+                    }
+                    folders.forEach { folder ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onPick(folder.id)
+                                    onDismiss()
+                                }
+                                .padding(horizontal = 4.dp, vertical = 10.dp),
+                        ) {
+                            Text(
+                                text = folder.name,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = stringResource(R.string.home_folder_apps, folder.apps.size),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                // A folder of one app is no folder: without a second app on the screen, there is
+                // nothing to pair this one with yet.
+                TextButton(onClick = { choosingCompanion = true }, enabled = companions.isNotEmpty()) {
+                    Text(stringResource(R.string.home_folder_new))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    } else {
+        val matches = remember(query, companions) {
+            if (query.isBlank()) {
+                companions
+            } else {
+                companions.filter { it.label.contains(query.trim(), ignoreCase = true) }
+            }
+        }
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.home_folder_new_pick)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.folder_name_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                        lazyItems(items = matches, key = { it.key }) { other ->
+                            Text(
+                                text = other.label,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onNew(other)
+                                        onDismiss()
+                                    }
+                                    .padding(horizontal = 4.dp, vertical = 12.dp),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            },
+        )
     }
 }

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.view.View
 import android.widget.Toast
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Drop-to-share on the taskbar (split out of AppTaskbarBar): content dragged out of another app —
@@ -68,7 +69,7 @@ internal fun AppTaskbar.shareDropTo(app: AppItem, clip: ClipData?): Boolean {
         val mime = clip.description?.getMimeType(0)
         if (!mime.isNullOrBlank()) intent.type = mime else intent.setType("text/plain")
     }
-    return runCatching {
+    return catching {
         context.startActivity(intent)
         true
     }.getOrElse {

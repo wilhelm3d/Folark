@@ -40,6 +40,7 @@ import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.NotificationBadge
 import org.arkikeskus.launcher.ui.expressive.Accent
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 // Display profiles, Grid & DPI, and Dock & taskbar sections, with their small previews (split out of SettingsScreen.kt).
 
@@ -47,7 +48,7 @@ import kotlin.math.roundToInt
 internal fun rememberLauncherIconBitmap(): ImageBitmap? {
     val context = LocalContext.current
     return remember {
-        runCatching {
+        catching {
             val drawable = context.packageManager.getApplicationIcon(context.packageName)
             val size = 144
             val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)

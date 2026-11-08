@@ -8,6 +8,7 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.widget.Toast
 import org.arkikeskus.launcher.model.SearchResult
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Opens the app for a search [SearchResult.Action], already filled in: the clock app's timer or
@@ -19,7 +20,7 @@ internal fun startSearchAction(context: Context, action: SearchResult.Action): B
     // A clipboard-history hit: copied again, no app opened.
     if (action.kind == SearchResult.Action.CLIPBOARD) {
         val clip = context.getSystemService(android.content.ClipboardManager::class.java) ?: return false
-        runCatching { clip.setPrimaryClip(android.content.ClipData.newPlainText("clip", action.args["text"].orEmpty())) }
+        catching { clip.setPrimaryClip(android.content.ClipData.newPlainText("clip", action.args["text"].orEmpty())) }
         Toast.makeText(context, R.string.search_clip_copied, Toast.LENGTH_SHORT).show()
         return true
     }

@@ -1,5 +1,39 @@
 package org.arkikeskus.launcher.data
 
+import org.arkikeskus.launcher.model.LaunchSettings
+
+import org.arkikeskus.launcher.model.RootSettings
+
+import org.arkikeskus.launcher.model.RecentsSettings
+
+import org.arkikeskus.launcher.model.LiveSettings
+
+import org.arkikeskus.launcher.model.TaskbarSettings
+
+import org.arkikeskus.launcher.model.AppearanceSettings
+
+import org.arkikeskus.launcher.model.MotionSettings
+
+import org.arkikeskus.launcher.model.FoldSettings
+
+import org.arkikeskus.launcher.model.StatusBarSettings
+
+import org.arkikeskus.launcher.model.WidgetSettings
+
+import org.arkikeskus.launcher.model.FolderSettings
+
+import org.arkikeskus.launcher.model.DotSettings
+
+import org.arkikeskus.launcher.model.IconSettings
+
+import org.arkikeskus.launcher.model.SearchSettings
+
+import org.arkikeskus.launcher.model.DrawerSettings
+
+import org.arkikeskus.launcher.model.HomeSettings
+
+import org.arkikeskus.launcher.model.DockSettings
+
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
@@ -100,7 +134,7 @@ class SettingsRepository @Inject constructor(
     }
 
     /** One stored value as a flow: emits only when that value changes, then parses it. */
-    private fun <K, T> keyFlow(key: Preferences.Key<K>, parse: (K?) -> T): Flow<T> =
+    internal fun <K, T> keyFlow(key: Preferences.Key<K>, parse: (K?) -> T): Flow<T> =
         dataStore.data.map { it[key] }.distinctUntilChanged().map { parse(it) }
 
     private suspend fun repairStore() {
@@ -121,7 +155,7 @@ class SettingsRepository @Inject constructor(
         // store during development (e.g. homeColumns = 0) must never reach the layout math, where a
         // zero column count would spin firstFreeCell() in an infinite loop.
         LauncherSettings(
-            dock = LauncherSettings.Dock(
+            dock = DockSettings(
                 enabled = p[Keys.dockEnabled(screenType)] ?: true,
                 columns = (p[Keys.dockColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
                 showLabels = p[Keys.showDockLabels(screenType)] ?: false,
@@ -130,7 +164,7 @@ class SettingsRepository @Inject constructor(
                     if (it == LauncherSettings.DOCK_ALIGNMENT_LEFT || it == LauncherSettings.DOCK_ALIGNMENT_RIGHT || it == LauncherSettings.DOCK_ALIGNMENT_FLOATING) it else LauncherSettings.DOCK_ALIGNMENT_CENTER
                 },
             ),
-            home = LauncherSettings.Home(
+            home = HomeSettings(
                 columns = (p[Keys.homeColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
                 rows = (p[Keys.homeRows(screenType)] ?: HomeLayoutRepository.ROWS).coerceIn(MIN_ROWS, MAX_ROWS),
                 showLabels = p[Keys.showHomeLabels(screenType)] ?: true,
@@ -165,7 +199,7 @@ class SettingsRepository @Inject constructor(
                     .let { if (it in LauncherSettings.PAGE_EFFECTS) it else LauncherSettings.PAGE_EFFECT_SLIDE },
                 innerDualPage = p[Keys.innerDualPageWorkspace(screenType)] ?: false,
             ),
-            drawer = LauncherSettings.Drawer(
+            drawer = DrawerSettings(
                 columns = (p[Keys.drawerColumns(screenType)] ?: if (screenType == ScreenType.INNER) 6 else 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
                 rows = (p[Keys.drawerRows(screenType)] ?: 6).coerceIn(MIN_DRAWER_ROWS, MAX_DRAWER_ROWS),
                 showSearch = p[Keys.showDrawerSearch(screenType)] ?: true,
@@ -225,12 +259,13 @@ class SettingsRepository @Inject constructor(
                 twoLineLabels = p[Keys.twoLineDrawerLabels(screenType)] ?: true,
                 folderTabs = p[Keys.drawerFolderTabs(screenType)] ?: false,
                 tabsExclusive = p[Keys.DRAWER_TABS_EXCLUSIVE] ?: true,
+                lockTabOrder = p[Keys.DRAWER_TABS_LOCKED] ?: false,
                 showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
                 innerSidebar = p[Keys.innerSidebarAppDrawer(screenType)] ?: false,
                 azHoldScroll = p[Keys.DRAWER_AZ_HOLD_SCROLL] ?: true,
                 twoPane = p[Keys.DRAWER_TWO_PANE] ?: false,
             ),
-            search = LauncherSettings.Search(
+            search = SearchSettings(
                 contacts = p[Keys.SEARCH_CONTACTS] ?: false,
                 shortcuts = p[Keys.SEARCH_SHORTCUTS] ?: true,
                 web = p[Keys.SEARCH_WEB] ?: true,
@@ -238,7 +273,7 @@ class SettingsRepository @Inject constructor(
                 settingsPages = p[Keys.SEARCH_SETTINGS_PAGES] ?: true,
                 inlineShortcuts = p[Keys.SEARCH_INLINE_SHORTCUTS] ?: true,
             ),
-            icons = LauncherSettings.Icons(
+            icons = IconSettings(
                 forceThemedIcons = p[Keys.FORCE_THEMED_ICONS] ?: false,
                 themedIconStyle = (p[Keys.THEMED_ICON_STYLE] ?: LauncherSettings.THEMED_STYLE_CLASSIC)
                     .let { if (it in LauncherSettings.THEMED_STYLES) it else LauncherSettings.THEMED_STYLE_CLASSIC },
@@ -258,7 +293,7 @@ class SettingsRepository @Inject constructor(
                 nudgeSoftness = (p[Keys.ICON_NUDGE_SOFTNESS] ?: 0.5f).coerceIn(0f, 1f),
                 ring = p[Keys.ICON_RING] ?: LauncherSettings.RING_PROGRESS,
             ),
-            dots = LauncherSettings.Dots(
+            dots = DotSettings(
                 enabled = p[Keys.showNotificationDots(screenType)] ?: true,
                 showCount = p[Keys.notificationDotCount(screenType)] ?: true,
                 scale = (p[Keys.notificationDotScale(screenType)] ?: 1.0f).coerceIn(MIN_DOT_SCALE, MAX_DOT_SCALE),
@@ -267,7 +302,7 @@ class SettingsRepository @Inject constructor(
                 position = (p[Keys.dotPosition(screenType)] ?: LauncherSettings.DOT_POSITION_TOP_END).let { if (it in LauncherSettings.DOT_POSITIONS) it else LauncherSettings.DOT_POSITION_TOP_END },
                 avatars = p[Keys.DOT_AVATARS] ?: true,
             ),
-            folders = LauncherSettings.Folders(
+            folders = FolderSettings(
                 shape = (p[Keys.folderShape(screenType)] ?: LauncherSettings.FOLDER_SHAPE_SQUIRCLE)
                     .let { if (it in LauncherSettings.FOLDER_SHAPES) it else LauncherSettings.FOLDER_SHAPE_SQUIRCLE },
                 theme = (p[Keys.folderTheme(screenType)] ?: LauncherSettings.FOLDER_THEME_GLASS)
@@ -283,7 +318,7 @@ class SettingsRepository @Inject constructor(
                 openAnimation = (p[Keys.FOLDER_OPEN_ANIMATION] ?: LauncherSettings.FOLDER_ANIM_SHEET)
                     .let { if (it in LauncherSettings.FOLDER_ANIMS) it else LauncherSettings.FOLDER_ANIM_SHEET },
             ),
-            widgets = LauncherSettings.Widgets(
+            widgets = WidgetSettings(
                 showWeather = p[Keys.showWeather(screenType)] ?: true,
                 tonalBackground = p[Keys.widgetTonalBackground(screenType)] ?: false,
                 notificationCountStyle = (p[Keys.notificationWidgetCountStyle(screenType)] ?: LauncherSettings.COUNT_NUMBER)
@@ -331,7 +366,7 @@ class SettingsRepository @Inject constructor(
                     .let { if (it in LauncherSettings.CLOCK_STYLES) it else LauncherSettings.CLOCK_STYLE_CLASSIC },
                 backgroundOpacity = (p[Keys.WIDGET_BACKGROUND_OPACITY] ?: 0f).coerceIn(0f, 1f),
             ),
-            statusBar = LauncherSettings.StatusBar(
+            statusBar = StatusBarSettings(
                 enabled = p[Keys.showStatusBar(screenType)] ?: false,
                 hideSystem = p[Keys.hideSystemStatusBar(screenType)] ?: false,
                 scrimOpacity = (p[Keys.statusBarScrimOpacity(screenType)] ?: 0.6f).coerceIn(0f, 1f),
@@ -341,7 +376,7 @@ class SettingsRepository @Inject constructor(
                 systemPaddingCover = (p[Keys.SYSTEM_BAR_PADDING_COVER] ?: 10)
                     .coerceIn(LauncherSettings.MIN_SYSTEM_PADDING, LauncherSettings.MAX_SYSTEM_PADDING),
             ),
-            fold = LauncherSettings.Fold(
+            fold = FoldSettings(
                 halfOpenedModeEnabled = p[Keys.HALF_OPENED_ENABLED] ?: false,
                 hingeTilt = p[Keys.HINGE_TILT] ?: true,
                 wallpaperHinge = p[Keys.WALLPAPER_HINGE] ?: false,
@@ -371,7 +406,7 @@ class SettingsRepository @Inject constructor(
                 liveHingeBlurDp = (p[Keys.LIVE_HINGE_BLUR] ?: 24).coerceIn(0, LauncherSettings.MAX_LIVE_HINGE_BLUR_DP),
                 liveHingeFrost = (p[Keys.LIVE_HINGE_FROST] ?: 0.2f).coerceIn(0f, LauncherSettings.MAX_LIVE_HINGE_FROST),
             ),
-            motion = LauncherSettings.Motion(
+            motion = MotionSettings(
                 aquamorphicTouchEnabled = p[Keys.aquamorphicTouchEnabled(screenType)] ?: true,
                 appLaunchZoomEnabled = p[Keys.appLaunchZoomEnabled(screenType)] ?: true,
                 animationSpeed = (p[Keys.ANIMATION_SPEED] ?: 1f).coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED),
@@ -396,7 +431,7 @@ class SettingsRepository @Inject constructor(
                 batterySaverLowBattery = p[Keys.BATTERY_SAVER_LOW_BATTERY] ?: true,
                 batterySaverWhenHot = p[Keys.BATTERY_SAVER_WHEN_HOT] ?: true,
             ),
-            appearance = LauncherSettings.Appearance(
+            appearance = AppearanceSettings(
                 amoledDark = p[Keys.amoledDark(screenType)] ?: false,
                 popupTheme = (p[Keys.popupTheme(screenType)] ?: LauncherSettings.POPUP_THEME_CLASSIC).let { if (it in LauncherSettings.POPUP_THEMES) it else LauncherSettings.POPUP_THEME_CLASSIC },
                 settingsStyle = p[Keys.SETTINGS_STYLE] ?: LauncherSettings.SETTINGS_STYLE_STUDIO,
@@ -414,7 +449,7 @@ class SettingsRepository @Inject constructor(
                 dpiAppDrawer = (p[Keys.dpiAppDrawer(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
                 dpiSettings = (p[Keys.dpiSettings(screenType)] ?: 1.0f).coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE),
             ),
-            taskbar = LauncherSettings.Taskbar(
+            taskbar = TaskbarSettings(
                 enabled = p[Keys.TASKBAR_ENABLED] ?: false,
                 pinnedApps = p[Keys.TASKBAR_PINNED]?.split("\n")?.filter { it.isNotEmpty() },
                 recentCount = (p[Keys.TASKBAR_RECENTS] ?: 4).coerceIn(0, 6),
@@ -468,7 +503,7 @@ class SettingsRepository @Inject constructor(
                 coverBar = p[Keys.TASKBAR_COVER_BAR] ?: false,
                 coverCount = (p[Keys.TASKBAR_COVER_COUNT] ?: 5).coerceIn(LauncherSettings.MIN_COVER_BAR, LauncherSettings.MAX_COVER_BAR),
             ),
-            live = LauncherSettings.Live(
+            live = LiveSettings(
                 popupNotifications = p[Keys.POPUP_NOTIFICATIONS] ?: true,
                 activities = p[Keys.LIVE_ACTIVITIES] ?: true,
                 activitiesTaskbar = p[Keys.LIVE_ACTIVITIES_TASKBAR] ?: true,
@@ -480,7 +515,7 @@ class SettingsRepository @Inject constructor(
             recents = readRecents(p).let { r ->
                 if (p[Keys.RECENTS_OUTER_LOOK] == true) r.copy(outerLookEnabled = true, outerLook = readRecents(coverLook(p))) else r
             },
-            root = LauncherSettings.Root(
+            root = RootSettings(
                 enabled = p[Keys.ROOT_ENABLED] ?: true,
                 lockMode = rootMode(p[Keys.ROOT_LOCK_MODE]),
                 recentsMode = rootMode(p[Keys.ROOT_RECENTS_MODE]),
@@ -492,7 +527,7 @@ class SettingsRepository @Inject constructor(
                 keepAccessibility = p[Keys.ROOT_KEEP_ACCESSIBILITY] ?: false,
                 keepWidgets = p[Keys.ROOT_KEEP_WIDGETS] ?: false,
             ),
-            launch = LauncherSettings.Launch(
+            launch = LaunchSettings(
                 splitEnabled = p[Keys.SPLIT_LAUNCH_ENABLED] ?: true,
                 floatingEnabled = p[Keys.FLOATING_LAUNCH_ENABLED] ?: true,
                 floatingWindowSize = (p[Keys.FLOATING_WINDOW_SIZE] ?: LauncherSettings.FLOATING_SIZE_MEDIUM)
@@ -647,6 +682,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setAutoRemoveEmptyPages(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.autoRemoveEmptyPages(screenType)] = value }
     suspend fun setDrawerFolderTabs(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerFolderTabs(screenType)] = value }
     suspend fun setDrawerTabsExclusive(value: Boolean) = edit { it[Keys.DRAWER_TABS_EXCLUSIVE] = value }
+    suspend fun setDrawerTabsLocked(value: Boolean) = edit { it[Keys.DRAWER_TABS_LOCKED] = value }
     suspend fun setFloatingWindowSize(value: String) = edit { it[Keys.FLOATING_WINDOW_SIZE] = value }
     suspend fun setThreeAppSplit(value: Boolean) = edit { it[Keys.THREE_APP_SPLIT] = value }
     suspend fun setThreeAppNative(value: Boolean) = edit { it[Keys.THREE_APP_NATIVE] = value }
@@ -824,8 +860,8 @@ class SettingsRepository @Inject constructor(
     private fun lines(raw: String?): Set<String> = raw?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     /** Settings ▸ Recents, read from [p]. */
-    private fun readRecents(p: Preferences): LauncherSettings.Recents =
-    LauncherSettings.Recents(
+    private fun readRecents(p: Preferences): RecentsSettings =
+    RecentsSettings(
         enabled = p[Keys.RECENTS_ENABLED] ?: true,
         replaceSystem = p[Keys.RECENTS_REPLACE_SYSTEM] ?: false,
         navHandleOpensSearch = p[Keys.NAV_HANDLE_SEARCH] ?: false,
@@ -954,7 +990,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setRecentsOuterLook(value: Boolean) = edit { it[Keys.RECENTS_OUTER_LOOK] = value }
 
     private fun recentsAction(value: String?, fallback: String): String =
-        if (value in LauncherSettings.RECENTS_ACTIONS) value!! else fallback
+        value?.takeIf { it in LauncherSettings.RECENTS_ACTIONS } ?: fallback
     suspend fun setRecentsAttachedSide(value: String) = edit { it[Keys.RECENTS_ATTACHED_SIDE] = value }
     suspend fun setRecentsAttachedPeek(value: Float) = edit {
         it[Keys.RECENTS_ATTACHED_PEEK] = value.coerceIn(LauncherSettings.MIN_RECENTS_ATTACHED_PEEK, LauncherSettings.MAX_RECENTS_ATTACHED_PEEK)
@@ -1046,7 +1082,7 @@ class SettingsRepository @Inject constructor(
     suspend fun setRootKeepWidgets(value: Boolean) = edit { it[Keys.ROOT_KEEP_WIDGETS] = value }
 
     private fun rootMode(value: String?): String =
-        if (value in LauncherSettings.ROOT_MODES) value!! else LauncherSettings.ROOT_MODE_FALLBACK
+        value?.takeIf { it in LauncherSettings.ROOT_MODES } ?: LauncherSettings.ROOT_MODE_FALLBACK
     suspend fun setIconNudge(value: Boolean) = edit { it[Keys.ICON_NUDGE] = value }
     suspend fun setUnlockTransition(value: Boolean) = edit { it[Keys.UNLOCK_TRANSITION] = value }
     suspend fun setUnlockSystemHook(value: Boolean) = edit { it[Keys.UNLOCK_SYSTEM_HOOK] = value }
@@ -1320,61 +1356,6 @@ class SettingsRepository @Inject constructor(
             if (i <= 0) null else line.substring(0, i) to line.substring(i + 1)
         }?.groupBy({ it.first }, { it.second })?.mapValues { it.value.toSet() } ?: emptyMap()
 
-    // --- App-drawer folders ----------------------------------------------------------------------
-    // Serialized one folder per line, tab-separated fields: "id\tname\tkey1\tkey2...". App keys
-    // never contain a tab; folder names are normalized in serializeFolders, so a plain split
-    // round-trips cleanly.
-
-    val drawerFolders: Flow<List<DrawerFolder>> = keyFlow(Keys.DRAWER_FOLDERS) { parseFolders(it) }
-
-    /** Creates an empty drawer folder, returns its new id. */
-    suspend fun createDrawerFolder(name: String): Long {
-        var newId = 1L
-        edit { p ->
-            val folders = parseFolders(p[Keys.DRAWER_FOLDERS])
-            newId = (folders.maxOfOrNull { it.id } ?: 0L) + 1L
-            p[Keys.DRAWER_FOLDERS] = serializeFolders(folders + DrawerFolder(newId, name, emptyList()))
-        }
-        return newId
-    }
-
-    suspend fun renameDrawerFolder(id: Long, name: String) = editFolders { folders ->
-        folders.map { if (it.id == id) it.copy(name = name) else it }
-    }
-
-    suspend fun deleteDrawerFolder(id: Long) = editFolders { folders -> folders.filterNot { it.id == id } }
-
-    suspend fun addAppsToDrawerFolder(id: Long, keys: List<String>) = editFolders { folders ->
-        folders.map { f ->
-            if (f.id == id) f.copy(appKeys = (f.appKeys + keys).distinct()) else f
-        }
-    }
-
-    suspend fun removeAppFromDrawerFolder(id: Long, key: String) = editFolders { folders ->
-        folders.map { f -> if (f.id == id) f.copy(appKeys = f.appKeys - key) else f }
-    }
-
-    private suspend fun editFolders(block: (List<DrawerFolder>) -> List<DrawerFolder>) = edit { p ->
-        p[Keys.DRAWER_FOLDERS] = serializeFolders(block(parseFolders(p[Keys.DRAWER_FOLDERS])))
-    }
-
-    private fun parseFolders(raw: String?): List<DrawerFolder> =
-        raw?.split("\n")?.filter { it.isNotEmpty() }?.mapNotNull { line ->
-            val parts = line.split('\t')
-            val id = parts.getOrNull(0)?.toLongOrNull() ?: return@mapNotNull null
-            DrawerFolder(id, parts.getOrNull(1).orEmpty(), parts.drop(2).filter { it.isNotEmpty() })
-        } ?: emptyList()
-
-    private fun serializeFolders(folders: List<DrawerFolder>): String =
-        folders.joinToString("\n") { f ->
-            // The record format is tab/newline-separated; a pasted separator in a folder name would
-            // truncate the record and corrupt the member list — normalize at the one write point.
-            val safeName = f.name.replace(SEPARATORS, " ")
-            (listOf(f.id.toString(), safeName) + f.appKeys).joinToString("\t")
-        }
-
-    private val SEPARATORS = Regex("[\\t\\n\\r]+")
-
     suspend fun setDockEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dockEnabled(screenType)] = value }
     suspend fun setDockColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dockColumns(screenType)] = value.coerceIn(MIN_COLUMNS, MAX_COLUMNS) }
     suspend fun setHomeColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeColumns(screenType)] = value.coerceIn(MIN_COLUMNS, MAX_COLUMNS) }
@@ -1620,7 +1601,7 @@ class SettingsRepository @Inject constructor(
     /** Replaces the (empty) dock with the first-run default apps — seeding only, not a user API. */
     suspend fun seedDock(keys: List<String>, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dockFavorites(screenType)] = keys.joinToString("\n") }
 
-    private suspend fun edit(block: (MutablePreferences) -> Unit) {
+    internal suspend fun edit(block: (MutablePreferences) -> Unit) {
         dataStore.edit(block)
     }
 

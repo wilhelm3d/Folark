@@ -3,6 +3,23 @@ package org.arkikeskus.launcher.feature.settings
 import android.content.Context
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import org.arkikeskus.launcher.data.DrawerFolder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
@@ -49,6 +66,9 @@ import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
 import java.io.File
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.data.drawerFolders
+import org.arkikeskus.launcher.data.moveDrawerFolder
+import org.arkikeskus.launcher.model.catching
 
 // The theming cards of the Theme page: one-tap presets, the look of menus and widget stacks, the
 // home backdrop and Folark's own widgets. Settings that are not about looks live as rows on the
@@ -240,13 +260,13 @@ internal fun HomeBackdropCard(
                 if (s.home.backgroundImage.isBlank()) R.string.settings_home_background_none
                 else R.string.settings_home_background_set,
             ),
-            onClick = { runCatching { pickBackground.launch("image/*") } },
+            onClick = { catching { pickBackground.launch("image/*") } },
         )
         ExpressiveRowDivider()
         ExpressiveActionItem(
             title = stringResource(R.string.settings_home_video),
             description = stringResource(R.string.settings_home_video_desc),
-            onClick = { runCatching { pickVideo.launch("video/*") } },
+            onClick = { catching { pickVideo.launch("video/*") } },
         )
         if (phoneWallpapers.isNotEmpty()) {
             ExpressiveRowDivider()
@@ -661,6 +681,16 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
             onCheckedChange = viewModel::setDrawerTwoPane,
             shared = true,
         )
+        ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_drawer_tabs_lock),
+            subtitle = stringResource(R.string.settings_drawer_tabs_lock_desc),
+            checked = s.drawer.lockTabOrder,
+            onCheckedChange = viewModel::setDrawerTabsLocked,
+            shared = true,
+        )
+        ExpressiveRowDivider()
+        DrawerTabOrder(viewModel, locked = s.drawer.lockTabOrder)
     }
 
     // Private Space exists from Android 15 on.
@@ -673,6 +703,112 @@ internal fun DrawerExtrasRows(s: LauncherSettings, viewModel: SettingsViewModel,
             onCheckedChange = viewModel::setShowPrivateSpace,
             shared = true,
         )
+    }
+}
+
+/**
+ * The order of the drawer's tabs, as a list you drag by the handle. The tabs are the drawer folders,
+ * so moving a row here moves the chip in the drawer's tab row (and the matching folder tile).
+ */
+@Composable
+private fun DrawerTabOrder(viewModel: SettingsViewModel, locked: Boolean = false) {
+    val folders by viewModel.drawerFolders.collectAsStateWithLifecycle()
+    val palette = LocalExpressivePalette.current
+    // A local copy so a row follows the finger before the write lands; reset when the store emits.
+    var order by remember(folders) { mutableStateOf(folders) }
+    val rowHeight = 54.dp
+    val rowHeightPx = with(LocalDensity.current) { rowHeight.toPx() }
+    var draggingIndex by remember { mutableStateOf(-1) }
+    var dragOffset by remember { mutableStateOf(0f) }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Text(
+            text = stringResource(R.string.settings_drawer_tab_order),
+            color = palette.text,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(start = 4.dp),
+        )
+        Text(
+            text = stringResource(R.string.settings_drawer_tab_order_desc),
+            color = palette.dim,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 8.dp),
+        )
+        if (order.isEmpty()) {
+            Text(
+                text = stringResource(R.string.settings_drawer_tab_order_empty),
+                color = palette.dim,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
+            )
+        }
+        order.forEachIndexed { index, folder ->
+            val lifted = draggingIndex == index
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(rowHeight)
+                    .zIndex(if (lifted) 1f else 0f)
+                    .graphicsLayer {
+                        translationY = if (lifted) dragOffset else 0f
+                        val s = if (lifted) 1.02f else 1f
+                        scaleX = s
+                        scaleY = s
+                    }
+                    .background(
+                        if (lifted) palette.surfaceHi else Color.Transparent,
+                        RoundedCornerShape(14.dp),
+                    )
+                    .padding(horizontal = 8.dp),
+            ) {
+                Icon(
+                    Icons.Rounded.Menu,
+                    contentDescription = stringResource(R.string.settings_drawer_tab_order),
+                    tint = if (locked) palette.faint else palette.dim,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .pointerInput(order, locked) {
+                            // Locked from the switch above: the handles stay put, so the order can
+                            // only be changed by unlocking it here.
+                            if (locked) return@pointerInput
+                            detectDragGestures(
+                                onDragStart = {
+                                    draggingIndex = index
+                                    dragOffset = 0f
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount.y
+                                },
+                                onDragEnd = {
+                                    val from = draggingIndex
+                                    val to = (from + (dragOffset / rowHeightPx).roundToInt())
+                                        .coerceIn(0, order.lastIndex)
+                                    draggingIndex = -1
+                                    dragOffset = 0f
+                                    if (from in order.indices && from != to) {
+                                        order = order.toMutableList().apply { add(to, removeAt(from)) }
+                                        viewModel.moveDrawerFolder(from, to)
+                                    }
+                                },
+                                onDragCancel = {
+                                    draggingIndex = -1
+                                    dragOffset = 0f
+                                },
+                            )
+                        },
+                )
+                Text(
+                    text = folder.name,
+                    color = palette.text,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 10.dp),
+                )
+            }
+        }
     }
 }
 
@@ -733,7 +869,7 @@ private fun homeBackgroundPrefix(screenType: ScreenType): String =
 /** Removes every stored background picture of [screenType] (only one is ever current). */
 private fun deleteHomeBackgrounds(context: Context, screenType: ScreenType) {
     val prefix = homeBackgroundPrefix(screenType)
-    runCatching {
+    catching {
         context.filesDir.listFiles()?.filter { it.name.startsWith(prefix) }?.forEach { it.delete() }
     }
 }
@@ -745,12 +881,12 @@ private fun deleteHomeBackgrounds(context: Context, screenType: ScreenType) {
  * previous one.
  */
 private fun copyHomeBackground(context: Context, uri: Uri, screenType: ScreenType, suffix: String = ""): String? {
-    return runCatching {
+    return catching {
         // Copy first, then drop the older pictures: a failed copy must leave the current one in place.
         // A video keeps its extension: that is how home tells it from a picture.
         val target = File(context.filesDir, homeBackgroundPrefix(screenType) + System.currentTimeMillis() + suffix)
         val input = context.contentResolver.openInputStream(uri) ?: return null
-        val copied = runCatching { input.use { source -> target.outputStream().use { source.copyTo(it) } } }.isSuccess
+        val copied = catching { input.use { source -> target.outputStream().use { source.copyTo(it) } } }.isSuccess
         if (!copied) {
             target.delete()
             return null

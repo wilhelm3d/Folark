@@ -18,12 +18,14 @@ import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.ScheduledPair
 import org.arkikeskus.launcher.data.nextFireAfter
+import org.arkikeskus.launcher.model.catching
 
 /**
- * Fires scheduled app-pair scenes (PairSchedules.kt): one exact alarm per scheduled pair; when it
- * goes off, the pair launches straight away if Folark is what the user is looking at, and otherwise
- * comes up as a heads-up notification ([PairLaunchActivity]) — Android does not let a background
- * app start activities, and a notification the user taps is the honest way around that.
+ * Fires scheduled app-pair scenes (PairSchedules.kt): one exact alarm, armed for the soonest
+ * scheduled pair; when it goes off, that pair launches straight away if Folark is what the user is
+ * looking at, and otherwise comes up as a heads-up notification ([PairLaunchActivity]) — Android
+ * does not let a background app start activities, and a notification the user taps is the honest
+ * way around that.
  *
  * Alarms are re-laid after boot, after any schedule/pair change (the application watches the
  * schedules flow), and after time or timezone changes; each fire re-lays the next occurrence.
@@ -48,24 +50,39 @@ class PairScheduleReceiver : BroadcastReceiver() {
         }
     }
 
-    /** The alarm for [pairId] went off: lay the next occurrence, then launch or notify. */
+    /**
+     * The alarm went off: lay the next occurrence, then launch or notify every pair due at this
+     * moment — the one the alarm named, and any other pair scheduled for the same minute (one alarm
+     * covers them all, so pairs sharing a minute arrive together).
+     */
     private suspend fun fire(context: Context, pairId: String?) {
-        pairId ?: return
-        val pair = scheduledPair(pairId) ?: return
-        rescheduleAll(context)
+        val firedAt = System.currentTimeMillis()
+        val due = dueNow(pairId, firedAt)
+        // Strictly in the future, so this fire cannot arm itself again.
+        rescheduleAll(context, after = firedAt)
+        if (due.isEmpty()) return
         if (folarkInFront(context)) {
-            runCatching { appRepository.launchAppPair(pair.pair) }
+            due.forEach { catching { appRepository.launchAppPair(it.pair) } }
         } else {
-            notifyPair(context, pair)
+            due.forEach { notifyPair(context, it) }
         }
     }
 
-    private suspend fun scheduledPair(pairId: String): ScheduledPair? =
+    /**
+     * The pair [pairId] (which this alarm was laid for, so a delivery delayed by Doze still comes
+     * up), plus every pair whose schedule falls within a second of [firedAt].
+     */
+    private suspend fun dueNow(pairId: String?, firedAt: Long): List<ScheduledPair> =
         withContext(Dispatchers.IO) {
-            val schedule = settingsRepository.pairSchedule(pairId) ?: return@withContext null
-            val pair = settingsRepository.appPairs.first().firstOrNull { it.id == pairId }
-                ?: return@withContext null
-            ScheduledPair(pair, schedule)
+            val schedules = settingsRepository.scheduledPairs.first()
+            val pairs = settingsRepository.appPairs.first()
+            schedules.mapNotNull { scheduled ->
+                val schedule = scheduled.schedule ?: return@mapNotNull null
+                val due = scheduled.pair.id == pairId ||
+                    schedule.nextFireAfter(firedAt - DUE_SLACK_MS) <= firedAt + 1_000L
+                if (!due) return@mapNotNull null
+                pairs.firstOrNull { it.id == scheduled.pair.id }?.let { ScheduledPair(it, schedule) }
+            }
         }
 
     /** A pair may only jump to the front while the user is actually on Folark, awake and unlocked. */
@@ -73,7 +90,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
         val power = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager ?: return false
         val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager ?: return false
         if (!power.isInteractive || keyguard.isKeyguardLocked) return false
-        val top = runCatching {
+        val top = catching {
             (context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager)
                 ?.getRunningTasks(1)?.firstOrNull()?.topActivity?.packageName
         }.getOrNull()
@@ -81,7 +98,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
     }
 
     private fun notifyPair(context: Context, pair: ScheduledPair) {
-        runCatching {
+        catching {
             val manager = context.getSystemService(android.app.NotificationManager::class.java) ?: return
             manager.createNotificationChannel(
                 android.app.NotificationChannel(
@@ -113,41 +130,75 @@ class PairScheduleReceiver : BroadcastReceiver() {
         const val EXTRA_PAIR_ID = "pair_id"
         const val CHANNEL_ID = "pair_schedules"
 
-        /** (Re)lays every scheduled pair's alarm; cancels the ones no longer wanted. */
-        fun rescheduleAll(context: Context) {
+        /** Single persistent scope shared across all rescheduleAll calls (lives for the app lifetime). */
+        private val rescheduleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        /** The one alarm's request code: it is re-armed for whichever pair is next. */
+        private const val SINGLE_ALARM_REQUEST = 0x50414952
+
+        /** How far before a fire a pair still counts as due with it (two schedules, one minute). */
+        private const val DUE_SLACK_MS = 2_000L
+
+        /**
+         * (Re)lays the single alarm, armed for the soonest pair scheduled strictly after [after];
+         * cancels it when nothing is scheduled.
+         *
+         * One alarm, not one per pair: every `RTC_WAKEUP` alarm is a separate exit from Doze, and
+         * the receiver re-lays the next occurrence on each fire anyway. Earlier versions armed one
+         * per pair; their pending intents are cancelled here so an upgrade cannot leave them behind.
+         */
+        fun rescheduleAll(context: Context, after: Long = System.currentTimeMillis()) {
             val manager = context.getSystemService(AlarmManager::class.java) ?: return
-            val hilt = runCatching {
+            val hilt = catching {
                 dagger.hilt.android.EntryPointAccessors.fromApplication(
                     context.applicationContext, PairSchedulerEntryPoint::class.java,
                 )
             }.getOrNull() ?: return
-            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            // FIX #1: use a single persistent scope instead of creating a new CoroutineScope on
+            // every call. The old code spawned an unbounded, never-cancelled scope each time
+            // rescheduleAll fired (alarm, boot, every schedule-change write), letting scopes
+            // accumulate and issuing concurrent SharedPreferences writes.
+            rescheduleScope.launch {
                 val wanted = withContext(Dispatchers.IO) {
                     hilt.settingsRepository().scheduledPairs.first()
                 }
                 val prefs = context.getSharedPreferences("pair_schedules", Context.MODE_PRIVATE)
-                // Cancel alarms of schedules removed since last time (AlarmManager has no listing).
-                val scheduled = prefs.getStringSet("scheduled", emptySet()).orEmpty()
-                (scheduled - wanted.map { it.pair.id }.toSet()).forEach { id ->
+                // Per-pair alarms from earlier versions (AlarmManager has no listing of its own).
+                prefs.getStringSet("scheduled", emptySet()).orEmpty().forEach { id ->
                     manager.cancel(fireIntent(context, id))
                 }
-                val now = System.currentTimeMillis()
-                val ids = wanted.mapNotNull { sp ->
-                    val next = sp.schedule?.nextFireAfter(now) ?: return@mapNotNull null
-                    val pi = fireIntent(context, sp.pair.id)
-                    // Exact when Android allows it (user grant on 12+); else a ±10 min window —
-                    // the pair then arrives a little late rather than not at all.
-                    if (Build.VERSION.SDK_INT >= 31 && !manager.canScheduleExactAlarms()) {
-                        manager.setWindow(AlarmManager.RTC_WAKEUP, next, 10 * 60_000L, pi)
-                    } else {
-                        manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pi)
-                    }
-                    sp.pair.id
+                val next = wanted
+                    .mapNotNull { sp -> sp.schedule?.nextFireAfter(after)?.let { at -> sp.pair.id to at } }
+                    .minByOrNull { it.second }
+                if (next == null) {
+                    manager.cancel(singleFireIntent(context, ""))
+                    prefs.edit().putStringSet("scheduled", emptySet()).apply()
+                    return@launch
                 }
-                prefs.edit().putStringSet("scheduled", ids.toSet()).apply()
+                val pi = singleFireIntent(context, next.first)
+                // Exact when Android allows it (user grant on 12+); else a ±10 min window —
+                // the pair then arrives a little late rather than not at all.
+                if (Build.VERSION.SDK_INT >= 31 && !manager.canScheduleExactAlarms()) {
+                    manager.setWindow(AlarmManager.RTC_WAKEUP, next.second, 10 * 60_000L, pi)
+                } else {
+                    manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next.second, pi)
+                }
+                prefs.edit().putStringSet("scheduled", setOf(next.first)).apply()
             }
         }
 
+        /** The single alarm, naming the pair it was armed for (extras are ignored when cancelling). */
+        private fun singleFireIntent(context: Context, pairId: String): PendingIntent {
+            val intent = Intent(context, PairScheduleReceiver::class.java)
+                .setAction(ACTION_FIRE)
+                .putExtra(EXTRA_PAIR_ID, pairId)
+            return PendingIntent.getBroadcast(
+                context, SINGLE_ALARM_REQUEST, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        /** A per-pair alarm from an earlier version, cancelled so an upgrade leaves none behind. */
         private fun fireIntent(context: Context, pairId: String): PendingIntent {
             val intent = Intent(context, PairScheduleReceiver::class.java)
                 .setAction(ACTION_FIRE)

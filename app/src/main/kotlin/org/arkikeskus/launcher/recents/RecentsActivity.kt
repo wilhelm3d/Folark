@@ -15,6 +15,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Folark's own Recents (Settings ▸ Recents), over the wallpaper: what is open, with split view for
@@ -45,7 +46,7 @@ class RecentsActivity : ComponentActivity() {
             // Liquid Glass: Android blurs whatever is behind Recents (home, or the app).
             val blurPx = if (settings.recents.glass) (settings.recents.glassBlur * resources.displayMetrics.density).toInt() else 0
             LaunchedEffect(blurPx) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) runCatching { window.setBackgroundBlurRadius(blurPx) }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) catching { window.setBackgroundBlurRadius(blurPx) }
             }
             LauncherTheme(
                 darkTheme = true,

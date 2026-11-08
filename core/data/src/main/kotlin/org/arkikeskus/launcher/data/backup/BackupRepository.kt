@@ -46,6 +46,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** How a restore went. */
 enum class RestoreResult {
@@ -99,7 +100,7 @@ class BackupRepository @Inject constructor(
     /** Writes a backup into [target] (a document the user just created). False if it failed. */
     suspend fun backupTo(target: Uri): Boolean = withContext(Dispatchers.IO) {
         mutex.withLock {
-            runCatching {
+            catching {
                 val bytes = buildBackup()
                 writeDocument(target, bytes)
             }.isSuccess
@@ -112,7 +113,7 @@ class BackupRepository @Inject constructor(
      */
     suspend fun shareableBackup(): Uri? = withContext(Dispatchers.IO) {
         mutex.withLock {
-            runCatching {
+            catching {
                 val dir = File(context.cacheDir, SHARE_DIR).apply { mkdirs() }
                 dir.listFiles().orEmpty().forEach { it.delete() }
                 val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(java.util.Date())
@@ -250,7 +251,7 @@ class BackupRepository @Inject constructor(
     private fun writeDocument(target: Uri, bytes: ByteArray) {
         val resolver = context.contentResolver
         // "wt" truncates an existing file; a few providers only know plain "w".
-        val stream = runCatching { resolver.openOutputStream(target, "wt") }.getOrNull()
+        val stream = catching { resolver.openOutputStream(target, "wt") }.getOrNull()
             ?: resolver.openOutputStream(target, "w")
             ?: error("Cannot write the backup")
         stream.use { it.write(bytes) }
@@ -264,7 +265,7 @@ class BackupRepository @Inject constructor(
      */
     suspend fun setAutoBackupFolder(folder: Uri): Boolean = withContext(Dispatchers.IO) {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        val taken = runCatching { context.contentResolver.takePersistableUriPermission(folder, flags) }.isSuccess
+        val taken = catching { context.contentResolver.takePersistableUriPermission(folder, flags) }.isSuccess
         if (!taken) return@withContext false
         val previous = dataStore.data.first()[AUTO_FOLDER].orEmpty()
         if (previous.isNotEmpty() && previous != folder.toString()) releaseFolder(previous)
@@ -284,7 +285,7 @@ class BackupRepository @Inject constructor(
 
     private fun releaseFolder(uri: String) {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(uri), flags) }
+        catching { context.contentResolver.releasePersistableUriPermission(Uri.parse(uri), flags) }
     }
 
     /** Called when the home screen goes to the background: backs up once a day when turned on. */
@@ -299,7 +300,7 @@ class BackupRepository @Inject constructor(
         val now = System.currentTimeMillis()
         if (!force && (now - last) in 0L until AUTO_INTERVAL_MS) return@withContext false
         val ok = mutex.withLock {
-            runCatching {
+            catching {
                 val bytes = buildBackup()
                 val file = autoBackupFile(Uri.parse(folder)) ?: error("No backup file")
                 writeDocument(file, bytes)
@@ -329,13 +330,13 @@ class BackupRepository @Inject constructor(
     /** Replaces everything with the backup in [source]. */
     suspend fun restoreFrom(source: Uri): RestoreResult = withContext(Dispatchers.IO) {
         mutex.withLock {
-            val backup = runCatching {
+            val backup = catching {
                 context.contentResolver.openInputStream(source)?.use { readBackup(it) }
             }.getOrNull() ?: return@withLock RestoreResult.NOT_A_BACKUP
             val manifest = backup.first
             if (manifest.optString("format") != FORMAT) return@withLock RestoreResult.NOT_A_BACKUP
             if (manifest.optInt("version", 0) > VERSION) return@withLock RestoreResult.TOO_NEW
-            val restored = runCatching {
+            val restored = catching {
                 restoreFiles(backup.second)
                 restoreSettings(manifest)
                 restoreHomeItems(manifest.optJSONArray("homeItems") ?: JSONArray())
@@ -429,7 +430,7 @@ class BackupRepository @Inject constructor(
                 val e = entries.optJSONObject(i) ?: continue
                 val name = e.optString("k")
                 if (name.isEmpty() || name in DEVICE_LOCAL_KEYS) continue
-                runCatching {
+                catching {
                     when (e.optString("t")) {
                         "b" -> p[booleanPreferencesKey(name)] = e.getBoolean("v")
                         "i" -> p[intPreferencesKey(name)] = e.getInt("v")

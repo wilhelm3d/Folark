@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import org.arkikeskus.launcher.model.LauncherSettings
 import java.io.File
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Motorola's own screens that any app may open (each found in the phone's system image, exported
@@ -29,18 +30,18 @@ object MotoLinks {
     fun intent(action: String): Intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** Whether this phone has a screen for [action]. */
-    fun available(context: Context, action: String): Boolean = runCatching {
+    fun available(context: Context, action: String): Boolean = catching {
         context.packageManager.resolveActivity(Intent(action), 0) != null
     }.getOrDefault(false)
 
     /** Opens [action]; false if this phone has no such screen. */
-    fun open(context: Context, action: String): Boolean = runCatching {
+    fun open(context: Context, action: String): Boolean = catching {
         context.startActivity(intent(action))
         true
     }.getOrDefault(false)
 
     /** The wallpapers that came with the phone (readable pictures only). */
-    fun wallpapers(): List<File> = runCatching {
+    fun wallpapers(): List<File> = catching {
         WALLPAPER_DIR.listFiles()
             ?.filter { it.isFile && it.canRead() && it.extension.lowercase() in PICTURE_TYPES }
             ?.sortedBy { it.name }
@@ -61,7 +62,7 @@ object MotoLinks {
         LauncherSettings.GESTURE_MOTO_VAULT -> listOf(intent("com.motorola.securevault.LAUNCH_SECURE_VAULT"))
         LauncherSettings.GESTURE_MOTO_READY_FOR -> listOf(intent("com.motorola.readyfor.OPEN_READY_FOR"))
         LauncherSettings.GESTURE_MOTO_GAMES -> listOfNotNull(
-            runCatching { context.packageManager.getLaunchIntentForPackage(GAME_MODE_PACKAGE) }.getOrNull()
+            catching { context.packageManager.getLaunchIntentForPackage(GAME_MODE_PACKAGE) }.getOrNull()
                 ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         LauncherSettings.GESTURE_MOTO_WEATHER -> listOf(intent(WEATHER))
@@ -69,7 +70,7 @@ object MotoLinks {
         else -> emptyList()
     }
 
-    private fun resolves(context: Context, intent: Intent): Boolean = runCatching {
+    private fun resolves(context: Context, intent: Intent): Boolean = catching {
         context.packageManager.resolveActivity(intent, 0) != null
     }.getOrDefault(false)
 
@@ -80,7 +81,7 @@ object MotoLinks {
     /** Runs a Motorola home gesture; false if the phone has nothing for it. */
     fun runGesture(context: Context, gesture: String): Boolean {
         val target = gestureIntents(context, gesture).firstOrNull { resolves(context, it) } ?: return false
-        return runCatching { context.startActivity(target) }.isSuccess
+        return catching { context.startActivity(target) }.isSuccess
     }
 
     private const val GAME_MODE_PACKAGE = "com.motorola.gamemode"

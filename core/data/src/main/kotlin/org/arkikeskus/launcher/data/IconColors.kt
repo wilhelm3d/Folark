@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
+import org.arkikeskus.launcher.model.catching
 
 /**
  * An app's own colour, read from its icon: the pixels averaged, weighted towards the colourful
@@ -16,7 +17,7 @@ object IconColors {
     const val GREY_SATURATION = 0.12f
 
     /** The icon's main colour (opaque), or null when it can't be read. */
-    fun dominant(icon: Drawable): Int? = runCatching {
+    fun dominant(icon: Drawable): Int? = catching {
         val side = SAMPLE_EDGE
         val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)

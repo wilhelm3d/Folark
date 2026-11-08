@@ -50,6 +50,7 @@ import org.arkikeskus.launcher.designsystem.theme.LocalLauncherColors
 import org.arkikeskus.launcher.launcher.system.BatteryMonitor
 import org.arkikeskus.launcher.model.BatteryStatus
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 @HiltViewModel
 class BatteryWidgetViewModel @Inject constructor(
@@ -94,7 +95,7 @@ fun BatteryWidget(
             modifier = Modifier
                 .size(diameter)
                 .clickable(interactionSource = noIndication, indication = null) {
-                    runCatching {
+                    catching {
                         context.startActivity(
                             Intent(Intent.ACTION_POWER_USAGE_SUMMARY).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         )

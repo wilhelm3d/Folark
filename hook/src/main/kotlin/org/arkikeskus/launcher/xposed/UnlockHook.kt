@@ -10,6 +10,7 @@ import android.os.SystemClock
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The SystemUI half of Folark's Vector module: tells Folark the moment the lock screen starts its
@@ -36,15 +37,15 @@ internal object UnlockHook {
 
     fun install(loader: ClassLoader, log: (String) -> Unit) {
         if (installed) return
-        val controller = runCatching { XposedHelpers.findClass(CONTROLLER, loader) }.getOrNull()
+        val controller = catching { XposedHelpers.findClass(CONTROLLER, loader) }.getOrNull()
         if (controller == null) {
             log("no $CONTROLLER in SystemUI; unlock sync stays off")
             return
         }
-        val hooks = runCatching {
+        val hooks = catching {
             XposedBridge.hookAllMethods(controller, METHOD, object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    runCatching { onExitStart(param) }
+                    catching { onExitStart(param) }
                 }
             })
         }.getOrNull()
@@ -59,7 +60,7 @@ internal object UnlockHook {
         val bySwipe = param.args?.lastOrNull() as? Boolean ?: false
         val context = appContext() ?: return
         worker.post {
-            runCatching {
+            catching {
                 val extras = Bundle().apply {
                     putLong(SystemUnlock.EXTRA_AT, at)
                     putString(SystemUnlock.EXTRA_TOP, topPackage(context))
@@ -74,12 +75,12 @@ internal object UnlockHook {
 
     /** The app at the top of the task stack, i.e. what the lock screen is uncovering. */
     @Suppress("DEPRECATION")
-    private fun topPackage(context: Context): String? = runCatching {
+    private fun topPackage(context: Context): String? = catching {
         (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
             .getRunningTasks(1).firstOrNull()?.topActivity?.packageName
     }.getOrNull()
 
-    private fun appContext(): Context? = runCatching {
+    private fun appContext(): Context? = catching {
         Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as? Context
     }.getOrNull()
 

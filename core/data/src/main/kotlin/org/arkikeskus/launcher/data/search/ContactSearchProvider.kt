@@ -15,6 +15,7 @@ import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** A raw contact row, decoupled from Android `Cursor` so the provider stays JVM-testable. */
 data class RawContact(
@@ -38,7 +39,7 @@ fun interface PermissionChecker {
 /**
  * Searches contacts, gated by the [SettingsRepository.search.contacts] setting AND the READ_CONTACTS
  * runtime permission. Never throws for normal input; a revoked-permission ContentResolver failure is
- * swallowed by the [SearchAggregator]'s runCatching.
+ * swallowed by the [SearchAggregator]'s catching.
  */
 @Singleton
 class ContactSearchProvider @Inject constructor(

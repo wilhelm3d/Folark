@@ -84,6 +84,7 @@ import org.arkikeskus.launcher.model.WifiBand
 import org.arkikeskus.launcher.model.WifiStatus
 import java.util.Date
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 /** Combined live system status driving the home status bar. */
 data class StatusBarState(
@@ -427,7 +428,7 @@ private fun rememberClock(): String {
             Settings.System.getUriFor(Settings.System.TIME_12_24), false, observer,
         )
         onDispose {
-            runCatching { context.unregisterReceiver(receiver) }
+            catching { context.unregisterReceiver(receiver) }
             context.contentResolver.unregisterContentObserver(observer)
         }
     }

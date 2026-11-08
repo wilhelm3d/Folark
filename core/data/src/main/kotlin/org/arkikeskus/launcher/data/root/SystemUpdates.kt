@@ -2,6 +2,7 @@ package org.arkikeskus.launcher.data.root
 
 import android.content.Context
 import android.content.pm.PackageManager
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Turning Motorola's system updates on or off (Settings ▸ Backup & restore). Updates are blocked by
@@ -28,11 +29,11 @@ object SystemUpdates {
 
     /** Whether this phone even has Motorola's OTA app (so the toggle is worth showing). */
     fun available(context: Context): Boolean =
-        runCatching { context.packageManager.getApplicationEnabledSetting(OTA) }.isSuccess
+        catching { context.packageManager.getApplicationEnabledSetting(OTA) }.isSuccess
 
     /** Whether system updates are allowed right now (the OTA app is enabled). No root needed. */
     fun enabled(context: Context): Boolean {
-        val state = runCatching { context.packageManager.getApplicationEnabledSetting(OTA) }.getOrNull()
+        val state = catching { context.packageManager.getApplicationEnabledSetting(OTA) }.getOrNull()
             ?: return true
         return state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT ||
             state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
@@ -49,7 +50,7 @@ object SystemUpdates {
         for (pkg in PACKAGES) {
             if (!SAFE.matches(pkg)) continue
             // Skip one this phone doesn't have (enable/disable of a missing package just fails).
-            if (runCatching { pm.getApplicationEnabledSetting(pkg) }.isFailure) continue
+            if (catching { pm.getApplicationEnabledSetting(pkg) }.isFailure) continue
             val command = if (enable) "pm enable $pkg" else "pm disable-user --user 0 $pkg"
             if (RootShell.run(command) == null) ok = false
         }

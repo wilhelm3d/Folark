@@ -11,6 +11,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.AppRepository
+import org.arkikeskus.launcher.model.catching
 
 /**
  * A translucent trampoline: a scheduled pair's notification taps here, the pair opens
@@ -29,7 +30,7 @@ class PairLaunchActivity : ComponentActivity() {
         scope.launch {
             val pair = appRepository.appPairs.first().firstOrNull { it.id == pairId }
                 ?: return@launch finish()
-            runCatching { appRepository.launchAppPair(pair) }
+            catching { appRepository.launchAppPair(pair) }
             finish()
         }
     }

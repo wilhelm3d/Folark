@@ -62,6 +62,7 @@ import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.DEFAULT_NUDGE_COLOR
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Folark's taskbar on the unfolded display: your pinned apps, a divider, and the apps you used last.
@@ -122,7 +123,7 @@ internal class AppTaskbar(
      * remembered across restarts until "Show here again" is tapped in that app.
      */
     internal var hiddenHere: Set<String> =
-        runCatching { prefs().getStringSet(PREF_HIDDEN_HERE, null)?.toSet() }.getOrNull().orEmpty()
+        catching { prefs().getStringSet(PREF_HIDDEN_HERE, null)?.toSet() }.getOrNull().orEmpty()
         private set
 
     internal fun prefs() = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -131,7 +132,7 @@ internal class AppTaskbar(
         val next = if (hidden) hiddenHere + packageName else hiddenHere - packageName
         if (next == hiddenHere) return
         hiddenHere = next
-        runCatching { prefs().edit().putStringSet(PREF_HIDDEN_HERE, next).apply() }
+        catching { prefs().edit().putStringSet(PREF_HIDDEN_HERE, next).apply() }
         setup?.let { updateWatching(it) }
     }
 
@@ -267,7 +268,7 @@ internal class AppTaskbar(
     }
 
     fun start() {
-        val entry = runCatching {
+        val entry = catching {
             EntryPointAccessors.fromApplication(context.applicationContext, AppTaskbarEntryPoint::class.java)
         }.getOrNull() ?: return
         val settingsRepository = entry.settingsRepository()
@@ -297,7 +298,7 @@ internal class AppTaskbar(
         // "Open with …" for a few seconds after an app you often pair is opened (off by default).
         scope.launch { split?.suggestion?.collect { offer -> if (offer != null) showSuggestion(offer) else hideSuggestion() } }
         source = entry.launcherAppsSource()
-        runCatching {
+        catching {
             context.registerReceiver(
                 screenReceiver,
                 IntentFilter().apply {
@@ -471,7 +472,7 @@ internal class AppTaskbar(
         media.stop()
         releaseGlow()
         handler.removeCallbacksAndMessages(null)
-        runCatching { context.unregisterReceiver(screenReceiver) }
+        catching { context.unregisterReceiver(screenReceiver) }
         remove()
         ensureProbe(false)
     }
@@ -586,7 +587,7 @@ internal class AppTaskbar(
 
     internal fun ensureProbe(wanted: Boolean) {
         if (!wanted) {
-            probe?.let { runCatching { windowManager.removeView(it) } }
+            probe?.let { catching { windowManager.removeView(it) } }
             probe = null
             fullScreen = false
             keyboardUp = false
@@ -616,7 +617,7 @@ internal class AppTaskbar(
             // Nothing to see in it, and as an application overlay it must not block touches below.
             if (passThroughAlpha != null) alpha = 0f
         }
-        if (runCatching { windowManager.addView(view, params) }.isSuccess) probe = view
+        if (catching { windowManager.addView(view, params) }.isSuccess) probe = view
     }
 
     /** The app in front (followed only while something needs it, see [updateWatching]), null when unknown. */
@@ -663,7 +664,7 @@ internal class AppTaskbar(
         org.arkikeskus.launcher.ui.TaskbarDropTarget.bounds = null
         livePill = null
         iconViews.clear()
-        shown.forEach { runCatching { windowManager.removeView(it) } }
+        shown.forEach { catching { windowManager.removeView(it) } }
         shown.clear()
         shownMode = MODE_NONE
         ghostEnd()
@@ -688,7 +689,7 @@ internal class AppTaskbar(
     }
 
     internal fun add(view: View, params: WindowManager.LayoutParams) {
-        if (runCatching { windowManager.addView(view, params) }.isSuccess) shown += view
+        if (catching { windowManager.addView(view, params) }.isSuccess) shown += view
     }
 
     /**
@@ -718,7 +719,7 @@ internal class AppTaskbar(
         }
     }
 
-    internal fun systemBottomInset(): Int = runCatching {
+    internal fun systemBottomInset(): Int = catching {
         val insets = windowManager.currentWindowMetrics.windowInsets
         maxOf(
             insets.getInsets(WindowInsets.Type.navigationBars()).bottom,
@@ -754,7 +755,7 @@ internal class AppTaskbar(
             val intent = Intent(ACTION_DESKTOP_RECENTS)
                 .setPackage(DESKTOP_TASKBAR_PACKAGE)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (runCatching { context.startActivity(intent) }.isSuccess) return
+            if (catching { context.startActivity(intent) }.isSuccess) return
             Toast.makeText(context, R.string.taskbar_desktop_recents_missing, Toast.LENGTH_SHORT).show()
         }
         LockAccessibilityService.openRecents()
@@ -836,9 +837,9 @@ internal class AppTaskbar(
 
     internal fun loadIcon(app: AppItem, s: TaskbarSetup): Drawable? {
         val dark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        val icon = runCatching {
+        val icon = catching {
             source?.loadIcon(app, s.themedIcons, dark, s.iconPack, s.customIcons[app.key].orEmpty())
-        }.getOrNull() ?: runCatching { context.packageManager.getActivityIcon(app.componentName) }.getOrNull()
+        }.getOrNull() ?: catching { context.packageManager.getActivityIcon(app.componentName) }.getOrNull()
         return icon?.let { IconShapes.apply(it, s.iconShapes[app.key] ?: s.iconShape, plateOthers = s.shapeAllIcons) }
     }
 

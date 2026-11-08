@@ -43,7 +43,10 @@ Android launcherin teeman asetukset.zip
 
 .artifacts/
 *.py
-*.txt
+# Ad-hoc dumps dropped in the root (device inspection, AI prompts): reference material, never sources.
+# Root only on purpose — a *.txt rule for the whole tree also hid any text file a module might keep.
+/*.txt
+/*.log
 !gemini_txt/**
 *.apk
 

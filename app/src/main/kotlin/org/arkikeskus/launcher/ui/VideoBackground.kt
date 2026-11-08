@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import java.io.File
+import org.arkikeskus.launcher.model.catching
 
 /** Home background files that are videos (picked in Settings ▸ Home backdrop ▸ Video background). */
 internal fun isVideoBackground(path: String): Boolean =
@@ -60,14 +61,14 @@ private class VideoHolder(private val file: File) : TextureView.SurfaceTextureLi
         wantPlaying = playing
         val p = player ?: return
         if (!prepared) return
-        runCatching { if (playing && !p.isPlaying) p.start() else if (!playing && p.isPlaying) p.pause() }
+        catching { if (playing && !p.isPlaying) p.start() else if (!playing && p.isPlaying) p.pause() }
     }
 
     private fun start(texture: SurfaceTexture) {
         if (player != null || !file.exists()) return
         val s = Surface(texture)
         surface = s
-        player = runCatching {
+        player = catching {
             MediaPlayer().apply {
                 setDataSource(file.absolutePath)
                 setSurface(s)
@@ -97,7 +98,7 @@ private class VideoHolder(private val file: File) : TextureView.SurfaceTextureLi
     }
 
     fun release() {
-        runCatching { player?.release() }
+        catching { player?.release() }
         player = null
         prepared = false
         surface?.release()
@@ -113,7 +114,7 @@ private class VideoHolder(private val file: File) : TextureView.SurfaceTextureLi
     }
 
     override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-        runCatching { player?.release() }
+        catching { player?.release() }
         player = null
         prepared = false
         surface?.release()

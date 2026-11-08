@@ -9,6 +9,7 @@ import android.os.ParcelFileDescriptor
 import android.os.Process
 import org.arkikeskus.launcher.data.root.RootShell
 import java.io.File
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Split screen through Android's own WM Shell commands (`dumpsys activity service SystemUIService
@@ -37,7 +38,7 @@ object ShellSplit {
     // unsafeCheckOpNoThrow is deprecated on new Android, but it is the only call that answers
     // for another app-op mode than this app's own process state; its replacement needs API 36.
     @Suppress("DEPRECATION")
-    fun hasUsageAccess(context: Context): Boolean = runCatching {
+    fun hasUsageAccess(context: Context): Boolean = catching {
         val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
         when (appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)) {
             AppOpsManager.MODE_ALLOWED -> true
@@ -66,7 +67,7 @@ object ShellSplit {
             if (args.any { !SAFE_ARG.matches(it) }) return null
             return RootShell.run("dumpsys activity " + args.joinToString(" "))
         }
-        return runCatching {
+        return catching {
             // A file of its own per read: reads run on several threads at once.
             val file = File.createTempFile("shell_split_", ".txt", context.cacheDir)
             try {

@@ -34,6 +34,7 @@ import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.AUTO_CO
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.MAX_SHORTCUTS
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.MIME_ACTIVITY
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.homeVisible
+import org.arkikeskus.launcher.model.catching
 
 // The taskbar's pop-ups: split and app menus, app shortcuts, live-activity details (split out of AppTaskbar.kt; extension functions on [AppTaskbar]).
 
@@ -185,7 +186,7 @@ internal fun AppTaskbar.placeAbove(anchor: View, panel: View) {
         this.x = x
         this.y = y
     }
-    if (runCatching { windowManager.addView(panel, params) }.isSuccess) shortcutWindow = panel
+    if (catching { windowManager.addView(panel, params) }.isSuccess) shortcutWindow = panel
 }
 
 /** The app's shortcuts in a card above [anchor]: tap one to open it, drag it (over an app) to split. */
@@ -198,7 +199,7 @@ internal fun AppTaskbar.showShortcuts(app: AppItem, anchor: View, s: TaskbarSetu
         val launcherApps = context.getSystemService(LauncherApps::class.java)
         val items = withContext(Dispatchers.IO) {
             shortcutsOf(app).map { info ->
-                info to runCatching { launcherApps?.getShortcutIconDrawable(info, dpi) }.getOrNull()
+                info to catching { launcherApps?.getShortcutIconDrawable(info, dpi) }.getOrNull()
             }
         }
         if (!anchor.isAttachedToWindow) return@launch
@@ -280,7 +281,7 @@ internal fun AppTaskbar.showShortcuts(app: AppItem, anchor: View, s: TaskbarSetu
                         val far = abs(event.rawX - downX) > slop * 2 || abs(event.rawY - downY) > slop * 2
                         if (!gone && !far) {
                             LaunchOrigin.view(v)
-                            runCatching { launcherApps?.startShortcut(info, null, null) }
+                            catching { launcherApps?.startShortcut(info, null, null) }
                             hideShortcuts()
                             expanded = false
                             if (!fixed) refresh()
@@ -320,7 +321,7 @@ internal fun AppTaskbar.showShortcuts(app: AppItem, anchor: View, s: TaskbarSetu
             this.x = x
             this.y = y
         }
-        if (runCatching { windowManager.addView(panel, params) }.isSuccess) shortcutWindow = panel
+        if (catching { windowManager.addView(panel, params) }.isSuccess) shortcutWindow = panel
     }
 }
 
@@ -430,19 +431,19 @@ internal fun AppTaskbar.showLiveDetails(item: org.arkikeskus.launcher.model.Live
         this.x = x
         this.y = y
     }
-    if (runCatching { windowManager.addView(panel, params) }.isSuccess) {
+    if (catching { windowManager.addView(panel, params) }.isSuccess) {
         shortcutWindow = panel
         handler.postDelayed({ if (shortcutWindow === panel) hideShortcuts() }, LIVE_PANEL_IDLE_MS)
     }
 }
 
 internal fun AppTaskbar.hideShortcuts() {
-    shortcutWindow?.let { runCatching { windowManager.removeView(it) } }
+    shortcutWindow?.let { catching { windowManager.removeView(it) } }
     shortcutWindow = null
 }
 
 /** The app's shortcuts (from its manifest, the app itself, and pinned ones), best first. */
-internal fun AppTaskbar.shortcutsOf(app: AppItem): List<ShortcutInfo> = runCatching {
+internal fun AppTaskbar.shortcutsOf(app: AppItem): List<ShortcutInfo> = catching {
     val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return emptyList()
     val query = LauncherApps.ShortcutQuery()
         .setPackage(app.packageName)

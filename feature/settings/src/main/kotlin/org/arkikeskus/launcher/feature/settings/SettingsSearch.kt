@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The title of the setting just picked in the search, while its page opens: that row scrolls into
@@ -71,8 +72,8 @@ internal fun SettingsSearchResults(query: String, onPick: (SettingsCategory, Str
     val palette = LocalExpressivePalette.current
     val found = remember(words) {
         SETTINGS_SEARCH_INDEX.mapNotNull { entry ->
-            val title = runCatching { context.getString(entry.title) }.getOrNull() ?: return@mapNotNull null
-            val sub = if (entry.subtitle != 0) runCatching { context.getString(entry.subtitle) }.getOrNull().orEmpty() else ""
+            val title = catching { context.getString(entry.title) }.getOrNull() ?: return@mapNotNull null
+            val sub = if (entry.subtitle != 0) catching { context.getString(entry.subtitle) }.getOrNull().orEmpty() else ""
             val hay = "$title $sub".lowercase()
             if (words.all { it in hay }) Triple(entry, title, sub) else null
         }

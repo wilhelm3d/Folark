@@ -28,6 +28,7 @@ import org.arkikeskus.launcher.ui.drawer.DrawerStyleSpec
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.ExpressiveCard
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
+import org.arkikeskus.launcher.model.catching
 
 // The drawer's search field and its result rows (calculator, contacts, web search) (split out of AppDrawerScreen.kt).
 
@@ -99,7 +100,7 @@ private const val GEMINI_SEARCH_URL = "https://www.google.com/search?udm=50&q="
  */
 internal fun launchWebSearch(context: android.content.Context, query: String) {
     if (query.isBlank()) return
-    val started = runCatching {
+    val started = catching {
         context.startActivity(
             Intent(Intent.ACTION_WEB_SEARCH)
                 .putExtra(android.app.SearchManager.QUERY, query)
@@ -107,7 +108,7 @@ internal fun launchWebSearch(context: android.content.Context, query: String) {
         )
     }.isSuccess
     if (started) return
-    val sharedToGemini = runCatching {
+    val sharedToGemini = catching {
         context.startActivity(
             Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
@@ -117,7 +118,7 @@ internal fun launchWebSearch(context: android.content.Context, query: String) {
         )
     }.isSuccess
     if (!sharedToGemini) {
-        runCatching {
+        catching {
             context.startActivity(
                 Intent(Intent.ACTION_VIEW, android.net.Uri.parse(GEMINI_SEARCH_URL + android.net.Uri.encode(query)))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -143,7 +144,7 @@ internal fun ContactResultRow(contact: SearchResult.Contact, onOpened: () -> Uni
     val callDesc = stringResource(R.string.search_contact_call)
     val messageDesc = stringResource(R.string.search_contact_message)
     ExpressiveCard(onClick = {
-        runCatching {
+        catching {
             context.startActivity(
                 android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(contact.lookupUri))
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -157,7 +158,7 @@ internal fun ContactResultRow(contact: SearchResult.Contact, onOpened: () -> Uni
             modifier = Modifier.weight(1f).padding(start = 14.dp))
         if (contact.number != null) {
             IconButton(onClick = {
-                runCatching {
+                catching {
                     context.startActivity(
                         android.content.Intent(android.content.Intent.ACTION_DIAL,
                             android.net.Uri.fromParts("tel", contact.number, null))
@@ -167,7 +168,7 @@ internal fun ContactResultRow(contact: SearchResult.Contact, onOpened: () -> Uni
                 }
             }) { Icon(painter = painterResource(LauncherIcons.Call), contentDescription = callDesc, tint = LocalAccent.current) }
             IconButton(onClick = {
-                runCatching {
+                catching {
                     context.startActivity(
                         android.content.Intent(android.content.Intent.ACTION_SENDTO,
                             android.net.Uri.fromParts("smsto", contact.number, null))

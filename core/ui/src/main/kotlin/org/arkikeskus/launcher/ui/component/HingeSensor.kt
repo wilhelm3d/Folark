@@ -7,6 +7,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Looper
 import android.os.SystemClock
+import org.arkikeskus.launcher.model.catching
 
 /**
  * The phone's hinge angle (Android's public hinge sensor; the Razr Fold reports it as "Hinge Angle",
@@ -51,7 +52,7 @@ object HingeSensor {
         if (!looked) {
             looked = true
             manager = context.applicationContext.getSystemService(SensorManager::class.java)
-            sensor = runCatching { manager?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE) }.getOrNull()
+            sensor = catching { manager?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE) }.getOrNull()
         }
         return sensor
     }
@@ -84,13 +85,13 @@ object HingeSensor {
         val s = sensor ?: return
         val wanted = clients.values.minOfOrNull { it.samplingUs } ?: 0
         if (wanted == registeredUs) return
-        if (registeredUs != 0) runCatching { manager?.unregisterListener(listener) }
+        if (registeredUs != 0) catching { manager?.unregisterListener(listener) }
         registeredUs = 0
         if (wanted == 0) {
             angle = Float.NaN
             return
         }
-        val ok = runCatching { manager?.registerListener(listener, s, wanted) == true }.getOrDefault(false)
+        val ok = catching { manager?.registerListener(listener, s, wanted) == true }.getOrDefault(false)
         if (ok) registeredUs = wanted
     }
 

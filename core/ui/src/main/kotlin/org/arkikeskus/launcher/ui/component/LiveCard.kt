@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.LiveActivity
 import kotlin.math.abs
+import org.arkikeskus.launcher.model.catching
 
 /**
  * A live activity opened up (a long press on its pill): everything a glance needs without opening
@@ -74,7 +75,7 @@ fun LiveCard(
     val accent = Color(activity.color ?: LivePillPainter.FALLBACK_ACCENT)
     val shown = if (accent.luminanceOf() < 0.18f) Color(0xFF8FD3FF) else accent
     val icon = remember(activity.key, activity.icon != null) {
-        runCatching { activity.icon?.loadDrawable(context)?.squareBitmap(64)?.asImageBitmap() }.getOrNull()
+        catching { activity.icon?.loadDrawable(context)?.squareBitmap(64)?.asImageBitmap() }.getOrNull()
     }
     val now by rememberSecondTick(activity.ticks)
     val progress by animateFloatAsState(activity.progress ?: 0f, tween(500), label = "progress")

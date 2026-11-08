@@ -34,6 +34,14 @@ import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SearchResult
 import org.arkikeskus.launcher.model.SearchResults
 import javax.inject.Inject
+import org.arkikeskus.launcher.data.drawerFolders
+import org.arkikeskus.launcher.data.createDrawerFolder
+import org.arkikeskus.launcher.data.renameDrawerFolder
+import org.arkikeskus.launcher.data.deleteDrawerFolder
+import org.arkikeskus.launcher.data.addAppsToDrawerFolder
+import org.arkikeskus.launcher.data.removeAppFromDrawerFolder
+import org.arkikeskus.launcher.data.moveAppsIntoDrawerFolder
+import org.arkikeskus.launcher.data.moveDrawerFolder
 
 /** A drawer folder resolved to its member [apps] (for rendering). */
 data class DrawerFolderUi(val id: Long, val name: String, val apps: List<AppItem>)
@@ -72,6 +80,8 @@ data class AppDrawerUiState(
     val folderTabsEnabled: Boolean = false,
     /** An app in a tab is shown only there, not in "All" as well. */
     val tabsExclusive: Boolean = true,
+    /** Settings ▸ App drawer ▸ Lock the tab order: chips can no longer be dragged. */
+    val tabsLocked: Boolean = false,
     val tabs: List<Pair<Long, String>> = emptyList(),
     val selectedTab: Long? = null,
     /** Search extras: matching app shortcuts, and whether to offer the "search the web" row. */
@@ -209,6 +219,7 @@ class AppDrawerViewModel @Inject constructor(
             iconSizeScale = settings.icons.sizeScale,
             folderTabsEnabled = settings.drawer.folderTabs,
             tabsExclusive = settings.drawer.tabsExclusive,
+            tabsLocked = settings.drawer.lockTabOrder,
             searchWeb = settings.search.web,
             searchInlineShortcuts = settings.search.inlineShortcuts,
             twoPane = settings.drawer.twoPane,
@@ -253,9 +264,16 @@ class AppDrawerViewModel @Inject constructor(
         if (hidden.isEmpty()) state else state.copy(apps = state.apps.filterNot { it.key in hidden })
     }.combine(settingsRepository.drawerFolders.combine(selectedTab) { folders, tab -> folders to tab }) { state, foldersAndTab ->
         val (folders, tab) = foldersAndTab
-        // While searching (or with no folders) keep a flat list so folder members stay findable.
-        if (state.query.isNotBlank() || folders.isEmpty()) {
+        if (folders.isEmpty()) {
             state
+        } else if (state.query.isNotBlank()) {
+            // Searching keeps a flat list so folder members stay findable, but the folders stay
+            // known: an open folder card survives a search, and a folder made from a search result
+            // can be opened instead of vanishing into an empty list.
+            val byKey = state.apps.associateBy { it.key }
+            state.copy(
+                folders = folders.map { f -> DrawerFolderUi(f.id, f.name, f.appKeys.mapNotNull { byKey[it] }) },
+            )
         } else if (state.folderTabsEnabled) {
             // Folders as tabs: a tab narrows the list to that folder; "All" shows the rest (or,
             // with Apps in a tab leave All off, every app).
@@ -271,7 +289,16 @@ class AppDrawerViewModel @Inject constructor(
                 val byKey = state.apps.associateBy { it.key }
                 open.appKeys.mapNotNull { byKey[it] }
             }
-            state.copy(apps = shown, tabs = folders.map { it.id to it.name }, selectedTab = open?.id)
+            // The folder list is kept in tab mode too: the tab menu and the folder popover look
+            // folders up here, even though no tiles are drawn for them.
+            val byKey = state.apps.associateBy { it.key }
+            val folderUis = folders.map { f -> DrawerFolderUi(f.id, f.name, f.appKeys.mapNotNull { byKey[it] }) }
+            state.copy(
+                apps = shown,
+                tabs = folders.map { it.id to it.name },
+                selectedTab = open?.id,
+                folders = folderUis,
+            )
         } else {
             val byKey = state.apps.associateBy { it.key }
             val folderUis = folders.map { f -> DrawerFolderUi(f.id, f.name, f.appKeys.mapNotNull { byKey[it] }) }
@@ -285,11 +312,10 @@ class AppDrawerViewModel @Inject constructor(
             // The real search is still on its way for this text (it waits for typing to pause):
             // show a plain name match meanwhile instead of an empty list.
             val typed = state.query.trim()
-            state.copy(apps = org.arkikeskus.launcher.data.search.AppMatcher.rank(state.apps, typed) { it.label }, folders = emptyList())
+            state.copy(apps = org.arkikeskus.launcher.data.search.AppMatcher.rank(state.apps, typed) { it.label })
         } else {
             state.copy(
                 apps = results.apps,          // hidden-aware app matches from AppSearchProvider
-                folders = emptyList(),         // no folders while searching
                 calc = results.calc,
                 settingResults = results.settings,
                 contactResults = results.contacts,
@@ -392,11 +418,80 @@ class AppDrawerViewModel @Inject constructor(
     fun deleteDrawerFolder(id: Long) =
         viewModelScope.launch { settingsRepository.deleteDrawerFolder(id) }
 
-    fun addAppsToDrawerFolder(id: Long, keys: List<String>) =
-        viewModelScope.launch { settingsRepository.addAppsToDrawerFolder(id, keys) }
+    /** Adds [keys] to the folder; like every folder move they leave any other folder behind. */
+    fun addAppsToDrawerFolder(id: Long, keys: List<String>) = viewModelScope.launch {
+        settingsRepository.moveAppsIntoDrawerFolder(id, keys)
+    }
 
-    fun removeAppFromDrawerFolder(id: Long, key: String) =
-        viewModelScope.launch { settingsRepository.removeAppFromDrawerFolder(id, key) }
+    /**
+     * Takes [key] out of the folder. A folder that loses its last app disappears, the way an iOS
+     * folder does when everything is dragged out of it, so no empty folder is left behind.
+     */
+    fun removeAppFromDrawerFolder(id: Long, key: String) = viewModelScope.launch {
+        if (settingsRepository.removeAppFromDrawerFolder(id, key) == 0) {
+            settingsRepository.deleteDrawerFolder(id)
+        }
+    }
+
+    /** Creates a folder and hands its new id back, so the drawer can open it at once. */
+    fun createDrawerFolder(name: String, onCreated: (Long) -> Unit) = viewModelScope.launch {
+        onCreated(settingsRepository.createDrawerFolder(name))
+    }
+
+    /**
+     * "Add to folder ▸ New folder": a folder made for [app] alone, handed back so the drawer can
+     * open it for renaming. The drag gesture makes a folder from two apps at once; this is the path
+     * for a folder that starts with one.
+     */
+    fun createFolderWithApp(app: AppItem, onCreated: (Long) -> Unit) = viewModelScope.launch {
+        val id = settingsRepository.createDrawerFolder(context.getString(R.string.folder_default_name))
+        settingsRepository.moveAppsIntoDrawerFolder(id, listOf(app.key))
+        onCreated(id)
+    }
+
+    /**
+     * Moves a drawer tab to a new place. The tab order is the stored folder order, so one write keeps
+     * the chips, the settings list and the folder tiles in step.
+     */
+    fun moveDrawerFolder(from: Int, to: Int) = viewModelScope.launch {
+        settingsRepository.moveDrawerFolder(from, to)
+    }
+
+    /**
+     * A folder made by dragging [app] onto [other] — the Pixel/iOS gesture. It is born holding both
+     * apps and the drawer opens it straight away, so the name can be typed over in place. Two apps
+     * that are already filed together just open that folder, instead of gaining a second one.
+     */
+    fun createFolderByDrop(app: AppItem, other: AppItem, onCreated: (Long) -> Unit) =
+        viewModelScope.launch {
+            val shared = settingsRepository.drawerFolders.first()
+                .firstOrNull { app.key in it.appKeys && other.key in it.appKeys }
+            if (shared != null) {
+                onCreated(shared.id)
+                return@launch
+            }
+            val id = settingsRepository.createDrawerFolder(context.getString(R.string.folder_default_name))
+            settingsRepository.moveAppsIntoDrawerFolder(id, listOf(app.key, other.key))
+            onCreated(id)
+        }
+
+    /**
+     * Files [app] into the folder [id] — a drag onto its tile, or onto its tab in the tab row. Like
+     * the iOS gesture this moves the app: one write takes it out of whatever folder held it.
+     */
+    fun addAppToDrawerFolder(app: AppItem, id: Long) = viewModelScope.launch {
+        settingsRepository.moveAppsIntoDrawerFolder(id, listOf(app.key))
+    }
+
+    /**
+     * The full app list for the folder editor's add-pane — not the tab-narrowed [AppDrawerUiState.apps]:
+     * with a folder tab open, that holds only the folder's own apps, leaving nothing to add.
+     * Hidden apps stay hidden.
+     */
+    val editorApps: StateFlow<List<AppItem>> = combine(
+        appRepository.apps, settingsRepository.hiddenApps,
+    ) { apps, hidden -> apps.filterNot { it.key in hidden } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
      * Drag-and-drop between folder tabs: the app came from the open tab ([target] null = the "All"
@@ -407,8 +502,15 @@ class AppDrawerViewModel @Inject constructor(
         val source = selectedTab.value
         if (source == target) return
         viewModelScope.launch {
-            if (source != null) settingsRepository.removeAppFromDrawerFolder(source, app.key)
-            if (target != null) settingsRepository.addAppsToDrawerFolder(target, listOf(app.key))
+            if (target != null) {
+                // One write: into the tab, out of the one it came from (a tab left empty goes too).
+                settingsRepository.moveAppsIntoDrawerFolder(target, listOf(app.key))
+            } else if (source != null) {
+                // Out of its folder and into "All": a tab dragged empty disappears.
+                if (settingsRepository.removeAppFromDrawerFolder(source, app.key) == 0) {
+                    settingsRepository.deleteDrawerFolder(source)
+                }
+            }
         }
     }
 }

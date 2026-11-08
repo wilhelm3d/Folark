@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Contacts in search (both displays): people show up in the drawer's search, with call and message
@@ -42,7 +43,7 @@ internal fun ContactSearchRow(checked: Boolean, onCheckedChange: (Boolean) -> Un
             // "Don't ask again": only Android's app settings can give it now.
             val activity = context.findHostActivity()
             if (activity != null && !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_CONTACTS)) {
-                runCatching {
+                catching {
                     context.startActivity(
                         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

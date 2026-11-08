@@ -8,6 +8,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.R
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import org.arkikeskus.launcher.model.catching
 
 /**
  * 5 Distinct Launcher Font Families:
@@ -89,11 +90,11 @@ object LauncherFontFamily {
     private fun phoneFamily(key: String): FontFamily? {
         phoneFamilies[key]?.let { return it }
         val files = PHONE_FONTS[key] ?: return null
-        val typeface = runCatching {
+        val typeface = catching {
             val fonts = files.mapNotNull { (name, weight) ->
                 val file = File(PHONE_FONT_DIR + name)
                 if (!file.canRead()) return@mapNotNull null
-                runCatching { android.graphics.fonts.Font.Builder(file).setWeight(weight).build() }.getOrNull()
+                catching { android.graphics.fonts.Font.Builder(file).setWeight(weight).build() }.getOrNull()
             }
             if (fonts.isEmpty()) return null
             val family = android.graphics.fonts.FontFamily.Builder(fonts.first())

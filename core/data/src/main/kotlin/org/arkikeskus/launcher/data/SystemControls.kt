@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.provider.Settings
 import android.view.Display
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Android settings Folark may change after the one-time adb grant of WRITE_SECURE_SETTINGS
@@ -40,7 +41,7 @@ object SystemControls {
     }
 
     /** Turns [service] back on if it is off and the user wants it kept on; true if it did. */
-    fun keepServiceOn(context: Context, service: ComponentName): Boolean = runCatching {
+    fun keepServiceOn(context: Context, service: ComponentName): Boolean = catching {
         if (!canWrite(context) || !keepAccessibility(context) || isServiceEnabled(context, service)) return false
         val resolver = context.contentResolver
         val current = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
@@ -53,7 +54,7 @@ object SystemControls {
     // ------------------------------------------------------------------ refresh rate
 
     /** The highest refresh rate the screen offers at its current size, in Hz. */
-    fun maxRefreshRate(context: Context): Float = runCatching {
+    fun maxRefreshRate(context: Context): Float = catching {
         val display = context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
             ?: return 60f
         val mode = display.mode
@@ -63,24 +64,24 @@ object SystemControls {
     }.getOrDefault(60f)
 
     /** Android's top refresh rate setting; null if it can't be read. */
-    fun peakRefreshRate(context: Context): Float? = runCatching {
+    fun peakRefreshRate(context: Context): Float? = catching {
         Settings.System.getFloat(context.contentResolver, PEAK_REFRESH_RATE)
     }.getOrNull()
 
     /** Sets Android's top refresh rate; false if Android refused. */
-    fun setPeakRefreshRate(context: Context, hz: Float): Boolean = runCatching {
+    fun setPeakRefreshRate(context: Context, hz: Float): Boolean = catching {
         canWrite(context) && Settings.System.putFloat(context.contentResolver, PEAK_REFRESH_RATE, hz)
     }.getOrDefault(false)
 
     // ------------------------------------------------------------------ animation speed
 
     /** Android's animation length scale (1 = normal, 0 = off). */
-    fun animationScale(context: Context): Float = runCatching {
+    fun animationScale(context: Context): Float = catching {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
     }.getOrDefault(1f)
 
     /** Sets all three of Android's animation scales; false if Android refused. */
-    fun setAnimationScale(context: Context, scale: Float): Boolean = runCatching {
+    fun setAnimationScale(context: Context, scale: Float): Boolean = catching {
         if (!canWrite(context)) return false
         val resolver = context.contentResolver
         Settings.Global.putFloat(resolver, Settings.Global.WINDOW_ANIMATION_SCALE, scale) &&

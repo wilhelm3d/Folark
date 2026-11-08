@@ -46,6 +46,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.SplitThree
+import org.arkikeskus.launcher.model.catching
 
 /** What split screen and the taskbar have on this phone right now (all cheap checks, no root prompt). */
 private data class SplitSetupState(
@@ -56,7 +57,7 @@ private data class SplitSetupState(
 )
 
 private fun readSplitSetup(context: Context) = SplitSetupState(
-    overlay = runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false),
+    overlay = catching { Settings.canDrawOverlays(context) }.getOrDefault(false),
     usage = ShellSplit.hasUsageAccess(context),
     dump = ShellSplit.hasDump(context),
     module = SplitThree.running(context),
@@ -100,7 +101,7 @@ internal fun SplitSetupPage() {
             description = stringResource(R.string.onboarding_split_overlay_desc),
             done = state.overlay,
             onClick = {
-                runCatching {
+                catching {
                     context.startActivity(
                         Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -113,7 +114,7 @@ internal fun SplitSetupPage() {
             description = stringResource(R.string.onboarding_split_usage_desc),
             done = state.usage,
             onClick = {
-                runCatching {
+                catching {
                     context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             },
@@ -138,7 +139,7 @@ internal fun SplitSetupPage() {
                 )
                 TextButton(onClick = {
                     val clipboard = context.getSystemService(ClipboardManager::class.java)
-                    runCatching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", command)) }
+                    catching { clipboard?.setPrimaryClip(ClipData.newPlainText("adb", command)) }
                     copied = true
                 }) {
                     Text(

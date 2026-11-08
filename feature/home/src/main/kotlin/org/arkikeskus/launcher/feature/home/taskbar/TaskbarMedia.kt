@@ -12,6 +12,7 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import org.arkikeskus.launcher.model.catching
 
 /**
  * What is playing, for the taskbar's media icon: the session that is playing (or, if none is, the
@@ -59,7 +60,7 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
     val canSeek: Boolean get() = (lastPlayback?.actions ?: 0L) and PlaybackState.ACTION_SEEK_TO != 0L
 
     fun seekTo(positionMs: Long) {
-        runCatching { controller?.transportControls?.seekTo(positionMs) }
+        catching { controller?.transportControls?.seekTo(positionMs) }
     }
 
     private val callback = object : MediaController.Callback() {
@@ -100,30 +101,30 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
 
     fun stop() {
         if (listening) {
-            runCatching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
+            catching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
             listening = false
         }
         attach(null)
     }
 
     fun previous() {
-        runCatching { controller?.transportControls?.skipToPrevious() }
+        catching { controller?.transportControls?.skipToPrevious() }
     }
 
     fun next() {
-        runCatching { controller?.transportControls?.skipToNext() }
+        catching { controller?.transportControls?.skipToNext() }
     }
 
     /** Stops playback (pausing as well, for players that ignore a stop). */
     fun stopPlayback() {
         val controls = controller?.transportControls ?: return
-        runCatching { controls.pause() }
-        runCatching { controls.stop() }
+        catching { controls.pause() }
+        catching { controls.stop() }
     }
 
     fun playPause() {
         val current = controller ?: return
-        runCatching {
+        catching {
             if (current.playbackState?.state == PlaybackState.STATE_PLAYING) {
                 current.transportControls.pause()
             } else {
@@ -147,12 +148,12 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
 
     private fun attach(next: MediaController?) {
         if (controller?.sessionToken != next?.sessionToken) {
-            runCatching { controller?.unregisterCallback(callback) }
+            catching { controller?.unregisterCallback(callback) }
             controller = next
-            runCatching { next?.registerCallback(callback) }
+            catching { next?.registerCallback(callback) }
             // One read when a session is taken up; the callbacks keep both current after that.
-            lastPlayback = runCatching { next?.playbackState }.getOrNull()
-            duration = runCatching { next?.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) }.getOrNull() ?: 0L
+            lastPlayback = catching { next?.playbackState }.getOrNull()
+            duration = catching { next?.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) }.getOrNull() ?: 0L
         }
         publish()
     }
@@ -170,7 +171,7 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
                     metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
                         ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
                     ).orEmpty(),
-                art = runCatching {
+                art = catching {
                     metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
                         ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
                         ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
@@ -191,7 +192,7 @@ internal class TaskbarMedia(private val context: Context, private val onChange: 
     }
 
     private fun sameArt(a: Bitmap?, b: Bitmap?): Boolean =
-        a === b || (a != null && b != null && runCatching { a.sameAs(b) }.getOrDefault(false))
+        a === b || (a != null && b != null && catching { a.sameAs(b) }.getOrDefault(false))
 
     private companion object {
         const val LISTENER_CLASS = "org.arkikeskus.launcher.notifications.NotificationDotListenerService"

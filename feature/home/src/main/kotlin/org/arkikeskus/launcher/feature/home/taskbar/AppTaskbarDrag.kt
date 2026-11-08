@@ -43,6 +43,7 @@ import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.EXTRA_D
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.EXTRA_DRAG_PENDING_INTENT
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.GHOST_ALPHA
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.MIME_ACTIVITY
+import org.arkikeskus.launcher.model.catching
 
 // Dragging from the taskbar: system drag-and-drop, the ghost icon, drop chips and edge zones (split out of AppTaskbar.kt; extension functions on [AppTaskbar]).
 
@@ -80,7 +81,7 @@ internal fun AppTaskbar.startSystemDrag(source: View, label: CharSequence, mime:
         }
     }
     systemDragging = true
-    val started = runCatching {
+    val started = catching {
         source.startDragAndDrop(
             clip,
             View.DragShadowBuilder(source),
@@ -115,7 +116,7 @@ internal fun AppTaskbar.appDragData(app: AppItem): Intent? {
 /** The launch link Android's own launcher uses; for Folark's own user, a plain one as a fallback. */
 internal fun AppTaskbar.mainActivityLink(app: AppItem): PendingIntent? {
     val launcherApps = context.getSystemService(LauncherApps::class.java)
-    val system = runCatching {
+    val system = catching {
         LauncherApps::class.java
             .getMethod("getMainActivityLaunchIntent", ComponentName::class.java, Bundle::class.java, UserHandle::class.java)
             .invoke(launcherApps, app.componentName, null, app.user) as? PendingIntent
@@ -126,7 +127,7 @@ internal fun AppTaskbar.mainActivityLink(app: AppItem): PendingIntent? {
         .addCategory(Intent.CATEGORY_LAUNCHER)
         .setComponent(app.componentName)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-    return runCatching {
+    return catching {
         PendingIntent.getActivity(
             context,
             app.key.hashCode(),
@@ -143,7 +144,7 @@ internal fun AppTaskbar.mainActivityLink(app: AppItem): PendingIntent? {
  */
 internal fun AppTaskbar.shortcutDragData(info: ShortcutInfo): Intent? {
     val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return null
-    val link = runCatching { launcherApps.getShortcutIntent(info.`package`, info.id, null, info.userHandle) }.getOrNull()
+    val link = catching { launcherApps.getShortcutIntent(info.`package`, info.id, null, info.userHandle) }.getOrNull()
         ?: return null
     return Intent()
         .putExtra(EXTRA_DRAG_PENDING_INTENT, link)
@@ -182,7 +183,7 @@ internal fun AppTaskbar.ghostStart(source: ImageView, hint: TextView) {
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         PixelFormat.TRANSLUCENT,
     ).apply { passThroughAlpha?.let { alpha = it } }
-    if (runCatching { windowManager.addView(root, params) }.isSuccess) {
+    if (catching { windowManager.addView(root, params) }.isSuccess) {
         ghostWindow = root
         ghostIcon = copy
         source.alpha = DRAG_ALPHA
@@ -204,7 +205,7 @@ internal fun AppTaskbar.ghostMove(rawX: Float, rawY: Float, hint: TextView) {
 }
 
 internal fun AppTaskbar.ghostEnd() {
-    ghostWindow?.let { runCatching { windowManager.removeView(it) } }
+    ghostWindow?.let { catching { windowManager.removeView(it) } }
     ghostWindow = null
     ghostIcon = null
     splitChip = null

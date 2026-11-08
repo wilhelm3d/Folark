@@ -20,6 +20,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** An app to place in a split: its running task when known, else the app to open. */
 data class SplitApp(val packageName: String, val app: AppItem? = null, val taskId: Int? = null) {
@@ -400,13 +401,13 @@ class SplitCoordinator @Inject constructor(
         if (!three && route.native && pickerNatively(first, firstOnRight, ::picker, route.root)) return
         // Three apps don't fit a half: that picker opens full screen and builds the split after.
         if (three || !route.commands) {
-            withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(false), noAnim) } }
+            withContext(Dispatchers.Main) { catching { context.startActivity(picker(false), noAnim) } }
             return
         }
         exitFirst(first.taskId ?: -1, route.root)
         if (firstOnRight) {
             // The picker first (it ends up on the left), then the first app, moved to the right.
-            withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(false), noAnim) } }
+            withContext(Dispatchers.Main) { catching { context.startActivity(picker(false), noAnim) } }
             delay(PICKER_START_MS)
             val (id, read) = bringToFront(first, route.root) ?: return
             delay(FRONT_SETTLE_MS)
@@ -415,7 +416,7 @@ class SplitCoordinator @Inject constructor(
             // The first app first (it ends up on the left), then the picker, which moves itself right.
             bringToFront(first, route.root)
             delay(FRONT_SETTLE_MS)
-            withContext(Dispatchers.Main) { runCatching { context.startActivity(picker(true), noAnim) } }
+            withContext(Dispatchers.Main) { catching { context.startActivity(picker(true), noAnim) } }
         }
     }
 
@@ -433,7 +434,7 @@ class SplitCoordinator @Inject constructor(
         exitFirst(id, root)
         val noAnim = ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
         return withContext(Dispatchers.Main) {
-            runCatching { context.startActivity(picker(first.copy(taskId = id), true), noAnim) }.isSuccess
+            catching { context.startActivity(picker(first.copy(taskId = id), true), noAnim) }.isSuccess
         }
     }
 
@@ -531,7 +532,7 @@ class SplitCoordinator @Inject constructor(
     private suspend fun bringToFront(app: SplitApp, root: Boolean): Pair<Int, Read>? {
         val found = running(app, root)
         val moved = found != null && withContext(Dispatchers.Main) {
-            runCatching { context.getSystemService(ActivityManager::class.java).moveTaskToFront(found.first, 0) }.isSuccess.also { ShellSplit.forget() }
+            catching { context.getSystemService(ActivityManager::class.java).moveTaskToFront(found.first, 0) }.isSuccess.also { ShellSplit.forget() }
         }
         return if (moved) found else open(app, root)
     }

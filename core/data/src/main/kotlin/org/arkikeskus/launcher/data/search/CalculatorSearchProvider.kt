@@ -3,6 +3,7 @@ package org.arkikeskus.launcher.data.search
 import org.arkikeskus.launcher.model.SearchResult
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Local calculator + simple unit conversion. Pure (no Android deps). Returns at most one
@@ -51,7 +52,7 @@ class CalculatorSearchProvider @Inject constructor() : SearchProvider {
         val s = raw.replace('×', '*').replace('÷', '/').replace('x', '*').replace('X', '*')
         if (s.isBlank() || s.none { it.isDigit() }) return null
         if (s.any { it !in "0123456789.+-*/() " }) return null
-        return runCatching { Parser(s).parse() }.getOrNull()
+        return catching { Parser(s).parse() }.getOrNull()
     }
 
     private fun format(value: Double): String {

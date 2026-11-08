@@ -34,6 +34,7 @@ import org.arkikeskus.launcher.data.root.RootTasks
 import org.arkikeskus.launcher.model.LauncherSettings
 import java.text.DateFormat
 import java.util.Date
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Phone & system ▸ Support: everything Folark knows about its own health, in one page —
@@ -191,7 +192,7 @@ private fun SupportModuleLogRow() {
             if (!running) {
                 running = true
                 scope.launch {
-                    val log = withContext(Dispatchers.IO) { runCatching { ModuleTools.moduleLog() }.getOrNull() }
+                    val log = withContext(Dispatchers.IO) { catching { ModuleTools.moduleLog() }.getOrNull() }
                     text = when {
                         log == null -> noRoot
                         log.isEmpty() -> empty
@@ -244,7 +245,7 @@ private fun ScreenshotCheckRow() {
                 running = true
                 scope.launch {
                     report = withContext(Dispatchers.IO) {
-                        runCatching { RootTasks.diagnose(context) }
+                        catching { RootTasks.diagnose(context) }
                             .getOrElse { "Check failed: ${it.javaClass.simpleName}: ${it.message}" }
                     }
                     running = false

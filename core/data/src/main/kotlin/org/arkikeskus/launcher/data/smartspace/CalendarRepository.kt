@@ -18,6 +18,7 @@ import org.arkikeskus.launcher.data.di.ApplicationScope
 import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.catching
 
 /** How far ahead the smartspace widget looks for the next calendar event. */
 private const val LOOKAHEAD_MS = 7L * 24 * 60 * 60 * 1000
@@ -73,13 +74,13 @@ class CalendarRepository @Inject constructor(
                 // Flag only after the platform call succeeded, or a transient failure would skip
                 // registration forever.
                 if (!observing) {
-                    runCatching {
+                    catching {
                         context.contentResolver.registerContentObserver(CalendarContract.CONTENT_URI, true, observer)
                     }.onSuccess { observing = true }
                 }
                 // A failed query keeps the previous good events (a transient provider error must not
                 // blank an event the user was already seeing); the next change/resume retries anyway.
-                runCatching { query() }.onSuccess { _events.value = it }
+                catching { query() }.onSuccess { _events.value = it }
             }
         }
     }

@@ -13,6 +13,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.MotoPopup
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Foldable page, under the floating window size: whether Motorola's pop-up gesture is on, read
@@ -42,6 +43,6 @@ internal fun MotoPopupGestureRow() {
                 null -> R.string.settings_moto_popup_gesture_unknown
             },
         ),
-        onClick = { runCatching { context.startActivity(MotoPopup.settingsIntent(context)) } },
+        onClick = { catching { context.startActivity(MotoPopup.settingsIntent(context)) } },
     )
 }

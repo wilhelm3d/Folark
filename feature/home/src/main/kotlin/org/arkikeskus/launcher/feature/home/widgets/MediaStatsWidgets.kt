@@ -63,6 +63,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.arkikeskus.launcher.designsystem.theme.LocalLauncherColors
+import org.arkikeskus.launcher.model.catching
 
 /** The class of the launcher's notification listener: the system only shows media sessions to an
  *  app whose notification listener the user has enabled. */
@@ -125,7 +126,7 @@ internal class MediaSessionWatcher(private val context: Context) {
 
     fun stop() {
         if (listening) {
-            runCatching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
+            catching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
             listening = false
         }
         attach(null)
@@ -140,9 +141,9 @@ internal class MediaSessionWatcher(private val context: Context) {
 
     private fun attach(next: MediaController?) {
         if (controller?.sessionToken != next?.sessionToken) {
-            runCatching { controller?.unregisterCallback(controllerCallback) }
+            catching { controller?.unregisterCallback(controllerCallback) }
             controller = next
-            runCatching { next?.registerCallback(controllerCallback) }
+            catching { next?.registerCallback(controllerCallback) }
         }
         publish()
     }
@@ -151,7 +152,7 @@ internal class MediaSessionWatcher(private val context: Context) {
         val current = controller
         nowPlaying = if (current == null) null else {
             val metadata = current.metadata
-            val art = runCatching {
+            val art = catching {
                 metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
                     ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
                     ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
@@ -161,7 +162,7 @@ internal class MediaSessionWatcher(private val context: Context) {
                     ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE).orEmpty(),
                 artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
                     ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST).orEmpty(),
-                art = runCatching { art?.asImageBitmap() }.getOrNull(),
+                art = catching { art?.asImageBitmap() }.getOrNull(),
                 playing = current.playbackState?.state == PlaybackState.STATE_PLAYING,
                 packageName = current.packageName.orEmpty(),
             )
@@ -183,11 +184,11 @@ internal class MediaSessionWatcher(private val context: Context) {
      * panel is the fallback.
      */
     fun showVolume() {
-        val shown = runCatching {
+        val shown = catching {
             controller?.adjustVolume(AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
         }.getOrNull() != null
         if (!shown) {
-            runCatching {
+            catching {
                 context.getSystemService(AudioManager::class.java)
                     ?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
             }
@@ -198,10 +199,10 @@ internal class MediaSessionWatcher(private val context: Context) {
     fun open() {
         val current = controller ?: return
         // Sent with the background-start opt-in; a plain send() is silently blocked on Android 14+.
-        val activity = runCatching { current.sessionActivity }.getOrNull()
+        val activity = catching { current.sessionActivity }.getOrNull()
         val opened = activity != null && sendNotificationIntent(context, activity)
         if (!opened) {
-            runCatching {
+            catching {
                 context.packageManager.getLaunchIntentForPackage(current.packageName)
                     ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     ?.let(context::startActivity)
@@ -244,7 +245,7 @@ fun NowPlayingWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsView
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clickable {
-                        runCatching {
+                        catching {
                             context.startActivity(
                                 Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -389,7 +390,7 @@ fun DeviceStatsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsVie
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.clickable {
-                            runCatching { askBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT) }
+                            catching { askBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT) }
                         },
                     ) {
                         Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {

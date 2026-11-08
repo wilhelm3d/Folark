@@ -29,10 +29,15 @@ import org.arkikeskus.launcher.data.PairSchedule
 import org.arkikeskus.launcher.data.IconPackRepository
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.data.DrawerFolder
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
+import org.arkikeskus.launcher.data.drawerFolders
+import org.arkikeskus.launcher.data.createDrawerFolder
+import org.arkikeskus.launcher.data.renameDrawerFolder
+import org.arkikeskus.launcher.data.moveDrawerFolder
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -79,6 +84,25 @@ class SettingsViewModel @Inject constructor(
     /** Keys currently hidden from the drawer. */
     val hiddenKeys: StateFlow<Set<String>> = repository.hiddenApps
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /**
+     * Drawer folders, in the order they appear. They are also the drawer's tabs, so this list is the
+     * tab order shown on the App drawer page.
+     */
+    val drawerFolders: StateFlow<List<DrawerFolder>> = repository.drawerFolders
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Moves the folder at [from] to [to]. The stored folder order is what the drawer reads, so the
+     * tab row follows on its next emission — no separate tab list to keep in step.
+     */
+    fun moveDrawerFolder(from: Int, to: Int) = viewModelScope.launch {
+        repository.moveDrawerFolder(from, to)
+    }
+
+    fun renameDrawerFolder(id: Long, name: String) = viewModelScope.launch {
+        repository.renameDrawerFolder(id, name)
+    }
 
     val appPairs: StateFlow<List<AppPair>> = appRepository.appPairs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -154,6 +178,7 @@ class SettingsViewModel @Inject constructor(
     fun setAutoRemoveEmptyPages(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setAutoRemoveEmptyPages(value, screenType) }
     fun setDrawerFolderTabs(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerFolderTabs(value, screenType) }
     fun setDrawerTabsExclusive(value: Boolean) = update { repository.setDrawerTabsExclusive(value) }
+    fun setDrawerTabsLocked(value: Boolean) = update { repository.setDrawerTabsLocked(value) }
     fun setHomeBackgroundImage(value: String, screenType: ScreenType = _screenType.value) = update { repository.setHomeBackgroundImage(value, screenType) }
     fun setFloatingWindowSize(value: String) = update { repository.setFloatingWindowSize(value) }
     fun setSearchShortcuts(value: Boolean) = update { repository.setSearchShortcuts(value) }

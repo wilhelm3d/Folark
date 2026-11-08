@@ -76,6 +76,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.ui.LauncherIcons
+import org.arkikeskus.launcher.model.catching
 
 /** The Arkikeskus brand colors the aurora blobs drift in (fixed — independent of the theme). */
 private val AURORA_BASE = Color(0xFF111318)
@@ -258,7 +259,7 @@ private fun WelcomePage(onRestored: () -> Unit) {
             )
         } else {
             Button(
-                onClick = { runCatching { setDefault.launch(DefaultLauncher.requestIntent(context)) } },
+                onClick = { catching { setDefault.launch(DefaultLauncher.requestIntent(context)) } },
                 colors = ButtonDefaults.buttonColors(containerColor = AURORA_BLUE),
             ) {
                 Text(stringResource(R.string.onboarding_set_default), color = Color.White)
@@ -319,7 +320,7 @@ private fun GestureRow(rotate: Float, text: String) {
     }
 }
 
-private fun hasNotificationAccess(context: Context): Boolean = runCatching {
+private fun hasNotificationAccess(context: Context): Boolean = catching {
     context.getSystemService(NotificationManager::class.java).isNotificationListenerAccessGranted(
         ComponentName(context.packageName, NOTIFICATION_LISTENER_CLASS),
     )
@@ -356,8 +357,8 @@ private fun PermissionsPage(onContactsGranted: () -> Unit, onPhoneGranted: () ->
         val cn = ComponentName(context.packageName, NOTIFICATION_LISTENER_CLASS)
         val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
             .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, cn.flattenToString())
-        runCatching { context.startActivity(detail) }.onFailure {
-            runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        catching { context.startActivity(detail) }.onFailure {
+            catching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
         }
     }
 

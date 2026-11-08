@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
+import org.arkikeskus.launcher.model.WidgetSettings
+
 import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
 
@@ -66,6 +68,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 @HiltViewModel
 class NothingClockViewModel @Inject constructor(
@@ -77,10 +80,10 @@ class NothingClockViewModel @Inject constructor(
 
     /** Settings ▸ Folark widgets ▸ clock style and text colour (both displays). */
     /** Only the widget settings: a change elsewhere in Settings doesn't redraw this widget. */
-    val widgets: StateFlow<LauncherSettings.Widgets> = settingsRepository.settings(ScreenType.OUTER)
+    val widgets: StateFlow<WidgetSettings> = settingsRepository.settings(ScreenType.OUTER)
         .map { it.widgets }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.Widgets())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WidgetSettings())
 }
 
 /** What sets one clock style apart: its type, where the date goes and how things line up. */
@@ -231,7 +234,7 @@ fun NothingClockWidget(
             } else Modifier
         )
         .clickable(interactionSource = noIndication, indication = null) {
-            runCatching {
+            catching {
                 context.startActivity(
                     Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )

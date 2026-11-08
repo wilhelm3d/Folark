@@ -5,6 +5,7 @@ import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.model.LauncherSettings
 import java.text.DateFormat
 import java.util.Date
+import org.arkikeskus.launcher.model.catching
 
 /**
  * Settings ▸ Recents ▸ Split screen ▸ Check split screen: every part split screen depends on, what
@@ -64,7 +65,7 @@ object SplitDiagnostics {
         } ?: "none yet"))
         // What System UI died of last (Android's crash log, through root): the cause of a restart.
         if (root) {
-            val crash = runCatching { lastSystemUiCrash() }.getOrNull()
+            val crash = catching { lastSystemUiCrash() }.getOrNull()
             appendLine("10. Last System UI crash: " + (crash ?: "none in Android's crash log"))
         }
     }

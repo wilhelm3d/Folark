@@ -68,6 +68,7 @@ import org.arkikeskus.launcher.ui.component.LocalFoldState
 import org.arkikeskus.launcher.ui.component.LocalIconEpochs
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import javax.inject.Inject
+import org.arkikeskus.launcher.model.catching
 
 @AndroidEntryPoint
 class LauncherActivity : ComponentActivity() {
@@ -180,7 +181,7 @@ class LauncherActivity : ComponentActivity() {
                     when (target.fold.foldAction) {
                         // "Already on home" semantics: close the drawer and snap to the home page.
                         LauncherSettings.ACTION_PAGE_0 -> homeSignals.tryEmit(true)
-                        LauncherSettings.ACTION_LOCK -> runCatching { LockAccessibilityService.lock() }
+                        LauncherSettings.ACTION_LOCK -> catching { LockAccessibilityService.lock() }
                         else -> Unit
                     }
                 }
@@ -395,7 +396,7 @@ class LauncherActivity : ComponentActivity() {
      * the inner display of a foldable usually top out at different rates.
      */
     private fun applyRefreshRate(idle: Boolean) {
-        runCatching {
+        catching {
             // Android 16+ panels with adaptive refresh rate (LTPO, as on the Razr Fold) pick the rate
             // per frame themselves, going far below 60 Hz on a still screen and boosting on touch.
             // A window-level ask would pin them at 60 Hz or more, so there Folark asks nothing.
@@ -427,7 +428,7 @@ class LauncherActivity : ComponentActivity() {
     private fun hasAdaptiveRefreshRate(): Boolean {
         if (android.os.Build.VERSION.SDK_INT < 36) return false
         val d = display ?: return false
-        return runCatching { d.javaClass.getMethod("hasArrSupport").invoke(d) as? Boolean }.getOrNull() == true
+        return catching { d.javaClass.getMethod("hasArrSupport").invoke(d) as? Boolean }.getOrNull() == true
     }
 
     /** Full rate now (a touch, a fold, coming home), back to the idle rate after a quiet moment. */
@@ -485,7 +486,7 @@ class LauncherActivity : ComponentActivity() {
      */
     private fun startWidgetConfig(appWidgetId: Int, onResult: (Boolean) -> Unit) {
         pendingConfigCallback = onResult
-        val launched = runCatching {
+        val launched = catching {
             appWidgetHost.startAppWidgetConfigureActivityForResult(this, appWidgetId, 0, WIDGET_CONFIG_REQUEST, null)
         }.isSuccess
         if (!launched) {
@@ -509,9 +510,9 @@ class LauncherActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         // A launcher is the device HOME — a host hiccup must never crash it.
-        runCatching { appWidgetHost.startListening() }
+        catching { appWidgetHost.startListening() }
         // "Display over other apps" may have been given or taken meanwhile: the taskbar's host follows.
-        runCatching { org.arkikeskus.launcher.feature.home.taskbar.TaskbarHost.refresh(this) }
+        catching { org.arkikeskus.launcher.feature.home.taskbar.TaskbarHost.refresh(this) }
         LockAccessibilityService.setHomeVisible(true)
         keepAccessibilityServiceOn()
         // Back from Settings after a restore: rebuild the home screen from the restored layout.
@@ -538,7 +539,7 @@ class LauncherActivity : ComponentActivity() {
         val resetNotice = org.arkikeskus.launcher.data.di.SettingsResetNotice
         if (resetNotice.reset && !resetNotice.shown) {
             resetNotice.shown = true
-            runCatching {
+            catching {
                 android.widget.Toast.makeText(
                     this, org.arkikeskus.launcher.R.string.settings_reset_notice, android.widget.Toast.LENGTH_LONG,
                 ).show()
@@ -558,7 +559,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        runCatching { appWidgetHost.stopListening() }
+        catching { appWidgetHost.stopListening() }
         LockAccessibilityService.setHomeVisible(false)
         wasForeground = false
         refreshHandler.removeCallbacks(dropToIdleRefreshRate)
@@ -652,11 +653,11 @@ class LauncherActivity : ComponentActivity() {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
         }
-        runCatching { registerReceiver(lockReceiver, filter, RECEIVER_NOT_EXPORTED) }
+        catching { registerReceiver(lockReceiver, filter, RECEIVER_NOT_EXPORTED) }
     }
 
     override fun onDestroy() {
-        runCatching { unregisterReceiver(lockReceiver) }
+        catching { unregisterReceiver(lockReceiver) }
         window.decorView.removeCallbacks(unlockFallback)
         super.onDestroy()
     }
