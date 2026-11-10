@@ -48,6 +48,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
+import org.arkikeskus.launcher.data.ai.AiNotificationEngine
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.data.StatusNotification
@@ -65,7 +66,15 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val splitCoordinator: SplitCoordinator,
     private val settingsRepository: SettingsRepository,
+    private val aiNotificationEngine: AiNotificationEngine,
 ) : ViewModel() {
+
+    /**
+     * Up to three replies suggested on the device (Android's TextClassifier) for a notification's
+     * text; empty when there is nothing to suggest. Nothing leaves the phone.
+     */
+    suspend fun smartReplies(notification: StatusNotification): List<String> =
+        aiNotificationEngine.generateSmartReplies(notification).map { it.toString() }.take(3)
 
     /** A long press offers "Open in split screen" (Settings ▸ Recents ▸ Split screen). */
     val splitOn = settingsRepository.settings(ScreenType.INNER).map { it.recents.notificationSplit }
@@ -100,8 +109,8 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
     }
 
     /** Hides one of an app's notification channels from every Folark surface (Android's shade untouched). */
-    fun hideChannel(packageName: String, channelId: String) = viewModelScope.launch {
-        settingsRepository.setChannelHidden(packageName, channelId)
+    fun hideChannel(packageName: String, channelId: String, name: String? = null) = viewModelScope.launch {
+        settingsRepository.setChannelHidden(packageName, channelId, hidden = true, name = name)
     }
 
     fun cancelNotification(key: String) {
@@ -227,6 +236,14 @@ fun InteractiveNotificationWidget(
                         
                         items(notifs, key = { it.key }) { notif ->
                             val context = LocalContext.current
+                            // Ask the on-device classifier only where the app gave no choices.
+                            var replies by remember(notif.key) { mutableStateOf(emptyList<String>()) }
+                            LaunchedEffect(notif.key) {
+                                val needsReply = notif.actions.any { a ->
+                                    a.remoteInputs?.any { it.choices.isNullOrEmpty() } == true
+                                }
+                                if (needsReply) replies = viewModel.smartReplies(notif)
+                            }
                             InteractiveNotificationItem(
                                 notification = notif,
                                 isPinned = pinnedKeys.contains(notif.key),
@@ -240,8 +257,9 @@ fun InteractiveNotificationWidget(
                                     null
                                 },
                                 onHideChannel = notif.channelId?.let { id ->
-                                    { viewModel.hideChannel(notif.packageName, id) }
+                                    { viewModel.hideChannel(notif.packageName, id, notif.channelName) }
                                 },
+                                suggestedReplies = replies,
                             )
                         }
                     }
@@ -264,6 +282,8 @@ fun InteractiveNotificationItem(
     onOpenInSplit: (() -> Unit)? = null,
     /** Hides this notification's channel from Folark's surfaces (null: the post had no channel). */
     onHideChannel: (() -> Unit)? = null,
+    /** On-device smart replies, shown when the app itself offered no reply choices. */
+    suggestedReplies: List<String> = emptyList(),
 ) {
     var menu by remember { mutableStateOf(false) }
     // The veto callback is deprecated in favour of dynamic anchors; it is still the simplest way to
@@ -420,8 +440,11 @@ fun InteractiveNotificationItem(
                     val context = LocalContext.current
                     notification.actions.forEach { action ->
                         action.remoteInputs?.forEach { remoteInput ->
-                            // Use app-provided choices, or default to a standard reply if empty
-                            val choices = remoteInput.choices ?: arrayOf("Yes", "No", "Thanks!")
+                            // The app's own choices, else Folark's on-device suggestions, else a
+                            // standard set (a notification with no text suggests nothing).
+                            val choices: List<CharSequence> = remoteInput.choices
+                                ?.takeIf { it.isNotEmpty() }?.toList()
+                                ?: suggestedReplies.ifEmpty { listOf("Yes", "No", "Thanks!") }
                             choices.forEach { choice ->
                                 OutlinedButton(
                                     onClick = { 

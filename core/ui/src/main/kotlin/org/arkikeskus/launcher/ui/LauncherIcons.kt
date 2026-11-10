@@ -29,4 +29,10 @@ object LauncherIcons {
     @DrawableRes val SwapHoriz: Int = R.drawable.ic_swap_horiz
     @DrawableRes val Folder: Int = R.drawable.ic_folder
     @DrawableRes val SwapVert: Int = R.drawable.ic_swap_vert
+    @DrawableRes val Tune: Int = R.drawable.ic_tune
+    @DrawableRes val ArrowBack: Int = R.drawable.ic_arrow_back
+    @DrawableRes val Visibility: Int = R.drawable.ic_visibility
+    @DrawableRes val CheckCircle: Int = R.drawable.ic_check_circle
+    @DrawableRes val Home: Int = R.drawable.ic_home
+    @DrawableRes val Lock: Int = R.drawable.ic_lock
 }

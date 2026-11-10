@@ -37,6 +37,13 @@ data class HomeSettings(
     val wallpaperBlur: Float = 0f,
     /** Path of this display's own home background picture ("" = show the system wallpaper). */
     val backgroundImage: String = "",
+    /**
+     * A video background (both displays): how long it plays after home comes back before it rests
+     * on its last frame, in seconds; 0 = it keeps looping as long as home shows.
+     */
+    val videoAwakeSeconds: Int = 30,
+    /** A newly installed app is put on home by itself (both displays, first free place). */
+    val addNewApps: Boolean = false,
     /** What a swipe up on a home app icon does (one of ICON_SWIPE_*). */
     val iconSwipeUpAction: String = LauncherSettings.ICON_SWIPE_NONE,
     /** Remove a home page as soon as its last item leaves it. */

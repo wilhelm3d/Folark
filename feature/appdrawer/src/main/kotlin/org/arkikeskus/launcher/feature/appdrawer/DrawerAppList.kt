@@ -175,6 +175,8 @@ internal fun AppListRow(
                             // also leaves the folder (a chip, the Remove pill, home, dock, split).
                             val pullOut = dragController.dragFromTab != null
                             when {
+                                // Uninstall or App info at the top: done; the app stays where it was.
+                                dragController.dropOnSystemTarget(app, root) -> Unit
                                 // Onto a folder chip over home: into that folder (the All chip pulls out).
                                 dragController.isOverFolderTab(root) ->
                                     onDropOnTab(app, dragController.folderTabAt(root))
@@ -502,6 +504,8 @@ internal fun LazyGridScope.appCells(
                                 }
                                 val pullOut = dragController.dragFromTab != null
                                 when {
+                                    // Uninstall or App info at the top: done; the app stays where it was.
+                                    dragController.dropOnSystemTarget(app, root) -> Unit
                                     // Onto a folder chip over home: into that folder (All pulls out).
                                     dragController.isOverFolderTab(root) ->
                                         onDropOnTab(app, dragController.folderTabAt(root))

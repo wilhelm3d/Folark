@@ -503,6 +503,17 @@ data class LauncherSettings(
         const val MIN_DPI_SCALE = 0.7f
         const val MAX_DPI_SCALE = 1.4f
 
+        /** Search's web engines: Android's own search, or a named engine's page in the browser. */
+        const val SEARCH_ENGINE_SYSTEM = "system"
+        const val SEARCH_ENGINE_GOOGLE = "google"
+        const val SEARCH_ENGINE_DUCKDUCKGO = "duckduckgo"
+        const val SEARCH_ENGINE_BING = "bing"
+        const val SEARCH_ENGINE_STARTPAGE = "startpage"
+        val SEARCH_ENGINES = listOf(
+            SEARCH_ENGINE_SYSTEM, SEARCH_ENGINE_GOOGLE, SEARCH_ENGINE_DUCKDUCKGO,
+            SEARCH_ENGINE_BING, SEARCH_ENGINE_STARTPAGE,
+        )
+
         const val SEARCH_TOP = "top"
         const val SEARCH_BOTTOM = "bottom"
 

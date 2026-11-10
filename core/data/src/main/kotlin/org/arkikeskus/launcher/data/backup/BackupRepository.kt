@@ -34,7 +34,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.di.ApplicationScope
-import org.arkikeskus.launcher.data.runSuspendCatching
 import org.arkikeskus.launcher.data.local.LauncherDatabase
 import org.json.JSONArray
 import org.json.JSONObject
@@ -290,7 +289,7 @@ class BackupRepository @Inject constructor(
 
     /** Called when the home screen goes to the background: backs up once a day when turned on. */
     fun autoBackupSoon() {
-        scope.launch { runSuspendCatching { autoBackup(force = false) } }
+        scope.launch { catching { autoBackup(force = false) } }
     }
 
     private suspend fun autoBackup(force: Boolean): Boolean = withContext(Dispatchers.IO) {

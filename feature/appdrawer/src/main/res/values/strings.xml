@@ -2,16 +2,10 @@
 <resources>
     <string name="app_drawer_search_hint">Search apps</string>
     <string name="add_to_dock">Add to dock</string>
-    <string name="remove_from_dock">Remove from dock</string>
     <string name="add_to_home">Add to home</string>
-    <string name="remove_from_home">Remove from home</string>
-    <string name="app_info">App info</string>
-    <string name="hide_app">Hide app</string>
     <string name="rename">Rename</string>
-    <string name="uninstall">Uninstall</string>
     <string name="folder_default_name">Folder</string>
     <string name="folder_name_label">Folder name</string>
-    <string name="folder_add_apps">Add apps</string>
     <string name="folder_delete">Delete folder</string>
     <string name="folder_add">Add</string>
     <string name="folder_cancel">Cancel</string>
@@ -30,8 +24,6 @@
     <string name="folder_popover_pull">Keep dragging to take it out</string>
     <string name="folder_popover_release">Release to take it out</string>
     <string name="folder_popover_no_match">No apps match</string>
-    <string name="folder_drop_hint">Drop to add</string>
-    <string name="folder_drop_new">Drop to make a folder</string>
     <string name="folder_tile_apps">%1$s, %2$d apps</string>
     <string name="search_section_apps">Apps</string>
     <string name="search_section_settings">Settings</string>
@@ -55,9 +47,7 @@
     <string name="drawer_clip_text">Text</string>
     <string name="search_clear">Clear search</string>
     <string name="search_no_results">No results found</string>
-    <string name="open_floating">Open in floating window</string>
     <string name="add_floating_shortcut">Add floating shortcut to home</string>
-    <string name="open_split">Open in split screen</string>
     <string name="change_icon">Change icon</string>
     <string name="search_section_shortcuts">Shortcuts</string>
     <string name="search_web">Search the web for “%1$s”</string>
@@ -71,10 +61,11 @@
     <string name="drawer_private_space_empty">No apps here yet</string>
     <string name="search_section_actions">Actions</string>
     <string name="search_action_no_app">No app on this phone can do that</string>
+    <string name="search_action_unavailable">This phone does not allow that switch here</string>
+    <string name="split_picker_swap">Swap</string>
     <string name="split_picker_recent">RECENT APPS</string>
     <string name="split_picker_back">Back</string>
     <string name="split_picker_choose">Choose an app</string>
-    <string name="split_picker_size">Size</string>
     <string name="split_picker_choose_more">Choose %2$d apps · %1$d chosen</string>
     <string name="split_picker_peek">Peek</string>
     <string name="split_picker_favorites">FAVORITES</string>
@@ -83,4 +74,14 @@
     <string name="split_picker_open_full">Open full screen</string>
     <string name="split_picker_favorite">Add to favorites</string>
     <string name="split_picker_unfavorite">Remove from favorites</string>
+    <!-- Hidden apps at the end of the app list -->
+    <plurals name="drawer_hidden_apps">
+        <item quantity="one">Hidden apps (%d)</item>
+        <item quantity="other">Hidden apps (%d)</item>
+    </plurals>
+    <string name="drawer_hidden_title">Hidden apps</string>
+    <string name="drawer_hidden_desc">Tap an app to open it, the eye to show it in the list again</string>
+    <string name="drawer_hidden_unhide">Show in the app list</string>
+    <string name="drawer_hidden_close">Close</string>
+    <string name="drawer_hidden_unlock">Show hidden apps</string>
 </resources>

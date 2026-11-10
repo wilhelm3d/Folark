@@ -40,6 +40,8 @@ data class StatusNotification(
     val actions: List<Notification.Action> = emptyList(),
     /** The Android notification channel this came in on, for the per-channel "hide" action. */
     val channelId: String? = null,
+    /** That channel's name as the app called it ("Messages", "Promotions"), shown in Settings when muted. */
+    val channelName: String? = null,
 )
 
 /** A new notification for an app ([badgeKey] = "packageName/userSerial"), to nudge its icon. */

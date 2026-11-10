@@ -11,12 +11,31 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Hidden apps in the app list can be locked behind the fingerprint (or the screen lock). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- Optional: contacts in app-drawer search; requested at runtime, gated by a setting. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Optional: files and media in app-drawer search; requested at runtime, gated by a setting.
+         Android 13+ splits the read permission by media type; older versions use the single one. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Optional, for documents (PDFs, texts…) in that search too: since Android 11 only "All files
+         access" lets an app see other apps' non-media files. The user turns it on in Android's own
+         page, opened from Settings ▸ App drawer ▸ Search; without it, search finds media only. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <!-- Search actions: "timer 10 min" and "alarm 7:30" hand the clock app a timer or alarm to
          confirm (an ordinary permission, granted at install). -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
+    <!-- Search's system switches: "brightness 40" and "auto-rotate" write a system setting, and
+         "do not disturb" changes the interruption filter. Both are special accesses the user
+         grants on Android's own page, which the switch opens the first time it is used. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
     <!-- Optional: the smartspace widget's next-calendar-event row; requested at runtime from the
          widget itself. Clock + date work without it. -->

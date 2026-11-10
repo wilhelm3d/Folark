@@ -49,6 +49,8 @@ class SplitPickerActivity : ComponentActivity() {
     private var peek by mutableStateOf(false)
     /** The picked app's share of the split in percent (Size row: 33, 50, 67). */
     private var share by mutableStateOf(50)
+    /** The Swap symbol in the corner: the first app moves to the other half. */
+    private var swappedSides by mutableStateOf(false)
     /** Opened for three apps (Recents' three-app split). */
     private val openedForThree get() = intent.getBooleanExtra(SplitPicker.EXTRA_THREE, false)
     /** Three apps a third each, chosen in the corner (33/33/33): two more apps to pick. */
@@ -58,6 +60,8 @@ class SplitPickerActivity : ComponentActivity() {
     private val firstKey get() = intent.getStringExtra(SplitPicker.EXTRA_FIRST_KEY)
     private val firstTaskId get() = intent.getIntExtra(SplitPicker.EXTRA_FIRST_TASK, -1).takeIf { it > 0 }
     private val firstOnRight get() = intent.getBooleanExtra(SplitPicker.EXTRA_RIGHT, false)
+    /** Which half the app being picked goes to: the first app's side, unless swapped. */
+    private val pickedOnLeft get() = firstOnRight.xor(swappedSides)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -100,14 +104,16 @@ class SplitPickerActivity : ComponentActivity() {
                             peek = if (!three && look.peekToggle && viewModel.peekAvailable) peek else null,
                             onPeekChange = { peek = it },
                             onAction = ::onAction,
-                            onPick = { app -> pick(app, peek, look.openAnim) },
+                            onPick = { app -> pick(app, peek, look.openAnim, pickedOnLeft) },
                             // The divider sizes need Folark's Vector module (as peek does).
                             share = if (!openedForThree && (viewModel.sizesAvailable || viewModel.threeEvenAvailable)) share else null,
                             sizes = viewModel.sizesAvailable,
                             threeEven = !openedForThree && viewModel.threeEvenAvailable,
-                            pickedOnLeft = firstOnRight,
+                            pickedOnLeft = pickedOnLeft,
                             // A size is a plain split: it ends peek.
                             onShareChange = { share = it; peek = false },
+                            // Two apps only: three apps are laid out by the three-app split itself.
+                            onSwapSides = if (openedForThree || three) null else ({ swappedSides = !swappedSides }),
                         )
                     }
                 }
@@ -115,21 +121,23 @@ class SplitPickerActivity : ComponentActivity() {
         }
     }
 
-    private fun pick(app: AppItem, peek: Boolean, openAnim: String) {
+    private fun pick(app: AppItem, peek: Boolean, openAnim: String, firstRight: Boolean = firstOnRight) {
         if (appPicked) return
         appPicked = true
-        // Docked beside the first app: the pick opens right here, in this half of the split.
-        if (isInMultiWindowMode) {
+        // Docked beside the first app: the pick opens right here, in this half of the split. Not
+        // when the sides were swapped: this half is the wrong one then, so the split is formed
+        // again below with the picked app on the other side.
+        if (isInMultiWindowMode && !swappedSides) {
             val mine = app.user == Process.myUserHandle()
             val opened = if (mine) launchInThisStage(app, openAnim) else launchOtherProfileHere(app, openAnim)
             if (opened) {
                 if (mine) {
                     viewModel.recordPair(firstPackage, firstTaskId, app)
-                    if (peek) viewModel.snapPeekLater(firstOnRight) else viewModel.snapShareLater(firstOnRight, share)
+                    if (peek) viewModel.snapPeekLater(firstRight) else viewModel.snapShareLater(firstRight, share)
                 } else {
                     // Another profile's app opens through Android's launcher service, which may put
                     // it full screen instead: checked, and the split made again around it if so.
-                    viewModel.ensureBeside(firstPackage, firstTaskId, firstOnRight, app, peek)
+                    viewModel.ensureBeside(firstPackage, firstTaskId, firstRight, app, peek)
                 }
                 // Zoom: the grown icon stays under the app until its window is up, then the picker goes.
                 if (openAnim == SplitPickerLook.OPEN_ZOOM) {
@@ -140,8 +148,8 @@ class SplitPickerActivity : ComponentActivity() {
                 return
             }
         }
-        viewModel.formSplit(firstPackage, firstKey, firstTaskId, firstOnRight, app, peek = peek)
-        if (!peek) viewModel.snapShareLater(firstOnRight, share, afterFormingSplit = true)
+        viewModel.formSplit(firstPackage, firstKey, firstTaskId, firstRight, app, peek = peek)
+        if (!peek) viewModel.snapShareLater(firstRight, share, afterFormingSplit = true)
         finishAndRemoveTask()
     }
 

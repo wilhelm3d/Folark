@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.ui.component
 
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -95,6 +96,9 @@ val LocalAquamorphicTouch = compositionLocalOf { true }
 /** The per-display "app launch zoom" switch (Settings ▸ Appearance). */
 val LocalAppLaunchZoom = compositionLocalOf { true }
 
+/** Keys of apps installed lately and not opened yet; [AppIcon] marks them with a dot. Provided by the app list. */
+val LocalNewApps = androidx.compose.runtime.compositionLocalOf { emptySet<String>() }
+
 /**
  * An app icon plus optional label. The icon is loaded via Coil (see AppIconFetcher), so it is
  * cached and loaded off the main thread. Caller supplies [labelColor] (white on wallpaper, the
@@ -187,6 +191,17 @@ fun AppIcon(
                 }
             }
             
+            // Installed lately and not opened yet: a small dot under the icon (the app list only).
+            if (appItem.key in LocalNewApps.current) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = 7.dp)
+                        .size(6.dp)
+                        .background(androidx.compose.material3.MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape),
+                )
+            }
+
             // A chat app with a sender photo shows the photo instead of the plain dot.
             val avatar = if (badgeCount > 0) LocalBadgeAvatars.current[appItem.badgeKey] else null
             if (avatar != null) {

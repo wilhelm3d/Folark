@@ -69,6 +69,8 @@ data class DrawerSettings(
     val innerSidebar: Boolean = false,
     /** A-Z bar: hold a letter still for a moment, then sliding scrolls smoothly through the apps instead of jumping letter to letter. */
     val azHoldScroll: Boolean = true,
+    /** "Hidden apps" at the end of the app list opens only after the fingerprint (or screen lock). */
+    val hiddenLock: Boolean = false,
     /** Unfolded: the drawer's tabs as a list on the left, their apps on the right. */
     val twoPane: Boolean = false,
     val layoutMode: String = LauncherSettings.DRAWER_LAYOUT_GRID,

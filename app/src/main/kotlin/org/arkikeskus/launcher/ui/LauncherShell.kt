@@ -360,6 +360,7 @@ fun LauncherShell(
             VideoBackground(
                 path = backgroundPath,
                 playing = !homeCovered && !LocalBatterySaver.current,
+                awakeSeconds = shellSettings.home.videoAwakeSeconds,
                 modifier = Modifier.fillMaxSize().then(hingeZoom),
             )
         } else if (backgroundPath.isNotBlank()) {
@@ -519,21 +520,33 @@ fun LauncherShell(
         // surface so it can travel between them. Positioned by the finger's root coords.
         val dragged = dragController.draggedApp
         if (dragged != null && dragController.moving) {
-            val sizeDp = 56.dp
+            // The icon's real size (from the surface it came from), centred where it was grabbed —
+            // not under the finger — so picking it up never makes it jump.
+            val iconDp = dragController.iconSize
+            val sizeDp = iconDp + 4.dp
             val halfPx = with(density) { (sizeDp / 2).toPx() }
+            // A short lift as the drag begins instead of popping straight to the lifted size.
+            val lift = remember(dragged.key) { androidx.compose.animation.core.Animatable(1f) }
+            LaunchedEffect(dragged.key) {
+                lift.animateTo(
+                    DRAG_LIFT_SCALE,
+                    androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 900f),
+                )
+            }
             Box(
                 modifier = Modifier
                     .offset {
+                        val p = dragController.rootPosition + dragController.grabOffset
                         IntOffset(
-                            (dragController.rootPosition.x - shellOrigin.x - halfPx).roundToInt(),
-                            (dragController.rootPosition.y - shellOrigin.y - halfPx).roundToInt(),
+                            (p.x - shellOrigin.x - halfPx).roundToInt(),
+                            (p.y - shellOrigin.y - halfPx).roundToInt(),
                         )
                     }
                     .size(sizeDp)
                     .graphicsLayer {
                         alpha = 0.92f
-                        scaleX = 1.1f
-                        scaleY = 1.1f
+                        scaleX = lift.value
+                        scaleY = lift.value
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -548,11 +561,14 @@ fun LauncherShell(
                         appItem = dragged,
                         labelColor = Color.White,
                         showLabel = false,
-                        iconSize = 52.dp,
+                        iconSize = iconDp,
                     )
                 }
             }
         }
+
+        // "… removed from home · Undo" after an app was removed or hidden anywhere (AppEdits).
+        org.arkikeskus.launcher.ui.UndoBar(Modifier.align(Alignment.BottomCenter))
     }
     }
 
@@ -625,3 +641,6 @@ private fun setSystemWallpaperZoom(view: android.view.View, zoom: Float) {
     val method = wallpaperZoomMethod ?: return
     catching { method.invoke(android.app.WallpaperManager.getInstance(view.context), token, zoom.coerceIn(0f, 1f)) }
 }
+
+/** How much a dragged icon grows as it is lifted. */
+private const val DRAG_LIFT_SCALE = 1.1f

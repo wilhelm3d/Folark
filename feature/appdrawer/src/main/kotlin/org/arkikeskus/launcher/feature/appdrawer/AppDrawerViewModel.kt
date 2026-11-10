@@ -2,6 +2,7 @@
 
 package org.arkikeskus.launcher.feature.appdrawer
 
+import org.arkikeskus.launcher.ui.AppEdits
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -88,6 +89,13 @@ data class AppDrawerUiState(
     val shortcutResults: List<SearchResult.Shortcut> = emptyList(),
     val actionResults: List<SearchResult.Action> = emptyList(),
     val searchWeb: Boolean = true,
+    /** Which engine the web row opens (Settings ▸ Search ▸ Web search engine). */
+    val searchWebEngine: String = LauncherSettings.SEARCH_ENGINE_SYSTEM,
+    /** Apps hidden from the list (shown under "Hidden apps" at its end), and whether that needs the fingerprint. */
+    val hiddenApps: List<AppItem> = emptyList(),
+    val hiddenLock: Boolean = false,
+    /** Apps installed lately and not opened yet: marked "new" in the list. */
+    val newApps: Set<String> = emptySet(),
     /** The top app found shows its shortcuts right under it (Settings ▸ Search). */
     val searchInlineShortcuts: Boolean = true,
     /** Unfolded: tabs in a list on the left, their apps on the right (Settings ▸ Drawer). */
@@ -221,6 +229,8 @@ class AppDrawerViewModel @Inject constructor(
             tabsExclusive = settings.drawer.tabsExclusive,
             tabsLocked = settings.drawer.lockTabOrder,
             searchWeb = settings.search.web,
+            searchWebEngine = settings.search.webEngine,
+            hiddenLock = settings.drawer.hiddenLock,
             searchInlineShortcuts = settings.search.inlineShortcuts,
             twoPane = settings.drawer.twoPane,
             azHoldScroll = settings.drawer.azHoldScroll,
@@ -260,8 +270,18 @@ class AppDrawerViewModel @Inject constructor(
     } }.combine(notificationBadgeRepository.badges) { state, badges ->
         state.copy(badges = badges)
     }.combine(settingsRepository.hiddenApps) { state, hidden ->
-        // Hide selected apps from the drawer (also excludes them from search results).
-        if (hidden.isEmpty()) state else state.copy(apps = state.apps.filterNot { it.key in hidden })
+        // Hide selected apps from the drawer (also excludes them from search results); they are
+        // kept apart for "Hidden apps" at the end of the list.
+        if (hidden.isEmpty()) {
+            state.copy(hiddenApps = emptyList())
+        } else {
+            state.copy(
+                apps = state.apps.filterNot { it.key in hidden },
+                hiddenApps = state.apps.filter { it.key in hidden },
+            )
+        }
+    }.combine(settingsRepository.newApps) { state, fresh ->
+        state.copy(newApps = fresh)
     }.combine(settingsRepository.drawerFolders.combine(selectedTab) { folders, tab -> folders to tab }) { state, foldersAndTab ->
         val (folders, tab) = foldersAndTab
         if (folders.isEmpty()) {
@@ -352,7 +372,16 @@ class AppDrawerViewModel @Inject constructor(
         query.value = value
     }
 
-    fun hideApp(appItem: AppItem) = viewModelScope.launch { settingsRepository.setAppHidden(appItem.key, true) }
+    /** Hides [appItem] from the app list, with "… hidden · Undo". */
+    fun hideApp(appItem: AppItem) = viewModelScope.launch {
+        settingsRepository.setAppHidden(appItem.key, true)
+        AppEdits.hidden(appItem.label) {
+            viewModelScope.launch { settingsRepository.setAppHidden(appItem.key, false) }
+        }
+    }
+
+    /** Shows a hidden app in the list again (Hidden apps at the end of the list). */
+    fun unhideApp(appItem: AppItem) = viewModelScope.launch { settingsRepository.setAppHidden(appItem.key, false) }
 
     /** Launches [appItem]; returns whether it started, so the drawer only closes on success. */
     fun onAppClick(appItem: AppItem): Boolean =
@@ -375,11 +404,23 @@ class AppDrawerViewModel @Inject constructor(
 
     fun addToDock(appItem: AppItem) = viewModelScope.launch { settingsRepository.addToDock(appItem.key, _screenType.value) }
 
-    fun removeFromDock(appItem: AppItem) = viewModelScope.launch { settingsRepository.removeFromDock(appItem.key, _screenType.value) }
+    /** Takes [appItem] off the dock, with "… removed from the dock · Undo". */
+    fun removeFromDock(appItem: AppItem) = viewModelScope.launch {
+        val screen = _screenType.value
+        val index = settingsRepository.dockKeys(screen).indexOf(appItem.key)
+        settingsRepository.removeFromDock(appItem.key, screen)
+        if (index < 0) return@launch
+        AppEdits.removedFromDock(appItem.label) {
+            viewModelScope.launch { settingsRepository.addToDockAt(appItem.key, index, screen) }
+        }
+    }
 
+    /** Puts [appItem] on home; home then jumps to its page and pops it in (the drawer closes). */
     fun addToHome(appItem: AppItem) = viewModelScope.launch {
-        val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.addToHome(appItem, s.home.columns, s.home.rows, _screenType.value)
+        val screen = _screenType.value
+        val s = settingsRepository.settings(screen).first()
+        val page = homeLayoutRepository.addToHome(appItem, s.home.columns, s.home.rows, screen)
+        AppEdits.reveal(appItem.key, page, screen.name)
     }
 
     /** Drag-and-drop from the drawer onto a specific home cell (free cell, or first free if taken). */
@@ -388,7 +429,16 @@ class AppDrawerViewModel @Inject constructor(
         homeLayoutRepository.placeAt(appItem, page, cellX, cellY, s.home.columns, s.home.rows, _screenType.value)
     }
 
-    fun removeFromHome(appItem: AppItem) = viewModelScope.launch { homeLayoutRepository.removeFromHome(appItem, _screenType.value) }
+    /** Takes [appItem] off home, with "… removed from home · Undo". */
+    fun removeFromHome(appItem: AppItem) = viewModelScope.launch {
+        val row = homeLayoutRepository.removeFromHome(appItem, _screenType.value) ?: return@launch
+        AppEdits.removedFromHome(appItem.label) {
+            viewModelScope.launch {
+                val s = settingsRepository.settings(ScreenType.valueOf(row.screenType)).first()
+                homeLayoutRepository.restore(row, s.home.columns, s.home.rows)
+            }
+        }
+    }
 
     /** Stores a pinned shortcut on home (system-level pin done by the caller, which has a Context). */
     fun addPinnedShortcut(packageName: String, shortcutId: String, userSerial: Long) = viewModelScope.launch {

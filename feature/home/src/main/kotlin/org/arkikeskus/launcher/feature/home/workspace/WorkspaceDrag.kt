@@ -125,9 +125,12 @@ this@workspaceEntryDrag.pointerInput(entry, rowId, cellW, cellH, columns, rows, 
                 val ev = awaitPointerEvent()
                 val c = ev.changes.firstOrNull { it.id == down.id }
                 if (c == null) { swiped = true; return@withTimeoutOrNull }
+                // A home swipe (drawer, shade, book page turn) took the touch first.
+                if (c.pressed && c.isConsumed) { swiped = true; return@withTimeoutOrNull }
                 c.consume()
                 if (!c.pressed) { tapped = true; return@withTimeoutOrNull }
-                if ((c.position - down.position).getDistance() > slop) { swiped = true; return@withTimeoutOrNull }
+                // A little drift (a thumb on the big screen) still picks up.
+                if ((c.position - down.position).getDistance() > slop * HOLD_DRIFT_SLOPS) { swiped = true; return@withTimeoutOrNull }
             }
         }
         if (tapped) {
@@ -157,13 +160,7 @@ this@workspaceEntryDrag.pointerInput(entry, rowId, cellW, cellH, columns, rows, 
                 }
                 // Publish root coords so the remove zone can highlight + hit-test this local drag.
                 if (removable) dragController.update(dragController.gridBounds.topLeft + localDragPos)
-                if (!pagerState.isScrollInProgress) {
-                    if (localDragPos.x > gridSize.width - edgePx && stepPage(1) != pagerState.currentPage) {
-                        scope.launch { pagerState.animateScrollToPage(stepPage(1)) }
-                    } else if (localDragPos.x < edgePx && pagerState.currentPage > 0) {
-                        scope.launch { pagerState.animateScrollToPage(stepPage(-1)) }
-                    }
-                }
+                // (Page turns at the edges: Workspace's edge-flip effect.)
                 val cx = (xInPage(localDragPos.x) / cellW).toInt().coerceIn(0, columns - 1)
                 val cy = (localDragPos.y / cellH).toInt().coerceIn(0, rows - 1)
                 val nc = IntOffset(cx, cy)

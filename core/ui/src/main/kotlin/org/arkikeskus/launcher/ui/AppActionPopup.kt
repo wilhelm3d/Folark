@@ -2,7 +2,9 @@ package org.arkikeskus.launcher.ui
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -63,6 +65,25 @@ import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 /** One action row in the long-press popup (e.g. "App info", "Remove from home"); optional leading icon. */
 data class PopupAction(val label: String, @DrawableRes val icon: Int? = null, val onClick: () -> Unit)
 
+/**
+ * The ways to get rid of an app, offered together on the popup's Remove page, each with a line
+ * that says what it does. Null: not possible here (no "Remove from home" in the drawer for an app
+ * that is not on home; no Uninstall for a system app).
+ */
+data class RemoveChoices(
+    /** Off home: the app stays installed and in the list. */
+    val fromHome: (() -> Unit)? = null,
+    /** Off the dock: the app stays installed, in the list and on home. */
+    val fromDock: (() -> Unit)? = null,
+    val hide: (() -> Unit)? = null,
+    val uninstall: (() -> Unit)? = null,
+) {
+    val any: Boolean get() = fromHome != null || fromDock != null || hide != null || uninstall != null
+}
+
+/** Which part of the popup is showing: the menu, the Customize page or the Remove page. */
+private enum class PopupPage { MAIN, CUSTOMIZE, REMOVE }
+
 /** One icon+label row in a generic [IconMenuPopup] (e.g. "Launcher", "Wallpaper"). */
 data class IconMenuItem(@DrawableRes val icon: Int, val label: String, val onClick: () -> Unit)
 
@@ -84,6 +105,13 @@ fun AppActionPopup(
     onDismiss: () -> Unit,
     onPinShortcut: ((AppShortcuts.Item) -> Unit)? = null,
     onRename: ((String) -> Unit)? = null,
+    /** Up to four everyday actions drawn as an icon row at the top (App info, Split, Floating…). */
+    quickActions: List<PopupAction> = emptyList(),
+    /** How the app looks and where it is filed (icon, aspect ratio, folder…), on a page of their own
+     *  behind "Customize" in the icon row; Rename joins them when [onRename] is set. */
+    customize: List<PopupAction> = emptyList(),
+    /** Remove from home / Hide / Uninstall, together on one page behind "Remove…". */
+    remove: RemoveChoices? = null,
 ) {
     val context = LocalContext.current
     var shortcuts by remember(app.key) { mutableStateOf<List<AppShortcuts.Item>>(emptyList()) }
@@ -114,8 +142,14 @@ fun AppActionPopup(
     }
 
     val renameLabel = stringResource(R.string.rename)
-    val effectiveActions = remember(actions, onRename, renameLabel) {
-        if (onRename != null && actions.none { it.icon == LauncherIcons.Edit }) {
+    // With a Customize page, Rename lives there; the older layout keeps it as the first row.
+    val grouped = quickActions.isNotEmpty() || customize.isNotEmpty() || remove != null
+    var page by remember(app.key) { mutableStateOf(PopupPage.MAIN) }
+    val customizeRows = remember(customize, onRename, renameLabel) {
+        if (onRename != null) listOf(PopupAction(renameLabel, LauncherIcons.Edit) { showRenameDialog = true }) + customize else customize
+    }
+    val effectiveActions = remember(actions, onRename, renameLabel, grouped) {
+        if (!grouped && onRename != null && actions.none { it.icon == LauncherIcons.Edit }) {
             listOf(
                 PopupAction(
                     label = renameLabel,
@@ -134,6 +168,64 @@ fun AppActionPopup(
         .take(MAX_POPUP_NOTIFICATIONS)
 
     ExpressivePopupCard(anchor = anchor, preferAbove = preferAbove, onDismiss = onDismiss) {
+        when (page) {
+            PopupPage.CUSTOMIZE -> {
+                PopupPageHeader(stringResource(R.string.popup_customize)) { page = PopupPage.MAIN }
+                customizeRows.forEach { action ->
+                    PopupRow(action.label, action.icon) {
+                        if (action.icon == LauncherIcons.Edit && onRename != null && action.label == renameLabel) {
+                            showRenameDialog = true
+                        } else {
+                            action.onClick()
+                            onDismiss()
+                        }
+                    }
+                }
+                return@ExpressivePopupCard
+            }
+            PopupPage.REMOVE -> {
+                val choices = remove ?: return@ExpressivePopupCard
+                PopupPageHeader(stringResource(R.string.popup_remove_title, app.label)) { page = PopupPage.MAIN }
+                choices.fromHome?.let { go ->
+                    RemoveChoiceRow(LauncherIcons.Close, stringResource(R.string.popup_remove_home), stringResource(R.string.popup_remove_home_desc)) {
+                        go(); onDismiss()
+                    }
+                }
+                choices.fromDock?.let { go ->
+                    RemoveChoiceRow(LauncherIcons.Close, stringResource(R.string.popup_remove_dock), stringResource(R.string.popup_remove_dock_desc)) {
+                        go(); onDismiss()
+                    }
+                }
+                choices.hide?.let { go ->
+                    RemoveChoiceRow(LauncherIcons.VisibilityOff, stringResource(R.string.popup_hide), stringResource(R.string.popup_hide_desc)) {
+                        go(); onDismiss()
+                    }
+                }
+                choices.uninstall?.let { go ->
+                    RemoveChoiceRow(
+                        LauncherIcons.Delete,
+                        stringResource(R.string.popup_uninstall),
+                        stringResource(R.string.popup_uninstall_desc),
+                        danger = true,
+                    ) { go(); onDismiss() }
+                }
+                return@ExpressivePopupCard
+            }
+            PopupPage.MAIN -> Unit
+        }
+        // The icon row: everyday actions first, then Customize (its own page) when there is one.
+        val icons = quickActions.take(if (customizeRows.isNotEmpty()) 3 else 4)
+        if (icons.isNotEmpty() || (grouped && customizeRows.isNotEmpty())) {
+            QuickActionRow(
+                icons.map { a -> QuickItem(a.label, a.icon ?: LauncherIcons.Info) { a.onClick(); onDismiss() } } +
+                    if (customizeRows.isNotEmpty() && grouped) {
+                        listOf(QuickItem(stringResource(R.string.popup_customize), LauncherIcons.Tune) { page = PopupPage.CUSTOMIZE })
+                    } else {
+                        emptyList()
+                    },
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = LocalExpressivePalette.current.trackOff)
+        }
         notifications.forEach { notification ->
             PopupNotificationRow(notification, onOpened = onDismiss)
         }
@@ -173,6 +265,9 @@ fun AppActionPopup(
                     onDismiss()
                 }
             }
+        }
+        if (remove != null && remove.any) {
+            PopupRow(stringResource(R.string.popup_remove), LauncherIcons.Delete) { page = PopupPage.REMOVE }
         }
     }
 }
@@ -433,5 +528,86 @@ private class AnchoredPopupPositionProvider(
                 .coerceAtMost((windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin))
         }
         return IntOffset(x, y)
+    }
+}
+
+/** One icon in the popup's top row. */
+private class QuickItem(val label: String, @DrawableRes val icon: Int, val onClick: () -> Unit)
+
+/** The popup's top row: up to four everyday actions as icons with a short label under each. */
+@Composable
+private fun QuickActionRow(items: List<QuickItem>) {
+    val palette = LocalExpressivePalette.current
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        items.forEach { item ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = item.onClick)
+                    .padding(vertical = 8.dp),
+            ) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(palette.btn),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(item.icon), contentDescription = null, tint = LocalAccent.current, modifier = Modifier.size(20.dp))
+                }
+                Text(
+                    item.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.dim,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+/** The top of the Customize and Remove pages: a back arrow and the page's title. */
+@Composable
+private fun PopupPageHeader(title: String, onBack: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onBack).padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+    ) {
+        Icon(
+            painterResource(LauncherIcons.ArrowBack),
+            contentDescription = stringResource(R.string.popup_back),
+            tint = LocalExpressivePalette.current.text,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = LocalExpressivePalette.current.text,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 12.dp),
+        )
+    }
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = LocalExpressivePalette.current.trackOff)
+}
+
+/** One choice on the Remove page: what it is, and in a line what it does. */
+@Composable
+private fun RemoveChoiceRow(@DrawableRes icon: Int, title: String, detail: String, danger: Boolean = false, onClick: () -> Unit) {
+    val palette = LocalExpressivePalette.current
+    val tint = if (danger) Color(0xFFE5534B) else LocalAccent.current
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Column(Modifier.padding(start = 16.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = if (danger) tint else palette.text)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = palette.dim)
+        }
     }
 }

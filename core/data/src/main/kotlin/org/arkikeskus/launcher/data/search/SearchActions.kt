@@ -30,6 +30,7 @@ object SearchActions {
         email(q, lower)?.let(out::add)
         note(q, lower)?.let(out::add)
         out += phone(q, lower)
+        out += toggles(lower)
         return out
     }
 
@@ -287,6 +288,81 @@ object SearchActions {
         val call = SearchResult.Action(SearchResult.Action.CALL, "Call $raw", "Open the dialer", mapOf("number" to number))
         val sms = SearchResult.Action(SearchResult.Action.MESSAGE, "Message $raw", "New text message", mapOf("number" to number))
         return if (textFirst) listOf(sms, call) else listOf(call, sms)
+    }
+
+    // ---------------------------------------------------------------- system switches
+
+    /**
+     * "turn on the flashlight", "turn the flashlight off", "flashlight off", "switch off wifi",
+     * "disable bluetooth": the thing switched ([2]) and the wanted state, wherever the words
+     * stand ([1] before it, [3] after it). Either may be missing (just "flashlight": toggle).
+     */
+    private val SWITCH = Regex("^(?:(?:turn|switch|put|set)\\s+)?(?:(on|off)\\s+)?(?:the\\s+)?(.+?)(?:\\s+(on|off))?$")
+    private val ENABLE = Regex("^(enable|disable)\\s+(?:the\\s+)?(.+)$")
+    private val FLASHLIGHT = Regex("^(?:flashlight|flash light|torch)$")
+    private val ROTATION = Regex("^(?:auto[- ]?rotate|auto[- ]?rotation|rotation)$")
+    private val ROTATION_LOCK = Regex("^(?:rotation lock|screen lock rotation|lock rotation)$")
+    private val DND = Regex("^(?:do not disturb|dnd|silence|silent mode)$")
+    private val WIFI = Regex("^(?:wi-?fi|wlan)$")
+    private val BLUETOOTH = Regex("^bluetooth$")
+    private val AIRPLANE = Regex("^(?:airplane|aeroplane|flight|plane) mode$")
+    private val BRIGHTNESS = Regex("^(?:set )?(?:the )?brightness(?: to)?(?: (\\d{1,3}))?(?: ?%)?$")
+
+    /** What a switch query asks for: the thing (lower case) and "on", "off" or "" (not said). */
+    internal fun switchOf(lower: String): Pair<String, String>? {
+        ENABLE.find(lower)?.let { m ->
+            return m.groupValues[2].trim() to (if (m.groupValues[1] == "enable") "on" else "off")
+        }
+        val m = SWITCH.find(lower) ?: return null
+        val before = m.groupValues[1]
+        val after = m.groupValues[3]
+        // "turn on X off" says two things: no switch at all.
+        if (before.isNotEmpty() && after.isNotEmpty() && before != after) return null
+        return m.groupValues[2].trim() to before.ifEmpty { after }
+    }
+
+    /**
+     * System switches typed into search: "flashlight", "turn off the flashlight", "wifi off",
+     * "do not disturb on", "disable bluetooth", "auto-rotate off", "brightness 40", "airplane mode".
+     * Each becomes a TOGGLE action with "on", "off" or "toggle"; the drawer decides what the phone
+     * allows (a panel, a settings page, or the switch itself).
+     */
+    private fun toggles(lower: String): List<SearchResult.Action> {
+        val out = ArrayList<SearchResult.Action>()
+        fun add(label: String, setting: String, state: String) {
+            out += SearchResult.Action(
+                SearchResult.Action.TOGGLE, label, "Quick action",
+                mapOf("setting" to setting, "state" to state),
+            )
+        }
+        BRIGHTNESS.find(lower)?.let { m ->
+            val percent = m.groupValues[1]
+            add(if (percent.isEmpty()) "Brightness" else "Brightness $percent%", "brightness", percent)
+            return out
+        }
+        val (thing, said) = switchOf(lower) ?: return out
+        val state = said.ifEmpty { "toggle" }
+        fun label(name: String) = when (said) {
+            "on" -> "Turn $name on"
+            "off" -> "Turn $name off"
+            else -> name
+        }
+        when {
+            FLASHLIGHT.matches(thing) -> add(label("the flashlight").replaceFirstChar { it.uppercase() }, "flashlight", state)
+            ROTATION_LOCK.matches(thing) ->
+                // Rotation lock on = auto-rotate off, and the other way round.
+                add(label("rotation lock").replaceFirstChar { it.uppercase() }, "rotation", when (said) {
+                    "on" -> "off"
+                    "off" -> "on"
+                    else -> "toggle"
+                })
+            ROTATION.matches(thing) -> add(label("auto-rotate").replaceFirstChar { it.uppercase() }, "rotation", state)
+            DND.matches(thing) -> add(label("Do Not Disturb"), "dnd", state)
+            WIFI.matches(thing) -> add(label("Wi-Fi"), "wifi", state)
+            BLUETOOTH.matches(thing) -> add(label("Bluetooth"), "bluetooth", state)
+            AIRPLANE.matches(thing) -> add(label("airplane mode").replaceFirstChar { it.uppercase() }, "airplane", state)
+        }
+        return out
     }
 
     private val CALC_LIKE = Regex("^\\d+\\s*[-/]\\s*\\d+$")

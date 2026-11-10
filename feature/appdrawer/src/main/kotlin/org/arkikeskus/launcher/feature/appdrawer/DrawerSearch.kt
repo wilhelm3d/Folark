@@ -95,11 +95,26 @@ private const val GEMINI_PACKAGE = "com.google.android.apps.bard"
 private const val GEMINI_SEARCH_URL = "https://www.google.com/search?udm=50&q="
 
 /**
- * Hands [query] to the system's web search. A device without one gets Gemini instead: the query is
- * shared to the Gemini app when it is installed, otherwise the Gemini-powered search page opens.
+ * Hands [query] to the engine chosen in Settings ▸ App drawer ▸ Search. Android's own search is
+ * asked first (a device without one gets Gemini instead: the query is shared to the Gemini app when
+ * it is installed, otherwise the Gemini-powered search page opens). A named engine simply opens its
+ * results page in the browser, with the query in the URL — no account, no prefetch.
  */
-internal fun launchWebSearch(context: android.content.Context, query: String) {
+internal fun launchWebSearch(
+    context: android.content.Context,
+    query: String,
+    engine: String = org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_SYSTEM,
+) {
     if (query.isBlank()) return
+    webSearchUrl(engine, query)?.let { url ->
+        val opened = catching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.isSuccess
+        if (opened) return
+    }
     val started = catching {
         context.startActivity(
             Intent(Intent.ACTION_WEB_SEARCH)
@@ -124,6 +139,18 @@ internal fun launchWebSearch(context: android.content.Context, query: String) {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
         }
+    }
+}
+
+/** The results page of a named engine; null for Android's own search (handled by an intent). */
+internal fun webSearchUrl(engine: String, query: String): String? {
+    val q = android.net.Uri.encode(query)
+    return when (engine) {
+        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_GOOGLE -> "https://www.google.com/search?q=$q"
+        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_DUCKDUCKGO -> "https://duckduckgo.com/?q=$q"
+        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_BING -> "https://www.bing.com/search?q=$q"
+        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_STARTPAGE -> "https://www.startpage.com/sp/search?query=$q"
+        else -> null
     }
 }
 

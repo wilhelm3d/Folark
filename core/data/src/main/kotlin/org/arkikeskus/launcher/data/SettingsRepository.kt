@@ -165,8 +165,8 @@ class SettingsRepository @Inject constructor(
                 },
             ),
             home = HomeSettings(
-                columns = (p[Keys.homeColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_COLUMNS),
-                rows = (p[Keys.homeRows(screenType)] ?: HomeLayoutRepository.ROWS).coerceIn(MIN_ROWS, MAX_ROWS),
+                columns = (p[Keys.homeColumns(screenType)] ?: 4).coerceIn(MIN_COLUMNS, MAX_HOME_COLUMNS),
+                rows = (p[Keys.homeRows(screenType)] ?: HomeLayoutRepository.ROWS).coerceIn(MIN_ROWS, MAX_HOME_ROWS),
                 showLabels = p[Keys.showHomeLabels(screenType)] ?: true,
                 parallaxWallpaper = p[Keys.parallaxWallpaper(screenType)] ?: false,
                 showPageIndicator = p[Keys.showPageIndicator(screenType)] ?: true,
@@ -191,6 +191,8 @@ class SettingsRepository @Inject constructor(
                 wallpaperDim = (p[Keys.homeWallpaperDim(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_DIM),
                 wallpaperBlur = (p[Keys.homeWallpaperBlur(screenType)] ?: 0f).coerceIn(0f, LauncherSettings.MAX_HOME_WALLPAPER_BLUR),
                 backgroundImage = p[Keys.homeBackgroundImage(screenType)] ?: "",
+                videoAwakeSeconds = (p[Keys.VIDEO_AWAKE_SECONDS] ?: 30).coerceIn(0, 600),
+                addNewApps = p[Keys.ADD_NEW_APPS] ?: false,
                 iconSwipeUpAction = (p[Keys.iconSwipeUpAction(screenType)] ?: LauncherSettings.ICON_SWIPE_NONE).let { if (it in LauncherSettings.ICON_SWIPES) it else LauncherSettings.ICON_SWIPE_NONE },
                 autoRemoveEmptyPages = p[Keys.autoRemoveEmptyPages(screenType)] ?: false,
                 newPageOnDrag = p[Keys.newPageOnDrag(screenType)] ?: false,
@@ -263,12 +265,16 @@ class SettingsRepository @Inject constructor(
                 showPrivateSpace = p[Keys.SHOW_PRIVATE_SPACE] ?: true,
                 innerSidebar = p[Keys.innerSidebarAppDrawer(screenType)] ?: false,
                 azHoldScroll = p[Keys.DRAWER_AZ_HOLD_SCROLL] ?: true,
+                hiddenLock = p[Keys.HIDDEN_APPS_LOCK] ?: false,
                 twoPane = p[Keys.DRAWER_TWO_PANE] ?: false,
             ),
             search = SearchSettings(
                 contacts = p[Keys.SEARCH_CONTACTS] ?: false,
                 shortcuts = p[Keys.SEARCH_SHORTCUTS] ?: true,
                 web = p[Keys.SEARCH_WEB] ?: true,
+                webEngine = (p[Keys.SEARCH_WEB_ENGINE] ?: LauncherSettings.SEARCH_ENGINE_SYSTEM)
+                    .let { if (it in LauncherSettings.SEARCH_ENGINES) it else LauncherSettings.SEARCH_ENGINE_SYSTEM },
+                files = p[Keys.SEARCH_FILES] ?: false,
                 actions = p[Keys.SEARCH_ACTIONS] ?: true,
                 settingsPages = p[Keys.SEARCH_SETTINGS_PAGES] ?: true,
                 inlineShortcuts = p[Keys.SEARCH_INLINE_SHORTCUTS] ?: true,
@@ -500,6 +506,7 @@ class SettingsRepository @Inject constructor(
                     LauncherSettings.TASKBAR_SOURCE_SYSTEM else LauncherSettings.TASKBAR_SOURCE_FOLARK,
                 systemMode = (p[Keys.SYSTEM_TASKBAR_MODE] ?: 1).let { if (it in listOf(1, 2, 4)) it else 1 },
                 pinnedPairs = p[Keys.TASKBAR_PAIRS]?.split("\n")?.filter { it.isNotEmpty() }.orEmpty(),
+                sceneSlots = (p[Keys.TASKBAR_SCENE_SLOTS] ?: 0).coerceIn(0, 4),
                 coverBar = p[Keys.TASKBAR_COVER_BAR] ?: false,
                 coverCount = (p[Keys.TASKBAR_COVER_COUNT] ?: 5).coerceIn(LauncherSettings.MIN_COVER_BAR, LauncherSettings.MAX_COVER_BAR),
             ),
@@ -550,13 +557,13 @@ class SettingsRepository @Inject constructor(
         prefs.asMap().entries
             .filter { it.key.name.startsWith(PAIR_SCHEDULE_PREFIX) }
             .associate { it.key.name.removePrefix(PAIR_SCHEDULE_PREFIX) to (it.value as? String).orEmpty() }
-    }
+    }.distinctUntilChanged() // the store emits on every write; only a schedule change matters here
 
     /** Pairs that have a schedule set, paired with their parsed schedule. */
     val scheduledPairs: Flow<List<ScheduledPair>> = combine(appPairs, pairSchedules) { pairs, raw ->
         pairs.map { ScheduledPair(it, PairSchedule.parse(raw[it.id])) }
             .filter { it.schedule != null }
-    }
+    }.distinctUntilChanged() // the alarm is re-laid only when a pair or its schedule changed
 
     /** Reads one pair's schedule (null when none). */
     suspend fun pairSchedule(pairId: String): PairSchedule? =
@@ -687,8 +694,13 @@ class SettingsRepository @Inject constructor(
     suspend fun setThreeAppSplit(value: Boolean) = edit { it[Keys.THREE_APP_SPLIT] = value }
     suspend fun setThreeAppNative(value: Boolean) = edit { it[Keys.THREE_APP_NATIVE] = value }
     suspend fun setTaskbarPairs(ids: List<String>) = edit { it[Keys.TASKBAR_PAIRS] = ids.distinct().joinToString("\n") }
+    suspend fun setTaskbarSceneSlots(value: Int) = edit { it[Keys.TASKBAR_SCENE_SLOTS] = value.coerceIn(0, 4) }
     suspend fun setSearchShortcuts(value: Boolean) = edit { it[Keys.SEARCH_SHORTCUTS] = value }
     suspend fun setSearchWeb(value: Boolean) = edit { it[Keys.SEARCH_WEB] = value }
+    suspend fun setSearchWebEngine(value: String) = edit {
+        it[Keys.SEARCH_WEB_ENGINE] = if (value in LauncherSettings.SEARCH_ENGINES) value else LauncherSettings.SEARCH_ENGINE_SYSTEM
+    }
+    suspend fun setSearchFiles(value: Boolean) = edit { it[Keys.SEARCH_FILES] = value }
     suspend fun setAnimationSpeed(value: Float) = edit {
         it[Keys.ANIMATION_SPEED] = value.coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED)
     }
@@ -714,6 +726,42 @@ class SettingsRepository @Inject constructor(
     suspend fun setAppFontSizeScale(value: Float, st: ScreenType) = edit { it[Keys.appFontSizeScale(st)] = value.coerceIn(0.7f, 1.4f) }
     suspend fun setWeatherWidgetAnimated(value: Boolean) = edit { it[Keys.WEATHER_WIDGET_ANIMATED] = value }
     suspend fun setWeatherAwakeSeconds(value: Int) = edit { it[Keys.WEATHER_AWAKE_SECONDS] = value }
+    suspend fun setAddNewApps(value: Boolean) = edit { it[Keys.ADD_NEW_APPS] = value }
+    suspend fun setHiddenAppsLock(value: Boolean) = edit { it[Keys.HIDDEN_APPS_LOCK] = value }
+
+    /**
+     * Apps installed lately and not opened yet (app keys): the drawer marks them "new". Stored as
+     * "key<TAB>installed-at"; a mark older than [NEW_APP_DAYS] days fades on its own.
+     */
+    val newApps: Flow<Set<String>> = keyFlow(Keys.NEW_APPS) { raw ->
+        val cutoff = System.currentTimeMillis() - NEW_APP_DAYS * 86_400_000L
+        parseNewApps(raw).filterValues { it >= cutoff }.keys
+    }
+
+    /** Marks [keys] as new (just installed). */
+    suspend fun markNewApps(keys: Collection<String>) = edit { p ->
+        if (keys.isEmpty()) return@edit
+        val now = System.currentTimeMillis()
+        val cutoff = now - NEW_APP_DAYS * 86_400_000L
+        val map = parseNewApps(p[Keys.NEW_APPS]).filterValues { it >= cutoff }.toMutableMap()
+        keys.forEach { map[it] = now }
+        p[Keys.NEW_APPS] = map.entries.joinToString("\n") { (k, t) -> "$k\t$t" }
+    }
+
+    /** [key] was opened: no longer new. */
+    suspend fun clearNewApp(key: String) = edit { p ->
+        val map = parseNewApps(p[Keys.NEW_APPS])
+        if (key !in map) return@edit
+        p[Keys.NEW_APPS] = (map - key).entries.joinToString("\n") { (k, t) -> "$k\t$t" }
+    }
+
+    private fun parseNewApps(raw: String?): Map<String, Long> =
+        raw?.split("\n")?.mapNotNull { line ->
+            val i = line.lastIndexOf('\t')
+            if (i <= 0) null else line.substring(0, i) to (line.substring(i + 1).toLongOrNull() ?: return@mapNotNull null)
+        }?.toMap() ?: emptyMap()
+
+    suspend fun setVideoAwakeSeconds(value: Int) = edit { it[Keys.VIDEO_AWAKE_SECONDS] = value.coerceIn(0, 600) }
     suspend fun setTaskbarEnabled(value: Boolean) = edit { it[Keys.TASKBAR_ENABLED] = value }
     /** Null goes back to the inner dock's apps. */
     suspend fun setTaskbarPinned(keys: List<String>?) = edit { p ->
@@ -1337,29 +1385,43 @@ class SettingsRepository @Inject constructor(
     // pair per line, same shape as the custom labels. Android's shade is untouched.
 
     /** Hidden notification channels, package name to its channel ids. */
-    val hiddenChannels: Flow<Map<String, Set<String>>> = keyFlow(Keys.HIDDEN_CHANNELS) { parseHiddenChannels(it) }
+    val hiddenChannels: Flow<Map<String, Set<String>>> = keyFlow(Keys.HIDDEN_CHANNELS) { raw ->
+        parseHiddenChannelList(raw).groupBy({ it.packageName }, { it.channelId }).mapValues { it.value.toSet() }
+    }
 
-    /** Hides (or, with [hidden] false, unhides) one of an app's notification channels. */
-    suspend fun setChannelHidden(packageName: String, channelId: String, hidden: Boolean = true) = edit { p ->
-        val current = parseHiddenChannels(p[Keys.HIDDEN_CHANNELS]).toMutableMap()
-        val channels = current[packageName].orEmpty().toMutableSet()
-        if (hidden) channels += channelId else channels -= channelId
-        if (channels.isEmpty()) current.remove(packageName) else current[packageName] = channels
-        p[Keys.HIDDEN_CHANNELS] = current.entries.joinToString("\n") { (pkg, ids) ->
-            ids.joinToString("\n") { "$pkg\t$it" }
+    /** The muted channels one by one, with the names they had when muted (Settings ▸ Notifications). */
+    val hiddenChannelList: Flow<List<HiddenChannel>> = keyFlow(Keys.HIDDEN_CHANNELS) { parseHiddenChannelList(it) }
+
+    /**
+     * Hides (or, with [hidden] false, unhides) one of an app's notification channels. [name] is the
+     * channel's own name, kept so Settings can say what was muted.
+     */
+    suspend fun setChannelHidden(packageName: String, channelId: String, hidden: Boolean = true, name: String? = null) = edit { p ->
+        val others = parseHiddenChannelList(p[Keys.HIDDEN_CHANNELS])
+            .filterNot { it.packageName == packageName && it.channelId == channelId }
+        val next = if (hidden) others + HiddenChannel(packageName, channelId, name) else others
+        p[Keys.HIDDEN_CHANNELS] = next.joinToString("\n") { h ->
+            // "package<TAB>channel[<TAB>name]": lines from before names were kept have two fields.
+            val clean = h.name?.replace('\t', ' ')?.replace('\n', ' ')?.takeIf { it.isNotBlank() }
+            if (clean == null) "${h.packageName}\t${h.channelId}" else "${h.packageName}\t${h.channelId}\t$clean"
         }
     }
 
-    private fun parseHiddenChannels(raw: String?): Map<String, Set<String>> =
+    /** Unmutes every channel (Settings ▸ Notifications ▸ Muted channels ▸ Unmute all). */
+    suspend fun clearHiddenChannels() = edit { it.remove(Keys.HIDDEN_CHANNELS) }
+
+    private fun parseHiddenChannelList(raw: String?): List<HiddenChannel> =
         raw?.split("\n")?.filter { it.isNotEmpty() }?.mapNotNull { line ->
-            val i = line.indexOf('\t')
-            if (i <= 0) null else line.substring(0, i) to line.substring(i + 1)
-        }?.groupBy({ it.first }, { it.second })?.mapValues { it.value.toSet() } ?: emptyMap()
+            val parts = line.split('\t')
+            val pkg = parts.getOrNull(0).orEmpty()
+            val id = parts.getOrNull(1).orEmpty()
+            if (pkg.isEmpty() || id.isEmpty()) null else HiddenChannel(pkg, id, parts.getOrNull(2)?.takeIf { it.isNotBlank() })
+        }?.distinctBy { it.packageName to it.channelId } ?: emptyList()
 
     suspend fun setDockEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dockEnabled(screenType)] = value }
     suspend fun setDockColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dockColumns(screenType)] = value.coerceIn(MIN_COLUMNS, MAX_COLUMNS) }
-    suspend fun setHomeColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeColumns(screenType)] = value.coerceIn(MIN_COLUMNS, MAX_COLUMNS) }
-    suspend fun setHomeRows(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeRows(screenType)] = value.coerceIn(MIN_ROWS, MAX_ROWS) }
+    suspend fun setHomeColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeColumns(screenType)] = value.coerceIn(MIN_COLUMNS, MAX_HOME_COLUMNS) }
+    suspend fun setHomeRows(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.homeRows(screenType)] = value.coerceIn(MIN_ROWS, MAX_HOME_ROWS) }
     suspend fun setDrawerColumns(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerColumns(screenType)] = value.coerceIn(MIN_COLUMNS, MAX_COLUMNS) }
     suspend fun setDrawerRows(value: Int, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerRows(screenType)] = value.coerceIn(MIN_DRAWER_ROWS, MAX_DRAWER_ROWS) }
     suspend fun setAllowLandscape(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.allowLandscape(screenType)] = value }
@@ -1405,7 +1467,6 @@ class SettingsRepository @Inject constructor(
     suspend fun setDrawerScrimOpacity(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerScrimOpacity(screenType)] = value.coerceIn(0f, 1f) }
     suspend fun setGlassBlurRadius(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.glassBlurRadius(screenType)] = value.coerceIn(0f, 50f) }
     suspend fun setGlassDarkTint(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.glassDarkTint(screenType)] = value.coerceIn(0f, 0.9f) }
-    suspend fun flushDataStore() = edit { }
     /** Switches the drawer style. The accent follows the new style's default only while the
      *  current accent is still a style default — a colour the user picked themselves is kept. */
     suspend fun setDrawerStyle(value: String, screenType: ScreenType = ScreenType.OUTER) = edit {
@@ -1554,6 +1615,10 @@ class SettingsRepository @Inject constructor(
     suspend fun setStatusBarScrimOpacity(value: Float, screenType: ScreenType = ScreenType.OUTER) =
         edit { it[Keys.statusBarScrimOpacity(screenType)] = value.coerceIn(0f, 1f) }
 
+    /** The dock's apps in order, as stored (for an undo that puts one back in its place). */
+    suspend fun dockKeys(screenType: ScreenType = ScreenType.OUTER): List<String> =
+        dataStore.data.first()[Keys.dockFavorites(screenType)]?.split("\n")?.filter { it.isNotEmpty() } ?: emptyList()
+
     suspend fun addToDock(key: String, screenType: ScreenType = ScreenType.OUTER) = edit { p ->
         val current = currentFavorites(p, screenType).toMutableList()
         if (key !in current) current.add(key)
@@ -1655,6 +1720,10 @@ class SettingsRepository @Inject constructor(
         /** Valid range for the home-grid row count (mirrors the settings stepper). */
         const val MIN_ROWS = 4
         const val MAX_ROWS = 8
+
+        /** The home grid goes two further than the dock and drawer (columns and rows). */
+        const val MAX_HOME_COLUMNS = MAX_COLUMNS + 2
+        const val MAX_HOME_ROWS = MAX_ROWS + 2
         const val MIN_DRAWER_ROWS = 3
         const val MAX_DRAWER_ROWS = 8
 
@@ -1667,3 +1736,9 @@ class SettingsRepository @Inject constructor(
         const val MAX_LABEL_SCALE = 1.6f
     }
 }
+
+/** A notification channel muted from the notifications widget: its app, id and (when known) name. */
+data class HiddenChannel(val packageName: String, val channelId: String, val name: String?)
+
+/** How long an installed app keeps its "new" mark in the drawer when it is not opened. */
+const val NEW_APP_DAYS = 7L

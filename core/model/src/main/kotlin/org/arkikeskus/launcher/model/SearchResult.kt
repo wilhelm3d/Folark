@@ -62,6 +62,12 @@ sealed interface SearchResult {
     const val CLIPBOARD = "clipboard"
             const val CALL = "call"
             const val MESSAGE = "message"
+
+            /** A file or picture found on the phone; [args] carry its content URI and MIME type. */
+            const val FILE = "file"
+
+            /** A system switch (flashlight, rotation, DND, brightness, Wi-Fi, Bluetooth, airplane). */
+            const val TOGGLE = "toggle"
         }
     }
 }

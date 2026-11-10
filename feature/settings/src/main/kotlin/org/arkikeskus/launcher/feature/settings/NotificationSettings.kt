@@ -97,6 +97,7 @@ internal fun NotificationsSection(
         ExpressiveRowDivider()
 
         IconNudgeRows(s, viewModel, previewIcon)
+        MutedChannelsRow(viewModel)
         ExpressiveRowDivider()
 
         LiveActivityRows(s, viewModel)

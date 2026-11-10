@@ -105,6 +105,9 @@ data class TaskbarSettings(
     val systemMode: Int = 1,
     /** Saved app pairs (and trios) pinned on Folark's taskbar, by pair id. */
     val pinnedPairs: List<String> = emptyList(),
+    /** Fixed slots for scenes at the start of the bar (0 = as many as are pinned). A slot keeps
+     *  its place when its scene is unpinned, so the bar never shifts under the finger. */
+    val sceneSlots: Int = 0,
     /** A slim bar on the cover screen too: opened from a bottom corner, [coverCount] apps. */
     val coverBar: Boolean = false,
     val coverCount: Int = 5,

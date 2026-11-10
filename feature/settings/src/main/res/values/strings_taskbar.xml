@@ -45,6 +45,7 @@
     <string name="settings_taskbar_done">Done</string>
     <string name="settings_taskbar_use_dock">Use dock apps</string>
     <string name="settings_taskbar_recents">Recent apps</string>
+    <string name="settings_taskbar_scene_slots">Fixed scene slots</string>
     <string name="settings_taskbar_usage_access">Allow Usage access</string>
     <string name="settings_taskbar_usage_access_desc">Lets the taskbar show the apps you used last, wherever you opened them. Without it, it shows the apps opened through Folark. Nothing leaves the phone</string>
     <string name="settings_taskbar_theme">Look</string>

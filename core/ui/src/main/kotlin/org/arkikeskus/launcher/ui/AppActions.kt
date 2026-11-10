@@ -74,6 +74,19 @@ object AppActions {
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /**
+     * Whether [appItem] can be uninstalled at all: not an app that came with the phone (those can
+     * only be turned off, and their updates removed, on Android's app page).
+     */
+    fun canUninstall(context: Context, appItem: AppItem): Boolean {
+        val info = catching {
+            context.getSystemService(LauncherApps::class.java)?.getApplicationInfo(appItem.packageName, 0, appItem.user)
+        }.getOrNull() ?: return true
+        val system = info.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0
+        val updated = info.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
+        return !system || updated
+    }
+
+    /**
      * Uninstalls [appItem]. The personal profile uses the system uninstall dialog directly; other
      * profiles (work / Private Space) have no reliable public profile-aware uninstall intent, so we
      * open that profile's app-details screen instead, from where the OS offers removal. This avoids

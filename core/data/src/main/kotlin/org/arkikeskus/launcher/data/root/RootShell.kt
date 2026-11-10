@@ -158,11 +158,7 @@ object RootShell {
         fun exec(command: String, timeoutMs: Long): ByteArray? {
             val marker = "__folark_" + UUID.randomUUID().toString().replace("-", "") + "__"
             synchronized(signal) { buffer.reset() }
-            // The command itself is capped by `timeout` (toybox, Android 7+): even if the shell or
-            // this session lingers past [timeoutMs], the command dies and frees the pipe. Its exit
-            // code (124 on its own timeout) arrives through __rc and is treated as any failure.
-            val seconds = ((timeoutMs + 999) / 1000).coerceAtLeast(1)
-            val script = "( timeout $seconds $command\n) </dev/null; __rc=\$?; echo; echo \"$marker:\$__rc\"\n"
+            val script = wrap(command, marker, timeoutMs)
             try {
                 input.write(script.toByteArray())
                 input.flush()
@@ -206,7 +202,7 @@ object RootShell {
             catching { input.close() }
             // SIGTERM, then SIGKILL after a grace: SIGKILL cannot be ignored by userspace, so the
             // only process that survives it is one the kernel can't stop either — and every
-            // command is `</dev/null` inside a `timeout` anyway (see [exec]), so nothing is left
+            // command is `</dev/null` under a watchdog anyway (see [wrap]), so nothing is left
             // holding Folark's pipe.
             catching { process.destroy() }
             val killer = Thread({
@@ -220,6 +216,23 @@ object RootShell {
         }
 
         companion object {
+            /**
+             * The shell text that runs [command] and then prints [marker] with its exit code.
+             *
+             * The command runs in a subshell of its own, in the background, with a watchdog that
+             * kills it (and the programs it started) once [timeoutMs] is over: even if this
+             * session lingers, nothing keeps Folark's pipe. Not `timeout <command>`: `timeout`
+             * runs one program, so commands starting with `if`, `for`, `X=…` or `f=$(…)` failed,
+             * and a syntax error took the whole shell down. A killed command ends with a non-zero
+             * code, which reads as any failure.
+             */
+            internal fun wrap(command: String, marker: String, timeoutMs: Long): String {
+                val seconds = ((timeoutMs + 999) / 1000).coerceAtLeast(1)
+                return "( $command\n) </dev/null & __fp=\$!; " +
+                    "( sleep $seconds; pkill -9 -P \$__fp; kill -9 \$__fp ) </dev/null >/dev/null 2>&1 & __fw=\$!; " +
+                    "wait \$__fp; __rc=\$?; pkill -P \$__fw 2>/dev/null; kill \$__fw 2>/dev/null; echo; echo \"$marker:\$__rc\"\n"
+            }
+
             fun start(): Session? = catching {
                 Session(ProcessBuilder(binary).redirectErrorStream(false).start())
             }.getOrNull()

@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.AppRepository
 import org.arkikeskus.launcher.data.SettingsRepository
@@ -40,9 +42,11 @@ class PairScheduleReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
+                // Done inside goAsync(): the next alarm is laid before the receiver reports back, so
+                // Android cannot stop the process in between and leave no alarm at all.
                 when (intent.action) {
                     ACTION_FIRE -> fire(context, intent.getStringExtra(EXTRA_PAIR_ID))
-                    else -> rescheduleAll(context)
+                    else -> relay(context, System.currentTimeMillis())
                 }
             } finally {
                 pending.finish()
@@ -59,7 +63,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
         val firedAt = System.currentTimeMillis()
         val due = dueNow(pairId, firedAt)
         // Strictly in the future, so this fire cannot arm itself again.
-        rescheduleAll(context, after = firedAt)
+        relay(context, after = firedAt)
         if (due.isEmpty()) return
         if (folarkInFront(context)) {
             due.forEach { catching { appRepository.launchAppPair(it.pair) } }
@@ -85,16 +89,17 @@ class PairScheduleReceiver : BroadcastReceiver() {
             }
         }
 
-    /** A pair may only jump to the front while the user is actually on Folark, awake and unlocked. */
+    /**
+     * A pair may only jump to the front while the user is actually on Folark, awake and unlocked.
+     * "On Folark" is one of Folark's own screens being resumed right now ([FolarkOnScreen]): asking
+     * Android for the top task does not work for this (an app only ever sees its own tasks, and
+     * the home task is always Folark's, so it said "in front" while any other app was open).
+     */
     private fun folarkInFront(context: Context): Boolean {
         val power = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager ?: return false
         val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager ?: return false
         if (!power.isInteractive || keyguard.isKeyguardLocked) return false
-        val top = catching {
-            (context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager)
-                ?.getRunningTasks(1)?.firstOrNull()?.topActivity?.packageName
-        }.getOrNull()
-        return top == context.packageName
+        return FolarkOnScreen.resumed
     }
 
     private fun notifyPair(context: Context, pair: ScheduledPair) {
@@ -132,6 +137,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
 
         /** Single persistent scope shared across all rescheduleAll calls (lives for the app lifetime). */
         private val rescheduleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val relayLock = Mutex()
 
         /** The one alarm's request code: it is re-armed for whichever pair is next. */
         private const val SINGLE_ALARM_REQUEST = 0x50414952
@@ -148,17 +154,22 @@ class PairScheduleReceiver : BroadcastReceiver() {
          * per pair; their pending intents are cancelled here so an upgrade cannot leave them behind.
          */
         fun rescheduleAll(context: Context, after: Long = System.currentTimeMillis()) {
-            val manager = context.getSystemService(AlarmManager::class.java) ?: return
+            // One persistent scope (not a new one per call), for callers outside a receiver.
+            rescheduleScope.launch { relay(context, after) }
+        }
+
+        /**
+         * [rescheduleAll]'s work, awaited: the receiver calls this directly so the alarm is laid
+         * before it finishes. One at a time, so two quick changes cannot interleave their writes.
+         */
+        suspend fun relay(context: Context, after: Long) = relayLock.withLock {
+            val manager = context.getSystemService(AlarmManager::class.java) ?: return@withLock
             val hilt = catching {
                 dagger.hilt.android.EntryPointAccessors.fromApplication(
                     context.applicationContext, PairSchedulerEntryPoint::class.java,
                 )
-            }.getOrNull() ?: return
-            // FIX #1: use a single persistent scope instead of creating a new CoroutineScope on
-            // every call. The old code spawned an unbounded, never-cancelled scope each time
-            // rescheduleAll fired (alarm, boot, every schedule-change write), letting scopes
-            // accumulate and issuing concurrent SharedPreferences writes.
-            rescheduleScope.launch {
+            }.getOrNull() ?: return@withLock
+            run {
                 val wanted = withContext(Dispatchers.IO) {
                     hilt.settingsRepository().scheduledPairs.first()
                 }
@@ -173,7 +184,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
                 if (next == null) {
                     manager.cancel(singleFireIntent(context, ""))
                     prefs.edit().putStringSet("scheduled", emptySet()).apply()
-                    return@launch
+                    return@withLock
                 }
                 val pi = singleFireIntent(context, next.first)
                 // Exact when Android allows it (user grant on 12+); else a ±10 min window —

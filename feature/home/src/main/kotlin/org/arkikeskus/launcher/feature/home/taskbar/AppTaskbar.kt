@@ -386,6 +386,7 @@ internal class AppTaskbar(
                     nudgeEffect = s.icons.nudgeEffect,
                     nudgeSoftness = s.icons.nudgeSoftness,
                     pairIds = s.taskbar.pinnedPairs,
+                    sceneSlots = s.taskbar.sceneSlots,
                     coverBar = s.taskbar.coverBar,
                     coverCount = s.taskbar.coverCount,
                     ratioMenu = s.recents.splitRatioMenu,

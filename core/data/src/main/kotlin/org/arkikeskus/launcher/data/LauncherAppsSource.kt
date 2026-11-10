@@ -108,6 +108,10 @@ class LauncherAppsSource @Inject constructor(
     private val _packageRemovals = MutableSharedFlow<Pair<String, Long>>(extraBufferCapacity = 16)
     val packageRemovals: SharedFlow<Pair<String, Long>> = _packageRemovals
 
+    /** A newly installed package (not an update) and the profile serial it came in. */
+    private val _packageAdditions = MutableSharedFlow<Pair<String, Long>>(extraBufferCapacity = 16)
+    val packageAdditions: SharedFlow<Pair<String, Long>> = _packageAdditions
+
     /** Re-fetch tokens for app icons (see [IconEpochs]): a package update bumps that package, an
      *  icon-pack content change bumps the global generation. AppIcon feeds these into the Coil
      *  model/cache key, so even icons already on screen re-fetch immediately. */
@@ -189,7 +193,11 @@ class LauncherAppsSource @Inject constructor(
         }
 
         val callback = object : LauncherApps.Callback() {
-            override fun onPackageAdded(packageName: String, user: UserHandle) = packageEvent(packageName)
+            override fun onPackageAdded(packageName: String, user: UserHandle) {
+                val serial = catching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
+                _packageAdditions.tryEmit(packageName to serial)
+                packageEvent(packageName)
+            }
             override fun onPackageRemoved(packageName: String, user: UserHandle) {
                 val serial = catching { userManager?.getSerialNumberForUser(user) }.getOrNull() ?: 0L
                 _packageRemovals.tryEmit(packageName to serial)

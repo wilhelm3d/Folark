@@ -211,7 +211,9 @@ fun Dock(
                                     }
                                     if (completed && dragController.moving) {
                                         val rootPos = dragController.rootPosition
-                                        if (dragController.dropOnSplit(app, rootPos)) {
+                                        if (dragController.dropOnSystemTarget(app, rootPos)) {
+                                            // Uninstall / App info: done; the dock is unchanged.
+                                        } else if (dragController.dropOnSplit(app, rootPos)) {
                                             // Split target: the partner picker opens; the dock is unchanged.
                                         } else if (dragController.isOverRemove(rootPos)) {
                                             onRemoveFromDock(app)

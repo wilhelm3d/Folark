@@ -151,6 +151,9 @@ private fun skyColors(sky: Sky, isDay: Boolean): Pair<Color, Color> = when {
 }
 
 private val WeatherShape = RoundedCornerShape(24.dp)
+
+/** While the sky rests, how often it looks again whether it is back in view (was 1 s). */
+private const val REST_CHECK_MS = 5_000L
 private val TextShadow = Shadow(color = Color.Black.copy(alpha = 0.45f), blurRadius = 6f)
 
 /**
@@ -214,8 +217,10 @@ fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewMod
                 time.floatValue = (now - start) / 1_000_000_000f
                 delay(frameMs)
             } else {
-                // Scrolled away, or resting: look again now and then (E19).
-                delay(1_000)
+                // Scrolled away, or resting: check rarely instead of every second. A pager scroll
+                // moves the widget without re-laying it out, so this check is the signal left;
+                // 5 s cuts the resting wake-ups by five.
+                delay(REST_CHECK_MS)
             }
         }
     }

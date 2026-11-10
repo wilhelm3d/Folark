@@ -3,12 +3,8 @@ package org.arkikeskus.launcher.ui.component
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -180,10 +176,23 @@ fun Modifier.recentsSelect(
         animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow * speed.coerceIn(0.4f, 3f)),
         label = "held",
     )
-    val breathe = if (effect == LauncherSettings.RECENTS_SELECT_GLOW && selected) {
-        val t = rememberInfiniteTransition(label = "glow")
-        t.animateFloat(0f, 1f, infiniteRepeatable(tween((ms * 2.4f).toInt()), RepeatMode.Reverse), label = "breathe")
-    } else null
+    // The glow breathes a few times when a card is picked, then rests half lit: a card can stay
+    // picked while Recents sits open, and an endless breath redrew it every frame meanwhile.
+    val glowOn = effect == LauncherSettings.RECENTS_SELECT_GLOW && selected
+    val breath = remember { Animatable(0f) }
+    LaunchedEffect(glowOn, ms) {
+        if (!glowOn) {
+            breath.snapTo(0f)
+            return@LaunchedEffect
+        }
+        val half = tween<Float>((ms * 2.4f).toInt())
+        repeat(GLOW_BREATHS) {
+            breath.animateTo(1f, half)
+            breath.animateTo(0f, half)
+        }
+        breath.animateTo(0.5f, half)
+    }
+    val breathe = if (glowOn) breath else null
     // Which way Tilt leans: the left slot to the left, the last split slot to the right.
     val lean = when {
         slot < 0 -> 0f
@@ -257,3 +266,6 @@ fun Modifier.recentsSelect(
             }
         }
 }
+
+/** How many times the picked card's glow breathes before it rests. */
+private const val GLOW_BREATHS = 4

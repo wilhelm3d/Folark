@@ -40,15 +40,19 @@ open class HomeLayoutRepository @Inject constructor(
     // Room re-runs the query on any change to the table, the other screen's rows included.
     fun homeItems(screenType: ScreenType): Flow<List<HomeItemEntity>> = dao.observeAll(screenType.name).distinctUntilChanged()
 
-    suspend fun addToHome(appItem: AppItem, columns: Int, rows: Int, screenType: ScreenType) {
+    /**
+     * Puts [appItem] on the first free cell (a new page when every page is full) and returns the
+     * page it is on — also when it was on home already, so the caller can show it there.
+     */
+    suspend fun addToHome(appItem: AppItem, columns: Int, rows: Int, screenType: ScreenType): Int =
         db.withTransaction {
-            if (dao.count(HOME, appItem.packageName, appItem.className, appItem.userSerial, screenType.name) > 0) {
-                return@withTransaction
+            dao.getByKey(HOME, appItem.packageName, appItem.className, appItem.userSerial, screenType.name)?.let {
+                return@withTransaction it.page
             }
             val (page, cellX, cellY) = firstFreeCell(dao.getContainer(HOME, screenType.name), columns, rows)
             dao.insert(homeApp(appItem, HOME, page, cellX, cellY, screenType))
+            page
         }
-    }
 
     suspend fun moveItem(appItem: AppItem, page: Int, cellX: Int, cellY: Int, screenType: ScreenType): Boolean =
         db.withTransaction {
@@ -75,9 +79,69 @@ open class HomeLayoutRepository @Inject constructor(
             true
         }
 
-    suspend fun removeFromHome(appItem: AppItem, screenType: ScreenType) {
-        dao.deleteByKey(HOME, appItem.packageName, appItem.className, appItem.userSerial, screenType.name)
+    /** Takes [appItem] off home; returns the row it had (for [restore], the undo), or null. */
+    suspend fun removeFromHome(appItem: AppItem, screenType: ScreenType): HomeItemEntity? =
+        db.withTransaction {
+            val row = dao.getByKey(HOME, appItem.packageName, appItem.className, appItem.userSerial, screenType.name)
+            dao.deleteByKey(HOME, appItem.packageName, appItem.className, appItem.userSerial, screenType.name)
+            row
+        }
+
+    /**
+     * Undo of [removeFromHome]: [row] goes back to its own cell, or to the first free one if
+     * something took that cell meanwhile. Nothing happens when the app is on home again already.
+     */
+    suspend fun restore(row: HomeItemEntity, columns: Int, rows: Int): Boolean =
+        db.withTransaction {
+            if (dao.count(HOME, row.packageName, row.className, row.userSerial, row.screenType) > 0) return@withTransaction false
+            val items = dao.getContainer(HOME, row.screenType)
+            val free = dao.getAt(HOME, row.page, row.cellX, row.cellY, row.screenType) == null &&
+                !cellInWidget(items, -1L, row.page, row.cellX, row.cellY)
+            val (p, x, y) = if (free) Triple(row.page, row.cellX, row.cellY) else firstFreeCell(items, columns, rows)
+            dao.insert(row.copy(id = 0, containerId = HOME, page = p, cellX = x, cellY = y, spanX = 1, spanY = 1))
+            true
+        }
+
+    /** Takes several apps off home at once (edit mode); returns their rows, for [restoreAll]. */
+    suspend fun removeAllFromHome(apps: List<AppItem>, screenType: ScreenType): List<HomeItemEntity> =
+        db.withTransaction {
+            apps.mapNotNull { app ->
+                val row = dao.getByKey(HOME, app.packageName, app.className, app.userSerial, screenType.name)
+                dao.deleteByKey(HOME, app.packageName, app.className, app.userSerial, screenType.name)
+                row
+            }
+        }
+
+    /** Undo of [removeAllFromHome]: each row back to its cell, or the first free one. */
+    suspend fun restoreAll(rows: List<HomeItemEntity>, columns: Int, gridRows: Int) {
+        for (row in rows) restore(row, columns, gridRows)
     }
+
+    /**
+     * Moves several home apps to [page] (edit mode's "Move to page"), each to that page's first
+     * free cell, in order; an app that does not fit any more goes to the next page with room.
+     * Returns the page the last one landed on.
+     */
+    suspend fun moveAllToPage(apps: List<AppItem>, page: Int, columns: Int, rows: Int, screenType: ScreenType): Int =
+        db.withTransaction {
+            var last = page
+            for (app in apps) {
+                val row = dao.getByKey(HOME, app.packageName, app.className, app.userSerial, screenType.name) ?: continue
+                if (row.page == page) {
+                    last = page
+                    continue
+                }
+                // The others on the home grid, this one left out, and only pages from [page] on.
+                // Counted from [page]: firstFreeCell then starts its search there.
+                val shifted = dao.getContainer(HOME, screenType.name)
+                    .filter { it.id != row.id && it.page >= page }
+                    .map { it.copy(page = it.page - page) }
+                val (p, x, y) = firstFreeCell(shifted, columns, rows)
+                dao.moveById(row.id, HOME, p + page, x, y)
+                last = p + page
+            }
+            last
+        }
 
     suspend fun moveFolder(folderId: Long, page: Int, cellX: Int, cellY: Int, screenType: ScreenType): Boolean =
         db.withTransaction {

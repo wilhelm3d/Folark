@@ -1,6 +1,17 @@
 package org.arkikeskus.launcher.feature.settings
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import org.arkikeskus.launcher.model.catching
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -162,6 +173,11 @@ internal fun AppPairsManager(
         )
     }
 
+    // A scheduled pair that comes due while Folark is not in front arrives as a notification, which
+    // Android 13+ only shows once the user allowed Folark's notifications: asked when a schedule is
+    // saved (a no-op when already allowed, or when the user chose "don't ask again").
+    val context = LocalContext.current
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     scheduling?.let { pair ->
         PairScheduleDialog(
             pairName = pair.name,
@@ -170,6 +186,9 @@ internal fun AppPairsManager(
             onSave = { schedule ->
                 onSetSchedule(pair.id, schedule)
                 scheduling = null
+                if (schedule != null && needsNotificationPermission(context)) {
+                    catching { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                }
             },
         )
     }
@@ -198,6 +217,13 @@ private fun PairScheduleDialog(
         )
     }
     var days by remember { mutableStateOf(initial?.days?.toSet() ?: emptySet()) }
+    val context = LocalContext.current
+    // Re-checked whenever the dialog comes back (the user may have allowed them in Android's page).
+    var notificationsOn by remember { mutableStateOf(notificationsAllowed(context)) }
+    LifecycleResumeEffect(Unit) {
+        notificationsOn = notificationsAllowed(context)
+        onPauseOrDispose { }
+    }
     val dayLabels = listOf(
         1 to stringResource(R.string.pair_schedule_mon), 2 to stringResource(R.string.pair_schedule_tue),
         3 to stringResource(R.string.pair_schedule_wed), 4 to stringResource(R.string.pair_schedule_thu),
@@ -240,6 +266,20 @@ private fun PairScheduleDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = palette.dim,
                     )
+                    // Without notifications, a pair due while another app is open cannot come up.
+                    if (!notificationsOn) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(R.string.pair_schedule_notifications_off),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = palette.dim,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { openNotificationSettings(context) }) {
+                                Text(stringResource(R.string.pair_schedule_notifications_allow), color = Accent)
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -567,4 +607,24 @@ private fun AppPickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) }
         },
     )
+}
+
+/** Folark's notifications are allowed (the channel for scheduled pairs is created when needed). */
+private fun notificationsAllowed(context: Context): Boolean =
+    NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+/** Android 13+ asks for notifications at run time; true while that has not been granted yet. */
+private fun needsNotificationPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+
+/** Android's notification page for Folark (where a refused permission is turned on). */
+private fun openNotificationSettings(context: Context) {
+    catching {
+        context.startActivity(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
 }

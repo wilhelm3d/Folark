@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
+import org.arkikeskus.launcher.ui.R as UiR
+import org.arkikeskus.launcher.ui.RemoveChoices
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -209,6 +211,9 @@ fun AppDrawerScreen(
     val context = LocalContext.current
     var menuTarget by remember { mutableStateOf<Pair<AppItem, Rect>?>(null) }
     var renameTarget by remember { mutableStateOf<AppItem?>(null) }
+    // "Hidden apps" at the end of the list, opened (after the fingerprint when locked).
+    var showHidden by remember { mutableStateOf(false) }
+    val unlockTitle = stringResource(R.string.drawer_hidden_unlock)
     // The app whose "Add to folder" is open (the non-drag way into a drawer folder).
     var folderTarget by remember { mutableStateOf<AppItem?>(null) }
     var openFolderId by remember { mutableStateOf<Long?>(null) }
@@ -217,7 +222,11 @@ fun AppDrawerScreen(
     val folderDrag = remember { DrawerFolderDrag() }
     DisposableEffect(folderDrag, viewModel) {
         folderDrag.onCombine = { app, other -> viewModel.createFolderByDrop(app, other) { openFolderId = it } }
-        folderDrag.onAddToFolder = { app, id -> viewModel.addAppToDrawerFolder(app, id) }
+        folderDrag.onAddToFolder = { app, id ->
+            viewModel.addAppToDrawerFolder(app, id)
+            // Switch to the tab that just received the app so the user sees it land there.
+            viewModel.selectTab(id)
+        }
         folderDrag.onOpenFolder = { id -> openFolderId = id }
         onDispose {
             folderDrag.onCombine = null
@@ -323,86 +332,95 @@ fun AppDrawerScreen(
     ExpressiveTheme {
     CompositionLocalProvider(LocalDensity provides drawerDensity) {
     FollowClipboard(uiState.clipboardRow)
-    AppDrawerContent(
-        colors = drawerColors,
-        style = drawerStyle,
-        searchAtBottom = uiState.drawerSearchPosition == LauncherSettings.SEARCH_BOTTOM,
-        sidebar = sidebar,
-        apps = uiState.apps,
-        frequentApps = uiState.frequentApps,
-        clipboardRow = uiState.clipboardRow,
-        folders = uiState.folders,
-        // With folders as tabs there are no tiles: the folders live in the tab row instead.
-        folderTiles = if (uiState.folderTabsEnabled) emptyList() else uiState.folders,
-        query = uiState.query,
-        columns = uiState.columns,
-        badges = badges,
-        badgeShowCount = uiState.notificationDotCount,
-        badgeScale = uiState.notificationDotScale,
-        showSearch = uiState.showSearch,
-        onQueryChange = viewModel::onQueryChange,
-        onFolderClick = { openFolderId = it.id },
-        onNewFolder = { showNewFolderDialog = true },
-        onEditFolder = { openFolderId = it },
-        onRenameFolder = viewModel::renameDrawerFolder,
-        onAppClick = { app ->
-            if (app.packageName == context.packageName) {
-                onOpenSettings()
-            } else if (viewModel.onAppClick(app)) {
-                // Keep the drawer open if the launch failed, so the user isn't dumped back to home
-                // with no explanation.
-                onClose()
-            }
-        },
-        onAppLongClick = { app, bounds -> menuTarget = app to bounds },
-        onClose = onClose,
-        onDrawerDrag = onDrawerDrag,
-        onDrawerSettle = onDrawerSettle,
-        dragController = dragController,
-        folderDrag = folderDrag,
-        onDragOutStart = onDragOutStart,
-        onDropOnHome = { app, page, cellX, cellY -> viewModel.addToHomeAt(app, page, cellX, cellY) },
-        onDropOnDock = { app -> viewModel.addToDock(app) },
-        onDropOnTab = viewModel::moveAppBetweenTabs,
-        showLabels = uiState.showLabels,
-        calc = uiState.calc,
-        settingResults = uiState.settingResults,
-        contactResults = uiState.contactResults,
-        shortcutResults = uiState.shortcutResults,
-        actionResults = uiState.actionResults,
-        searchWeb = uiState.searchWeb,
-        searchInlineShortcuts = uiState.searchInlineShortcuts,
-        azHoldScroll = uiState.azHoldScroll,
-        twoPane = uiState.twoPane,
-        tabs = uiState.tabs,
-        tabBar = uiState.folderTabsEnabled,
-        selectedTab = uiState.selectedTab,
-        onSelectTab = viewModel::selectTab,
-        onMoveTab = viewModel::moveDrawerFolder,
-        tabsReorderable = !uiState.tabsLocked,
-        onDeleteTab = { id -> viewModel.deleteDrawerFolder(id); viewModel.selectTab(null) },
-        locked = uiState.desktopLocked,
-        gridState = gridState,
-        listState = listState,
-        drawerLayoutMode = uiState.drawerLayoutMode,
-        drawerIndexBarEnabled = uiState.drawerIndexBarEnabled,
-        azIndexPosition = uiState.azIndexPosition,
-        azIndexScale = uiState.azIndexScale,
-        drawerCornerRadius = uiState.drawerCornerRadius,
-        drawerHandleStyle = uiState.drawerHandleStyle,
-        drawerBottomSpace = uiState.drawerBottomSpace,
-        drawerLetterHeaders = uiState.drawerLetterHeaders,
-        drawerLargeLetterPopup = uiState.drawerLargeLetterPopup,
-        drawerSwipeTabs = uiState.drawerSwipeTabs,
-        drawerFlickClose = uiState.drawerFlickClose,
-        drawerOpen = drawerOpen,
-        drawerHeightFraction = effectiveHeightFraction,
-        drawerWidthFraction = effectiveWidthFraction,
-        drawerAlignment = effectiveAlignment,
-        drawerScrimOpacity = uiState.drawerScrimOpacity,
-        drawerProgress = drawerProgress,
-        modifier = modifier,
-    )
+    // Apps installed lately and not opened yet get a small dot (AppIcon).
+    CompositionLocalProvider(org.arkikeskus.launcher.ui.component.LocalNewApps provides uiState.newApps) {
+        AppDrawerContent(
+            colors = drawerColors,
+            style = drawerStyle,
+            searchAtBottom = uiState.drawerSearchPosition == LauncherSettings.SEARCH_BOTTOM,
+            sidebar = sidebar,
+            apps = uiState.apps,
+            frequentApps = uiState.frequentApps,
+            clipboardRow = uiState.clipboardRow,
+            folders = uiState.folders,
+            // With folders as tabs there are no tiles: the folders live in the tab row instead.
+            folderTiles = if (uiState.folderTabsEnabled) emptyList() else uiState.folders,
+            query = uiState.query,
+            columns = uiState.columns,
+            badges = badges,
+            badgeShowCount = uiState.notificationDotCount,
+            badgeScale = uiState.notificationDotScale,
+            showSearch = uiState.showSearch,
+            onQueryChange = viewModel::onQueryChange,
+            onFolderClick = { openFolderId = it.id },
+            onNewFolder = { showNewFolderDialog = true },
+            onEditFolder = { openFolderId = it },
+            onRenameFolder = viewModel::renameDrawerFolder,
+            onAppClick = { app ->
+                if (app.packageName == context.packageName) {
+                    onOpenSettings()
+                } else if (viewModel.onAppClick(app)) {
+                    // Keep the drawer open if the launch failed, so the user isn't dumped back to home
+                    // with no explanation.
+                    onClose()
+                }
+            },
+            onAppLongClick = { app, bounds -> menuTarget = app to bounds },
+            onClose = onClose,
+            onDrawerDrag = onDrawerDrag,
+            onDrawerSettle = onDrawerSettle,
+            dragController = dragController,
+            folderDrag = folderDrag,
+            onDragOutStart = onDragOutStart,
+            onDropOnHome = { app, page, cellX, cellY -> viewModel.addToHomeAt(app, page, cellX, cellY) },
+            onDropOnDock = { app -> viewModel.addToDock(app) },
+            onDropOnTab = viewModel::moveAppBetweenTabs,
+            showLabels = uiState.showLabels,
+            calc = uiState.calc,
+            settingResults = uiState.settingResults,
+            contactResults = uiState.contactResults,
+            shortcutResults = uiState.shortcutResults,
+            actionResults = uiState.actionResults,
+            searchWeb = uiState.searchWeb,
+            searchWebEngine = uiState.searchWebEngine,
+            hiddenCount = uiState.hiddenApps.size,
+            hiddenLock = uiState.hiddenLock,
+            onHiddenApps = {
+                if (uiState.hiddenLock) confirmOwner(context, unlockTitle) { showHidden = true } else showHidden = true
+            },
+            searchInlineShortcuts = uiState.searchInlineShortcuts,
+            azHoldScroll = uiState.azHoldScroll,
+            twoPane = uiState.twoPane,
+            tabs = uiState.tabs,
+            tabBar = uiState.folderTabsEnabled,
+            selectedTab = uiState.selectedTab,
+            onSelectTab = viewModel::selectTab,
+            onMoveTab = viewModel::moveDrawerFolder,
+            tabsReorderable = !uiState.tabsLocked,
+            onDeleteTab = { id -> viewModel.deleteDrawerFolder(id); viewModel.selectTab(null) },
+            locked = uiState.desktopLocked,
+            gridState = gridState,
+            listState = listState,
+            drawerLayoutMode = uiState.drawerLayoutMode,
+            drawerIndexBarEnabled = uiState.drawerIndexBarEnabled,
+            azIndexPosition = uiState.azIndexPosition,
+            azIndexScale = uiState.azIndexScale,
+            drawerCornerRadius = uiState.drawerCornerRadius,
+            drawerHandleStyle = uiState.drawerHandleStyle,
+            drawerBottomSpace = uiState.drawerBottomSpace,
+            drawerLetterHeaders = uiState.drawerLetterHeaders,
+            drawerLargeLetterPopup = uiState.drawerLargeLetterPopup,
+            drawerSwipeTabs = uiState.drawerSwipeTabs,
+            drawerFlickClose = uiState.drawerFlickClose,
+            drawerOpen = drawerOpen,
+            drawerHeightFraction = effectiveHeightFraction,
+            drawerWidthFraction = effectiveWidthFraction,
+            drawerAlignment = effectiveAlignment,
+            drawerScrimOpacity = uiState.drawerScrimOpacity,
+            drawerProgress = drawerProgress,
+            modifier = modifier,
+        )
+    }
     }
 
     val menu = menuTarget
@@ -422,25 +440,34 @@ fun AppDrawerScreen(
             app = app,
             anchor = anchor,
             preferAbove = preferAbove,
-            actions = listOfNotNull(
-                PopupAction(stringResource(R.string.app_info), LauncherIcons.Info) { AppActions.openAppInfo(context, app) },
-                if (uiState.aspectRatioMenu && AppActions.canOpenAspectRatio(context, app)) {
-                    PopupAction(stringResource(org.arkikeskus.launcher.ui.R.string.app_aspect_ratio), LauncherIcons.SwapHoriz) {
-                        AppActions.openAspectRatio(context, app)
+            // The everyday actions as icons on top; how it looks and where it is filed on a
+            // Customize page; Add to home / dock as rows; the ways to get rid of it on a Remove page.
+            quickActions = listOfNotNull(
+                PopupAction(stringResource(UiR.string.popup_app_info), LauncherIcons.Info) { AppActions.openAppInfo(context, app) },
+                if (uiState.splitLaunchEnabled) {
+                    // The partner picker lives with the home screen (shared drag controller).
+                    PopupAction(stringResource(UiR.string.popup_split), LauncherIcons.SwapHoriz) { dragController.splitRequest = app }
+                } else {
+                    null
+                },
+                if (uiState.floatingLaunchEnabled) {
+                    PopupAction(stringResource(UiR.string.popup_floating), LauncherIcons.OpenInNew) {
+                        if (viewModel.launchFloating(app)) onClose()
                     }
                 } else {
                     null
                 },
-                PopupAction(stringResource(R.string.rename), LauncherIcons.Edit) { renameTarget = app },
-                // Organizing without a drag: the drawer's folders (and tabs) are the targets here.
-                PopupAction(stringResource(R.string.folder_add_to), LauncherIcons.Add) { folderTarget = app },
+            ),
+            customize = listOfNotNull(
                 // The icon picker lives with the home screen (shared drag controller), like the split picker.
                 PopupAction(stringResource(R.string.change_icon), LauncherIcons.SwapVert) {
                     dragController.iconPickRequest = app
                 },
-                if (uiState.floatingLaunchEnabled) {
-                    PopupAction(stringResource(R.string.open_floating), LauncherIcons.OpenInNew) {
-                        if (viewModel.launchFloating(app)) onClose()
+                // Organizing without a drag: the drawer's folders (and tabs) are the targets here.
+                PopupAction(stringResource(R.string.folder_add_to), LauncherIcons.Folder) { folderTarget = app },
+                if (uiState.aspectRatioMenu && AppActions.canOpenAspectRatio(context, app)) {
+                    PopupAction(stringResource(UiR.string.app_aspect_ratio), LauncherIcons.SwapHoriz) {
+                        AppActions.openAspectRatio(context, app)
                     }
                 } else {
                     null
@@ -452,40 +479,49 @@ fun AppDrawerScreen(
                 } else {
                     null
                 },
-                if (uiState.splitLaunchEnabled) {
-                    // The partner picker lives with the home screen (shared drag controller).
-                    PopupAction(stringResource(R.string.open_split), LauncherIcons.SwapHoriz) {
-                        dragController.splitRequest = app
+            ),
+            actions = listOfNotNull(
+                // Added to home: the drawer closes and home shows where it went.
+                if (!inHome) {
+                    PopupAction(stringResource(R.string.add_to_home), LauncherIcons.Home) {
+                        viewModel.addToHome(app)
+                        onClose()
                     }
                 } else {
                     null
                 },
-                PopupAction(
-                    stringResource(if (inHome) R.string.remove_from_home else R.string.add_to_home),
-                    if (inHome) LauncherIcons.Close else LauncherIcons.Add,
-                ) {
-                    if (inHome) viewModel.removeFromHome(app) else viewModel.addToHome(app)
-                },
-                // Offer "Remove from dock" for a member, "Add to dock" only when a visible slot is
-                // free; a full dock hides the add action instead of appearing to do nothing.
-                if (inDock) {
-                    PopupAction(stringResource(R.string.remove_from_dock), LauncherIcons.Close) {
-                        viewModel.removeFromDock(app)
-                    }
-                } else if (!dockFull) {
-                    PopupAction(stringResource(R.string.add_to_dock), LauncherIcons.Add) {
-                        viewModel.addToDock(app)
-                    }
+                // "Add to dock" only when a visible slot is free; a full dock hides it instead of
+                // appearing to do nothing.
+                if (!inDock && !dockFull) {
+                    PopupAction(stringResource(R.string.add_to_dock), LauncherIcons.Add) { viewModel.addToDock(app) }
                 } else {
                     null
                 },
-                PopupAction(stringResource(R.string.hide_app), LauncherIcons.VisibilityOff) { viewModel.hideApp(app) },
-                PopupAction(stringResource(R.string.uninstall), LauncherIcons.Delete) { AppActions.uninstall(context, app) },
+            ),
+            remove = RemoveChoices(
+                fromHome = if (inHome) ({ viewModel.removeFromHome(app) }) else null,
+                fromDock = if (inDock) ({ viewModel.removeFromDock(app) }) else null,
+                hide = { viewModel.hideApp(app) },
+                uninstall = if (AppActions.canUninstall(context, app)) ({ AppActions.uninstall(context, app) }) else null,
             ),
             onDismiss = { menuTarget = null },
             onPinShortcut = { item -> viewModel.pinShortcut(item) },
             onRename = { newLabel -> viewModel.setCustomAppLabel(app.key, newLabel) },
         )
+    }
+
+    if (showHidden) {
+        HiddenAppsDialog(
+            apps = uiState.hiddenApps,
+            onOpen = { app ->
+                showHidden = false
+                if (viewModel.onAppClick(app)) onClose()
+            },
+            onUnhide = { app -> viewModel.unhideApp(app) },
+            onDismiss = { showHidden = false },
+        )
+        // The last one shown again: nothing left to list.
+        if (uiState.hiddenApps.isEmpty()) showHidden = false
     }
 
     renameTarget?.let { app ->
@@ -608,6 +644,10 @@ private fun AppDrawerContent(
     shortcutResults: List<SearchResult.Shortcut> = emptyList(),
     actionResults: List<SearchResult.Action> = emptyList(),
     searchWeb: Boolean = false,
+    searchWebEngine: String = org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_SYSTEM,
+    hiddenCount: Int = 0,
+    hiddenLock: Boolean = false,
+    onHiddenApps: () -> Unit = {},
     searchInlineShortcuts: Boolean = false,
     azHoldScroll: Boolean = false,
     twoPane: Boolean = false,
@@ -972,6 +1012,9 @@ private fun AppDrawerContent(
                             }
                             }
                             if (selectedTab == null) privateSpace?.let { privateSpaceRows(it, colors) }
+                            if (selectedTab == null && hiddenCount > 0) {
+                                item(key = "hidden-apps", contentType = "hidden") { HiddenAppsRow(hiddenCount, hiddenLock, onHiddenApps) }
+                            }
                         } else {
                             calc?.let { c ->
                                 item(contentType = "calc") {
@@ -1062,7 +1105,7 @@ private fun AppDrawerContent(
                                         label = stringResource(R.string.search_web, query.trim()),
                                         description = "",
                                         trailingIcon = LauncherIcons.Search,
-                                    ) { launchWebSearch(context, query.trim()) }
+                                    ) { launchWebSearch(context, query.trim(), searchWebEngine) }
                                 }
                             }
                             if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty() &&
@@ -1133,6 +1176,11 @@ private fun AppDrawerContent(
                                     onAppLongClick, dragController, folderDrag, selectedTab, onDragOutStart, onDropOnHome, onDropOnTab, onDropOnDock, haptics, locked)
                             }
                             if (selectedTab == null) privateSpace?.let { privateSpaceCells(it, colors, showLabels, drawerIconSize) }
+                            if (selectedTab == null && hiddenCount > 0) {
+                                item(key = "hidden-apps", span = { GridItemSpan(maxLineSpan) }, contentType = "hidden") {
+                                    HiddenAppsRow(hiddenCount, hiddenLock, onHiddenApps)
+                                }
+                            }
                         } else {
                             calc?.let { c ->
                                 item(span = { GridItemSpan(maxLineSpan) }, contentType = "calc") {
@@ -1211,7 +1259,7 @@ private fun AppDrawerContent(
                                         label = stringResource(R.string.search_web, query.trim()),
                                         description = "",
                                         trailingIcon = LauncherIcons.Search,
-                                    ) { launchWebSearch(context, query.trim()) }
+                                    ) { launchWebSearch(context, query.trim(), searchWebEngine) }
                                 }
                             }
                             if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty() &&

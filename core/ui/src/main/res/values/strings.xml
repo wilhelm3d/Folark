@@ -12,4 +12,29 @@
     <string name="popup_notification_dismiss">Dismiss</string>
     <string name="app_aspect_ratio">Aspect ratio…</string>
     <string name="app_aspect_ratio_unavailable">This phone doesn\'t have Android\'s aspect ratio page</string>
+    <!-- Undo bar (AppEdits) -->
+    <string name="undo_removed_home">%s removed from home</string>
+    <string name="undo_removed_dock">%s removed from the dock</string>
+    <string name="undo_hidden">%s hidden</string>
+    <plurals name="undo_removed_many">
+        <item quantity="one">%d app removed from home</item>
+        <item quantity="other">%d apps removed from home</item>
+    </plurals>
+    <string name="undo_action">Undo</string>
+    <!-- Long-press menu: the icon row, Customize and Remove pages -->
+    <string name="popup_app_info">App info</string>
+    <string name="popup_customize">Customize</string>
+    <string name="popup_split">Split</string>
+    <string name="popup_floating">Pop-up</string>
+    <string name="popup_back">Back</string>
+    <string name="popup_remove">Remove…</string>
+    <string name="popup_remove_title">Remove %s</string>
+    <string name="popup_remove_home">Remove from home</string>
+    <string name="popup_remove_home_desc">It stays in your apps</string>
+    <string name="popup_remove_dock">Remove from dock</string>
+    <string name="popup_remove_dock_desc">It stays in your apps and on home</string>
+    <string name="popup_hide">Hide from app list</string>
+    <string name="popup_hide_desc">Out of sight; find it again under Hidden apps at the end of the app list</string>
+    <string name="popup_uninstall">Uninstall</string>
+    <string name="popup_uninstall_desc">Deletes the app and its data from the phone</string>
 </resources>

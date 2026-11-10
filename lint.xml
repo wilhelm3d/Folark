@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A light Android Lint setup for Folark (`gradlew lint` writes the reports to each module's
+  build/reports). Lint finds this file by itself from every module. It only quiets checks that do
+  not fit what Folark is (a root-capable launcher with a System UI module, English only for now),
+  so real problems stand out; nothing here makes a check stricter, so no build can start failing.
+-->
+<lint>
+    <!-- One language for now. -->
+    <issue id="MissingTranslation" severity="ignore" />
+    <issue id="ExtraTranslation" severity="ignore" />
+
+    <!-- Hidden APIs, protected permissions and every app on the phone are what Folark is for
+         (module, root helper, launcher). -->
+    <issue id="PrivateApi" severity="ignore" />
+    <issue id="DiscouragedPrivateApi" severity="ignore" />
+    <issue id="SoonBlockedPrivateApi" severity="ignore" />
+    <issue id="BlockedPrivateApi" severity="warning" />
+    <issue id="ProtectedPermissions" severity="ignore" />
+    <issue id="QueryAllPackagesPermission" severity="ignore" />
+    <issue id="ScopedStorage" severity="ignore" />
+
+    <!-- Version updates are done on purpose, not because lint says so. -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+
+    <!-- Kept visible, never fatal. -->
+    <issue id="UnusedResources" severity="warning" />
+</lint>

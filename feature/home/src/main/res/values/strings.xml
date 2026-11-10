@@ -72,12 +72,8 @@
     <string name="onboarding_root_no_root">Root didn\'t answer: no root on this phone, or it was declined. Grant them one by one below instead</string>
     <string name="onboarding_root_all_done">All granted with root</string>
     <string name="onboarding_root_partly">%1$d of %2$d granted with root. Grant the rest below</string>
-    <string name="home_remove">Remove from home</string>
     <string name="drag_remove">Remove</string>
     <string name="drag_folder_all">All apps</string>
-    <string name="dock_remove">Remove from dock</string>
-    <string name="app_info">App info</string>
-    <string name="uninstall">Uninstall</string>
     <string name="rename">Rename</string>
     <string name="rename_title">Rename</string>
     <string name="rename_reset">Reset to default</string>
@@ -152,9 +148,7 @@
     <string name="drag_split_left">Split left</string>
     <string name="drag_split_right">Split right</string>
     <string name="drag_split_three">Three apps</string>
-    <string name="open_floating">Open in floating window</string>
     <string name="add_floating_shortcut">Add floating shortcut to home</string>
-    <string name="open_split">Open in split screen</string>
     <string name="split_pick_title">Open %1$s in split screen with…</string>
     <string name="split_pick_cancel">Cancel</string>
     <string name="split_pick_add_home">Also add this pair to the home screen</string>
@@ -214,6 +208,7 @@
     <string name="taskbar_show_here">Keep taskbar open in this app again</string>
     <string name="taskbar_full">The taskbar is full. Unpin an app first.</string>
     <string name="taskbar_pin">Pin to taskbar</string>
+    <string name="taskbar_scene_slot_empty">Empty scene slot — pin a scene in Settings ▸ Split screen ▸ Scenes (app pairs)</string>
     <string name="taskbar_unpin">Unpin from taskbar</string>
     <string name="taskbar_open_pair">%1$s and %2$s in split screen</string>
     <string name="taskbar_a11y_split">Open in split screen</string>
@@ -314,5 +309,31 @@
     <string name="onboarding_split_ready_commands">Split screen is ready: Android\'s split commands</string>
     <string name="onboarding_split_not_yet">Split screen needs the ADB grant (or root)</string>
     <string name="taskbar_pins_locked">Taskbar apps are locked (Settings ▸ Taskbar)</string>
+    <string name="taskbar_share_locked">The app you dragged from does not let its files be passed on</string>
     <string name="taskbar_share_failed">That app can\'t take what you dropped on it</string>
+    <!-- Edit home (several apps at once) -->
+    <string name="home_options_edit">Edit home</string>
+    <string name="edit_home_hint">Tap apps to select them, or the minus to remove one</string>
+    <plurals name="edit_home_selected">
+        <item quantity="one">%d app selected</item>
+        <item quantity="other">%d apps selected</item>
+    </plurals>
+    <string name="edit_home_remove">Remove</string>
+    <string name="edit_home_folder">Folder</string>
+    <string name="edit_home_move">Move</string>
+    <string name="edit_home_add">Add apps</string>
+    <string name="edit_home_done">Done</string>
+    <string name="edit_home_move_title">Move to page</string>
+    <string name="edit_home_page">Page %d</string>
+    <string name="edit_home_new_page">New page</string>
+    <string name="edit_home_cancel">Cancel</string>
+    <string name="edit_home_add_title">Add apps to home</string>
+    <string name="edit_home_search">Search apps</string>
+    <plurals name="edit_home_add_count">
+        <item quantity="one">Add %d</item>
+        <item quantity="other">Add %d</item>
+    </plurals>
+    <!-- Drop targets while an app is dragged -->
+    <string name="drag_uninstall">Uninstall</string>
+    <string name="drag_app_info">App info</string>
 </resources>

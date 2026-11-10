@@ -37,7 +37,6 @@ import org.arkikeskus.launcher.data.BatchSchedule
 import org.arkikeskus.launcher.data.MessageHeuristics
 import org.arkikeskus.launcher.data.NotificationBadgeRepository
 import org.arkikeskus.launcher.data.PeopleGrouping
-import org.arkikeskus.launcher.data.runSuspendCatching
 import org.arkikeskus.launcher.data.PersonEntry
 import org.arkikeskus.launcher.data.PersonEventKind
 import org.arkikeskus.launcher.data.ReplyAction
@@ -82,6 +81,7 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     /** Lives while the listener is connected; carries the batch settings + pins into [holdForBatch]. */
     private var settingsJob: Job? = null
+    private var hiddenJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     @Volatile private var batchEnabled = false
@@ -102,10 +102,32 @@ class NotificationDotListenerService : NotificationListenerService() {
     private var heldLoaded = false
     private var settingsReady = false
 
+    /**
+     * Saves the held notifications a moment after the last change: a group chat holding message
+     * after message was one rewrite of the whole settings file per message. The map in memory is
+     * what counts while Folark runs; the saved copy only bridges a restart, so a few seconds of
+     * delay lose nothing (the listener being stopped saves at once, see [flushHeld]).
+     */
     private fun persistHeld() {
-        val snapshot = HashMap(heldUntil)
-        scope.launch { catching { settingsRepository.setHeldNotifications(snapshot) } }
+        heldDirty = true
+        handler.removeCallbacks(heldSaver)
+        handler.postDelayed(heldSaver, HELD_SAVE_DELAY_MS)
     }
+
+    private var heldDirty = false
+    private val heldSaver = Runnable { flushHeld() }
+
+    /** Writes the held notifications now, if they changed since the last write. */
+    private fun flushHeld() {
+        handler.removeCallbacks(heldSaver)
+        if (!heldDirty) return
+        heldDirty = false
+        val snapshot = HashMap(heldUntil)
+        // Not [scope]: it is cancelled when the service is destroyed, and this last write must land.
+        persistScope.launch { catching { settingsRepository.setHeldNotifications(snapshot) } }
+    }
+
+    private val persistScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val userManager by lazy { getSystemService(UserManager::class.java) }
 
@@ -148,6 +170,9 @@ class NotificationDotListenerService : NotificationListenerService() {
         )
 
         const val TAG = "NotifDots"
+
+        /** How long after the last change the held notifications are saved. */
+        const val HELD_SAVE_DELAY_MS = 3_000L
 
         /** Cap on the held-notification map (and the settings store it persists to). */
         const val HELD_MAX = 300
@@ -258,13 +283,20 @@ class NotificationDotListenerService : NotificationListenerService() {
         }
         mailPackages = queryMailPackages()
         settingsJob?.cancel()
-        // Hidden notification channels (the widget's mute action): kept current for the snapshot filter.
-        scope.launch {
-            settingsRepository.hiddenChannels.collect { hiddenChannels = it }
+        // Hidden notification channels (the widget's mute action, undone in Settings): kept current
+        // for the snapshot filter. A change rebuilds at once, so a muted channel leaves (or an
+        // unmuted one comes back) right away instead of at the next notification.
+        hiddenJob?.cancel()
+        hiddenJob = scope.launch {
+            settingsRepository.hiddenChannels.distinctUntilChanged().collect {
+                val changed = it != hiddenChannels
+                hiddenChannels = it
+                if (changed) scheduleRefresh()
+            }
         }
         settingsJob = scope.launch {
             if (!heldLoaded) {
-                val saved = runSuspendCatching { settingsRepository.heldNotifications.first() }.getOrDefault(emptyMap())
+                val saved = catching { settingsRepository.heldNotifications.first() }.getOrDefault(emptyMap())
                 for ((k, v) in saved) heldUntil.putIfAbsent(k, v)
                 heldLoaded = true
             }
@@ -286,6 +318,7 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        flushHeld()
         connected = false
         handler.removeCallbacks(retryRefresh)
         handler.removeCallbacks(deliverBatch)
@@ -296,6 +329,8 @@ class NotificationDotListenerService : NotificationListenerService() {
         stopPackageRefresh()
         settingsJob?.cancel()
         settingsJob = null
+        hiddenJob?.cancel()
+        hiddenJob = null
         badgeRepository.clearCanceller()
         badgeRepository.clearAllCanceller()
         badgeRepository.setBadges(emptyMap())
@@ -354,16 +389,28 @@ class NotificationDotListenerService : NotificationListenerService() {
         liveRefreshQueued = false
         if (!connected || !heldLoaded) return
         val active = catching { activeNotifications }.getOrNull() ?: return
-        val ranking = catching { currentRanking }.getOrNull()
-        val tmp = Ranking()
         val live = ArrayList<LiveActivity>()
         for (sbn in active) {
             if (sbn == null) continue
+            // Muted channels stay out of the live pill too, as in the full rebuild.
+            if (isHiddenChannel(sbn)) continue
             val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
             catching { liveEntry(sbn, serial) }.getOrNull()?.let(live::add)
         }
         badgeRepository.setLive(live.sortedWith(compareByDescending<LiveActivity> { livePriority(it) }.thenByDescending { it.postTime }))
     }
+
+    /** The notification came in on a channel muted from the notifications widget. */
+    private fun isHiddenChannel(sbn: StatusBarNotification): Boolean {
+        val id = sbn.notification?.channelId ?: return false
+        return hiddenChannels[sbn.packageName]?.contains(id) == true
+    }
+
+    /** The name the app gave [sbn]'s channel, from the ranking (null when it is not known). */
+    private fun channelName(sbn: StatusBarNotification, ranking: RankingMap?, tmp: Ranking): String? =
+        catching {
+            if (ranking?.getRanking(sbn.key, tmp) == true) tmp.channel?.name?.toString()?.takeIf { it.isNotBlank() } else null
+        }.getOrNull()
 
     /** Notifications that already nudged their app's icon (a silent update must not nudge again). */
     private val nudgedKeys = HashSet<String>()
@@ -534,7 +581,7 @@ class NotificationDotListenerService : NotificationListenerService() {
             val key = "${sbn.packageName}/$serial"
             // A channel hidden for this app (the notification widget's mute action): none of Folark's
             // surfaces show it — dots, status icons, widgets, people tiles. Android's shade is untouched.
-            if (sbn.notification?.channelId in (hiddenChannels[sbn.packageName] ?: emptySet())) continue
+            if (isHiddenChannel(sbn)) continue
             // People tiles: conversation-like notifications reduced to sender + text + actions; any
             // other real (icon-worthy, not ongoing) notification becomes an app-grouped entry.
             val person = catching { personEntry(sbn, serial, ranking, tmp) }.getOrNull()
@@ -577,6 +624,7 @@ class NotificationDotListenerService : NotificationListenerService() {
                     color = color,
                     actions = actions,
                     channelId = sbn.notification?.channelId,
+                    channelName = channelName(sbn, ranking, tmp),
                 )
                 
                 val isSilent = if (ranking != null && ranking.getRanking(sbn.key, tmp)) {
@@ -818,6 +866,7 @@ class NotificationDotListenerService : NotificationListenerService() {
 
     override fun onDestroy() {
         connected = false
+        flushHeld()
         handler.removeCallbacksAndMessages(null)
         liveRefreshQueued = false
         stopPackageRefresh()

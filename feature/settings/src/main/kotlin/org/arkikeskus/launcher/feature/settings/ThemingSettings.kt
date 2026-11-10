@@ -268,6 +268,27 @@ internal fun HomeBackdropCard(
             description = stringResource(R.string.settings_home_video_desc),
             onClick = { catching { pickVideo.launch("video/*") } },
         )
+        // Only once a video is the background: how long it plays before resting on a still frame.
+        if (s.home.backgroundImage.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS) {
+            ExpressiveRowDivider()
+            ExpressiveSegmentedControl(
+                title = stringResource(R.string.settings_video_awake),
+                options = listOf(
+                    "15" to "15 s",
+                    "30" to "30 s",
+                    "120" to "2 min",
+                    "0" to stringResource(R.string.settings_weather_awake_always),
+                ),
+                selected = s.home.videoAwakeSeconds.toString(),
+                onSelect = { viewModel.setVideoAwakeSeconds(it.toInt()) },
+            )
+            Text(
+                text = stringResource(R.string.settings_video_awake_desc),
+                color = LocalExpressivePalette.current.dim,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+            )
+        }
         if (phoneWallpapers.isNotEmpty()) {
             ExpressiveRowDivider()
             ExpressiveActionItem(
@@ -653,6 +674,14 @@ internal fun AutoRemovePagesRow(s: LauncherSettings, viewModel: SettingsViewMode
         checked = s.home.newPageOnDrag,
         onCheckedChange = { viewModel.setNewPageOnDrag(it, screenType) },
     )
+    ExpressiveRowDivider()
+    ExpressiveSwitchRow(
+        title = stringResource(R.string.settings_add_new_apps),
+        subtitle = stringResource(R.string.settings_add_new_apps_desc),
+        checked = s.home.addNewApps,
+        onCheckedChange = viewModel::setAddNewApps,
+        shared = true,
+    )
 }
 
 /** App drawer page: folders as tabs, the two-pane drawer, and Private Space. */
@@ -846,6 +875,22 @@ internal fun DrawerSearchRows(s: LauncherSettings, viewModel: SettingsViewModel)
         onCheckedChange = viewModel::setSearchWeb,
         shared = true,
     )
+    if (s.search.web) {
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_search_web_engine),
+            options = listOf(
+                LauncherSettings.SEARCH_ENGINE_SYSTEM to stringResource(R.string.settings_search_engine_system),
+                LauncherSettings.SEARCH_ENGINE_GOOGLE to stringResource(R.string.settings_search_engine_google),
+                LauncherSettings.SEARCH_ENGINE_DUCKDUCKGO to stringResource(R.string.settings_search_engine_duckduckgo),
+                LauncherSettings.SEARCH_ENGINE_BING to stringResource(R.string.settings_search_engine_bing),
+                LauncherSettings.SEARCH_ENGINE_STARTPAGE to stringResource(R.string.settings_search_engine_startpage),
+            ),
+            selected = s.search.webEngine,
+            onSelect = viewModel::setSearchWebEngine,
+        )
+    }
+    ExpressiveRowDivider()
+    FileSearchRow(checked = s.search.files, onCheckedChange = viewModel::setSearchFiles)
 }
 
 /** Foldable page (shared card): the size a floating window opens at. */
@@ -1082,3 +1127,6 @@ internal fun WeatherLocationRow(viewModel: WeatherLocationViewModel = hiltViewMo
         )
     }
 }
+
+/** The file types home plays as a video background (as VideoBackground.kt decides). */
+private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mkv", "3gp", "mov")

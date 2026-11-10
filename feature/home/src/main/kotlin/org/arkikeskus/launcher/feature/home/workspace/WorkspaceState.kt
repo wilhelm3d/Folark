@@ -10,7 +10,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
@@ -41,6 +43,19 @@ internal class WorkspaceDragState {
 
     /** That entry, shown at its new cell (row id to page, x, y) until the database catches up. */
     var localOptimistic by mutableStateOf<Pair<Long, Triple<Int, Int, Int>>?>(null)
+
+    /** From the finger to the dragged app icon's centre (px), set at pick-up. */
+    var grab by mutableStateOf(Offset.Zero)
+
+    /** An app icon's size and how far its centre sits above its cell's centre (the label under it), px. */
+    var iconPx by mutableFloatStateOf(0f)
+    var iconDy by mutableFloatStateOf(0f)
+
+    /** A dropped app gliding into its cell (or back to its old one); null when none is. */
+    var settle by mutableStateOf<Settle?>(null)
+
+    /** The [Settle] a cell has already started gliding, so it is not drawn at the drop point again. */
+    var settleStarted by mutableLongStateOf(0L)
 
     /** The cell a drag would drop into (the placeholder), and its page. */
     var targetCell by mutableStateOf<IntOffset?>(null)
@@ -129,3 +144,26 @@ internal data class WorkspaceEnv(
 ) {
     val latestEntries: List<HomeEntry> get() = latestEntriesState.value
 }
+
+/**
+ * A dropped app icon on its way into a cell: [from] is where the floating icon's centre was at the
+ * drop (grid px), [page]/[x]/[y] the cell it glides into, [token] (System.nanoTime at the drop)
+ * tells one drop from the next.
+ */
+internal data class Settle(val key: String, val from: Offset, val page: Int, val x: Int, val y: Int, val token: Long)
+
+/** A glide not started within this long (its page was not on screen) is dropped. */
+internal const val SETTLE_STALE_NS = 1_000_000_000L
+
+/** How long a dropped icon takes to glide into place. */
+internal const val SETTLE_MS = 220
+
+/** The edge strip that turns the page while an item is dragged, and how long to hold it there. */
+internal const val EDGE_FLIP_DP = 40
+internal const val EDGE_FLIP_HOLD_MS = 400L
+
+/** Holding on at the edge turns again only after this pause (after the page has settled). */
+internal const val EDGE_FLIP_REPEAT_MS = 700L
+
+/** How far a finger may drift during the hold and still pick an icon up, in touch slops. */
+internal const val HOLD_DRIFT_SLOPS = 2f

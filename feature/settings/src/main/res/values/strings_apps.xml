@@ -12,6 +12,14 @@
     <string name="settings_notif_widget_count_number">As a number</string>
     <string name="settings_notif_widget_count_dot">As a dot</string>
     <string name="settings_notif_widget_count_none">No indicator</string>
+    <string name="settings_muted_channels">Muted channels</string>
+    <plurals name="settings_muted_channels_count">
+        <item quantity="one">%d channel muted from the notifications widget</item>
+        <item quantity="other">%d channels muted from the notifications widget</item>
+    </plurals>
+    <string name="settings_muted_channels_desc">These stay out of Folark\'s dots, status icons, widgets and live pill. Android\'s own notification shade still shows them.</string>
+    <string name="settings_muted_channels_unmute">Unmute</string>
+    <string name="settings_muted_channels_unmute_all">Unmute all</string>
     <string name="settings_search_contacts">Contacts in search</string>
     <string name="settings_search_contacts_desc">People show up when you search, with call and message buttons</string>
     <string name="settings_search_contacts_no_permission">Needs the contacts permission: turn it on again to allow it</string>
@@ -93,6 +101,17 @@
     <string name="settings_search_shortcuts">Search app shortcuts</string>
     <string name="settings_search_shortcuts_desc">Find actions such as “New tab” or “Compose”. Works while Folark is the default home app.</string>
     <string name="settings_search_web">Offer web search</string>
+    <string name="settings_search_web_engine">Web search engine</string>
+    <string name="settings_search_engine_system">Android\'s search</string>
+    <string name="settings_search_engine_google">Google</string>
+    <string name="settings_search_engine_duckduckgo">DuckDuckGo</string>
+    <string name="settings_search_engine_bing">Bing</string>
+    <string name="settings_search_engine_startpage">Startpage</string>
+    <string name="settings_search_files">Files and media in search</string>
+    <string name="settings_search_files_desc">Find a picture, video or sound by name and open it</string>
+    <string name="settings_search_documents">Documents too</string>
+    <string name="settings_search_documents_desc">PDFs, texts and downloads need Android\'s All files access: tap to turn it on or off there. Folark only reads file names, for search</string>
+    <string name="settings_search_files_no_permission">Needs access to files: turn it on again to allow it</string>
     <string name="settings_app_open_animation">App opening</string>
     <string name="settings_az_index_size">A-Z index bar size</string>
     <string name="settings_drawer_corner">Drawer corner radius</string>
@@ -156,4 +175,6 @@
     <string name="settings_pv_recents_motion">Cards</string>
     <string name="settings_pv_recents_press">Press</string>
     <string name="settings_pv_split">Split picker</string>
+    <string name="settings_hidden_lock">Lock hidden apps</string>
+    <string name="settings_hidden_lock_desc">\"Hidden apps\" at the end of the app list opens only after your fingerprint or screen lock</string>
 </resources>

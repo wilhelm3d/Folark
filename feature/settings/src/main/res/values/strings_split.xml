@@ -17,7 +17,6 @@
     <string name="settings_split_screen">Split screen</string>
     <string name="settings_split_screen_desc">Dragging an app to a screen edge, in Recents and from the taskbar</string>
     <string name="settings_split_engine">Split engine</string>
-    <string name="settings_split_engine_desc">How Folark puts two apps side by side. Automatic uses the Vector module when it runs in System UI, else Android\'s split commands.</string>
     <string name="settings_split_engine_intent">Automatic</string>
     <string name="settings_split_engine_classic">Commands</string>
     <string name="settings_split_engine_lsposed">Native</string>
@@ -111,7 +110,6 @@
     <string name="pair_schedule_row">Schedule:</string>
     <string name="pair_schedule_title">Schedule "%s"</string>
     <string name="pair_schedule_on">Come up at a set time</string>
-    <string name="pair_schedule_time">Time</string>
     <string name="pair_schedule_days_hint">Choose the weekdays — none chosen means every day</string>
     <string name="pair_schedule_every_day">Every day</string>
     <string name="pair_schedule_mon">Mon</string>
@@ -124,5 +122,7 @@
     <string name="pair_schedule_save">Save</string>
     <string name="pair_schedule_cancel">Cancel</string>
     <string name="pair_schedule_channel">Scheduled app pairs</string>
+    <string name="pair_schedule_notifications_off">Notifications are off for Folark: a pair that comes due while another app is open cannot be shown</string>
+    <string name="pair_schedule_notifications_allow">Allow</string>
     <string name="pair_schedule_due">Your scheduled pair is ready — tap to open it</string>
 </resources>

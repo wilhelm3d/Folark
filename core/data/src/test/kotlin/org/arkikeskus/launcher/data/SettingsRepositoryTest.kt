@@ -170,7 +170,7 @@ class SettingsRepositoryTest {
         assertThat(repo.settings.first().home.columns).isEqualTo(8)
 
         repo.setHomeColumns(99)
-        assertThat(repo.settings.first().home.columns).isEqualTo(SettingsRepository.MAX_COLUMNS)
+        assertThat(repo.settings.first().home.columns).isEqualTo(SettingsRepository.MAX_HOME_COLUMNS)
 
         repo.setHomeColumns(1)
         assertThat(repo.settings.first().home.columns).isEqualTo(SettingsRepository.MIN_COLUMNS)
@@ -185,7 +185,7 @@ class SettingsRepositoryTest {
         assertThat(repo.settings.first().home.rows).isEqualTo(8)
 
         repo.setHomeRows(99)
-        assertThat(repo.settings.first().home.rows).isEqualTo(SettingsRepository.MAX_ROWS)
+        assertThat(repo.settings.first().home.rows).isEqualTo(SettingsRepository.MAX_HOME_ROWS)
 
         repo.setHomeRows(1)
         assertThat(repo.settings.first().home.rows).isEqualTo(SettingsRepository.MIN_ROWS)

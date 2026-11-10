@@ -62,6 +62,28 @@ class RootShellTest {
         assertThat(RootShell.run("echo \"[\$X]\"")).isEqualTo("[]\n")
     }
 
+    // The shapes Folark's real root scripts have (RootTasks, SystemTaskbar, ModuleTools): they
+    // must run as written, not as the name of a program (a `timeout <command>` prefix broke them).
+    @Test fun `a command may start with a variable or a command substitution`() {
+        assertThat(RootShell.run("f=\$(echo hi); [ -n \"\$f\" ] && echo \"got \$f\"")).isEqualTo("got hi\n")
+        assertThat(RootShell.run("CLASSPATH=/x sh -c 'echo \$CLASSPATH'")).isEqualTo("/x\n")
+    }
+
+    @Test fun `a command may start with if or for`() {
+        assertThat(RootShell.run("if true; then echo yes; fi")).isEqualTo("yes\n")
+        assertThat(RootShell.run("for i in 1 2; do echo n\$i; done")).isEqualTo("n1\nn2\n")
+        assertThat(RootShell.run("echo still")).isEqualTo("still\n")
+    }
+
+    @Test fun `a multi-line script runs whole`() {
+        val script = """
+            U=${'$'}(echo 7 | tr -cd '0-9')
+            [ -n "${'$'}U" ] || U=0
+            echo "user=${'$'}U"
+        """.trimIndent()
+        assertThat(RootShell.run(script)).isEqualTo("user=7\n")
+    }
+
     @Test fun `switched off it never starts a shell`() {
         RootShell.enabled = false
         assertThat(RootShell.run("echo hi")).isNull()

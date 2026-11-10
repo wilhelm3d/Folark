@@ -13,6 +13,7 @@ import org.arkikeskus.launcher.data.search.ContentSearchProvider
 import org.arkikeskus.launcher.data.search.ContactDataSource
 import org.arkikeskus.launcher.data.search.ContactSearchProvider
 import org.arkikeskus.launcher.data.search.ContentResolverContactDataSource
+import org.arkikeskus.launcher.data.search.FileSearchProvider
 import org.arkikeskus.launcher.data.search.PermissionChecker
 import org.arkikeskus.launcher.data.search.SearchProvider
 import org.arkikeskus.launcher.data.search.SettingsSearchProvider
@@ -28,6 +29,7 @@ abstract class SearchModule {
     @Binds @IntoSet abstract fun shortcutProvider(p: ShortcutSearchProvider): SearchProvider
     @Binds @IntoSet abstract fun actionProvider(p: ActionSearchProvider): SearchProvider
     @Binds @IntoSet abstract fun contentProvider(p: ContentSearchProvider): SearchProvider
+    @Binds @IntoSet abstract fun fileProvider(p: FileSearchProvider): SearchProvider
 
     @Binds abstract fun contactDataSource(impl: ContentResolverContactDataSource): ContactDataSource
     @Binds abstract fun permissionChecker(impl: AndroidPermissionChecker): PermissionChecker

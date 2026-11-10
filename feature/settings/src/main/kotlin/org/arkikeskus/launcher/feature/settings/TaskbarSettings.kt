@@ -168,6 +168,14 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         )
         ExpressiveRowDivider()
         ExpressiveStepperRow(
+            title = stringResource(R.string.settings_taskbar_scene_slots),
+            value = s.taskbar.sceneSlots,
+            min = 0,
+            max = 4,
+            onValueChange = viewModel::setTaskbarSceneSlots,
+        )
+        ExpressiveRowDivider()
+        ExpressiveStepperRow(
             title = stringResource(R.string.settings_taskbar_recents),
             value = s.taskbar.recentCount,
             min = 0,

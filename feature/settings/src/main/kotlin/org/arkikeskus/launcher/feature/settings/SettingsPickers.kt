@@ -218,6 +218,14 @@ internal fun IconPackPicker(
                     .heightIn(max = 420.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
+                var query by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.settings_taskbar_search)) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -231,7 +239,8 @@ internal fun IconPackPicker(
                         fontSize = 16.sp,
                     )
                 }
-                packs.forEach { pack ->
+                packs.filter { query.isBlank() || it.label.contains(query.trim(), ignoreCase = true) }
+                    .forEach { pack ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

@@ -106,13 +106,18 @@ class RecentsViewModel @Inject constructor(
     // the ViewModel is destroyed. This prevents the launcher from competing for RAM during
     // low-memory situations (e.g. while gaming or during multitasking on low-RAM devices).
     private val memoryCallbacks = object : ComponentCallbacks2 {
+        // Android 14+ sends only these two levels. The cache is what makes Recents open fast, so
+        // it is not emptied just because Folark left the screen (UI_HIDDEN comes every time an
+        // app is opened from Recents): halved then, emptied only once Folark sits in the
+        // background, where Android may soon need the memory.
         override fun onTrimMemory(level: Int) {
             when {
-                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> cache.evictAll()
-                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> cache.trimToSize(cache.maxSize() / 2)
+                level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> cache.evictAll()
+                level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> cache.trimToSize(cache.maxSize() / 2)
             }
         }
         override fun onConfigurationChanged(newConfig: Configuration) = Unit
+        @Deprecated("Deprecated in Java")
         override fun onLowMemory() = cache.evictAll()
     }
 
@@ -612,14 +617,7 @@ class RecentsViewModel @Inject constructor(
                 firstOnRight = !left,
             )
             if (!formed) return@launch
-            if (splitCoordinator.snapPeek(peekOnLeft = left)) return@launch
-
-            delay(ATTACH_SETTLE_MS)
-            val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
-            val y = screen.exactCenterY()
-            val from = screen.exactCenterX()
-            val to = if (left) screen.left + screen.width() * safeFraction else screen.right - screen.width() * safeFraction
-            DividerDrag.drag(from, y, to, y)
+            peekInto(left, screen, peekFraction)
         }
     }
 
@@ -662,14 +660,27 @@ class RecentsViewModel @Inject constructor(
             if (card.tasks.size >= 3) {
                 if (SplitThree.ready(context) && SplitThree.snap(context, SplitThree.SNAP_THREE_PEEK)) return@launch
             }
-            if (splitCoordinator.snapPeek(peekOnLeft = left)) return@launch
-            delay(ATTACH_SETTLE_MS)
-            val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
-            val y = screen.exactCenterY()
-            val from = screen.exactCenterX()
-            val to = if (left) screen.left + screen.width() * safeFraction else screen.right - screen.width() * safeFraction
-            DividerDrag.drag(from, y, to, y)
+            peekInto(left, screen, peekFraction)
         }
+    }
+
+    /**
+     * Turns the split showing now into peek view, the app on the [left] side peeking in, the way
+     * Settings ▸ Recents ▸ Native peek says: on, System UI's own peek snap (Folark's module) first;
+     * off (the default), the divider dragged like a finger, which some ROMs handle far more
+     * reliably. Either way the other route is the fallback when the first one cannot be taken
+     * (no module; no root and no accessibility service to drag with).
+     */
+    private suspend fun peekInto(left: Boolean, screen: android.graphics.Rect, peekFraction: Float) {
+        val native = settings.value.recents.attachedNative
+        if (native && splitCoordinator.snapPeek(peekOnLeft = left)) return
+        delay(ATTACH_SETTLE_MS)
+        val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
+        val y = screen.exactCenterY()
+        val from = screen.exactCenterX()
+        val to = if (left) screen.left + screen.width() * safeFraction else screen.right - screen.width() * safeFraction
+        if (DividerDrag.drag(from, y, to, y)) return
+        if (!native) splitCoordinator.snapPeek(peekOnLeft = left)
     }
 
     fun toggleMute(card: RecentsCard) {

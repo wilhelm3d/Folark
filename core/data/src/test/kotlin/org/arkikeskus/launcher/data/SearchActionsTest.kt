@@ -44,4 +44,43 @@ class SearchActionsTest {
         assertThat(SearchActions.parse("12-3", now)).isEmpty()
         assertThat(SearchActions.parse("spotify", now)).isEmpty()
     }
+
+    private fun switch(q: String): Pair<String, String>? =
+        SearchActions.parse(q, now).singleOrNull { it.kind == SearchResult.Action.TOGGLE }
+            ?.let { it.args["setting"].orEmpty() to it.args["state"].orEmpty() }
+
+    @Test fun `switches read on and off wherever they stand`() {
+        // The words before the thing count as much as the words after it.
+        assertThat(switch("turn off the flashlight")).isEqualTo("flashlight" to "off")
+        assertThat(switch("turn on the flashlight")).isEqualTo("flashlight" to "on")
+        assertThat(switch("turn the flashlight off")).isEqualTo("flashlight" to "off")
+        assertThat(switch("torch on")).isEqualTo("flashlight" to "on")
+        assertThat(switch("flashlight")).isEqualTo("flashlight" to "toggle")
+        assertThat(switch("turn off do not disturb")).isEqualTo("dnd" to "off")
+        assertThat(switch("turn on dnd")).isEqualTo("dnd" to "on")
+        assertThat(switch("do not disturb")).isEqualTo("dnd" to "toggle")
+        assertThat(switch("switch off wifi")).isEqualTo("wifi" to "off")
+        assertThat(switch("disable bluetooth")).isEqualTo("bluetooth" to "off")
+        assertThat(switch("enable wi-fi")).isEqualTo("wifi" to "on")
+        assertThat(switch("auto-rotate off")).isEqualTo("rotation" to "off")
+        assertThat(switch("airplane mode")).isEqualTo("airplane" to "toggle")
+    }
+
+    @Test fun `rotation lock is auto-rotate the other way round`() {
+        assertThat(switch("rotation lock on")).isEqualTo("rotation" to "off")
+        assertThat(switch("turn off rotation lock")).isEqualTo("rotation" to "on")
+    }
+
+    @Test fun `brightness takes a number`() {
+        assertThat(switch("brightness 40")).isEqualTo("brightness" to "40")
+        assertThat(switch("set brightness to 70%")).isEqualTo("brightness" to "70")
+        assertThat(switch("brightness")).isEqualTo("brightness" to "")
+    }
+
+    @Test fun `ordinary searches are no switches`() {
+        assertThat(switch("spotify")).isNull()
+        assertThat(switch("the office")).isNull()
+        assertThat(switch("turn on x off")).isNull()
+        assertThat(switch("flashlight app")).isNull()
+    }
 }

@@ -241,7 +241,7 @@ internal fun GridSizeCard(
             title = stringResource(R.string.settings_columns) + " (" + stringResource(R.string.settings_home) + ")",
             value = s.home.columns,
             min = 3,
-            max = 8,
+            max = 10,
             onValueChange = { viewModel.setHomeColumns(it, screenType) },
         )
         ExpressiveRowDivider()
@@ -250,7 +250,7 @@ internal fun GridSizeCard(
             title = stringResource(R.string.settings_rows) + " (" + stringResource(R.string.settings_home) + ")",
             value = s.home.rows,
             min = 4,
-            max = 8,
+            max = 10,
             onValueChange = { viewModel.setHomeRows(it, screenType) },
         )
         ExpressiveRowDivider()

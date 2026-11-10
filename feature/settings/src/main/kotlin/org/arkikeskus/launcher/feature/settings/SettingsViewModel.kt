@@ -54,11 +54,6 @@ class SettingsViewModel @Inject constructor(
         _screenType.value = type
     }
 
-    /** Updates the target screen type to match the active physical screen (`LocalScreenType.current`). */
-    fun initScreenType(type: ScreenType) {
-        setScreenType(type)
-    }
-
     val settings: StateFlow<LauncherSettings> = _screenType.flatMapLatest { screenType ->
         repository.settings(screenType)
     }.stateIn(
@@ -80,6 +75,19 @@ class SettingsViewModel @Inject constructor(
     /** All launchable apps, for the hidden-apps manager list (already sorted by AppRepository). */
     val apps: StateFlow<List<AppItem>> = appRepository.apps
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Notification channels muted from the notifications widget (Settings ▸ Notifications). */
+    val hiddenChannels: StateFlow<List<org.arkikeskus.launcher.data.HiddenChannel>> = repository.hiddenChannelList
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun unmuteChannel(channel: org.arkikeskus.launcher.data.HiddenChannel) =
+        update { repository.setChannelHidden(channel.packageName, channel.channelId, hidden = false) }
+
+    fun unmuteAllChannels() = update { repository.clearHiddenChannels() }
+
+    /** An app's name for a package (any profile), or the package itself when it is not installed. */
+    fun appLabel(packageName: String): String =
+        apps.value.firstOrNull { it.packageName == packageName }?.label ?: packageName
 
     /** Keys currently hidden from the drawer. */
     val hiddenKeys: StateFlow<Set<String>> = repository.hiddenApps
@@ -183,6 +191,8 @@ class SettingsViewModel @Inject constructor(
     fun setFloatingWindowSize(value: String) = update { repository.setFloatingWindowSize(value) }
     fun setSearchShortcuts(value: Boolean) = update { repository.setSearchShortcuts(value) }
     fun setSearchWeb(value: Boolean) = update { repository.setSearchWeb(value) }
+    fun setSearchWebEngine(value: String) = update { repository.setSearchWebEngine(value) }
+    fun setSearchFiles(value: Boolean) = update { repository.setSearchFiles(value) }
     fun setAnimationSpeed(value: Float) = update { repository.setAnimationSpeed(value) }
     fun setAppOpenAnimation(value: String) = update { repository.setAppOpenAnimation(value) }
     fun setFolderOpenAnimation(value: String) = update { repository.setFolderOpenAnimation(value) }
@@ -199,9 +209,11 @@ class SettingsViewModel @Inject constructor(
     fun setClockWidgetGlassEffect(value: Boolean) = update { repository.setClockWidgetGlassEffect(value) }
     fun setWeatherWidgetAnimated(value: Boolean) = update { repository.setWeatherWidgetAnimated(value) }
     fun setWeatherAwakeSeconds(value: Int) = update { repository.setWeatherAwakeSeconds(value) }
+    fun setVideoAwakeSeconds(value: Int) = update { repository.setVideoAwakeSeconds(value) }
     fun setTaskbarEnabled(value: Boolean) = update { repository.setTaskbarEnabled(value) }
     fun setTaskbarPinned(keys: List<String>?) = update { repository.setTaskbarPinned(keys) }
     fun setTaskbarRecentCount(value: Int) = update { repository.setTaskbarRecentCount(value) }
+    fun setTaskbarSceneSlots(value: Int) = update { repository.setTaskbarSceneSlots(value) }
     fun setTaskbarIconSize(value: Int) = update { repository.setTaskbarIconSize(value) }
     fun setTaskbarIconSpacing(value: Int) = update { repository.setTaskbarIconSpacing(value) }
     fun setTaskbarBottomOffset(value: Int) = update { repository.setTaskbarBottomOffset(value) }
@@ -268,6 +280,8 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarLaunchGlow(value: String) = update { repository.setTaskbarLaunchGlow(value) }
     fun setDrawerTwoPane(value: Boolean) = update { repository.setDrawerTwoPane(value) }
     fun setDrawerAzHoldScroll(value: Boolean) = update { repository.setDrawerAzHoldScroll(value) }
+    fun setHiddenAppsLock(value: Boolean) = update { repository.setHiddenAppsLock(value) }
+    fun setAddNewApps(value: Boolean) = update { repository.setAddNewApps(value) }
     fun setSearchInlineShortcuts(value: Boolean) = update { repository.setSearchInlineShortcuts(value) }
     fun setSearchSettingsPages(value: Boolean) = update { repository.setSearchSettingsPages(value) }
     fun setRecentsMemoryBadge(value: Boolean) = update { repository.setRecentsMemoryBadge(value) }
@@ -539,15 +553,6 @@ class SettingsViewModel @Inject constructor(
     fun setStatusBarScrimOpacity(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setStatusBarScrimOpacity(value, screenType) }
 
     /** Flushes DataStore changes to disk, invalidates caches, re-emits settings, and notifies [onComplete]. */
-    fun applyAllSettings(onComplete: () -> Unit) {
-        viewModelScope.launch {
-            repository.flushDataStore()
-            appRepository.invalidateCaches()
-            _screenType.value = _screenType.value
-            onComplete()
-        }
-    }
-
     private companion object {
         const val DEFAULT_GLASS_BLUR = 18f
     }

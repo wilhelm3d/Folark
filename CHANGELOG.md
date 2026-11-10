@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+### Moving icons on home
+- The dragged icon keeps the spot it was picked up by and its real size (it used to jump to centre itself under the finger at a fixed 52 dp), and lifts with a short grow.
+- On drop the icon glides into its cell; dropped on App info, Uninstall, Split or the taskbar, or on a full dock, it glides back to where it was.
+- The cell it will land in is the one under the icon (not under the finger), shown as a faint outline of the icon that glides from cell to cell instead of a jumping white dot.
+- Turning the page while dragging: a wider edge strip (40 dp instead of 20) that turns after a short hold (0.4 s) and, held on, again after a pause, instead of at the first touch and straight on; the same for apps, folders, shortcuts and apps dragged in from the dock or the app list.
+- Picking up: a little finger drift during the hold no longer cancels it; in Edit home an icon moves as soon as it is dragged (no long-press), and home swipes pause while editing.
+- Home grid: up to 10 columns and 10 rows (was 8).
+
+### Energy (review, 10 November)
+- Taskbar: the music progress line is drawn again only when it has moved about a pixel (every 1–10 s instead of twice a second for as long as music plays), and not while the bar is hidden.
+- Notifications held for later delivery are saved a few seconds after the last change, not with every held message (each save rewrote the whole settings file); saved at once when the listener stops.
+- The hinge is read from its non-wake-up sensor where the phone has one (Android's default hinge sensor may wake the processor for each reading).
+- Recents: the glow on a picked card breathes four times and then rests, instead of redrawing every frame while Recents stays open.
+- Smartspace: the next calendar event is worked out from the widget's existing minute clock instead of a second, separate timer that woke the app every minute even with the screen off.
+- Timer rings on app icons (a running stopwatch or call) redraw only the ring each second instead of rebuilding the whole icon.
+
+### Adding and removing apps (redesign)
+- One "Remove…" in the long-press menu: a page with Remove from home (or from the dock), Hide from app list and Uninstall, each with a line saying what it does; Uninstall only for apps that can be uninstalled.
+- Undo instead of "are you sure": "Spotify removed from home · Undo" (also for the dock, hiding, and several apps at once); the app goes back to its own place.
+- A shorter long-press menu: App info, Split, Pop-up and Customize as an icon row on top; Rename, Change icon, Add to folder, Aspect ratio and the floating shortcut together on the Customize page.
+- Dragging an app shows Remove, Uninstall and App info at the top (home, dock and app list).
+- Add to home shows where it went: home jumps to the page and the icon pops in (a new page when home is full).
+- Edit home (long-press empty space ▸ Edit home): a minus on every icon, tap to select several, then Remove, put in a Folder, Move to another page, or Add apps from a list.
+- Hidden apps at the end of the app list, to open or show again; optionally behind the fingerprint (Settings ▸ App drawer ▸ Lock hidden apps).
+- Add new apps to home (Settings ▸ Home), and a dot under apps installed lately until they are opened.
+- The same words and icons everywhere: × for remove, an eye for hide, a bin for uninstall.
+
+### Fixes and checks (review, 10 November)
+- Root: commands run under a watchdog instead of a `timeout` prefix, which broke every root script starting with a variable, `if` or `for` (Recents screenshots, closing apps, keeping pinned apps alive, the system taskbar mode, the module log fallback) and could take the root shell down.
+- Scheduled pairs: Folark asks for notifications when a schedule is saved (Android 13+), and the schedule dialog says when they are off; a pair opens straight away only while a Folark screen is really in front (it could open over other apps); the next alarm is laid before the receiver finishes; alarms are re-laid only when a pair or its schedule changes.
+- Split picker: Swap really puts the picked app in the other half (and the size on the right app); no Swap for three apps.
+- Search switches: "turn off …", "… off", "switch off …", "disable …" all mean off (some did the opposite); Do Not Disturb and auto-rotate toggle properly; the flashlight follows its real state.
+- Recents ▸ Native peek (System UI) now does what it says: on, System UI's own peek first; off, the divider is dragged; each is the other's fallback.
+- Recents opens fast again: its screenshot cache is halved when Folark leaves the screen and emptied only in the background (Android 14+ emptied it on every app opened from Recents).
+- Drop-to-share on the taskbar: files from other apps are copied while the drop allows it and handed on from Folark, with a clear message when the source app keeps them locked.
+- Muted notification channels: listed in Settings ▸ Notifications with Unmute / Unmute all; muting and unmuting take effect at once, the live pill included.
+- Video background: "Video plays for" 15 s, 30 s (default), 2 min or Always (Settings ▸ Theme).
+- File search: pictures, videos and sounds; documents with "Documents too" (Android's All files access).
+- Clocks refresh when the screen comes on and when the time or time zone changes; the status bar keeps its last state while the drawer covers home; busy icon rings hand their spin over instead of freezing; app-usage scores survive a launch made right after a cold start.
+- Build: string resources are checked and the Settings search index is regenerated before every build (Gradle tasks `checkStrings` and `generateSettingsIndex`, no Python needed); a light `lint.xml`.
+- Tests for root scripts with `if`/`for`/variables, the search switches, and pair schedules on weekdays and daylight-saving days. Dead code, unused strings and icons, old settings names and compiler warnings removed.
+
 ### Efficiency and fixes (audit)
 - One hinge listener for all of Folark (HingeSensor): the live hinge effect, the hinge tilt of home and the wallpaper following the hinge share it, at the fastest rate any of them needs, and it stops when none does.
 - Weather widget: "Sky moves for" 15 s, 45 s (default), 2 min or Always (Settings ▸ Home screen ▸ Folark widgets).

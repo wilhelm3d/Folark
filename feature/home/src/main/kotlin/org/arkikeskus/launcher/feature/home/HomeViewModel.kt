@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.ui.AppEdits
 import org.arkikeskus.launcher.feature.home.taskbar.*
 import org.arkikeskus.launcher.feature.home.widgets.*
 import org.arkikeskus.launcher.feature.home.workspace.*
@@ -247,7 +248,7 @@ class HomeViewModel @Inject constructor(
     /** First-run seeding and package-event hygiene, split out (see HomeBootstrap.kt). Declared
      *  before the init block below, which starts both. */
     private val seeder = HomeSeeder(context, settingsRepository, homeLayoutRepository, appRepository)
-    private val hygiene = HomeHygiene(appRepository, homeLayoutRepository)
+    private val hygiene = HomeHygiene(appRepository, homeLayoutRepository, settingsRepository)
 
     init {
         // First-run experience (see [HomeSeeder]) and the quiet package-event hygiene
@@ -845,18 +846,90 @@ class HomeViewModel @Inject constructor(
     fun reorderDock(newOrder: List<AppItem>) =
         viewModelScope.launch { settingsRepository.reorderVisibleDock(newOrder.map { it.key }, _screenType.value) }
 
-    fun removeFromHome(appItem: AppItem) =
-        viewModelScope.launch { homeLayoutRepository.removeFromHome(appItem, _screenType.value) }
+    /** Takes [appItem] off home, with "… removed from home · Undo" (it goes back to its cell). */
+    fun removeFromHome(appItem: AppItem) = viewModelScope.launch {
+        val row = homeLayoutRepository.removeFromHome(appItem, _screenType.value) ?: return@launch
+        AppEdits.removedFromHome(appItem.label) {
+            viewModelScope.launch {
+                val s = settingsRepository.settings(ScreenType.valueOf(row.screenType)).first()
+                homeLayoutRepository.restore(row, s.home.columns, s.home.rows)
+            }
+        }
+    }
+
+    // ---- Edit home (several apps at once) ------------------------------------------------------
+
+    /** Takes [apps] off home together, with one "N apps removed from home · Undo". */
+    fun removeAll(apps: List<AppItem>) = viewModelScope.launch {
+        if (apps.isEmpty()) return@launch
+        val screen = _screenType.value
+        val rows = homeLayoutRepository.removeAllFromHome(apps, screen)
+        if (rows.isEmpty()) return@launch
+        val undo: () -> Unit = {
+            viewModelScope.launch {
+                val s = settingsRepository.settings(screen).first()
+                homeLayoutRepository.restoreAll(rows, s.home.columns, s.home.rows)
+            }
+        }
+        if (rows.size == 1) AppEdits.removedFromHome(apps.first().label, undo) else AppEdits.removedMany(rows.size, undo)
+    }
+
+    /** Puts [apps] (two or more, all on home) in a new folder at the first one's place. */
+    fun folderOf(apps: List<AppItem>, name: String) = viewModelScope.launch {
+        if (apps.size < 2) return@launch
+        val screen = _screenType.value
+        val id = homeLayoutRepository.createFolder(apps[0], apps[1], name, screen)
+        if (id < 0) return@launch
+        apps.drop(2).forEach { homeLayoutRepository.addToFolder(it, id, screen) }
+    }
+
+    /** Moves [apps] to [page] (a new page when it is one past the last) and shows them there. */
+    fun moveAllToPage(apps: List<AppItem>, page: Int) = viewModelScope.launch {
+        if (apps.isEmpty()) return@launch
+        val screen = _screenType.value
+        val s = settingsRepository.settings(screen).first()
+        val landed = homeLayoutRepository.moveAllToPage(apps, page, s.home.columns, s.home.rows, screen)
+        AppEdits.reveal(apps.last().key, landed, screen.name)
+    }
+
+    /** Adds [apps] to home (edit mode's "Add apps") and shows where the last one went. */
+    fun addAll(apps: List<AppItem>) = viewModelScope.launch {
+        if (apps.isEmpty()) return@launch
+        val screen = _screenType.value
+        val s = settingsRepository.settings(screen).first()
+        var page = 0
+        apps.forEach { page = homeLayoutRepository.addToHome(it, s.home.columns, s.home.rows, screen) }
+        AppEdits.reveal(apps.last().key, page, screen.name)
+    }
+
+    /** Hides [appItem] from the app list, with "… hidden · Undo". */
+    fun hideApp(appItem: AppItem) = viewModelScope.launch {
+        settingsRepository.setAppHidden(appItem.key, true)
+        AppEdits.hidden(appItem.label) {
+            viewModelScope.launch { settingsRepository.setAppHidden(appItem.key, false) }
+        }
+    }
 
     fun addToDock(appItem: AppItem) =
         viewModelScope.launch { settingsRepository.addToDock(appItem.key, _screenType.value) }
 
-    fun removeFromDock(appItem: AppItem) =
-        viewModelScope.launch { settingsRepository.removeFromDock(appItem.key, _screenType.value) }
+    /** Takes [appItem] off the dock, with "… removed from the dock · Undo" (back in its place). */
+    fun removeFromDock(appItem: AppItem) = viewModelScope.launch {
+        val screen = _screenType.value
+        val index = settingsRepository.dockKeys(screen).indexOf(appItem.key)
+        settingsRepository.removeFromDock(appItem.key, screen)
+        if (index < 0) return@launch
+        AppEdits.removedFromDock(appItem.label) {
+            viewModelScope.launch { settingsRepository.addToDockAt(appItem.key, index, screen) }
+        }
+    }
 
+    /** Puts [appItem] on home and shows it there (home jumps to its page, the icon pops in). */
     fun addToHome(appItem: AppItem) = viewModelScope.launch {
-        val s = settingsRepository.settings(_screenType.value).first()
-        homeLayoutRepository.addToHome(appItem, s.home.columns, s.home.rows, _screenType.value)
+        val screen = _screenType.value
+        val s = settingsRepository.settings(screen).first()
+        val page = homeLayoutRepository.addToHome(appItem, s.home.columns, s.home.rows, screen)
+        AppEdits.reveal(appItem.key, page, screen.name)
     }
 
     /** Moves/swaps a home shortcut; returns whether the repository accepted it (see [Workspace]). */

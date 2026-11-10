@@ -6,7 +6,6 @@
     <string name="settings_category_dock_taskbar_desc">Dock icons, labels and background</string>
     <string name="settings_category_app_drawer_desc">Look, layout, search and folders</string>
     <string name="settings_category_gestures_desc">Swipes, double tap and edge apps</string>
-    <string name="settings_category_appearance_desc">Dark mode, icons, Liquid Glass, fonts and animations</string>
     <string name="settings_category_notifications_desc">Dots, counts and notification previews</string>
     <string name="settings_category_permissions_desc">Default home app, notification access and more</string>
     <string name="settings_category_animations_desc">Fluid dynamic motion feedback, fold transitions, launch zoom &amp; page edge bounce</string>
@@ -25,14 +24,12 @@
     <string name="settings_copy_profile_done">Settings copied</string>
     <string name="settings_category_backup_desc">Save all settings to a file and restore them</string>
     <string name="settings_category_taskbar_desc">Apps on the bar, look, pull handles and split screen</string>
-    <string name="settings_preview_title">Live preview: follows every option on this page</string>
     <string name="settings_preview_folder">Folder</string>
     <string name="settings_preview_glass">Live glass</string>
     <string name="settings_preview_glass_values">Blur %1$d%% · Tint %2$d%%</string>
     <string name="settings_preview_widget">Widget</string>
     <string name="settings_preview_menu_info">App info</string>
     <string name="settings_preview_menu_widgets">Widgets</string>
-    <string name="settings_category_recents_desc">Open apps as cards, split screen and pop-ups</string>
     <string name="settings_category_root_desc">What root can do instead of ADB, each part on its own</string>
     <string name="settings_start">Start</string>
     <string name="settings_category_start_desc">Set-up status, quick switches and what\'s new</string>

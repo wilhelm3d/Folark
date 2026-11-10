@@ -43,7 +43,6 @@
     <string name="settings_dock_align_floating">Floating Card</string>
     <string name="settings_grid_dpi">Grid &amp; size</string>
     <string name="settings_dock_taskbar">Dock</string>
-    <string name="settings_display_screen_profiles">Displays &amp; folding</string>
     <string name="settings_page_bounce">Workspace Page Edge Bounce</string>
     <string name="settings_foldable_shared">Foldable</string>
     <string name="settings_folders">Folders</string>
@@ -99,6 +98,8 @@
     <string name="settings_hinge_tilt_desc">Half folded, home leans a little with the hinge</string>
     <string name="settings_home_video">Video background</string>
     <string name="settings_home_video_desc">A looping, silent video behind this display\'s home. It plays only while home is in view</string>
+    <string name="settings_video_awake">Video plays for</string>
+    <string name="settings_video_awake_desc">After coming back to home; then it rests on its last frame. Always: it keeps looping as long as home shows (uses more battery)</string>
     <string name="settings_gesture_recents">Folark Recents</string>
     <string name="settings_status_icons">Android\'s status bar icons</string>
     <string name="settings_status_icons_desc">Hide icons you don\'t need to see, like the VPN key or NFC</string>
@@ -113,4 +114,6 @@
     <string name="settings_unfold_animation_desc">When you open the phone, the home pages open out from the hinge</string>
     <string name="settings_folder_direct_apps">Open apps from the folder tile</string>
     <string name="settings_folder_direct_apps_desc">A tap on an app in the tile opens it straight away; the label, a free place or the \"+\" place opens the folder</string>
+    <string name="settings_add_new_apps">Add new apps to home</string>
+    <string name="settings_add_new_apps_desc">A newly installed app is put on home (both displays) at the first free place. New apps are marked with a dot in the app list until you open them</string>
 </resources>

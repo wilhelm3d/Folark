@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Only the clipboard history's pictures (see ClipboardHistoryRepository) and a setup being
-     shared to another phone (BackupRepository.shareableBackup) are ever handed out. -->
+     shared to another phone (BackupRepository.shareableBackup) and files dropped on a taskbar icon are ever handed out. -->
 <paths>
     <files-path name="clips" path="clips/" />
     <cache-path name="setup" path="setup/" />
+    <!-- Files dropped on a taskbar icon, copied so that app may read them (AppTaskbarShare). -->
+    <cache-path name="drops" path="drops/" />
 </paths>

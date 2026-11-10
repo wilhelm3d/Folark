@@ -51,7 +51,12 @@ internal class TaskbarMediaProgress(
         canvas.drawLine(start, y, end, y, track)
         canvas.drawLine(start, y, start + (end - start) * fraction.coerceIn(0f, 1f), y, played)
         removeCallbacks(tick)
-        if (isAttachedToWindow && media.state?.playing == true && dragFraction < 0f) postDelayed(tick, TICK_MS)
+        // Drawn again when the line has moved about a pixel (a song on a small tile moves one pixel
+        // every few seconds), within 1–10 s; not while the bar is hidden or the music paused.
+        if (isAttachedToWindow && isShown && media.state?.playing == true && dragFraction < 0f) {
+            val perPixel = if (end > start) total / (end - start).toDouble() else Double.MAX_VALUE
+            postDelayed(tick, perPixel.toLong().coerceIn(MIN_TICK_MS, MAX_TICK_MS))
+        }
     }
 
     override fun onDetachedFromWindow() {
@@ -84,6 +89,8 @@ internal class TaskbarMediaProgress(
     }
 
     private companion object {
-        const val TICK_MS = 500L
+        /** How often the line can move at most, and at least (a long podcast on a wide tile). */
+        const val MIN_TICK_MS = 1_000L
+        const val MAX_TICK_MS = 10_000L
     }
 }

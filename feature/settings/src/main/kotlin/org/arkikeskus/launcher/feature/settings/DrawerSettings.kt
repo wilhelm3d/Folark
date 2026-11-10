@@ -388,6 +388,14 @@ internal fun AppDrawerSection(
             shared = true,
         )
         ExpressiveRowDivider()
+        ExpressiveSwitchRow(
+            title = stringResource(R.string.settings_hidden_lock),
+            subtitle = stringResource(R.string.settings_hidden_lock_desc),
+            checked = s.drawer.hiddenLock,
+            onCheckedChange = viewModel::setHiddenAppsLock,
+            shared = true,
+        )
+        ExpressiveRowDivider()
 
         val newFolderName = stringResource(R.string.drawer_folder_default)
         val folderCreatedMsg = stringResource(R.string.settings_drawer_folder_created)

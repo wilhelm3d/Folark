@@ -36,5 +36,9 @@ gradlePlugin {
             id = "arkikeskus.android.feature"
             implementationClass = "AndroidFeatureConventionPlugin"
         }
+        register("repoChecks") {
+            id = "arkikeskus.repo.checks"
+            implementationClass = "RepoChecksConventionPlugin"
+        }
     }
 }

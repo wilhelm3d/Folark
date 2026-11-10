@@ -1,5 +1,8 @@
 package org.arkikeskus.launcher.ui
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -29,6 +32,18 @@ class HomeDragController {
     var source by mutableStateOf(DragSource.Home)
         private set
     var rootPosition by mutableStateOf(Offset.Zero)
+        private set
+
+    /**
+     * From the finger to the centre of the dragged icon (px). The floating icon keeps the spot it
+     * was grabbed by instead of centring itself under the finger (a grab by the label used to make
+     * it jump up). Zero for surfaces that don't set it.
+     */
+    var grabOffset by mutableStateOf(Offset.Zero)
+        private set
+
+    /** The dragged icon's size on the surface it came from, so the floating copy matches it. */
+    var iconSize by mutableStateOf(DEFAULT_ICON_SIZE)
         private set
 
     /**
@@ -84,12 +99,21 @@ class HomeDragController {
 
     /** Lift [app] (long-press) — menu shows; not yet "moving". [fromTab]: the drawer folder tab the
      *  drag started from, or null for the All tab (drawer drags only). */
-    fun start(app: AppItem, from: DragSource, root: Offset, fromTab: Long? = null) {
+    fun start(
+        app: AppItem,
+        from: DragSource,
+        root: Offset,
+        fromTab: Long? = null,
+        grab: Offset = Offset.Zero,
+        size: Dp = DEFAULT_ICON_SIZE,
+    ) {
         draggedApp = app
         source = from
         rootPosition = root
         moving = false
         dragFromTab = fromTab
+        grabOffset = grab
+        iconSize = size
     }
 
     fun update(root: Offset) {
@@ -104,6 +128,8 @@ class HomeDragController {
     fun stop() {
         draggedApp = null
         moving = false
+        grabOffset = Offset.Zero
+        iconSize = DEFAULT_ICON_SIZE
         hoverFolderTab = null
         dragFromTab = null
     }
@@ -113,6 +139,35 @@ class HomeDragController {
     fun isOverGrid(p: Offset): Boolean = !gridBounds.isEmpty && gridBounds.contains(p)
 
     fun isOverRemove(p: Offset): Boolean = !removeBounds.isEmpty && removeBounds.contains(p)
+
+    // "Uninstall" and "App info" next to Remove at the top while an app is dragged, as on Pixel
+    // (bounds published by HomeScreen while shown; zero when not shown, so they never catch a drop).
+    var uninstallBounds by mutableStateOf(Rect.Zero)
+    var infoBounds by mutableStateOf(Rect.Zero)
+
+    /** What those two do with the app (HomeScreen sets them; it has the Context). */
+    var onUninstall: ((AppItem) -> Unit)? = null
+    var onAppInfo: ((AppItem) -> Unit)? = null
+
+    fun isOverUninstall(p: Offset): Boolean = !uninstallBounds.isEmpty && uninstallBounds.contains(p)
+    fun isOverInfo(p: Offset): Boolean = !infoBounds.isEmpty && infoBounds.contains(p)
+
+    /**
+     * A drop of [app] at [p] on Uninstall or App info: does it and returns true; false when it
+     * landed elsewhere. Checked first wherever an app can be dropped (home, dock, drawer); the app
+     * itself stays where it was.
+     */
+    fun dropOnSystemTarget(app: AppItem, p: Offset): Boolean {
+        if (isOverUninstall(p)) {
+            onUninstall?.invoke(app)
+            return true
+        }
+        if (isOverInfo(p)) {
+            onAppInfo?.invoke(app)
+            return true
+        }
+        return false
+    }
 
     // The "Split" drop target next to the remove zone (bounds published by HomeScreen while it is
     // shown; [splitEnabled] mirrors the setting, so a stale rect can never catch a drop).
@@ -207,6 +262,11 @@ class HomeDragController {
     }
 
     var isDualPage by mutableStateOf(false)
+
+    companion object {
+        /** The floating icon's size when the surface does not give one (drawer, dock). */
+        val DEFAULT_ICON_SIZE = 52.dp
+    }
 
     /** Home cell (page, cellX, cellY) under [p] (root coords) — for a dock/drawer→home drop. */
     fun cellAt(p: Offset): Triple<Int, Int, Int> {

@@ -141,6 +141,8 @@ fun SplitPickerDrawer(
     share: Int? = null,
     pickedOnLeft: Boolean = false,
     onShareChange: (Int) -> Unit = {},
+    /** Flips which half the first app sits in, from the header's corner (null hides the symbol). */
+    onSwapSides: (() -> Unit)? = null,
     /** Offer the 67/33 · 50/50 · 33/67 sizes ([share] is still shown for [threeEven] alone). */
     sizes: Boolean = true,
     /** Offer 33/33/33 next to the sizes: [share] [SHARE_THREE] picks two more apps for three thirds. */
@@ -250,7 +252,9 @@ fun SplitPickerDrawer(
                     alpha = 1f - 0.7f * q
                 },
         ) {
-            if (pickCount > 1 || peek != null || share != null) {
+            // The header also comes for the Swap symbol alone, so a phone without the divider
+            // module can still choose which half its picks go to.
+            if (pickCount > 1 || peek != null || share != null || onSwapSides != null) {
                 Header(
                     text = if (pickCount > 1) stringResource(R.string.split_picker_choose_more, chosen.size, pickCount)
                     else stringResource(R.string.split_picker_choose),
@@ -259,6 +263,11 @@ fun SplitPickerDrawer(
                 ) {
                     // In the corner: how the screen is shared, 67/33 · 50/50 · 33/67 as on screen
                     // (picking one turns peek off).
+                    // In the corner with the sizes: swap which half the app being chosen goes to.
+                    if (onSwapSides != null) {
+                        SwapButton(onSwapSides)
+                        Spacer(Modifier.width(6.dp))
+                    }
                     if (share != null && (pickCount == 1 || share == SHARE_THREE)) {
                         ShareButtons(share, pickedOnLeft, peek == true, onShareChange, sizes, threeEven)
                     }
@@ -511,6 +520,47 @@ private fun PeekButton(on: Boolean, onClick: () -> Unit) {
         Text(
             label,
             color = if (on) ACCENT else Color.White.copy(alpha = 0.7f),
+            fontSize = 10.sp,
+            modifier = Modifier.padding(top = 1.dp),
+        )
+    }
+}
+
+/**
+ * "Swap" as a symbol in the size buttons' style: two panes with the bigger one changing sides,
+ * lit softly, with its label beneath. Tapping it puts the app being chosen in the other half.
+ */
+@Composable
+private fun SwapButton(onClick: () -> Unit) {
+    val label = stringResource(R.string.split_picker_swap)
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClickLabel = label, onClick = onClick)
+            .padding(2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            Modifier
+                .size(width = 38.dp, height = 22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White.copy(alpha = 0.06f))
+                .border(1.5.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                .padding(2.5.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Box(
+                Modifier.weight(0.34f).fillMaxHeight()
+                    .clip(RoundedCornerShape(2.5.dp)).background(Color.White.copy(alpha = 0.16f)),
+            )
+            Box(
+                Modifier.weight(0.66f).fillMaxHeight()
+                    .clip(RoundedCornerShape(2.5.dp)).background(Color.White.copy(alpha = 0.55f)),
+            )
+        }
+        Text(
+            label,
+            color = Color.White.copy(alpha = 0.7f),
             fontSize = 10.sp,
             modifier = Modifier.padding(top = 1.dp),
         )

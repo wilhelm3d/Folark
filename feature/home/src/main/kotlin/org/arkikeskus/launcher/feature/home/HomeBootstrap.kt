@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.home
 
+import kotlinx.coroutines.withTimeoutOrNull
 import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -79,6 +80,7 @@ internal class HomeSeeder(
 internal class HomeHygiene(
     private val appRepository: AppRepository,
     private val homeLayoutRepository: HomeLayoutRepository,
+    private val settingsRepository: SettingsRepository,
 ) {
     fun start(scope: CoroutineScope, onPackageEvent: (String) -> Unit) {
         // A package update can change a pinned shortcut's label/icon; drop its cached resolutions
@@ -94,9 +96,29 @@ internal class HomeHygiene(
                 homeLayoutRepository.removeAppRowsForPackage(pkg, serial)
             }
         }
+        // A newly installed app: marked "new" in the drawer until it is opened, and, with Settings ▸
+        // Home ▸ Add new apps to home, put on home (both displays). Its launcher entries are known
+        // only once the app list has been read again, so this waits for them (briefly).
+        scope.launch {
+            appRepository.packageAdditions.collect { (pkg, serial) ->
+                val added = withTimeoutOrNull(NEW_APP_WAIT_MS) {
+                    appRepository.apps.first { list -> list.any { it.packageName == pkg && it.userSerial == serial } }
+                }?.filter { it.packageName == pkg && it.userSerial == serial }.orEmpty()
+                if (added.isEmpty()) return@collect
+                settingsRepository.markNewApps(added.map { it.key })
+                for (screen in ScreenType.entries) {
+                    val s = settingsRepository.settings(screen).first()
+                    if (!s.home.addNewApps) break
+                    added.forEach { homeLayoutRepository.addToHome(it, s.home.columns, s.home.rows, screen) }
+                }
+            }
+        }
         scope.launch {
             appRepository.apps.first { it.isNotEmpty() } // let the app providers settle on a cold start
             homeLayoutRepository.removeStaleAppRows(appRepository::isAppInstalled)
         }
     }
 }
+
+/** How long a new install waits for its launcher entries to show up in the app list. */
+private const val NEW_APP_WAIT_MS = 15_000L

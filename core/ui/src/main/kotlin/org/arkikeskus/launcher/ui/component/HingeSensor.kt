@@ -52,7 +52,14 @@ object HingeSensor {
         if (!looked) {
             looked = true
             manager = context.applicationContext.getSystemService(SensorManager::class.java)
-            sensor = catching { manager?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE) }.getOrNull()
+            // The non-wake-up hinge sensor where the phone has one: Android's default for the
+            // hinge is the wake-up kind, whose every reading may wake the processor (and hold a
+            // short wake lock). Folark only reads the hinge while home is on screen, so readings
+            // that wait for an awake phone lose nothing.
+            sensor = catching {
+                manager?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE, false)
+                    ?: manager?.getDefaultSensor(Sensor.TYPE_HINGE_ANGLE)
+            }.getOrNull()
         }
         return sensor
     }

@@ -522,7 +522,8 @@ internal object SplitThreeHook {
             }
             return
         }
-        val active = layout ?: return reply(context, request, false, detail = "no split layout")
+        // Known to be there: [fits] above needs a layout.
+        val active: Any = layout
         val ok = catching {
             val algorithm = field(active, "mDividerSnapAlgorithm") ?: error("no DividerSnapAlgorithm")
             val leftRight = field(algorithm, "mIsLeftRightSplit") as? Boolean ?: true

@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.delay
 import java.io.File
 import org.arkikeskus.launcher.model.catching
 
@@ -28,7 +29,7 @@ internal fun isVideoBackground(path: String): Boolean =
  * cropped to fill the screen like a picture background.
  */
 @Composable
-internal fun VideoBackground(path: String, playing: Boolean, modifier: Modifier = Modifier) {
+internal fun VideoBackground(path: String, playing: Boolean, awakeSeconds: Int = 0, modifier: Modifier = Modifier) {
     val holder = remember(path) { VideoHolder(File(path)) }
     DisposableEffect(holder) { onDispose { holder.release() } }
     // Home in front: another app over it pauses the video.
@@ -37,7 +38,19 @@ internal fun VideoBackground(path: String, playing: Boolean, modifier: Modifier 
         resumed = true
         onPauseOrDispose { resumed = false }
     }
-    LaunchedEffect(holder, playing && resumed) { holder.setPlaying(playing && resumed) }
+    // A video backdrop is the most expensive thing home can draw (hardware decode + composition,
+    // for as long as it is visible). Like the weather sky, it plays for [awakeSeconds] after home
+    // comes back and then holds its last frame (Settings ▸ Theme ▸ Video plays for; 0 = always).
+    LaunchedEffect(holder, playing && resumed, awakeSeconds) {
+        val active = playing && resumed
+        holder.setPlaying(active)
+        if (active) {
+            if (awakeSeconds > 0) {
+                delay(awakeSeconds * 1_000L)
+                holder.setPlaying(false)
+            }
+        }
+    }
     AndroidView(
         factory = { context -> TextureView(context).also { holder.attach(it) } },
         modifier = modifier,
@@ -126,3 +139,4 @@ private class VideoHolder(private val file: File) : TextureView.SurfaceTextureLi
 }
 
 private val VIDEO_TYPES = setOf("mp4", "webm", "mkv", "3gp", "mov")
+

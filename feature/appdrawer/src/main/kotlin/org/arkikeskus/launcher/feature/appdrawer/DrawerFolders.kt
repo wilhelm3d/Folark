@@ -232,13 +232,21 @@ internal fun DrawerTabRow(
                 }
             }
             val fill by androidx.compose.animation.animateColorAsState(
-                targetValue = if (isSelected) accent else palette.btn,
+                targetValue = when {
+                    isSelected -> accent
+                    dropping   -> accent.copy(alpha = 0.22f)
+                    else       -> palette.btn
+                },
                 animationSpec = androidx.compose.animation.core.tween(180),
                 label = "tabFill",
             )
             Text(
                 text = name,
-                color = if (isSelected) Color.White else palette.text,
+                color = when {
+                    isSelected -> Color.White
+                    dropping   -> accent
+                    else       -> palette.text
+                },
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -254,7 +262,7 @@ internal fun DrawerTabRow(
                     .zIndex(if (id != null && liftedId == id) 1f else 0f)
                     .graphicsLayer {
                         val s = when {
-                            dropping -> 1.08f
+                            dropping -> 1.13f
                             id != null && liftedId == id -> 1.06f
                             else -> 1f
                         }
@@ -372,13 +380,21 @@ internal fun DrawerTabRail(
                 }
             }
             val fill by androidx.compose.animation.animateColorAsState(
-                targetValue = if (isSelected) accent else Color.Transparent,
+                targetValue = when {
+                    isSelected -> accent
+                    dropping   -> accent.copy(alpha = 0.22f)
+                    else       -> Color.Transparent
+                },
                 animationSpec = androidx.compose.animation.core.tween(220),
                 label = "tabRailFill",
             )
             Text(
                 text = name,
-                color = if (isSelected) Color.White else palette.text,
+                color = when {
+                    isSelected -> Color.White
+                    dropping   -> accent
+                    else       -> palette.text
+                },
                 fontSize = 15.sp,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -395,7 +411,7 @@ internal fun DrawerTabRail(
                     .zIndex(if (id != null && liftedId == id) 1f else 0f)
                     .graphicsLayer {
                         val s = when {
-                            dropping -> 1.04f
+                            dropping -> 1.08f
                             id != null && liftedId == id -> 1.03f
                             else -> 1f
                         }

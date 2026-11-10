@@ -54,14 +54,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -114,18 +112,11 @@ class SmartspaceViewModel @Inject constructor(
         }
     }
 
-    /** Re-picked every minute so an ended event flips to the next one without a provider change. */
-    val nextEvent: StateFlow<CalendarEvent?> =
-        combine(calendarRepository.events, minuteTicks()) { events, now -> NextEventPicker.pick(events, now) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    private fun minuteTicks(): Flow<Long> = flow {
-        while (true) {
-            val now = System.currentTimeMillis()
-            emit(now)
-            delay(60_000 - now % 60_000)
-        }
-    }
+    /**
+     * The calendar's coming events; the widget picks the ongoing or next one with its own minute
+     * clock (MinuteTicker), so an ended event flips to the next without a timer of its own here.
+     */
+    val events: StateFlow<List<CalendarEvent>> = calendarRepository.events
 
     init {
         refresh()
@@ -146,13 +137,15 @@ fun SmartspaceWidget(
     LaunchedEffect(screenType) { viewModel.setScreenType(screenType) }
     val context = LocalContext.current
     val hasPermission by viewModel.hasCalendarPermission.collectAsStateWithLifecycle()
-    val nextEvent by viewModel.nextEvent.collectAsStateWithLifecycle()
+    val events by viewModel.events.collectAsStateWithLifecycle()
     val hasLocationPermission by viewModel.hasLocationPermission.collectAsStateWithLifecycle()
     val showWeather by viewModel.showWeather.collectAsStateWithLifecycle()
     val weather by viewModel.weather.collectAsStateWithLifecycle()
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     MinuteTicker { now = it }
+    // Re-picked each minute (the clock's own tick): an ended event gives way to the next.
+    val nextEvent = remember(events, now) { NextEventPicker.pick(events, now) }
     LifecycleResumeEffect(Unit) {
         now = System.currentTimeMillis()
         viewModel.refresh()

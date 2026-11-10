@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -77,6 +78,7 @@ import org.arkikeskus.launcher.launcher.system.BatteryMonitor
 import org.arkikeskus.launcher.launcher.system.ConnectivityMonitor
 import org.arkikeskus.launcher.launcher.system.SignalMonitor
 import org.arkikeskus.launcher.launcher.system.SystemFlagsMonitor
+import org.arkikeskus.launcher.ui.component.LocalHomeCovered
 import org.arkikeskus.launcher.model.BatteryStatus
 import org.arkikeskus.launcher.model.MobileStatus
 import org.arkikeskus.launcher.model.SystemFlags
@@ -147,7 +149,18 @@ fun StatusBar(
     scrimAlpha: Float = 0.6f,
     viewModel: StatusViewModel = hiltViewModel(),
 ) {
-    val s by viewModel.state.collectAsStateWithLifecycle()
+    // Home stays composed behind the drawer; while it is covered, stop collecting the five system
+    // sources behind the bar (signal, Wi-Fi, notifications…) instead of keeping them registered.
+    // The last state stays on screen meanwhile, so the bar never comes back empty: it shows what it
+    // showed before and is brought up to date as soon as the sources answer again.
+    val covered = LocalHomeCovered.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val s by androidx.compose.runtime.produceState(viewModel.state.value, covered, lifecycle) {
+        if (covered) return@produceState
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            viewModel.state.collect { value = it }
+        }
+    }
     val colors = LocalLauncherColors.current
     val accent = colors.statusFlag
     val time = rememberClock()

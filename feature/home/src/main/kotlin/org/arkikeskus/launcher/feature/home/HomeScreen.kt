@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
+import org.arkikeskus.launcher.ui.RemoveChoices
+import org.arkikeskus.launcher.ui.R as UiR
 import org.arkikeskus.launcher.feature.home.taskbar.*
 import org.arkikeskus.launcher.feature.home.widgets.*
 import org.arkikeskus.launcher.feature.home.workspace.*
@@ -211,6 +213,30 @@ fun HomeScreen(
     // Page the workspace should show after a page was added or removed from the empty-area menu.
     val pageRequests = remember { MutableSharedFlow<Int>(extraBufferCapacity = 1) }
     val defaultFolderName = stringResource(R.string.folder_default_name)
+
+    // Edit home (several apps at once), and "show me where it went" after Add to home.
+    val homeEdit = remember { HomeEditState() }
+    var movingPage by remember { mutableStateOf(false) }
+    var addingApps by remember { mutableStateOf(false) }
+    LaunchedEffect(screenType) {
+        org.arkikeskus.launcher.ui.AppEdits.reveal.collect { r ->
+            if (r.screen != screenType.name) return@collect
+            pageRequests.tryEmit(r.page)
+            homeEdit.reveal(r.key)
+        }
+    }
+    // Leaving home (an app opens, the screen goes off) ends edit mode; so does Back.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_STOP) { homeEdit.stop() }
+    androidx.activity.compose.BackHandler(enabled = homeEdit.editing) { homeEdit.stop() }
+    // Uninstall and App info as drop targets (HomeDragController): they need a Context.
+    DisposableEffect(dragController, context) {
+        dragController.onUninstall = { app -> AppActions.uninstall(context, app) }
+        dragController.onAppInfo = { app -> AppActions.openAppInfo(context, app) }
+        onDispose {
+            dragController.onUninstall = null
+            dragController.onAppInfo = null
+        }
+    }
 
     val widgetHost = LocalAppWidgetHost.current
     val widgetConfigLauncher = LocalWidgetConfigLauncher.current
@@ -583,18 +609,20 @@ fun HomeScreen(
                 // All home gestures pause while the first-run intro covers the screen — this
                 // detector runs in the Initial pass on the ROOT, so it would otherwise catch a
                 // vertical swipe before the intro overlay could swallow it.
-                swipeUpAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.home.swipeUpAction,
-                swipeDownAction = if (showOnboarding) LauncherSettings.GESTURE_NONE else settings.home.swipeDownAction,
+                // Edit home pauses them too: there an icon moves as soon as it is dragged, so a
+                // swipe that starts on one must not open the drawer or the shade instead.
+                swipeUpAction = if (showOnboarding || homeEdit.editing) LauncherSettings.GESTURE_NONE else settings.home.swipeUpAction,
+                swipeDownAction = if (showOnboarding || homeEdit.editing) LauncherSettings.GESTURE_NONE else settings.home.swipeDownAction,
                 dragController = dragController,
                 onDrawerDrag = onDrawerDrag,
                 onDrawerSettle = onDrawerSettle,
                 onAction = ::executeAction,
                 // Left-edge action: a right-drag on the leftmost page launches the configured app.
-                leftEdgeEnabled = settings.home.leftSwipeAppKey.isNotBlank() && !showOnboarding,
+                leftEdgeEnabled = settings.home.leftSwipeAppKey.isNotBlank() && !showOnboarding && !homeEdit.editing,
                 atLeftEdge = { dragController.currentPage == 0 },
                 onLeftEdgeAction = viewModel::onLeftSwipe,
                 // Right-edge action: a left-drag on the rightmost page launches the configured app.
-                rightEdgeEnabled = settings.home.rightSwipeAppKey.isNotBlank() && !showOnboarding,
+                rightEdgeEnabled = settings.home.rightSwipeAppKey.isNotBlank() && !showOnboarding && !homeEdit.editing,
                 // Book layout: the pager rests on the left page of the last pair.
                 atRightEdge = {
                     dragController.currentPage + (if (dragController.isDualPage) 1 else 0) >= (uiState.pageCount - 1).coerceAtLeast(0)
@@ -602,7 +630,7 @@ fun HomeScreen(
                 onRightEdgeAction = viewModel::onRightSwipe,
                 // Swipe up on an app icon (Settings ▸ Gestures): instead of opening the drawer.
                 iconSwipeEnabled = settings.home.iconSwipeUpAction != LauncherSettings.ICON_SWIPE_NONE &&
-                    !settings.home.desktopLocked && !showOnboarding,
+                    !settings.home.desktopLocked && !showOnboarding && !homeEdit.editing,
                 onIconSwipe = { app, at ->
                     when (settings.home.iconSwipeUpAction) {
                         LauncherSettings.ICON_SWIPE_MENU -> {
@@ -687,6 +715,7 @@ fun HomeScreen(
                     unfold.snapTo(1f)
                 }
             }
+            CompositionLocalProvider(LocalHomeEdit provides homeEdit) {
             Workspace(
                 unfoldProgress = { unfold.value },
                 pageCount = uiState.pageCount,
@@ -797,6 +826,7 @@ fun HomeScreen(
                     // shift outward by a negligible ~8dp.
                     .padding(vertical = 12.dp),
             )
+            }
 
             // Show the dock whenever it's enabled — even with no favorites yet — so a fresh install
             // can be populated by dragging apps onto it (there is no "add to dock" menu item).
@@ -892,7 +922,19 @@ fun HomeScreen(
         LaunchedEffect(showFolderChips) {
             if (!showFolderChips) dragController.drawerTabBounds = emptyMap()
         }
-        if (showRemoveTarget || showSplitTarget || showFolderChips) {
+        // Uninstall and App info for any app being dragged (home, dock or drawer), as on Pixel;
+        // Uninstall only for an app that can be uninstalled.
+        val draggedApp = dragController.draggedApp
+        val showInfoTarget = dragController.moving && draggedApp != null && !dragController.localDragging
+        val canUninstallDragged = remember(draggedApp?.key) {
+            draggedApp?.let { AppActions.canUninstall(context, it) } ?: false
+        }
+        val showUninstallTarget = showInfoTarget && canUninstallDragged
+        LaunchedEffect(showInfoTarget, showUninstallTarget) {
+            if (!showInfoTarget) dragController.infoBounds = androidx.compose.ui.geometry.Rect.Zero
+            if (!showUninstallTarget) dragController.uninstallBounds = androidx.compose.ui.geometry.Rect.Zero
+        }
+        if (showRemoveTarget || showSplitTarget || showFolderChips || showInfoTarget) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -930,6 +972,30 @@ fun HomeScreen(
                         active = overRemove,
                         activeColor = Color(0xFFD32F2F),
                         modifier = Modifier.onGloballyPositioned { dragController.removeBounds = it.boundsInRoot() },
+                    )
+                }
+                if (showUninstallTarget) {
+                    val overUninstall by remember(dragController) {
+                        derivedStateOf { dragController.isOverUninstall(dragController.rootPosition) }
+                    }
+                    DragTargetPill(
+                        icon = LauncherIcons.Delete,
+                        label = stringResource(R.string.drag_uninstall),
+                        active = overUninstall,
+                        activeColor = Color(0xFFD32F2F),
+                        modifier = Modifier.onGloballyPositioned { dragController.uninstallBounds = it.boundsInRoot() },
+                    )
+                }
+                if (showInfoTarget) {
+                    val overInfo by remember(dragController) {
+                        derivedStateOf { dragController.isOverInfo(dragController.rootPosition) }
+                    }
+                    DragTargetPill(
+                        icon = LauncherIcons.Info,
+                        label = stringResource(R.string.drag_app_info),
+                        active = overInfo,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.onGloballyPositioned { dragController.infoBounds = it.boundsInRoot() },
                     )
                 }
                 if (showSplitTarget && splitZones.isEmpty()) {
@@ -999,6 +1065,47 @@ fun HomeScreen(
                 }
             }
         }
+        // Edit home: the bar at the bottom and its two dialogs.
+        val placedApps = uiState.entries.filterIsInstance<PlacedApp>()
+        fun selectedApps() = homeEdit.selected.mapNotNull { key -> placedApps.firstOrNull { it.app.key == key }?.app }
+        EditHomeBar(
+            edit = homeEdit,
+            onRemove = {
+                viewModel.removeAll(selectedApps())
+                homeEdit.selected.clear()
+            },
+            onFolder = {
+                viewModel.folderOf(selectedApps(), defaultFolderName)
+                homeEdit.selected.clear()
+            },
+            onMove = { movingPage = true },
+            onAdd = { addingApps = true },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+        if (movingPage) {
+            MoveToPageDialog(
+                pageCount = uiState.pageCount,
+                onPick = { page ->
+                    viewModel.moveAllToPage(selectedApps(), page)
+                    homeEdit.selected.clear()
+                    movingPage = false
+                },
+                onDismiss = { movingPage = false },
+            )
+        }
+        if (addingApps) {
+            val allApps by viewModel.allApps.collectAsStateWithLifecycle()
+            val onHome = placedApps.map { it.app.key }.toSet()
+            AddAppsDialog(
+                apps = allApps.filter { it.key !in onHome }.sortedBy { it.label.lowercase() },
+                onAdd = { picked ->
+                    viewModel.addAll(picked)
+                    addingApps = false
+                },
+                onDismiss = { addingApps = false },
+            )
+        }
+
         // Not-default reminder card: shown until ARK-launcher is the default home — but never under
         // the full first-run intro, which has its own set-as-default step.
         if (!isDefaultLauncher && !showOnboarding) {
@@ -1115,22 +1222,35 @@ fun HomeScreen(
             // Flip the popup above the icon when it's in the lower half (e.g. dock or a bottom-row
             // icon), so it never runs off the bottom of the screen. Decided where the anchor is built.
             preferAbove = menu.preferAbove,
-            actions = listOfNotNull(
-                PopupAction(stringResource(R.string.app_info), LauncherIcons.Info) { AppActions.openAppInfo(context, menu.app) },
-                if (settings.launch.aspectRatioMenu && AppActions.canOpenAspectRatio(context, menu.app)) {
-                    PopupAction(stringResource(org.arkikeskus.launcher.ui.R.string.app_aspect_ratio), LauncherIcons.SwapHoriz) {
-                        AppActions.openAspectRatio(context, menu.app)
-                    }
+            // The everyday actions as icons on top; how it looks on a Customize page; the ways to
+            // get rid of it together on a Remove page (each with undo, see AppEdits).
+            quickActions = listOfNotNull(
+                PopupAction(stringResource(UiR.string.popup_app_info), LauncherIcons.Info) { AppActions.openAppInfo(context, menu.app) },
+                if (settings.launch.splitEnabled) {
+                    PopupAction(stringResource(UiR.string.popup_split), LauncherIcons.SwapHoriz) { dragController.splitRequest = menu.app }
                 } else {
                     null
                 },
-                PopupAction(stringResource(R.string.rename), LauncherIcons.Edit) { renameTarget = menu.app },
+                if (settings.launch.floatingEnabled) {
+                    PopupAction(stringResource(UiR.string.popup_floating), LauncherIcons.OpenInNew) { viewModel.launchFloating(menu.app) }
+                } else {
+                    null
+                },
+            ),
+            customize = listOfNotNull(
                 PopupAction(stringResource(R.string.change_icon), LauncherIcons.SwapVert) {
                     dragController.iconPickRequest = menu.app
                 },
-                if (settings.launch.floatingEnabled) {
-                    PopupAction(stringResource(R.string.open_floating), LauncherIcons.OpenInNew) {
-                        viewModel.launchFloating(menu.app)
+                // A folder belongs to a screen: on home this only offers home folders. A dock item
+                // is not on home, so filing it would do nothing — hence the source check.
+                if (menu.source != DragSource.Dock) {
+                    PopupAction(stringResource(R.string.home_add_to_folder), LauncherIcons.Folder) { folderTarget = menu.app }
+                } else {
+                    null
+                },
+                if (settings.launch.aspectRatioMenu && AppActions.canOpenAspectRatio(context, menu.app)) {
+                    PopupAction(stringResource(UiR.string.app_aspect_ratio), LauncherIcons.SwapHoriz) {
+                        AppActions.openAspectRatio(context, menu.app)
                     }
                 } else {
                     null
@@ -1142,30 +1262,13 @@ fun HomeScreen(
                 } else {
                     null
                 },
-                if (settings.launch.splitEnabled) {
-                    PopupAction(stringResource(R.string.open_split), LauncherIcons.SwapHoriz) {
-                        dragController.splitRequest = menu.app
-                    }
-                } else {
-                    null
-                },
-                // A folder belongs to a screen: on home this only offers home folders. A dock item
-                // is not on home, so filing it would do nothing — hence the source check.
-                if (menu.source != DragSource.Dock) {
-                    PopupAction(stringResource(R.string.home_add_to_folder), LauncherIcons.Add) {
-                        folderTarget = menu.app
-                    }
-                } else {
-                    null
-                },
-                PopupAction(
-                    stringResource(if (menu.source == DragSource.Dock) R.string.dock_remove else R.string.home_remove),
-                    LauncherIcons.Close,
-                ) {
-                    if (menu.source == DragSource.Dock) viewModel.removeFromDock(menu.app)
-                    else viewModel.removeFromHome(menu.app)
-                },
-                PopupAction(stringResource(R.string.uninstall), LauncherIcons.Delete) { AppActions.uninstall(context, menu.app) },
+            ),
+            actions = emptyList(),
+            remove = RemoveChoices(
+                fromHome = if (menu.source != DragSource.Dock) ({ viewModel.removeFromHome(menu.app) }) else null,
+                fromDock = if (menu.source == DragSource.Dock) ({ viewModel.removeFromDock(menu.app) }) else null,
+                hide = { viewModel.hideApp(menu.app) },
+                uninstall = if (AppActions.canUninstall(context, menu.app)) ({ AppActions.uninstall(context, menu.app) }) else null,
             ),
             onDismiss = { menuTarget = null },
             onPinShortcut = { item -> viewModel.pinShortcut(item) },
@@ -1178,6 +1281,10 @@ fun HomeScreen(
             anchor = anchor,
             preferAbove = above,
             items = buildList {
+                // Edit home: select several apps, remove them, file them, move them, add more.
+                if (!settings.home.desktopLocked) {
+                    add(IconMenuItem(LauncherIcons.Edit, stringResource(R.string.home_options_edit)) { homeEdit.start() })
+                }
                 if (!settings.home.desktopLocked) {
                     add(IconMenuItem(R.drawable.ic_widgets, stringResource(R.string.home_options_widgets)) {
                         stackToAddTo = null

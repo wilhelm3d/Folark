@@ -144,6 +144,37 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
             marginEnd = dp(s.spacingDp) / 2
         })
     }
+    // A fixed scene slot with no scene yet: a dashed "+" that keeps the place (and says how to
+    // fill it) instead of letting the bar close the gap.
+    fun addSceneSlot() {
+        // On the light theme the tile is dark ink on a pale bar, so it stays visible.
+        val ink = if (lightTheme) 0 else 255
+        val slot = FrameLayout(context).apply {
+            contentDescription = context.getString(R.string.taskbar_scene_slot_empty)
+            background = GradientDrawable().apply {
+                cornerRadius = size * 0.28f
+                setColor(Color.argb(if (lightTheme) 28 else 20, ink, ink, ink))
+                setStroke(dp(1), Color.argb(if (lightTheme) 70 else 75, ink, ink, ink), dp(4).toFloat(), dp(4).toFloat())
+            }
+            addView(
+                TextView(context).apply {
+                    text = "+"
+                    // In pixels: the "+" follows the tile's size, not the font scale.
+                    setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, size * 0.42f)
+                    setTextColor(Color.argb(if (lightTheme) 170 else 180, ink, ink, ink))
+                    gravity = Gravity.CENTER
+                },
+                FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
+            )
+            setOnClickListener {
+                Toast.makeText(context, R.string.taskbar_scene_slot_empty, Toast.LENGTH_SHORT).show()
+            }
+        }
+        row.addView(slot, LinearLayout.LayoutParams(size, size).apply {
+            marginStart = dp(s.spacingDp) / 2
+            marginEnd = dp(s.spacingDp) / 2
+        })
+    }
     val showMedia = mediaShown(s)
     mediaWasShown = showMedia
     val controls = if (showMedia) mediaControlsView(s) else null
@@ -187,7 +218,14 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
     }
     if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_START) addMedia()
     s.pinned.forEachIndexed { i, app -> addIcon(app, i) }
-    s.pairs.forEach(::addPairIcon)
+    // Fixed scene slots keep their places at the start of the scene run, empty or not.
+    val slots = s.sceneSlots.coerceIn(0, MAX_SCENE_SLOTS)
+    if (slots > 0) {
+        repeat(slots) { i -> s.pairs.getOrNull(i)?.let(::addPairIcon) ?: addSceneSlot() }
+        s.pairs.drop(slots).forEach(::addPairIcon)
+    } else {
+        s.pairs.forEach(::addPairIcon)
+    }
     if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE) addMedia()
     val recentApps = recents.filter { r -> s.pinned.none { it.key == r.key } }
     val livePair = openPair
@@ -551,3 +589,6 @@ internal fun AppTaskbar.barButton(
 
 /** The bar keeps this far from each screen edge before its row scrolls. */
 private const val SCROLL_SIDE_MARGIN_DP = 16
+
+/** Settings offers 0–4 fixed scene slots. */
+private const val MAX_SCENE_SLOTS = 4

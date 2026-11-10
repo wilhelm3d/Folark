@@ -1,6 +1,8 @@
 package org.arkikeskus.launcher
 
 import android.app.Application
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -11,6 +13,7 @@ import org.arkikeskus.launcher.data.root.RootGrants
 import org.arkikeskus.launcher.data.root.RootFeatures
 import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.SettingsRepository
+import org.arkikeskus.launcher.data.AppUsageRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.shareIn
@@ -31,6 +34,8 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
 
     @Inject lateinit var settingsRepository: SettingsRepository
 
+    @Inject lateinit var appUsageRepository: AppUsageRepository
+
     @Inject @field:ApplicationScope
     lateinit var appScope: CoroutineScope
 
@@ -39,6 +44,20 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // The local crash log (Settings ▸ System ▸ Crash log): every uncaught exception lands in a
         // small on-device file, so a crash never needs adb to be read.
         org.arkikeskus.launcher.data.CrashLog.install(this)
+        // Which Folark screen is on screen, for scheduled pairs (open now, or notify instead).
+        org.arkikeskus.launcher.pairs.FolarkOnScreen.install(this)
+
+        // F7: app launches are written in one batch after a burst; write the rest when the
+        // launcher leaves the screen so a launch is never lost with the process.
+        registerComponentCallbacks(object : ComponentCallbacks2 {
+            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+            @Deprecated("Deprecated in Java")
+            override fun onLowMemory() = appUsageRepository.flush()
+            // UI_HIDDEN when Folark leaves the screen, BACKGROUND (and up) when it may be stopped.
+            override fun onTrimMemory(level: Int) {
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) appUsageRepository.flush()
+            }
+        })
 
         // FIX #4: share one upstream DataStore flow instead of opening four independent subscriptions.
         // Each settingsRepository.settings() call was a separate DataStore collector, meaning every

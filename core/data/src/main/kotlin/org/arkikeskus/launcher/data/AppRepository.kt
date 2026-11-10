@@ -46,6 +46,9 @@ interface AppRepository {
     /** See [LauncherAppsSource.packageRemovals]. */
     val packageRemovals: Flow<Pair<String, Long>>
 
+    /** See [LauncherAppsSource.packageAdditions] (none in fakes). */
+    val packageAdditions: Flow<Pair<String, Long>> get() = kotlinx.coroutines.flow.emptyFlow()
+
     /** The saved app scenes (pairs), as settings keep them. */
     val appPairs: Flow<List<AppPair>>
 
@@ -155,6 +158,8 @@ class AppRepositoryImpl @Inject constructor(
     /** See [LauncherAppsSource.packageRemovals]. */
     override val packageRemovals: Flow<Pair<String, Long>> get() = source.packageRemovals
 
+    override val packageAdditions: Flow<Pair<String, Long>> get() = source.packageAdditions
+
     /** See [LauncherAppsSource.isAppInstalled] (fail-safe: unknown → true). */
     override fun isAppInstalled(packageName: String, userSerial: Long): Boolean =
         source.isAppInstalled(packageName, userSerial)
@@ -172,8 +177,17 @@ class AppRepositoryImpl @Inject constructor(
         if (result.isSuccess) {
             if (haptic) Haptics.play(context, Haptics.Event.LAUNCH)
             scope.launch { appUsageRepository.recordLaunch(appItem.key) }
+            // Opened once: no longer marked new in the drawer (a store write only when it was).
+            if (appItem.key in newAppKeys) scope.launch { settingsRepository.clearNewApp(appItem.key) }
         }
         return result
+    }
+
+    /** The apps marked new (settingsRepository.newApps), kept here so a launch can check cheaply. */
+    @Volatile private var newAppKeys: Set<String> = emptySet()
+
+    init {
+        scope.launch { settingsRepository.newApps.collect { newAppKeys = it } }
     }
 
     override val appPairs: Flow<List<AppPair>> = settingsRepository.appPairs

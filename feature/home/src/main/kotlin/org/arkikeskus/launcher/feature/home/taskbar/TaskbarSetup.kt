@@ -103,6 +103,8 @@ internal data class TaskbarSetup(
     val nudgeSoftness: Float,
     /** Saved app pairs / trios pinned on the bar (ids from settings, then the pairs themselves). */
     val pairIds: List<String>,
+    /** Fixed scene slots at the start of the bar; 0 = just the pinned scenes. */
+    val sceneSlots: Int = 0,
     val pairs: List<AppPair> = emptyList(),
     /** The slim bar on the cover screen ([coverCount] apps), and the split menu's divider sizes. */
     val coverBar: Boolean = false,

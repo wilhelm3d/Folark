@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -248,8 +249,9 @@ fun Workspace(
     fun restPage(page: Int): Int = (if (isDualPage) page - page % 2 else page).coerceIn(0, lastLeftPage)
     val pagerState = rememberPagerState(initialPage = restPage(homePage ?: 0), pageCount = { lastPage + 1 })
     /** The page a step forward (+1) or back (-1) lands on; the book layout turns two pages at once. */
-    // Page edge for flipping while dragging: only when the icon is pushed against the screen edge.
-    val edgePx = with(density) { 20.dp.toPx() }
+    // Page edge for flipping while dragging: a strip at each side that turns the page after a short
+    // hold there (see the edge-flip effect below).
+    val edgePx = with(density) { EDGE_FLIP_DP.dp.toPx() }
     val grid = WorkspaceGrid(columns, rows, pageCount, lastPage, lastLeftPage, isDualPage, locked, edgePx, pagerState, ws)
     fun stepPage(direction: Int): Int = grid.stepPage(direction)
     // For the long-lived swipe detector, which must see the page count of the latest composition.
@@ -434,6 +436,15 @@ fun Workspace(
     } else {
         preferredIconSize
     }
+    // Where an app icon sits in its cell, for the floating icon, the drop preview and the glide in.
+    val iconPxNow = with(density) { cellIconSize.toPx() }
+    val iconDyNow = -with(density) { labelBlock.toPx() } / 2f
+    SideEffect {
+        ws.iconPx = iconPxNow
+        ws.iconDy = iconDyNow
+    }
+    // Edit home: an icon moves at once, so the book-layout page swipe must leave an icon touch alone.
+    val editingNow by rememberUpdatedState(org.arkikeskus.launcher.feature.home.LocalHomeEdit.current?.editing == true)
 
     // Client-side mirror of rectFitsForRow over the rendered entries, for the live drag placeholder.
     fun rectFreeOnGrid(excludeRowId: Long, page: Int, x: Int, y: Int, spanX: Int, spanY: Int): Boolean {
@@ -726,26 +737,77 @@ fun Workspace(
         snapshotFlow { pagerState.currentPage }
             .collect { dragController.currentPage = it.coerceIn(0, lastPage) }
     }
-    // Cross-page flip for a drawer→home / dock→home drag. The in-home icon and folder/shortcut drags
-    // run their own edge-flip (they own grid-local coords); a drawer/dock drag is owned by another
-    // surface and only feeds the controller a root position, so Workspace watches it here and advances
-    // the pager at the screen edges — letting an app be dropped straight onto any page.
-    LaunchedEffect(pagerState, pageCount, isDualPage, lastPage) {
-        snapshotFlow {
-            if (dragController.moving &&
-                (dragController.source == DragSource.Drawer || dragController.source == DragSource.Dock)
-            ) {
-                dragController.rootPosition
-            } else {
-                null
+    // The cell a drag would land in (page, x, y) — our own app drag and folder/shortcut moves use
+    // [targetCell]; an app from the dock or the drawer is worked out from the finger. Derived, so
+    // it changes only when the cell does, not with every finger move.
+    val ghostTarget by remember(isDualPage) {
+        derivedStateOf {
+            val tc = targetCell
+            when {
+                draggingLocal != null && localMoving && tc != null ->
+                    Triple(if (isDualPage) targetCellPage else pagerState.currentPage, tc.x, tc.y)
+                dragging != null && dragController.moving && tc != null ->
+                    if (dragController.isOverDock(dragController.rootPosition)) null
+                    else Triple(if (isDualPage) targetCellPage else pagerState.currentPage, tc.x, tc.y)
+                dragController.moving &&
+                    (dragController.source == DragSource.Dock || dragController.source == DragSource.Drawer) &&
+                    dragController.isOverGrid(dragController.rootPosition) -> {
+                    val (cellPage, cx, cy) = dragController.cellAt(dragController.rootPosition)
+                    Triple(if (isDualPage) cellPage else pagerState.currentPage, cx, cy)
+                }
+                else -> null
             }
-        }.collect { pos ->
-            if (pos == null || pagerState.isScrollInProgress) return@collect
-            val localX = pos.x - dragController.gridBounds.left
-            if (localX > gridSize.width - edgePx && stepPage(1) != pagerState.currentPage) {
-                pagerState.animateScrollToPage(stepPage(1))
-            } else if (localX < edgePx && pagerState.currentPage > 0) {
-                pagerState.animateScrollToPage(stepPage(-1))
+        }
+    }
+    // The preview's top-left (page px) and page; -1 while there is none. It glides between cells
+    // and appears in place (no glide in from the last drag or another page).
+    val ghostPos = remember { androidx.compose.animation.core.Animatable(Offset.Zero, Offset.VectorConverter) }
+    var ghostPage by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(cellW, cellH) {
+        snapshotFlow { ghostTarget }.collectLatest { g ->
+            if (g == null) {
+                ghostPage = -1
+                return@collectLatest
+            }
+            val to = Offset(g.second * cellW, g.third * cellH)
+            if (ghostPage != g.first) {
+                ghostPos.snapTo(to)
+                ghostPage = g.first
+            } else {
+                ghostPos.animateTo(to, spring(dampingRatio = 0.85f, stiffness = 1400f))
+            }
+        }
+    }
+
+    // Turning the page while something is dragged: hold it in the edge strip for a moment and the
+    // page turns once; keep holding and it turns again after a pause. One place for every drag — an
+    // app from home, a folder or shortcut, and an app coming from the dock or the drawer — instead of
+    // turning the moment the finger touched a thin strip (and again straight after).
+    LaunchedEffect(pagerState, pageCount, isDualPage, lastPage, edgePx) {
+        snapshotFlow {
+            val crossSurface = dragController.moving &&
+                (dragController.source == DragSource.Drawer || dragController.source == DragSource.Dock)
+            val p: Offset? = when {
+                dragging != null && dragController.moving -> dragPos
+                draggingLocal != null && localMoving -> localDragPos
+                crossSurface -> dragController.rootPosition - dragController.gridBounds.topLeft
+                else -> null
+            }
+            when {
+                p == null || p.y < 0f || p.y > gridSize.height -> 0
+                p.x > gridSize.width - edgePx -> 1
+                p.x < edgePx -> -1
+                else -> 0
+            }
+        }.collectLatest { direction ->
+            if (direction == 0) return@collectLatest
+            delay(EDGE_FLIP_HOLD_MS)
+            while (true) {
+                val next = currentStepPage(direction)
+                if (next == pagerState.currentPage) break
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                pagerState.animateScrollToPage(next)
+                delay(EDGE_FLIP_REPEAT_MS)
             }
         }
     }
@@ -867,6 +929,10 @@ fun Workspace(
                         val slop = viewConfiguration.touchSlop
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            // Edit home: a touch on an app moves the app, not the pages.
+                            if (editingNow && dragController.appAt?.invoke(dragController.gridBounds.topLeft + down.position) != null) {
+                                return@awaitEachGesture
+                            }
                             var total = Offset.Zero
                             var claimed = false
                             while (true) {
@@ -918,34 +984,21 @@ fun Workspace(
                         // Drop placeholder, drawn (not composed) so moving it across cells during a
                         // drag never triggers recomposition — keeps the drag smooth.
                         .drawBehind {
-                            var onThisPage = page == (if (isDualPage) targetCellPage else pagerState.currentPage) && cellW > 1f
-                            // Placeholder cell: our own in-home drag uses [targetCell]; a dock→home
-                            // drag (driven by the shared controller) computes it from the finger.
-                            val tc: IntOffset? = when {
-                                // Local relocation (folder or pinned shortcut) — stays on the grid.
-                                draggingLocal != null && localMoving -> targetCell
-                                // Our own home drag: hide the cell hint while hovering the dock.
-                                dragging != null && dragController.moving -> {
-                                    if (dragController.isOverDock(dragController.rootPosition)) null else targetCell
-                                }
-                                dragController.moving &&
-                                    (dragController.source == DragSource.Dock ||
-                                        dragController.source == DragSource.Drawer) &&
-                                    dragController.isOverGrid(dragController.rootPosition) -> {
-                                    val (cellPage, cx, cy) = dragController.cellAt(dragController.rootPosition)
-                                    if (isDualPage) onThisPage = page == cellPage && cellW > 1f
-                                    IntOffset(cx, cy)
-                                }
-                                else -> null
-                            }
-                            if (tc != null && onThisPage) {
-                                drawCircle(
-                                    color = Color.White.copy(alpha = 0.32f),
-                                    radius = 29.dp.toPx(),
-                                    center = Offset(
-                                        (tc.x + 0.5f) * cellW,
-                                        (tc.y + 0.5f) * cellH,
-                                    ),
+                            // The drop preview: a faint outline of the icon in the cell it would
+                            // land in, gliding from cell to cell (see [ghostPos]).
+                            if (ghostPage == page && cellW > 1f) {
+                                val gp = ghostPos.value
+                                val icon = ws.iconPx.takeIf { it > 0f } ?: 52.dp.toPx()
+                                val topLeft = Offset(
+                                    gp.x + (cellW - icon) / 2f,
+                                    gp.y + (cellH - icon) / 2f + ws.iconDy,
+                                )
+                                val box = androidx.compose.ui.geometry.Size(icon, icon)
+                                val corner = androidx.compose.ui.geometry.CornerRadius(icon * GHOST_CORNER)
+                                drawRoundRect(Color.White.copy(alpha = 0.22f), topLeft, box, corner)
+                                drawRoundRect(
+                                    Color.White.copy(alpha = 0.7f), topLeft, box, corner,
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx()),
                                 )
                             }
                         }
@@ -1126,3 +1179,6 @@ fun Workspace(
 private const val UNFOLD_SHIFT = 0.22f
 private const val UNFOLD_TILT_DEG = 14f
 private const val UNFOLD_SHRINK = 0.08f
+
+/** The drop preview's corner, as a share of the icon size. */
+private const val GHOST_CORNER = 0.3f

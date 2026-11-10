@@ -85,25 +85,25 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `initScreenType updates screen type for active physical screen`() = runTest {
+    fun `setScreenType updates screen type for active physical screen`() = runTest {
         val viewModel = createViewModel()
 
         // Initial screen type defaults to OUTER before initialization
         assertThat(viewModel.currentScreenType.value).isEqualTo(ScreenType.OUTER)
 
-        // initScreenType sets it to INNER
-        viewModel.initScreenType(ScreenType.INNER)
+        // setScreenType sets it to INNER
+        viewModel.setScreenType(ScreenType.INNER)
         assertThat(viewModel.currentScreenType.value).isEqualTo(ScreenType.INNER)
 
-        // initScreenType sets it back to OUTER
-        viewModel.initScreenType(ScreenType.OUTER)
+        // setScreenType sets it back to OUTER
+        viewModel.setScreenType(ScreenType.OUTER)
         assertThat(viewModel.currentScreenType.value).isEqualTo(ScreenType.OUTER)
     }
 
     @Test
     fun `dpi scaling setters update settings for selected screen type`() = runTest {
         val viewModel = createViewModel()
-        viewModel.initScreenType(ScreenType.OUTER)
+        viewModel.setScreenType(ScreenType.OUTER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
         viewModel.setDpiWorkspace(0.9f)
@@ -117,7 +117,7 @@ class SettingsViewModelTest {
         assertThat(settingsOuter.appearance.dpiAppDrawer).isEqualTo(1.1f)
         assertThat(settingsOuter.appearance.dpiSettings).isEqualTo(1.2f)
 
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         viewModel.setDpiWorkspace(1.3f)
 
         testScheduler.advanceUntilIdle()
@@ -129,7 +129,7 @@ class SettingsViewModelTest {
     @Test
     fun `inner tablet feature setters update settings for selected screen type`() = runTest {
         val viewModel = createViewModel()
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
         viewModel.setInnerDualPageWorkspace(true)
@@ -147,7 +147,7 @@ class SettingsViewModelTest {
     @Test
     fun `drawer dimensions and alignment setters update settings for selected screen type`() = runTest {
         val viewModel = createViewModel()
-        viewModel.initScreenType(ScreenType.OUTER)
+        viewModel.setScreenType(ScreenType.OUTER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
         viewModel.setDrawerHeightFraction(0.85f)
@@ -161,7 +161,7 @@ class SettingsViewModelTest {
         assertThat(outer.drawer.widthFraction).isEqualTo(0.75f)
         assertThat(outer.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_LEFT)
 
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         testScheduler.advanceUntilIdle()
 
         val defaultInner = viewModel.settings.value
@@ -184,7 +184,7 @@ class SettingsViewModelTest {
     @Test
     fun `glass blur radius and dark tint setters update settings for selected screen type`() = runTest {
         val viewModel = createViewModel()
-        viewModel.initScreenType(ScreenType.OUTER)
+        viewModel.setScreenType(ScreenType.OUTER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
         viewModel.setGlassBlurRadius(30f)
@@ -196,7 +196,7 @@ class SettingsViewModelTest {
         assertThat(outer.drawer.glassBlurRadius).isEqualTo(30f)
         assertThat(outer.drawer.glassDarkTint).isEqualTo(0.6f)
 
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         testScheduler.advanceUntilIdle()
 
         val defaultInner = viewModel.settings.value
@@ -216,7 +216,7 @@ class SettingsViewModelTest {
     @Test
     fun `azIndexPosition setter updates settings for selected screen type`() = runTest {
         val viewModel = createViewModel()
-        viewModel.initScreenType(ScreenType.OUTER)
+        viewModel.setScreenType(ScreenType.OUTER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
         viewModel.setAzIndexPosition(LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM)
@@ -225,7 +225,7 @@ class SettingsViewModelTest {
         val outer = viewModel.settings.value
         assertThat(outer.drawer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM)
 
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         testScheduler.advanceUntilIdle()
 
         val defaultInner = viewModel.settings.value
@@ -241,16 +241,16 @@ class SettingsViewModelTest {
     @Test
     fun `settingsForScreen returns settings for requested screen type independent of selected screen type`() = runTest {
         val viewModel = createViewModel()
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
         // Set DPI for OUTER screen
-        viewModel.initScreenType(ScreenType.OUTER)
+        viewModel.setScreenType(ScreenType.OUTER)
         viewModel.setDpiSettings(1.1f)
         testScheduler.advanceUntilIdle()
 
         // Set DPI for INNER screen
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         viewModel.setDpiSettings(1.4f)
         testScheduler.advanceUntilIdle()
 
@@ -266,7 +266,7 @@ class SettingsViewModelTest {
     @Test
     fun `animations and fluid motion setters update settings for selected screen type`() = runTest {
         val viewModel = createViewModel()
-        viewModel.initScreenType(ScreenType.OUTER)
+        viewModel.setScreenType(ScreenType.OUTER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
         viewModel.setAquamorphicTouchEnabled(false)
@@ -282,7 +282,7 @@ class SettingsViewModelTest {
         assertThat(outer.motion.appLaunchZoomEnabled).isFalse()
         assertThat(outer.home.pageBounceEnabled).isFalse()
 
-        viewModel.initScreenType(ScreenType.INNER)
+        viewModel.setScreenType(ScreenType.INNER)
         testScheduler.advanceUntilIdle()
 
         val defaultInner = viewModel.settings.value
@@ -506,16 +506,4 @@ class SettingsViewModelTest {
         assertThat(outer.home.pageBounceEnabled).isEqualTo(initialOuter.home.pageBounceEnabled)
     }
 
-    @Test
-    fun `applyAllSettings executes callback and flushes settings`() = runTest {
-        val viewModel = createViewModel()
-        var completed = false
-
-        viewModel.applyAllSettings {
-            completed = true
-        }
-
-        testScheduler.advanceUntilIdle()
-        assertThat(completed).isTrue()
-    }
 }
