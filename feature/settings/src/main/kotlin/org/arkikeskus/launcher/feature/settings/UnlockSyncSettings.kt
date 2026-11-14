@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import org.arkikeskus.launcher.data.ModulePrefs
 import org.arkikeskus.launcher.model.LauncherSettings
 
 /**
@@ -22,7 +23,7 @@ import org.arkikeskus.launcher.model.LauncherSettings
 internal fun UnlockSyncRow(s: LauncherSettings, viewModel: SettingsViewModel) {
     val context = LocalContext.current
     val seenAt = remember(s.motion.unlockSystemHook) {
-        context.getSharedPreferences(HOOK_PREFS, 0).getLong(UNLOCK_SEEN_AT, 0L)
+        context.getSharedPreferences(ModulePrefs.FILE, 0).getLong(ModulePrefs.UNLOCK_SEEN_AT, 0L)
     }
     val active = seenAt > 0L && System.currentTimeMillis() - seenAt < 7L * 24 * 3600 * 1000
     ExpressiveSwitchRow(
@@ -83,7 +84,3 @@ internal fun UnlockStyleRow(s: LauncherSettings, viewModel: SettingsViewModel) {
         }
     }
 }
-
-// Written by the app's RecentsHookState provider (same keys).
-private const val HOOK_PREFS = "folark_recents_hook"
-private const val UNLOCK_SEEN_AT = "unlock_seen_at"

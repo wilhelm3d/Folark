@@ -1,9 +1,6 @@
 package org.arkikeskus.launcher.recents
 
 import org.arkikeskus.launcher.data.LaunchOrigin
-import androidx.compose.ui.res.pluralStringResource
-import kotlinx.coroutines.delay
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.runtime.snapshotFlow
@@ -26,10 +23,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,10 +46,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -73,18 +64,13 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -104,8 +90,6 @@ import org.arkikeskus.launcher.ui.component.pressClick
 import org.arkikeskus.launcher.ui.component.PressStyle
 import org.arkikeskus.launcher.ui.component.LocalPressStyle
 import androidx.compose.runtime.CompositionLocalProvider
-import org.arkikeskus.launcher.ui.component.recentsEnter
-import org.arkikeskus.launcher.ui.component.recentsSelect
 import org.arkikeskus.launcher.ui.component.rememberRecentsBackdrop
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -126,16 +110,6 @@ internal fun slotLabels(count: Int, thirdInSplit: Boolean): List<Int> = when {
 
 internal const val MAX_PICK = 4
 
-/** Themes whose cards scroll sideways and so run to the screen's edges. */
-private val EDGE_TO_EDGE_THEMES = setOf(
-    LauncherSettings.RECENTS_THEME_IPAD,
-    LauncherSettings.RECENTS_THEME_CAROUSEL,
-    LauncherSettings.RECENTS_THEME_DECK,
-    LauncherSettings.RECENTS_THEME_ARC,
-    LauncherSettings.RECENTS_THEME_PORTRAIT,
-    LauncherSettings.RECENTS_THEME_SPOTLIGHT,
-    LauncherSettings.RECENTS_THEME_GALLERY,
-)
 
 /** Everything a Recents theme needs to draw its cards and answer touches. */
 internal class RecentsEnv(
@@ -256,37 +230,10 @@ internal fun RecentsScreen(
     /** The margin at the screen's sides (title, buttons, grid and list themes). */
     val side = if (wide) 28.dp else 16.dp
 
-    var selecting by remember { mutableStateOf(false) }
-    val picked = remember { mutableStateListOf<RecentsCard>() }
-    /**
-     * How the picked apps open (chips on the picking bar): opens by itself once [openAt] are
-     * picked — two side by side, three in a three-way split, or two as peek view ([peekPick]);
-     * 0 = pick freely and press Open.
-     */
-    var openAt by remember { mutableIntStateOf(2) }
-    var peekPick by remember { mutableStateOf(false) }
-    /** P3: three apps picked for peek view; which one shows big is chosen by tapping it. */
-    var peekBig by remember { mutableStateOf<RecentsCard?>(null) }
-    LaunchedEffect(picked.size, openAt, peekPick, peekBig) {
-        if (peekPick && openAt >= 3 && picked.size >= 3 && peekBig == null) return@LaunchedEffect
-        if (openAt > 0 && picked.size >= openAt) {
-            delay(220)
-            val chosen = picked.toList()
-            when {
-                peekPick && chosen.size >= 3 -> {
-                    // The chosen big app first (it opens in the middle), the others at the edges.
-                    val big = peekBig ?: chosen[0]
-                    onPeekThree(listOf(big) + chosen.filter { it.key != big.key })
-                    peekBig = null
-                }
-                peekPick -> onPeek(chosen[0], chosen[1])
-                openAt >= 3 -> onOpenThree(chosen)
-                else -> onOpenTogether(chosen)
-            }
-            openAt = 2
-            peekPick = false
-        }
-    }
+    // Picking apps for a split view, and opening them once enough are picked (RecentsChrome.kt).
+    val picking = remember { RecentsPicking() }
+    val selecting = picking.selecting
+    OpenWhenPicked(picking, onOpenTogether, onOpenThree, onPeek, onPeekThree)
     /** Peek view takes three apps (Motorola's three-app peek, through the module) where it can. */
     val peekContext = LocalContext.current
     val moduleReady = remember { org.arkikeskus.launcher.data.SplitThree.ready(peekContext) }
@@ -326,11 +273,11 @@ internal fun RecentsScreen(
         corner = settings.recents.cornerDp.dp,
         canClose = state.root && settings.recents.rootClose,
         selecting = selecting,
-        picked = picked,
+        picked = picking.picked,
         drag = drag,
         glass = glass,
         onTap = { card ->
-            if (!selecting) {
+            if (!picking.selecting) {
                 // The app grows out of this card as it comes back.
                 drag.bounds[card.key]?.let { r ->
                     val at = IntArray(2)
@@ -344,20 +291,20 @@ internal fun RecentsScreen(
                     )
                 }
                 onOpen(card)
+            } else {
+                picking.tap(card)
             }
-            else if (card in picked) picked.remove(card)
-            else if ((if (openAt > 0) openAt else MAX_PICK) > picked.size && !card.isSplit) picked.add(card)
         },
         onClose = onClose,
-        onSplit = { card -> selecting = true; openAt = 2; peekPick = false; picked.clear(); picked.add(card) },
+        onSplit = { card -> picking.start(card, count = 2, peek = false) },
         onPopUp = onPopUp,
         onUnsplit = onUnsplit,
         onCombine = onCombine,
         onAppInfo = onAppInfo,
         onTogglePin = onTogglePin,
         menu = menu,
-        onSplitThree = { card -> selecting = true; peekPick = false; picked.clear(); picked.add(card); openAt = 3 },
-        onPeekPick = { card -> selecting = true; peekPick = true; picked.clear(); picked.add(card); openAt = peekCount },
+        onSplitThree = { card -> picking.start(card, count = 3, peek = false) },
+        onPeekPick = { card -> picking.start(card, count = peekCount, peek = true) },
         onPeekSplit = onPeekSplit,
         onCloseAll = onCloseAll,
         onSavePair = onSavePair,
@@ -379,7 +326,7 @@ internal fun RecentsScreen(
         when {
             menu.isOpen -> menu.close()
             drag.card != null -> drag.cancel()
-            else -> { selecting = false; openAt = 2; peekPick = false; picked.clear() }
+            else -> picking.cancel()
         }
     }
     // Leaving with Android's back gesture: the cards shrink back with the finger, then Recents
@@ -409,7 +356,7 @@ internal fun RecentsScreen(
             .drawBehind { drawRect(Color(0xFF05090A).copy(alpha = settings.recents.backdropDim * backdrop())) }
             // A tap on empty space goes back home.
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                if (selecting) { selecting = false; openAt = 2; peekPick = false; picked.clear() } else onDismiss()
+                if (picking.selecting) picking.cancel() else onDismiss()
             },
     ) {
         Box(
@@ -419,169 +366,15 @@ internal fun RecentsScreen(
                 .padding(vertical = 16.dp),
         ) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                // ---------------------------------------------------------------- header
-                Row(
-                    Modifier.padding(horizontal = side),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.recents_title), color = Ink, fontSize = if (wide) 40.sp else 32.sp, fontWeight = FontWeight.Bold)
-                        val count = state.cards.sumOf { it.tasks.size }
-                        Text(
-                            when {
-                                state.loading -> stringResource(R.string.recents_loading)
-                                count == 0 -> stringResource(R.string.recents_nothing_open)
-                                drag.card != null -> stringResource(R.string.recents_drag_hint)
-                                else -> stringResource(R.string.recents_count, count)
-                            },
-                            color = Muted, fontSize = 12.sp, fontFamily = Mono,
-                        )
-                    }
-                    if (state.cards.size >= 2 && (settings.recents.btnSplitView || selecting)) {
-                        Pill(
-                            text = stringResource(if (selecting) R.string.recents_cancel else R.string.recents_split_view),
-                            color = if (selecting) onAccent else accent,
-                            background = if (selecting) accent else Color.Transparent,
-                            filled = selecting,
-                            glass = glass,
-                            onClick = { selecting = !selecting; picked.clear() },
-                        )
-                    }
-                    if (state.cards.isNotEmpty() && !selecting && settings.recents.btnCloseAll) {
-                        Pill(
-                            text = stringResource(
-                                when {
-                                    confirmAll -> R.string.recents_close_all_confirm
-                                    state.cards.any { it.pinned } && !state.root -> R.string.recents_close_all_pins_too
-                                    state.cards.any { it.pinned } -> R.string.recents_close_others
-                                    else -> R.string.recents_close_all
-                                },
-                            ),
-                            color = onAccent, background = accent, filled = true, glass = false,
-                            onClick = {
-                                if (settings.recents.confirmCloseAll && !confirmAll) confirmAll = true
-                                else { confirmAll = false; onCloseAll() }
-                            },
-                        )
-                    }
-                }
-
-                // ---------------------------------------------------------------- body
-                // Rows of cards (iPad, Carousel, Deck) run to the screen's edges; the rest keep the margin.
-                val edgeToEdge = settings.recents.theme in EDGE_TO_EDGE_THEMES
-                val ticks = rememberScrollTicks(settings.recents.scrollTicks)
-                Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (edgeToEdge) 0.dp else side).then(ticks)) {
-                    when {
-                        !state.canList -> NeedsGrant(accent)
-                        state.unreadable -> Text(
-                            stringResource(R.string.recents_unreadable),
-                            color = Muted, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center),
-                        )
-                        !state.loading && state.cards.isEmpty() -> Text(
-                            stringResource(R.string.recents_nothing_open_long),
-                            color = Muted, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center),
-                        )
-                        else -> when (settings.recents.theme) {
-                            LauncherSettings.RECENTS_THEME_IPAD -> IpadTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_CAROUSEL -> CarouselTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_DECK -> DeckTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_COMPACT -> CompactTheme(state.cards, env, if (wide) settings.recents.columnsInner.coerceAtMost(3) else 1)
-                            LauncherSettings.RECENTS_THEME_SWITCHER -> SwitcherTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_STACK -> StackTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_ARC -> ArcTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_PORTRAIT -> PortraitTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_SPOTLIGHT -> SpotlightTheme(state.cards, env)
-                            LauncherSettings.RECENTS_THEME_GALLERY -> GalleryTheme(state.cards, env)
-                            else -> FolarkTheme(state.cards, env, if (wide) settings.recents.columnsInner else settings.recents.columnsOuter)
-                        }
-                    }
-                }
+                RecentsHeader(
+                    state = state, settings = settings, picking = picking, dragging = drag.card != null,
+                    wide = wide, side = side, accent = accent, onAccent = onAccent, glass = glass,
+                    confirmAll = confirmAll, onConfirmAll = { confirmAll = it }, onCloseAll = onCloseAll,
+                )
+                RecentsCardsArea(state, settings, env, wide, side, accent, Modifier.weight(1f))
             }
-
-            // ---------------------------------------------------------------- split view bar
             if (selecting) {
-                val labels = slotLabels(picked.size, settings.recents.thirdInSplit)
-                Column(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = side),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                // How the picked apps open: the chosen one is filled; each opens by itself when enough are picked.
-                Row(
-                    Modifier
-                        .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
-                        .padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    val modes = buildList {
-                        add(Triple(R.string.recents_mode_two, 2, false))
-                        if (settings.launch.threeAppSplit) add(Triple(R.string.recents_mode_three, 3, false))
-                        add(Triple(R.string.recents_mode_peek, peekCount, true))
-                        add(Triple(R.string.recents_mode_free, 0, false))
-                    }
-                    modes.forEach { (label, count, peek) ->
-                        val on = openAt == count && peekPick == peek
-                        Pill(
-                            text = stringResource(label),
-                            color = if (on) onAccent else Ink,
-                            background = if (on) accent else Color.White.copy(alpha = 0.08f),
-                            filled = true, glass = false,
-                            // Peek as a symbol: one big pane, the others peeking in at the edges.
-                            glyph = if (peek) ({ c -> PeekGlyph(c, three = count >= 3) }) else null,
-                            onClick = {
-                                openAt = count
-                                peekPick = peek
-                                // Peek view and two side by side take two: keep the first two picked.
-                                while (count in 1 until picked.size) picked.removeAt(picked.lastIndex)
-                            },
-                        )
-                    }
-                }
-                if (peekPick && openAt >= 3 && picked.size >= 3) {
-                    // P3: which app shows big in the middle — tap it.
-                    Row(
-                        Modifier
-                            .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(stringResource(R.string.recents_pick_peek_which), color = accent, fontSize = 13.sp)
-                        picked.toList().forEach { card ->
-                            Box(Modifier.clip(RoundedCornerShape(12.dp)).clickable { peekBig = card }.padding(4.dp)) {
-                                AppBadge(card.apps.firstOrNull(), 36.dp)
-                            }
-                        }
-                    }
-                }
-                Row(
-                    Modifier
-                        .recentsSurface(RoundedCornerShape(999.dp), glass, false, accent, solid = Color(0xEB0B1214))
-                        .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Text(
-                        if (peekPick && openAt >= 3 && picked.size < 3) stringResource(R.string.recents_pick_peek_three)
-                        else if (peekPick && picked.size < 2) stringResource(R.string.recents_pick_peek)
-                        else if (openAt > 0 && picked.size < openAt) pluralStringResource(R.plurals.recents_pick_more, openAt - picked.size, openAt - picked.size)
-                        else if (picked.isEmpty()) stringResource(R.string.recents_pick_hint)
-                        else picked.mapIndexed { i, c -> "${stringResource(labels[i])} · ${c.label}" }.joinToString("   "),
-                        color = accent, fontFamily = Mono, fontSize = 13.sp, maxLines = 2,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (openAt == 0) {
-                        Pill(
-                            text = stringResource(R.string.recents_open_together),
-                            color = onAccent, background = if (picked.size >= 2) accent else accent.copy(alpha = 0.35f), filled = true, glass = false,
-                            onClick = { if (picked.size >= 2) onOpenTogether(picked.toList()) },
-                        )
-                    }
-                }
-                }
+                SplitViewBar(picking, settings, peekCount, side, accent, onAccent, glass, onOpenTogether)
             }
         }
 
@@ -970,7 +763,7 @@ internal fun PinGlyph(color: Color) {
  * [TICK_STEP] scrolled, in any theme (they all scroll through nested scrolling).
  */
 @Composable
-private fun rememberScrollTicks(on: Boolean): Modifier {
+internal fun rememberScrollTicks(on: Boolean): Modifier {
     if (!on) return Modifier
     val view = androidx.compose.ui.platform.LocalView.current
     val step = with(LocalDensity.current) { TICK_STEP.toPx() }
@@ -1174,7 +967,7 @@ private fun SmallAction(text: String, accent: Color, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Pill(
+internal fun Pill(
     text: String,
     color: Color,
     filled: Boolean,
@@ -1236,7 +1029,7 @@ internal fun CrossGlyph(color: Color) {
 
 /** Without the one-time DUMP grant Android won't say what is open: how to give it. */
 @Composable
-private fun NeedsGrant(accent: Color) {
+internal fun NeedsGrant(accent: Color) {
     val context = LocalContext.current
     val command = remember { ShellSplit.grantCommand(context.packageName) }
     Column(

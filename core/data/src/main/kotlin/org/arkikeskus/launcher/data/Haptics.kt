@@ -1,7 +1,6 @@
 package org.arkikeskus.launcher.data
 
 import org.arkikeskus.launcher.model.MotionSettings
-
 import android.content.Context
 import android.os.Build
 import android.os.VibrationAttributes
@@ -42,7 +41,8 @@ object Haptics {
         DROP,
     }
 
-    /** The current settings, kept up to date by the app (LauncherApplication). */
+    /** The current settings, kept up to date by the app (LauncherApplication). Process-wide on
+     *  purpose: haptics play from views, overlay windows and services that have no object graph. */
     @Volatile
     var settings: MotionSettings = MotionSettings()
 

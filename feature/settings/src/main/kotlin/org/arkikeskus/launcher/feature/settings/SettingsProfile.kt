@@ -40,7 +40,7 @@ import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
  * whichever display the settings are open on. [active] is the display currently in use.
  */
 @Composable
-fun DisplayProfileSwitcher(
+internal fun DisplayProfileSwitcher(
     selected: ScreenType,
     active: ScreenType,
     onSelect: (ScreenType) -> Unit,
@@ -119,7 +119,7 @@ fun DisplayProfileSwitcher(
 
 /** Small pill marking a setting that is shared by both displays (not part of a display profile). */
 @Composable
-fun ScopeBadge(modifier: Modifier = Modifier) {
+internal fun ScopeBadge(modifier: Modifier = Modifier) {
     val palette = LocalExpressivePalette.current
     Box(
         modifier = modifier

@@ -5,13 +5,19 @@ import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
+import android.net.Uri
 import coil3.SingletonImageLoader
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.data.root.RootGrants
 import org.arkikeskus.launcher.data.root.RootFeatures
 import org.arkikeskus.launcher.data.di.ApplicationScope
+import org.arkikeskus.launcher.feature.home.taskbar.SplitOverlays
+import org.arkikeskus.launcher.pairs.FolarkOnScreen
+import org.arkikeskus.launcher.xposed.HookStateCache
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.AppUsageRepository
 import kotlinx.coroutines.launch
@@ -36,6 +42,11 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
 
     @Inject lateinit var appUsageRepository: AppUsageRepository
 
+    // Process-wide helpers the app starts once (each owns something only one may exist of).
+    @Inject lateinit var folarkOnScreen: FolarkOnScreen
+    @Inject lateinit var hookStateCache: HookStateCache
+    @Inject lateinit var splitOverlays: SplitOverlays
+
     @Inject @field:ApplicationScope
     lateinit var appScope: CoroutineScope
 
@@ -45,7 +56,7 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
         // small on-device file, so a crash never needs adb to be read.
         org.arkikeskus.launcher.data.CrashLog.install(this)
         // Which Folark screen is on screen, for scheduled pairs (open now, or notify instead).
-        org.arkikeskus.launcher.pairs.FolarkOnScreen.install(this)
+        folarkOnScreen.install(this)
 
         // F7: app launches are written in one batch after a burst; write the rest when the
         // launcher leaves the screen so a launch is never lost with the process.
@@ -74,40 +85,22 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
                 // Settings ▸ Haptics, for every place that plays them (some without a view).
                 org.arkikeskus.launcher.data.Haptics.settings = s.motion
                 // The module's provider answers from memory (no binder-thread DataStore reads).
-                org.arkikeskus.launcher.xposed.HookStateCache.update(s)
-                RootGrants.restoreIfNeeded(this@LauncherApplication)
+                hookStateCache.update(s)
+                RootGrants.restoreIfNeeded(this@LauncherApplication, appScope)
             }
         }
         // The Vector module in the system launcher keeps Folark's answer for Replace Android's
         // Recents and the gesture handle's search: tell it when either changes.
-        appScope.launch {
-            innerSettings
-                .map { (it.recents.enabled && it.recents.replaceSystem) to it.recents.navHandleOpensSearch }
-                .distinctUntilChanged()
-                .drop(1)
-                .collect {
-                    catching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.state, null) }
-                }
+        innerSettings.tellModuleWhenChanged(org.arkikeskus.launcher.xposed.HookLinks.state) {
+            (it.recents.enabled && it.recents.replaceSystem) to it.recents.navHandleOpensSearch
         }
         // The module in System UI keeps the status bar margins (Settings ▸ Motorola): tell it when they change.
-        appScope.launch {
-            innerSettings
-                .map { Triple(it.statusBar.systemPadding, it.statusBar.systemPaddingInner, it.statusBar.systemPaddingCover) }
-                .distinctUntilChanged()
-                .drop(1)
-                .collect {
-                    catching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.statusBarPadding, null) }
-                }
+        innerSettings.tellModuleWhenChanged(org.arkikeskus.launcher.xposed.HookLinks.statusBarPadding) {
+            Triple(it.statusBar.systemPadding, it.statusBar.systemPaddingInner, it.statusBar.systemPaddingCover)
         }
         // The module's divider stops (Settings ▸ Recents & split screen): tell it when they change.
-        appScope.launch {
-            innerSettings
-                .map { r -> with(r.recents) { listOf(dividerStops, freeDivider, dividerLock, dividerMarks, dividerHaptics, keepSplitSize, peekFlingClose) } }
-                .distinctUntilChanged()
-                .drop(1)
-                .collect {
-                    catching { contentResolver.notifyChange(org.arkikeskus.launcher.xposed.HookLinks.dividerStops, null) }
-                }
+        innerSettings.tellModuleWhenChanged(org.arkikeskus.launcher.xposed.HookLinks.dividerStops) { s ->
+            with(s.recents) { listOf(dividerStops, freeDivider, dividerLock, dividerMarks, dividerHaptics, keepSplitSize, peekFlingClose) }
         }
         // Folark's taskbar in its own overlay windows, when "Display over other apps" is allowed
         // (otherwise the accessibility service hosts it, if enabled). Deferred a moment: nothing
@@ -118,7 +111,7 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
             catching { org.arkikeskus.launcher.feature.home.taskbar.TaskbarHost.refresh(this@LauncherApplication) }
         }
         // Split screen: marks while a divider is dragged, the drag hint between panes (S5, S14).
-        org.arkikeskus.launcher.feature.home.taskbar.SplitOverlays.start(this, appScope, innerSettings)
+        splitOverlays.start(this, appScope, innerSettings)
         // S1: where a split's divider rests is kept per set of apps (left to right).
         appScope.launch {
             org.arkikeskus.launcher.data.SplitEvents.layouts.collect { (tasks, fractions) ->
@@ -135,6 +128,19 @@ class LauncherApplication : Application(), SingletonImageLoader.Factory {
             settingsRepository.scheduledPairs.collect {
                 org.arkikeskus.launcher.pairs.PairScheduleReceiver.rescheduleAll(this@LauncherApplication)
             }
+        }
+    }
+
+    /**
+     * Tells the Vector module, through its provider at [uri], when the part of the settings that
+     * [selector] picks out has changed. Not for the first value: the module asks for that itself.
+     */
+    private fun <T> Flow<LauncherSettings>.tellModuleWhenChanged(uri: Uri, selector: (LauncherSettings) -> T) {
+        appScope.launch {
+            map(selector)
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { catching { contentResolver.notifyChange(uri, null) } }
         }
     }
 }

@@ -1,7 +1,6 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.widgets.*
-
+import org.arkikeskus.launcher.feature.home.widgets.WidgetPreviewContainer
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas

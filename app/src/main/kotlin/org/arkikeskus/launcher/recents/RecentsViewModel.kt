@@ -36,6 +36,7 @@ import org.arkikeskus.launcher.data.SplitThree
 import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.data.root.RootTasks
+import org.arkikeskus.launcher.data.root.ShellSafe
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.AppPair
@@ -45,6 +46,8 @@ import org.arkikeskus.launcher.data.LaunchOrigin
 import org.arkikeskus.launcher.data.Haptics
 import org.arkikeskus.launcher.data.SplitSizes
 import org.arkikeskus.launcher.model.catching
+import org.arkikeskus.launcher.data.setRecentsPinned
+import org.arkikeskus.launcher.data.setTaskbarPairs
 
 /** One card in Folark's Recents: an open app, or the apps sharing a split screen. */
 data class RecentsCard(
@@ -693,7 +696,7 @@ class RecentsViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 if (RootShell.available()) {
                     val mode = if (muting) "ignore" else "allow"
-                    pkgs.forEach { p -> if (SAFE_PKG.matches(p)) RootShell.run("appops set $p PLAY_AUDIO $mode") }
+                    pkgs.forEach { p -> if (ShellSafe.isName(p)) RootShell.run("appops set $p PLAY_AUDIO $mode") }
                 }
             }
         }
@@ -708,7 +711,5 @@ class RecentsViewModel @Inject constructor(
 
         const val SPLIT_STEP_MS = 200L
         const val ATTACH_SETTLE_MS = 350L
-
-        val SAFE_PKG = Regex("[A-Za-z0-9_.]+")
     }
 }

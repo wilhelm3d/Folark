@@ -70,7 +70,7 @@ private fun onColor(argb: Int): Color =
  * visible. Colours are compared without alpha.
  */
 @Composable
-fun ColorSwatchRow(
+internal fun ColorSwatchRow(
     title: String,
     presets: List<Int>,
     selected: Int,
@@ -151,7 +151,7 @@ private val RAINBOW = listOf(
 
 /** Full colour picker: hue / saturation / brightness sliders and a hex field, with a live preview. */
 @Composable
-fun ColorPickerDialog(
+internal fun ColorPickerDialog(
     title: String,
     initial: Int,
     onConfirm: (Int) -> Unit,

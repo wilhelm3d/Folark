@@ -1,10 +1,8 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.HomeEntry
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.workspace.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.WidgetEntry
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,22 +24,14 @@ import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.ui.HomeDragController
 import kotlin.math.roundToInt
 
+/**
+ * The entries as ReorderPlanner footprints. A widget-like entry keeps its real row id (so the planner
+ * can leave out the one being moved or resized); an app, folder or shortcut, one cell each, gets a
+ * stand-in id from its place in the list that no row can have.
+ */
 internal fun List<HomeEntry>.widgetRects() = mapIndexed { index, e ->
-    val span = when (e) {
-        is PlacedWidget -> e.spanX to e.spanY
-        is PendingWidget -> e.spanX to e.spanY
-        is PlacedBuiltin -> e.spanX to e.spanY
-        is PlacedWidgetStack -> e.spanX to e.spanY
-        else -> 1 to 1
-    }
-    val id = when (e) {
-        is PlacedWidget -> e.rowId
-        is PendingWidget -> e.rowId
-        is PlacedBuiltin -> e.rowId
-        is PlacedWidgetStack -> e.rowId
-        else -> -(index.toLong() + 1)
-    }
-    ReorderPlanner.Rect(id, e.page, e.cellX, e.cellY, span.first, span.second)
+    val w = e as? WidgetEntry
+    ReorderPlanner.Rect(w?.rowId ?: -(index.toLong() + 1), e.page, e.cellX, e.cellY, w?.spanX ?: 1, w?.spanY ?: 1)
 }
 
 @Composable

@@ -1,6 +1,7 @@
 package org.arkikeskus.launcher.data
 
 import android.content.Context
+import org.arkikeskus.launcher.data.root.ShellSafe
 import org.arkikeskus.launcher.model.catching
 
 /**
@@ -18,7 +19,6 @@ object SplitHistory {
     private const val MAX_PAIRS = 24
     /** Times kept per pair: enough to tell "often lately". */
     private const val MAX_TIMES = 6
-    private val SAFE = Regex("""^[\w.]+$""")
 
     /** "Open with …" offers a partner paired at least this often within [SUGGEST_WINDOW_MS]. */
     const val SUGGEST_MIN_TIMES = 3
@@ -30,7 +30,7 @@ object SplitHistory {
 
     /** [a] and [b] were just put side by side. */
     fun record(context: Context, a: String, b: String, now: Long = System.currentTimeMillis()) {
-        if (a == b || !SAFE.matches(a) || !SAFE.matches(b)) return
+        if (a == b || !ShellSafe.isName(a) || !ShellSafe.isName(b)) return
         catching {
             val p = context.getSharedPreferences(PREFS, 0)
             val entry = entry(a, b)

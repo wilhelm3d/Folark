@@ -58,6 +58,8 @@ class NotificationDotListenerServiceTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         // The parser and callback are exercised without binding a real notification listener.
         service = NotificationDotListenerService()
+        // Rebuilds run off the main thread on a phone; here they run in place, so a check sees their result.
+        service.buildDispatcher = Dispatchers.Main
         ReflectionHelpers.callInstanceMethod<Unit>(service, "attachBaseContext", from(Context::class.java, context))
         service.badgeRepository = NotificationBadgeRepository()
         service.settingsRepository = SettingsRepository(object : DataStore<Preferences> {

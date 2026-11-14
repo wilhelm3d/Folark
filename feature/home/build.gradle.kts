@@ -13,9 +13,11 @@ android {
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:model"))
+    implementation(project(":core:root"))
     implementation(project(":core:ui"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:launcher"))
+    implementation(project(":feature:taskbar"))
     implementation(libs.androidx.window)
     implementation(libs.androidx.compose.material.icons.extended)
     testImplementation(libs.junit)

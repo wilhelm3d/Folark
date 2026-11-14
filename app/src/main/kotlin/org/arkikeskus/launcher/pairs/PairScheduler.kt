@@ -1,16 +1,18 @@
 package org.arkikeskus.launcher.pairs
 
+import org.arkikeskus.launcher.model.safeScope
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -40,7 +42,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+        safeScope(Dispatchers.Default).launch {
             try {
                 // Done inside goAsync(): the next alarm is laid before the receiver reports back, so
                 // Android cannot stop the process in between and leave no alarm at all.
@@ -99,7 +101,9 @@ class PairScheduleReceiver : BroadcastReceiver() {
         val power = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager ?: return false
         val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager ?: return false
         if (!power.isInteractive || keyguard.isKeyguardLocked) return false
-        return FolarkOnScreen.resumed
+        return dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext, PairSchedulerEntryPoint::class.java,
+        ).folarkOnScreen().resumed
     }
 
     private fun notifyPair(context: Context, pair: ScheduledPair) {
@@ -119,7 +123,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
             manager.notify(
                 pair.pair.id.hashCode(),
                 android.app.Notification.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_menu_myplaces)
+                    .setSmallIcon(org.arkikeskus.launcher.R.drawable.ic_stat_pair)
                     .setContentTitle(pair.pair.name)
                     .setContentText(context.getString(org.arkikeskus.launcher.feature.settings.R.string.pair_schedule_due))
                     .setContentIntent(pending)
@@ -136,7 +140,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
         const val CHANNEL_ID = "pair_schedules"
 
         /** Single persistent scope shared across all rescheduleAll calls (lives for the app lifetime). */
-        private val rescheduleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val rescheduleScope = safeScope(Dispatchers.IO)
         private val relayLock = Mutex()
 
         /** The one alarm's request code: it is re-armed for whichever pair is next. */
@@ -173,6 +177,7 @@ class PairScheduleReceiver : BroadcastReceiver() {
                 val wanted = withContext(Dispatchers.IO) {
                     hilt.settingsRepository().scheduledPairs.first()
                 }
+                keepReceiverWhile(context, scheduled = wanted.any { it.schedule != null })
                 val prefs = context.getSharedPreferences("pair_schedules", Context.MODE_PRIVATE)
                 // Per-pair alarms from earlier versions (AlarmManager has no listing of its own).
                 prefs.getStringSet("scheduled", emptySet()).orEmpty().forEach { id ->
@@ -195,6 +200,30 @@ class PairScheduleReceiver : BroadcastReceiver() {
                     manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next.second, pi)
                 }
                 prefs.edit().putStringSet("scheduled", setOf(next.first)).apply()
+            }
+        }
+
+        /**
+         * The receiver is switched on only while a pair is [scheduled]. Without a schedule there is
+         * nothing to lay after a boot or a time change, yet those broadcasts started Folark's whole
+         * process to find that out: also in a profile where Folark is installed but never opened
+         * (a private space), where a second launcher process then sat in memory for nothing.
+         * Checked on every change of the schedules and each time Folark starts, so saving a
+         * schedule switches it back on before its alarm is laid.
+         */
+        private fun keepReceiverWhile(context: Context, scheduled: Boolean) {
+            catching {
+                val component = ComponentName(context, PairScheduleReceiver::class.java)
+                val wanted = if (scheduled) {
+                    PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+                } else {
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                }
+                val packages = context.packageManager
+                // Only on a change: setting it tells every app that Folark's package changed.
+                if (packages.getComponentEnabledSetting(component) != wanted) {
+                    packages.setComponentEnabledSetting(component, wanted, PackageManager.DONT_KILL_APP)
+                }
             }
         }
 
@@ -225,5 +254,6 @@ class PairScheduleReceiver : BroadcastReceiver() {
     @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
     interface PairSchedulerEntryPoint {
         fun settingsRepository(): SettingsRepository
+        fun folarkOnScreen(): FolarkOnScreen
     }
 }

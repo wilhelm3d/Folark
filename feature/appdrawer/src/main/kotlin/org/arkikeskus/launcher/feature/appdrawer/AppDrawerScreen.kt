@@ -2,23 +2,15 @@ package org.arkikeskus.launcher.feature.appdrawer
 
 import org.arkikeskus.launcher.ui.R as UiR
 import org.arkikeskus.launcher.ui.RemoveChoices
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Intent
-import android.widget.Toast
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,27 +31,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -67,23 +47,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -98,25 +70,19 @@ import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlin.math.roundToInt
-import kotlin.math.abs
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.SearchResult
 import org.arkikeskus.launcher.ui.AppActionPopup
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.AppActions
-import org.arkikeskus.launcher.ui.AppShortcuts
 import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.LauncherIcons
 import org.arkikeskus.launcher.ui.PopupAction
@@ -134,11 +100,8 @@ import org.arkikeskus.launcher.ui.component.LocalThemedIcons
 import org.arkikeskus.launcher.ui.drawer.DrawerColors
 import org.arkikeskus.launcher.ui.drawer.DrawerStyleSpec
 import org.arkikeskus.launcher.ui.drawer.drawerStyleSpec
-import org.arkikeskus.launcher.ui.drawer.readableOn
 import org.arkikeskus.launcher.ui.drawer.rememberDrawerColors
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
-import org.arkikeskus.launcher.ui.expressive.ExpressiveActionRow
-import org.arkikeskus.launcher.ui.expressive.ExpressiveSectionTitle
 import org.arkikeskus.launcher.ui.expressive.ExpressiveTheme
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import org.arkikeskus.launcher.ui.rememberHomeDragController
@@ -687,7 +650,6 @@ private fun AppDrawerContent(
 ) {
     val haptics = LocalHapticFeedback.current
     val privateSpace = LocalPrivateSpace.current
-    val flickClosePx = with(LocalDensity.current) { 2400.dp.toPx() }
     // While an app is dragged out of the drawer, the folder tabs become the drop-target chips over
     // home (the drawer itself slides away): what the chips are and where a drop on one lands.
     androidx.compose.runtime.DisposableEffect(tabs) {
@@ -698,51 +660,7 @@ private fun AppDrawerContent(
             dragController.folderDrop = null
         }
     }
-    val pullConnection = remember(onDrawerDrag, onDrawerSettle, drawerOpen, drawerFlickClose, onClose) {
-        object : NestedScrollConnection {
-            private var pulling = false
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (pulling && available.y < 0f) {
-                    onDrawerDrag(available.y)
-                    return available
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (available.y > 0f && source == NestedScrollSource.UserInput) {
-                    pulling = true
-                    onDrawerDrag(available.y)
-                    return available
-                }
-                return Offset.Zero
-            }
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                // Settings ▸ App drawer ▸ flick down to close: a fast downward flick closes the
-                // drawer wherever the list is scrolled to, instead of flinging the list.
-                if (!pulling && drawerFlickClose && available.y > flickClosePx) {
-                    onClose()
-                    return available
-                }
-                if (pulling) {
-                    pulling = false
-                    onDrawerSettle(available.y)
-                    return available
-                }
-                return Velocity.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (pulling) {
-                    pulling = false
-                    onDrawerSettle(consumed.y + available.y)
-                    return available
-                }
-                return Velocity.Zero
-            }
-        }
-    }
+    val pullConnection = rememberDrawerPullConnection(onDrawerDrag, onDrawerSettle, drawerOpen, drawerFlickClose, onClose)
 
     val sheetAlignment = when (drawerAlignment.lowercase()) {
         LauncherSettings.DRAWER_ALIGNMENT_LEFT -> Alignment.BottomStart
@@ -754,35 +672,11 @@ private fun AppDrawerContent(
         modifier = modifier.fillMaxSize(),
         contentAlignment = sheetAlignment,
     ) {
-        if (drawerScrimOpacity > 0f) {
-            // Present only while the drawer is at least partly open (it would catch taps otherwise);
-            // its strength follows the slide in the draw phase.
-            val progress by rememberUpdatedState(drawerProgress)
-            val scrimShown by remember { derivedStateOf { progress() > 0f } }
-            if (scrimShown) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = (progress() * drawerScrimOpacity * 0.7f).coerceIn(0f, 0.8f) }
-                        .background(Color.Black)
-                        .pointerInput(Unit) {
-                            detectTapGestures { onClose() }
-                        }
-                )
-            }
-        }
+        if (drawerScrimOpacity > 0f) DrawerScrim(drawerScrimOpacity, drawerProgress, onClose)
 
-        // Settings ▸ App drawer ▸ corner radius; "Auto" keeps the drawer style's own corners (and a
-        // square full-screen drawer).
-        val customCorner = drawerCornerRadius >= 0
-        val panelCorner = if (customCorner) drawerCornerRadius.dp else style.corner
-        val panelShape = when {
-            !sidebar && !customCorner && drawerHeightFraction >= 1.0f && drawerWidthFraction >= 1.0f -> RoundedCornerShape(0.dp)
-            !sidebar -> RoundedCornerShape(topStart = panelCorner, topEnd = panelCorner)
-            drawerAlignment == LauncherSettings.DRAWER_ALIGNMENT_LEFT ->
-                RoundedCornerShape(topEnd = panelCorner, bottomEnd = panelCorner)
-            else -> RoundedCornerShape(topStart = panelCorner, bottomStart = panelCorner)
-        }
+        val panelShape = drawerPanelShape(
+            sidebar, drawerCornerRadius, style.corner, drawerHeightFraction, drawerWidthFraction, drawerAlignment,
+        )
         Box(
             modifier = Modifier
                 .fillMaxWidth(drawerWidthFraction.coerceIn(0.4f, 1.0f))
@@ -834,35 +728,13 @@ private fun AppDrawerContent(
                 DrawerSearchField(query = query, onQueryChange = onQueryChange, colors = colors, style = style)
             }
             if (tabBar && query.isBlank() && !(twoPane && LocalScreenType.current == ScreenType.INNER)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    DrawerTabRow(
-                        tabs = tabs, selected = selectedTab, onSelect = onSelectTab,
-                        drag = folderDrag, onRename = onRenameFolder,
-                        modifier = Modifier.weight(1f),
-                        onMove = onMoveTab, reorderable = tabsReorderable,
-                    )
-                    // "+": a new folder tab, created here and filled in the card that opens.
-                    IconButton(onClick = onNewFolder, modifier = Modifier.padding(end = 8.dp)) {
-                        Icon(
-                            Icons.Rounded.Add,
-                            contentDescription = stringResource(R.string.folder_new),
-                            tint = LocalAccent.current,
-                        )
-                    }
-                    if (selectedTab != null) {
-                        val currentTabFolder = folders.firstOrNull { it.id == selectedTab }
-                        if (currentTabFolder != null) {
-                            TabFolderSettingsMenu(
-                                folder = currentTabFolder,
-                                onEdit = { onEditFolder(selectedTab) },
-                                onDelete = { onDeleteTab(selectedTab) },
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                        }
-                    }
-                }
+                DrawerTabBar(
+                    tabs = tabs, selectedTab = selectedTab, onSelectTab = onSelectTab,
+                    folderDrag = folderDrag, onRenameFolder = onRenameFolder,
+                    onMoveTab = onMoveTab, tabsReorderable = tabsReorderable, onNewFolder = onNewFolder,
+                    folders = folders, onEditFolder = onEditFolder, onDeleteTab = onDeleteTab,
+                )
             }
-            val context = LocalContext.current
             val searching = query.isNotBlank()
             var gridWidthPx by remember { mutableStateOf(0) }
             val density = LocalDensity.current
@@ -879,26 +751,34 @@ private fun AppDrawerContent(
                 top = if (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_TOP) indexStrip else 0.dp,
                 bottom = if (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM) indexStrip else 0.dp,
             )
-            // Letter headings: the full list as runs of apps that share a first letter (a single run
-            // without a letter when headings are off or a search is showing).
-            val letterRuns: List<Pair<Char?, List<AppItem>>> = remember(apps, drawerLetterHeaders, searching) {
-                if (!drawerLetterHeaders || searching) {
-                    listOf<Pair<Char?, List<AppItem>>>(null to apps)
+            // Letter headings: the apps in runs under their first letter (one run when off or searching).
+            val letterRuns = remember(apps, drawerLetterHeaders, searching) { runsByLetter(apps, drawerLetterHeaders && !searching) }
+            // What the list shows, written once for both layouts (DrawerItems.kt).
+            val appDeps = remember(
+                badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick, onAppLongClick, dragController,
+                folderDrag, selectedTab, onDragOutStart, onDropOnHome, onDropOnDock, onDropOnTab, haptics, locked, onClose,
+            ) {
+                DrawerAppDeps(
+                    badges = badges, badgeShowCount = badgeShowCount, badgeScale = badgeScale, showLabels = showLabels,
+                    iconSize = drawerIconSize, onAppClick = onAppClick, onAppLongClick = onAppLongClick,
+                    dragController = dragController, folderDrag = folderDrag, sourceTab = selectedTab,
+                    onDragOutStart = onDragOutStart, onDropOnHome = onDropOnHome, onDropOnDock = onDropOnDock,
+                    onDropOnTab = onDropOnTab, haptics = haptics, locked = locked, onClose = onClose,
+                )
+            }
+            val drawerItems: DrawerItems.() -> Unit = {
+                if (searching) {
+                    searchResults(
+                        query, calc, actionResults, apps, settingResults, contactResults, shortcutResults,
+                        searchWeb, searchWebEngine, searchInlineShortcuts,
+                    )
                 } else {
-                    buildList<Pair<Char?, List<AppItem>>> {
-                        var start = 0
-                        while (start < apps.size) {
-                            val letter = drawerLetterOf(apps[start])
-                            var end = start + 1
-                            while (end < apps.size && drawerLetterOf(apps[end]) == letter) end++
-                            add(letter to apps.subList(start, end))
-                            start = end
-                        }
-                    }
+                    browse(
+                        clipboardRow, frequentApps, columns, folderTiles, letterRuns, onFolderClick, privateSpace, colors,
+                        hiddenCount, hiddenLock, onHiddenApps,
+                    )
                 }
             }
-            // The letter under the finger on the A-Z bar, shown large in the middle of the list.
-            var activeLetter by remember { mutableStateOf<Char?>(null) }
             val currentSelectedTab by rememberUpdatedState(selectedTab)
             val currentSelectTab by rememberUpdatedState(onSelectTab)
             // Settings ▸ App drawer ▸ two-pane (unfolded): the tabs as a list on the left.
@@ -918,212 +798,18 @@ private fun AppDrawerContent(
                     // app or onto a folder tile). Carrying the app up over the header — the one
                     // strip that never holds a drop target — is how it goes out to home.
                     .onGloballyPositioned { folderDrag.gridBounds = it.boundsInRoot() }
-                    // Settings ▸ App drawer ▸ swipe sideways to change tab. Watched on the way down
-                    // to the icons; a drag that starts on a horizontal A-Z bar, or while an icon is
-                    // being dragged out, is left alone.
-                    .pointerInput(drawerSwipeTabs, tabs, searching, azIndexPosition, indexStrip) {
-                        if (!drawerSwipeTabs || tabs.isEmpty() || searching) return@pointerInput
-                        val slop = viewConfiguration.touchSlop
-                        val stripPx = indexStrip.toPx()
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                            val onBar = (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM && down.position.y > size.height - stripPx) ||
-                                (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_TOP && down.position.y < stripPx)
-                            var total = Offset.Zero
-                            var claimed = false
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) break
-                                total += change.positionChange()
-                                if (onBar || dragController.moving) { claimed = false; break }
-                                if (!claimed && abs(total.x) > slop * 2f && abs(total.x) > abs(total.y) * 1.5f) claimed = true
-                                if (claimed) change.consume()
-                            }
-                            if (claimed && abs(total.x) > slop * 3f) {
-                                val ids: List<Long?> = listOf<Long?>(null) + tabs.map { it.first }
-                                val at = ids.indexOf(currentSelectedTab).coerceAtLeast(0)
-                                val next = (at + if (total.x < 0f) 1 else -1).coerceIn(0, ids.lastIndex)
-                                if (next != at) currentSelectTab(ids[next])
-                            }
-                        }
-                    },
+                    .swipeToChangeTab(
+                        enabled = drawerSwipeTabs, tabs = tabs, searching = searching,
+                        azIndexPosition = azIndexPosition, indexStrip = indexStrip, dragController = dragController,
+                        selectedTab = { currentSelectedTab }, onSelectTab = { currentSelectTab(it) },
+                    ),
             ) {
                 if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) {
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(vertical = 8.dp),
                         modifier = Modifier.fillMaxSize().padding(indexStripPadding),
-                    ) {
-                        if (!searching) {
-                            if (clipboardRow) {
-                                item(key = "clipboard", contentType = "clipboard") { DrawerClipboardRow() }
-                            }
-                            if (frequentApps.isNotEmpty()) {
-                                item(contentType = "frequent") {
-                                    FrequentAppsCard(
-                                        apps = frequentApps,
-                                        columns = columns,
-                                        badges = badges,
-                                        badgeShowCount = badgeShowCount,
-                                        badgeScale = badgeScale,
-                                        showLabels = showLabels,
-                                        iconSize = drawerIconSize,
-                                        onAppClick = onAppClick,
-                                        onAppLongClick = onAppLongClick,
-                                    )
-                                }
-                            }
-                            items(items = folderTiles, key = { "folder-${it.id}" }, contentType = { "folder" }) { folder ->
-                                DrawerFolderTile(
-                                    folder = folder,
-                                    showLabel = showLabels,
-                                    drag = folderDrag,
-                                    tileSize = drawerIconSize,
-                                    badgeCount = folder.apps.sumOf { badges[it.badgeKey] ?: 0 },
-                                    badgeShowCount = badgeShowCount,
-                                    badgeScale = badgeScale,
-                                    onClick = { onFolderClick(folder) },
-                                )
-                            }
-                            letterRuns.forEachIndexed { runIndex, (letter, runApps) ->
-                            if (letter != null) {
-                                item(key = "letter-$runIndex", contentType = "letter") { DrawerLetterHeader(letter) }
-                            }
-                            items(items = runApps, key = { it.key }, contentType = { "app" }) { app ->
-                                AppListRow(
-                                    app = app,
-                                    badgeCount = badges[app.badgeKey] ?: 0,
-                                    badgeShowCount = badgeShowCount,
-                                    badgeScale = badgeScale,
-                                    showLabels = showLabels,
-                                    onAppClick = onAppClick,
-                                    onAppLongClick = onAppLongClick,
-                                    dragController = dragController,
-                                    folderDrag = folderDrag,
-                                    sourceTab = selectedTab,
-                                    onDragOutStart = onDragOutStart,
-                                    onDropOnHome = onDropOnHome,
-                                    onDropOnDock = onDropOnDock,
-                                    onDropOnTab = onDropOnTab,
-                                    haptics = haptics,
-                                    locked = locked,
-                                )
-                            }
-                            }
-                            if (selectedTab == null) privateSpace?.let { privateSpaceRows(it, colors) }
-                            if (selectedTab == null && hiddenCount > 0) {
-                                item(key = "hidden-apps", contentType = "hidden") { HiddenAppsRow(hiddenCount, hiddenLock, onHiddenApps) }
-                            }
-                        } else {
-                            calc?.let { c ->
-                                item(contentType = "calc") {
-                                    val copiedMsg = stringResource(R.string.search_calc_copied)
-                                    CalcResultCard(c) {
-                                        val clip = context.getSystemService(ClipboardManager::class.java)
-                                        clip?.setPrimaryClip(ClipData.newPlainText("result", c.result))
-                                        Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                            if (actionResults.isNotEmpty()) {
-                                item(contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_actions))
-                                }
-                                items(items = actionResults, key = { it.id }, contentType = { "action" }) { action ->
-                                    ExpressiveActionRow(label = action.label, description = action.detail, trailingIcon = LauncherIcons.OpenInNew) {
-                                        if (startSearchAction(context, action)) onClose()
-                                    }
-                                }
-                            }
-                            if (apps.isNotEmpty()) {
-                                item(contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
-                                }
-                                items(items = apps, key = { it.key }, contentType = { "app" }) { app ->
-                                    AppListRow(
-                                        app = app,
-                                        badgeCount = badges[app.badgeKey] ?: 0,
-                                        badgeShowCount = badgeShowCount,
-                                        badgeScale = badgeScale,
-                                        showLabels = showLabels,
-                                        onAppClick = onAppClick,
-                                        onAppLongClick = onAppLongClick,
-                                        dragController = dragController,
-                                        folderDrag = folderDrag,
-                                        sourceTab = selectedTab,
-                                        onDragOutStart = onDragOutStart,
-                                        onDropOnHome = onDropOnHome,
-                                        onDropOnDock = onDropOnDock,
-                                        onDropOnTab = onDropOnTab,
-                                        haptics = haptics,
-                                        locked = locked,
-                                    )
-                                    // The best match's shortcuts, right under it.
-                                    if (searchInlineShortcuts && app.key == apps.first().key) {
-                                        TopAppShortcutChips(app, onOpened = onClose)
-                                    }
-                                }
-                            }
-                            if (settingResults.isNotEmpty()) {
-                                item(contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_settings))
-                                }
-                                items(items = settingResults, key = { it.id }, contentType = { "setting" }) { setting ->
-                                    ExpressiveActionRow(label = setting.title, description = "") {
-                                        catching {
-                                            context.startActivity(
-                                                Intent(setting.action)
-                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            if (contactResults.isNotEmpty()) {
-                                item(contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_contacts))
-                                }
-                                items(items = contactResults, key = { it.id }, contentType = { "contact" }) { contact ->
-                                    ContactResultRow(contact, onOpened = onClose)
-                                }
-                            }
-                            if (shortcutResults.isNotEmpty()) {
-                                item(contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_shortcuts))
-                                }
-                                items(items = shortcutResults, key = { it.id }, contentType = { "shortcut" }) { shortcut ->
-                                    ExpressiveActionRow(label = shortcut.label, description = shortcut.appLabel) {
-                                        AppShortcuts.startById(context, shortcut.packageName, shortcut.shortcutId, shortcut.userSerial)
-                                        onClose()
-                                    }
-                                }
-                            }
-                            if (searchWeb) {
-                                item(contentType = "web") {
-                                    ExpressiveActionRow(
-                                        label = stringResource(R.string.search_web, query.trim()),
-                                        description = "",
-                                        trailingIcon = LauncherIcons.Search,
-                                    ) { launchWebSearch(context, query.trim(), searchWebEngine) }
-                                }
-                            }
-                            if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty() &&
-                                shortcutResults.isEmpty() && actionResults.isEmpty() && !searchWeb
-                            ) {
-                                item(contentType = "empty") {
-                                    Text(
-                                        text = stringResource(R.string.search_no_results),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 24.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    ) { DrawerListItems(this, appDeps).drawerItems() }
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(columns),
@@ -1134,236 +820,27 @@ private fun AppDrawerContent(
                             .padding(indexStripPadding)
                             .padding(horizontal = 12.dp)
                             .onSizeChanged { gridWidthPx = it.width },
-                    ) {
-                        if (!searching) {
-                            if (clipboardRow) {
-                                item(key = "clipboard", span = { GridItemSpan(maxLineSpan) }, contentType = "clipboard") { DrawerClipboardRow() }
-                            }
-                            if (frequentApps.isNotEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "frequent") {
-                                    FrequentAppsCard(
-                                        apps = frequentApps,
-                                        columns = columns,
-                                        badges = badges,
-                                        badgeShowCount = badgeShowCount,
-                                        badgeScale = badgeScale,
-                                        showLabels = showLabels,
-                                        iconSize = drawerIconSize,
-                                        onAppClick = onAppClick,
-                                        onAppLongClick = onAppLongClick,
-                                    )
-                                }
-                            }
-                            items(items = folderTiles, key = { "folder-${it.id}" }, contentType = { "folder" }) { folder ->
-                                DrawerFolderTile(
-                                    folder = folder,
-                                    showLabel = showLabels,
-                                    drag = folderDrag,
-                                    tileSize = drawerIconSize,
-                                    badgeCount = folder.apps.sumOf { badges[it.badgeKey] ?: 0 },
-                                    badgeShowCount = badgeShowCount,
-                                    badgeScale = badgeScale,
-                                    onClick = { onFolderClick(folder) },
-                                )
-                            }
-                            letterRuns.forEachIndexed { runIndex, (letter, runApps) ->
-                                if (letter != null) {
-                                    item(key = "letter-$runIndex", span = { GridItemSpan(maxLineSpan) }, contentType = "letter") {
-                                        DrawerLetterHeader(letter)
-                                    }
-                                }
-                                appCells(runApps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
-                                    onAppLongClick, dragController, folderDrag, selectedTab, onDragOutStart, onDropOnHome, onDropOnTab, onDropOnDock, haptics, locked)
-                            }
-                            if (selectedTab == null) privateSpace?.let { privateSpaceCells(it, colors, showLabels, drawerIconSize) }
-                            if (selectedTab == null && hiddenCount > 0) {
-                                item(key = "hidden-apps", span = { GridItemSpan(maxLineSpan) }, contentType = "hidden") {
-                                    HiddenAppsRow(hiddenCount, hiddenLock, onHiddenApps)
-                                }
-                            }
-                        } else {
-                            calc?.let { c ->
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "calc") {
-                                    val copiedMsg = stringResource(R.string.search_calc_copied)
-                                    CalcResultCard(c) {
-                                        val clip = context.getSystemService(ClipboardManager::class.java)
-                                        clip?.setPrimaryClip(ClipData.newPlainText("result", c.result))
-                                        Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                            if (actionResults.isNotEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_actions))
-                                }
-                                items(items = actionResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
-                                    contentType = { "action" }) { action ->
-                                    ExpressiveActionRow(label = action.label, description = action.detail, trailingIcon = LauncherIcons.OpenInNew) {
-                                        if (startSearchAction(context, action)) onClose()
-                                    }
-                                }
-                            }
-                            if (apps.isNotEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_apps))
-                                }
-                                // The best match's shortcuts first, as chips above the app grid.
-                                if (searchInlineShortcuts) {
-                                    item(key = "top-shortcuts", span = { GridItemSpan(maxLineSpan) }, contentType = "shortcut-chips") {
-                                        TopAppShortcutChips(apps.first(), onOpened = onClose)
-                                    }
-                                }
-                                appCells(apps, badges, badgeShowCount, badgeScale, showLabels, drawerIconSize, onAppClick,
-                                    onAppLongClick, dragController, folderDrag, selectedTab, onDragOutStart, onDropOnHome, onDropOnTab, onDropOnDock, haptics, locked)
-                            }
-                            if (settingResults.isNotEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_settings))
-                                }
-                                items(items = settingResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
-                                    contentType = { "setting" }) { setting ->
-                                    ExpressiveActionRow(label = setting.title, description = "") {
-                                        catching {
-                                            context.startActivity(
-                                                Intent(setting.action)
-                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            if (contactResults.isNotEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_contacts))
-                                }
-                                items(items = contactResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
-                                    contentType = { "contact" }) { contact ->
-                                    ContactResultRow(contact, onOpened = onClose)
-                                }
-                            }
-                            if (shortcutResults.isNotEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                                    ExpressiveSectionTitle(stringResource(R.string.search_section_shortcuts))
-                                }
-                                items(items = shortcutResults, key = { it.id }, span = { GridItemSpan(maxLineSpan) },
-                                    contentType = { "shortcut" }) { shortcut ->
-                                    ExpressiveActionRow(label = shortcut.label, description = shortcut.appLabel) {
-                                        AppShortcuts.startById(context, shortcut.packageName, shortcut.shortcutId, shortcut.userSerial)
-                                        onClose()
-                                    }
-                                }
-                            }
-                            if (searchWeb) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "web") {
-                                    ExpressiveActionRow(
-                                        label = stringResource(R.string.search_web, query.trim()),
-                                        description = "",
-                                        trailingIcon = LauncherIcons.Search,
-                                    ) { launchWebSearch(context, query.trim(), searchWebEngine) }
-                                }
-                            }
-                            if (calc == null && apps.isEmpty() && settingResults.isEmpty() && contactResults.isEmpty() &&
-                                shortcutResults.isEmpty() && actionResults.isEmpty() && !searchWeb
-                            ) {
-                                item(span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
-                                    Text(
-                                        text = stringResource(R.string.search_no_results),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 24.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    ) { DrawerGridItems(this, appDeps).drawerItems() }
                 }
 
                 if (drawerIndexBarEnabled && !searching) {
-                    val coroutineScope = rememberCoroutineScope()
                     if (railTabs && selectedTab != null) {
-                        val currentTabFolder = folders.firstOrNull { it.id == selectedTab }
-                        if (currentTabFolder != null) {
-                            TabFolderSettingsMenu(
-                                folder = currentTabFolder,
-                                onEdit = { onEditFolder(selectedTab) },
-                                onDelete = { onDeleteTab(selectedTab) },
-                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
-                            )
-                        }
+                        OpenTabSettingsMenu(folders, selectedTab, onEditFolder, onDeleteTab, Modifier.align(Alignment.TopEnd).padding(8.dp))
                     }
-                    val alignModifier = when (azIndexPosition) {
-                        LauncherSettings.AZ_POSITION_VERTICAL_LEFT -> Modifier.align(Alignment.CenterStart)
-                        LauncherSettings.AZ_POSITION_HORIZONTAL_TOP -> Modifier.align(Alignment.TopCenter)
-                        LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM -> Modifier.align(Alignment.BottomCenter)
-                        else -> Modifier.align(Alignment.CenterEnd)
-                    }
-                    DrawerIndexBar(
+                    DrawerIndexOverlay(
                         position = azIndexPosition,
                         scale = azIndexScale,
-                        onLetterSelected = { char ->
-                            // Only the tiles drawn above the list push the apps down; with folders
-                            // as tabs there are none, so counting folders here would overshoot.
-                            val headerOffset = (if (clipboardRow) 1 else 0) + (if (frequentApps.isNotEmpty()) 1 else 0) + folderTiles.size
-                            val matchIdx = if (char == '#') {
-                                0
-                            } else {
-                                apps.indexOfFirst {
-                                    val firstChar = it.label.firstOrNull()?.uppercaseChar() ?: ' '
-                                    firstChar >= char
-                                    // No app from this letter on: go to the end, not back to the top.
-                                }.let { if (it < 0) (apps.size - 1).coerceAtLeast(0) else it }
-                            }
-                            // With letter headings every run before the target adds one more item.
-                            var headingsBefore = 0
-                            if (letterRuns.firstOrNull()?.first != null) {
-                                var seen = 0
-                                for ((_, run) in letterRuns) {
-                                    if (seen > matchIdx) break
-                                    headingsBefore++
-                                    seen += run.size
-                                }
-                                headingsBefore = (headingsBefore - 1).coerceAtLeast(0)
-                            }
-                            val targetIndex = (headerOffset + matchIdx + headingsBefore)
-                                .coerceIn(0, (headerOffset + apps.size + letterRuns.size).coerceAtLeast(0))
-                            coroutineScope.launch {
-                                // Nearby: a short animated glide; far (A→Z while sliding): an instant
-                                // jump, which feels snappier than flying the whole list.
-                                if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) {
-                                    val near = kotlin.math.abs(targetIndex - listState.firstVisibleItemIndex) <= 45
-                                    if (near) listState.animateScrollToItem(targetIndex)
-                                    else listState.scrollToItem(targetIndex)
-                                } else {
-                                    val near = kotlin.math.abs(targetIndex - gridState.firstVisibleItemIndex) <= 45
-                                    if (near) gridState.animateScrollToItem(targetIndex)
-                                    else gridState.scrollToItem(targetIndex)
-                                }
-                            }
-                        },
-                        modifier = alignModifier,
-                        onActiveLetter = if (drawerLargeLetterPopup) ({ letter: Char? -> activeLetter = letter }) else null,
-                        // Held, then slid: a smooth scroll through the apps instead of letter jumps.
-                        onFineScroll = if (azHoldScroll) ({ by: Float ->
-                            coroutineScope.launch {
-                                if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) listState.scrollBy(by) else gridState.scrollBy(by)
-                            }
-                        }) else null,
+                        apps = apps,
+                        letterRuns = letterRuns,
+                        // Only the tiles drawn above the list push the apps down; with folders
+                        // as tabs there are none, so counting folders here would overshoot.
+                        itemsAbove = (if (clipboardRow) 1 else 0) + (if (frequentApps.isNotEmpty()) 1 else 0) + folderTiles.size,
+                        listLayout = drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST,
+                        listState = listState,
+                        gridState = gridState,
+                        largeLetterPopup = drawerLargeLetterPopup,
+                        holdScroll = azHoldScroll,
                     )
-                    activeLetter?.let { letter ->
-                        Surface(
-                            shape = CircleShape,
-                            color = LocalAccent.current,
-                            contentColor = readableOn(LocalAccent.current),
-                            shadowElevation = 8.dp,
-                            modifier = Modifier.size(104.dp).align(Alignment.Center),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(text = letter.toString(), fontSize = 46.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
                 }
             }
             }
@@ -1374,26 +851,7 @@ private fun AppDrawerContent(
         }
         }
 
-        // The icon being dragged stays in the drawer while the drag does: it follows the finger, so
-        // dropping it on another app (or on a folder) reads as one motion. Once the drag leaves the
-        // panel this goes away and the home drag layer shows the icon instead.
-        folderDrag.dragged?.let { dragged ->
-            val ghostSize = 56.dp * LocalIconSizeScale.current
-            val half = with(LocalDensity.current) { ghostSize.toPx() / 2f }
-            Box(Modifier.matchParentSize(), contentAlignment = Alignment.TopStart) {
-                AppIcon(
-                    appItem = dragged,
-                    labelColor = Color.Transparent,
-                    showLabel = false,
-                    iconSize = ghostSize,
-                    modifier = Modifier.graphicsLayer {
-                        translationX = folderDrag.position.x - half
-                        translationY = folderDrag.position.y - half
-                        alpha = 0.95f
-                    },
-                )
-            }
-        }
+        DrawerDragGhost(folderDrag)
     }
 }
 

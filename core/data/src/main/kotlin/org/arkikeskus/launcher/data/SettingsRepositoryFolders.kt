@@ -1,39 +1,22 @@
 package org.arkikeskus.launcher.data
 
 import org.arkikeskus.launcher.model.LaunchSettings
-
 import org.arkikeskus.launcher.model.RootSettings
-
 import org.arkikeskus.launcher.model.RecentsSettings
-
 import org.arkikeskus.launcher.model.LiveSettings
-
 import org.arkikeskus.launcher.model.TaskbarSettings
-
 import org.arkikeskus.launcher.model.AppearanceSettings
-
 import org.arkikeskus.launcher.model.MotionSettings
-
 import org.arkikeskus.launcher.model.FoldSettings
-
 import org.arkikeskus.launcher.model.StatusBarSettings
-
 import org.arkikeskus.launcher.model.WidgetSettings
-
 import org.arkikeskus.launcher.model.FolderSettings
-
 import org.arkikeskus.launcher.model.DotSettings
-
 import org.arkikeskus.launcher.model.IconSettings
-
 import org.arkikeskus.launcher.model.SearchSettings
-
 import org.arkikeskus.launcher.model.DrawerSettings
-
 import org.arkikeskus.launcher.model.HomeSettings
-
 import org.arkikeskus.launcher.model.DockSettings
-
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences

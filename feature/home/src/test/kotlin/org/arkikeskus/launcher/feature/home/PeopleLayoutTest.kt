@@ -1,7 +1,6 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.widgets.*
-
+import org.arkikeskus.launcher.feature.home.widgets.PeopleLayout
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 

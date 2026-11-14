@@ -1,5 +1,7 @@
 package org.arkikeskus.launcher.xposed
 
+import javax.inject.Inject
+import javax.inject.Singleton
 import org.arkikeskus.launcher.model.LauncherSettings
 
 /**
@@ -8,10 +10,12 @@ import org.arkikeskus.launcher.model.LauncherSettings
  * provider methods answer from memory instead of blocking a binder thread on DataStore.
  *
  * Values are null until the first settings snapshot arrives; the provider falls back to reading
- * the settings then (the app may have been started by the module's question itself).
+ * the settings then (the app may have been started by the module's question itself). One per
+ * process, in the app's object graph: the app's settings stream keeps it current, the provider
+ * reads it through its entry point.
  */
-/** Public: the app's own settings stream is what keeps it current (see LauncherApplication). */
-object HookStateCache {
+@Singleton
+class HookStateCache @Inject constructor() {
     @Volatile var replaceRecents: Boolean? = null
     @Volatile var navHandleSearch: Boolean? = null
     @Volatile var statusBarOn: Boolean? = null

@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.SettingsRepository
+import org.arkikeskus.launcher.data.di.ApplicationScope
 import org.arkikeskus.launcher.data.ClipboardHistoryRepository
 import org.arkikeskus.launcher.data.backup.BackupRepository
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
@@ -94,6 +95,7 @@ class LauncherActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var backupRepository: BackupRepository
     @Inject lateinit var clipboardHistory: ClipboardHistoryRepository
+    @Inject @field:ApplicationScope lateinit var appScope: kotlinx.coroutines.CoroutineScope
 
     /** The restore count this screen was built with; a restore made in Settings reloads it. */
     private var seenRestore = 0
@@ -546,7 +548,7 @@ class LauncherActivity : ComponentActivity() {
             }
         }
         // Settings ▸ Root ▸ keep: give back a grant Android took away (cheap unless one is missing).
-        org.arkikeskus.launcher.data.root.RootGrants.restoreIfNeeded(this)
+        org.arkikeskus.launcher.data.root.RootGrants.restoreIfNeeded(this, appScope)
         val cap = org.arkikeskus.launcher.data.SystemControls.peakRefreshRate(this)
             ?.takeIf { it > 0f && it.isFinite() } ?: Float.POSITIVE_INFINITY
         if (cap != peakRefreshCap) {

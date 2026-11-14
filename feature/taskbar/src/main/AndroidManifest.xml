@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The taskbar over other apps (Settings ▸ Taskbar, off by default) draws in Folark's own
+         overlay windows: "Display over other apps", granted by the user in Android's settings. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application>
+        <!-- Double-tap-to-lock and a few system actions (Recents, quick switch, divider drag); the
+             taskbar's host only without "Display over other apps". Bound by the system only after the
+             user allows it in accessibility settings. Never reads screen content; receives window
+             changes only while taskbar per-app rules or "Replace Android's Recents" need them — see
+             the service class + lock_accessibility_service.xml. Its class keeps the package it always
+             had (org.arkikeskus.launcher.feature.home.taskbar): Android remembers an allowed
+             accessibility service by that name, and root grants it by that name too. -->
+        <service
+            android:name="org.arkikeskus.launcher.feature.home.taskbar.LockAccessibilityService"
+            android:exported="false"
+            android:label="@string/lock_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/lock_accessibility_service" />
+        </service>
+    </application>
+
+</manifest>

@@ -70,14 +70,28 @@ enum class ClipKind {
  *
  * Only while a clipboard widget is on screen or the app drawer's clipboard row is switched on
  * ([attach]/[detach]); nothing is read otherwise. Copied pictures are kept as a small private copy.
- * Clips Android marks as sensitive (passwords, one-time codes) are never kept. The list lives in a
+ * Clips Android marks as sensitive (passwords, one-time codes) are never kept, and with Settings ▸
+ * App drawer ▸ Keep copied items the others go after an hour, a day or a week. The list lives in a
  * private file on the device, never in backups, and is cleared from the widget.
  */
 @Singleton
 class ClipboardHistoryRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     @ApplicationScope private val scope: CoroutineScope,
+    settingsRepository: SettingsRepository,
 ) {
+    /** Settings ▸ App drawer ▸ Keep copied items, in ms; 0 keeps them until pushed out. */
+    @Volatile private var keepMs = 0L
+
+    init {
+        scope.launch {
+            settingsRepository.clipboardKeepMinutes.collect { minutes ->
+                keepMs = minutes * 60_000L
+                prune()
+            }
+        }
+    }
+
     private val clipboard = context.getSystemService(ClipboardManager::class.java)
     private val file = File(context.filesDir, FILE_NAME)
     /** Copied pictures, one small JPEG each (never in backups: filesDir/clips isn't backed up). */
@@ -95,7 +109,7 @@ class ClipboardHistoryRepository @Inject constructor(
     val clips: StateFlow<List<ClipEntry>> = _clips
 
     @Volatile private var widgets = 0
-    private var loaded = false
+    @Volatile private var loaded = false
     /** Timestamp of the clip last looked at: the same clip is not read twice (each read of another
      *  app's clip shows Android's "pasted from your clipboard" notice). */
     private var lastSeen = Long.MIN_VALUE
@@ -122,6 +136,7 @@ class ClipboardHistoryRepository @Inject constructor(
 
     /** Adds the current clip, if it is new text and not sensitive. Call when Folark is in front. */
     fun capture() {
+        prune()
         if (widgets == 0) return
         val cm = clipboard ?: return
         catching {
@@ -222,7 +237,28 @@ class ClipboardHistoryRepository @Inject constructor(
     /** Reads the stored history once, without starting the clipboard listener (the search reads
      *  [clips] even when no clipboard widget is on any home screen to have loaded it). */
     @Synchronized
-    fun ensureLoaded() = load()
+    fun ensureLoaded() {
+        load()
+        prune()
+    }
+
+    /**
+     * Drops clips older than Settings ▸ App drawer ▸ Keep copied items allows. Checked whenever the
+     * history is about to be shown (home coming into view, a widget, the drawer row, search) and
+     * when the setting changes, so no timer runs for it. Never before the stored list is read: a
+     * save then would write an empty list over it.
+     */
+    private fun prune() {
+        val keep = keepMs
+        if (keep <= 0L || !loaded) return
+        val oldest = System.currentTimeMillis() - keep
+        var dropped = false
+        _clips.update { list -> list.filter { it.time >= oldest }.also { dropped = it.size != list.size } }
+        if (dropped) {
+            save()
+            deleteUnusedImages()
+        }
+    }
 
     private fun load() {
         if (loaded) return
@@ -237,6 +273,7 @@ class ClipboardHistoryRepository @Inject constructor(
         }.getOrDefault(emptyList())
         // Clips captured before the file was read stay on top.
         _clips.update { now -> (now + stored.filterNot { s -> now.any { it.text == s.text && it.image == s.image } }).take(MAX_CLIPS) }
+        prune()
     }
 
     private fun save() {

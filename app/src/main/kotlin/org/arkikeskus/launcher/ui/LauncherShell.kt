@@ -1,106 +1,55 @@
 package org.arkikeskus.launcher.ui
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.AnimatedContent
-import org.arkikeskus.launcher.ui.component.LiveCard
 import androidx.activity.compose.PredictiveBackHandler
-import kotlinx.coroutines.CancellationException
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.feature.appdrawer.AppDrawerScreen
 import org.arkikeskus.launcher.feature.home.HomeScreen
-import org.arkikeskus.launcher.model.LauncherSettings
-import org.arkikeskus.launcher.ui.component.IconRing
-import org.arkikeskus.launcher.ui.component.IconRings
-import org.arkikeskus.launcher.ui.component.AppIcon
-import org.arkikeskus.launcher.ui.component.LocalHomeCovered
-import org.arkikeskus.launcher.ui.component.LocalBatterySaver
-import org.arkikeskus.launcher.ui.component.WindowBlurBehind
-import org.arkikeskus.launcher.ui.component.LocalIconPack
-import org.arkikeskus.launcher.ui.component.LocalIconShape
-import org.arkikeskus.launcher.ui.component.LocalScreenType
-import org.arkikeskus.launcher.ui.component.LocalThemedIcons
-import kotlin.math.roundToInt
-import org.arkikeskus.launcher.ui.component.rememberKeyboardShown
-import androidx.compose.foundation.layout.ime
-import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
-import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.feature.home.taskbar.TaskbarSpace
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import org.arkikeskus.launcher.ui.component.LocalIconNudges
-import org.arkikeskus.launcher.ui.component.IconNudges
-import org.arkikeskus.launcher.ui.component.IconNudgeEvent
-import androidx.compose.runtime.mutableStateMapOf
+import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.component.LocalBadgeAvatars
-import org.arkikeskus.launcher.ui.component.LivePill
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.padding
-import android.os.Build
-import android.content.Context
-import android.app.PendingIntent
-import android.app.ActivityOptions
-import org.arkikeskus.launcher.model.catching
+import org.arkikeskus.launcher.ui.component.LocalBatterySaver
+import org.arkikeskus.launcher.ui.component.LocalHomeCovered
+import org.arkikeskus.launcher.ui.component.LocalIconNudges
+import org.arkikeskus.launcher.ui.component.LocalIconRings
+import org.arkikeskus.launcher.ui.component.LocalScreenType
+import org.arkikeskus.launcher.ui.component.LocalTaskbarInset
+import org.arkikeskus.launcher.ui.component.WindowBlurBehind
 
 /**
  * Hosts the launcher surface: the home screen with the app drawer as a **finger-following** slide-up
- * overlay. A swipe up on home drives [progress] (0 = closed, 1 = open) so the drawer tracks the
- * finger; releasing flings/settles to the nearest end. A pull-down at the top of the drawer (or BACK
- * / HOME) closes it. [onOpenSettings] is a long-press on home / the launcher's own drawer icon.
+ * overlay. A swipe up on home drives the drawer's progress (0 = closed, 1 = open, see [DrawerSlide])
+ * so the drawer tracks the finger; releasing flings/settles to the nearest end. A pull-down at the
+ * top of the drawer (or BACK / HOME) closes it. [onOpenSettings] is a long-press on home / the
+ * launcher's own drawer icon.
  *
  * This is also the launcher's drag layer: it owns the shared [HomeDragController] and draws the single
  * floating icon above every surface, so an icon can be dragged from the dock, the home grid, **or the
  * app drawer** onto any of them. Dragging an app out of the drawer slides the drawer closed (so home
  * is visible to drop onto) while keeping the drawer composed, so the in-flight gesture isn't cancelled.
+ *
+ * Its parts are in DrawerSlide.kt (the drawer's position and gestures) and LauncherShellParts.kt
+ * (what the icons show, the taskbar's room, and the background, live pill and dragged icon layers).
  */
 @Composable
 fun LauncherShell(
@@ -109,44 +58,31 @@ fun LauncherShell(
     modifier: Modifier = Modifier,
     shellCommands: Flow<String> = emptyFlow(),
 ) {
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
     val viewModel = hiltViewModel<LauncherShellViewModel>()
     val screenType = LocalScreenType.current
     LaunchedEffect(screenType) {
         viewModel.setScreenType(screenType)
     }
     val iconStyle by viewModel.iconStyle.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     // Read only where it is shown (the pill layer, the icon rings): a download ticking along used to
     // recompose this whole shell every second.
     val liveState = viewModel.live.collectAsStateWithLifecycle()
-    // Read only when an app's long-press menu shows them (see popupNotifications below).
+    // Read only when an app's long-press menu shows them (see rememberPopupNotifications).
     val statusNotifications = viewModel.notifications.collectAsStateWithLifecycle()
     val avatars by viewModel.avatars.collectAsStateWithLifecycle()
     val shellSettings by viewModel.settings.collectAsStateWithLifecycle()
     val drawerHeightFraction by viewModel.drawerHeightFraction.collectAsStateWithLifecycle()
     val drawerWidthFraction by viewModel.drawerWidthFraction.collectAsStateWithLifecycle()
     val drawerAlignment by viewModel.drawerAlignment.collectAsStateWithLifecycle()
-    // Bounds keep a high-initial-velocity settle (the fling-carried spring below) from overshooting
-    // past the ends — an overshoot past 1 would briefly translate the drawer above the screen top.
-    val progress = remember { Animatable(0f).apply { updateBounds(0f, 1f) } }
-    var shellHeightPx by remember { mutableFloatStateOf(1f) }
+    val slide = rememberDrawerSlide()
     var shellOrigin by remember { mutableStateOf(Offset.Zero) }
-    val settleSpring = remember { spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow) }
 
     // The shared drag state. Created here so both the home screen and the app drawer feed the same
     // controller and the floating icon below can travel between them.
     val dragController = rememberHomeDragController()
-    var isDraggingDrawer by remember { mutableStateOf(false) }
-    var dragProgress by remember { mutableFloatStateOf(0f) }
-    val currentProgress by remember {
-        derivedStateOf { if (isDraggingDrawer) dragProgress else progress.value }
-    }
 
-    val drawerOpen by remember { derivedStateOf { currentProgress > 0.001f } }
     // The taskbar steps aside while the drawer is open (or being pulled up), and comes back after.
-    LaunchedEffect(drawerOpen) { TaskbarSpace.setDrawerOpen(drawerOpen) }
+    LaunchedEffect(slide.isOpen) { TaskbarSpace.setDrawerOpen(slide.isOpen) }
     // While an app is being dragged out of the drawer, keep the drawer composed even after it has
     // slid shut — otherwise removing it from composition would cancel the in-progress drag gesture.
     // Keyed on [moving] (not [isDragging]): a still long-press only lifts (menu), and must NOT fade
@@ -154,68 +90,16 @@ fun LauncherShell(
     val draggingFromDrawer by remember {
         derivedStateOf { dragController.moving && dragController.source == DragSource.Drawer }
     }
-    // Smoothly cross-fade the drawer out as a drag-out begins (instead of a hard cut), then reset.
-    val dragOutAlpha = remember { Animatable(1f) }
-    LaunchedEffect(draggingFromDrawer) {
-        if (draggingFromDrawer) dragOutAlpha.animateTo(0f, tween(durationMillis = 180))
-        else dragOutAlpha.snapTo(1f)
-    }
-
-    // The single in-flight drawer-progress coroutine (a drag snapTo or a settle animateTo). Each new
-    // drag/settle cancels the previous one, so a fast finger flick can't pile up competing snapTo/
-    // animateTo jobs that make the drawer lag behind the finger.
-    var dragJob by remember { mutableStateOf<Job?>(null) }
-
-    fun animateProgress(target: Float) {
-        isDraggingDrawer = false
-        dragJob?.cancel()
-        dragJob = scope.launch { progress.animateTo(target, settleSpring) }
-    }
-
-    fun dragDrawer(dyPx: Float) {
-        if (!isDraggingDrawer) {
-            isDraggingDrawer = true
-            dragProgress = progress.value
-        }
-        val effectiveDrawerHeightPx = shellHeightPx.coerceAtLeast(1f)
-        // Swipe up (negative dy) increases progress; clamp to [0, 1].
-        val target = (dragProgress - dyPx / effectiveDrawerHeightPx).coerceIn(0f, 1f)
-        dragProgress = target
-        dragJob?.cancel()
-        dragJob = scope.launch { progress.snapTo(target) }
-    }
-
-    fun settleDrawer(velocityPxPerSec: Float) {
-        val currentVal = if (isDraggingDrawer) dragProgress else progress.value
-        isDraggingDrawer = false
-        val effectiveDrawerHeightPx = shellHeightPx.coerceAtLeast(1f)
-        // Launcher3-style: a fling (release speed past the threshold) snaps to the direction of the
-        // fling regardless of distance; otherwise settle by how far it was dragged. Velocity is px/s.
-        val flingThreshold = 600f
-        val target = when {
-            velocityPxPerSec < -flingThreshold -> 1f // fast up → open
-            velocityPxPerSec > flingThreshold -> 0f  // fast down → close
-            else -> if (currentVal > 0.4f) 1f else 0f
-        }
-        dragJob?.cancel()
-        dragJob = scope.launch {
-            progress.snapTo(currentVal)
-            // Carry the finger's release velocity into the spring (converted to progress units/s;
-            // downward px velocity = negative progress velocity). Starting the spring from rest made a
-            // fling-to-close visibly hesitate before accelerating — the "drawer lags coming down" feel.
-            progress.animateTo(target, settleSpring, initialVelocity = -velocityPxPerSec / effectiveDrawerHeightPx)
-        }
-    }
 
     LaunchedEffect(homeSignals) {
-        homeSignals.collect { animateProgress(0f) }
+        homeSignals.collect { slide.animateTo(0f) }
     }
 
     // Fold/unfold actions from the activity ("open the drawer / search after unfolding").
     LaunchedEffect(shellCommands) {
         shellCommands.collect { command ->
             when (command) {
-                LauncherSettings.ACTION_DRAWER, LauncherSettings.ACTION_SEARCH -> animateProgress(1f)
+                LauncherSettings.ACTION_DRAWER, LauncherSettings.ACTION_SEARCH -> slide.animateTo(1f)
                 else -> Unit
             }
         }
@@ -230,160 +114,46 @@ fun LauncherShell(
     val homeBlurDp = if (batterySaver) 0f else shellSettings.home.wallpaperBlur
     val drawerBlurDp = if (batterySaver) 0f else maxOf(shellSettings.drawer.backgroundBlur * 2f, homeBlurDp)
     // The drawer (almost) fully open: what is underneath can stop animating.
-    val homeCovered by remember { derivedStateOf { currentProgress > 0.97f } }
+    val homeCovered by remember { derivedStateOf { slide.progress > 0.97f } }
     WindowBlurBehind(maxRadiusDp = drawerBlurDp) {
-        val progress = if (draggingFromDrawer) 0f else currentProgress
+        val progress = if (draggingFromDrawer) 0f else slide.progress
         if (drawerBlurDp <= 0f) 0f else (homeBlurDp + (drawerBlurDp - homeBlurDp) * progress) / drawerBlurDp
     }
 
-    // Each app's notifications for its long-press menu (Settings ▸ Notifications), sender photos
-    // for the dots: provided to home, dock and drawer alike.
-    // A function, read by the menu as it shows: an ongoing download's notification changing every
-    // second used to recompose this whole shell each time.
-    val popupOn = shellSettings.live.popupNotifications
-    val popupNotifications: () -> List<org.arkikeskus.launcher.ui.PopupNotification> = remember(popupOn) { {
-        if (!popupOn) {
-            emptyList()
-        } else {
-            statusNotifications.value.mapNotNull { n ->
-                val title = n.title?.takeIf { it.isNotBlank() } ?: n.text?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                PopupNotification(
-                    key = n.key,
-                    packageName = n.packageName,
-                    userSerial = n.userSerial,
-                    title = title,
-                    text = if (n.title.isNullOrBlank()) "" else n.text.orEmpty(),
-                    postTime = n.postTime,
-                    icon = n.icon,
-                    open = {
-                        n.contentIntent?.let { openNotificationIntent(context, it) }
-                        if (n.autoCancel) viewModel.dismissNotification(n.key)
-                    },
-                    dismiss = { viewModel.dismissNotification(n.key) },
-                )
-            }
-        }
-    } }
-    // A new notification nudges its app's icon (newest per app; each with its own id so a second
-    // message replays the effect). Not in battery saver.
-    val nudgeEvents = remember { mutableStateMapOf<String, IconNudgeEvent>() }
-    LaunchedEffect(Unit) {
-        var id = 0L
-        viewModel.nudges.collect { n -> nudgeEvents[n.badgeKey] = IconNudgeEvent(n.badgeKey, n.color, n.time, ++id) }
-    }
-    val iconNudges = remember(shellSettings.icons.nudge, shellSettings.icons.nudgeEffect, shellSettings.icons.nudgeSoftness, batterySaver) {
-        if (shellSettings.icons.nudge && !batterySaver) {
-            IconNudges(shellSettings.icons.nudgeEffect, shellSettings.icons.nudgeSoftness, nudgeEvents)
-        } else {
-            null
-        }
-    }
-    // Rings around icons (Settings ▸ Icons & badges): a download's progress, a running timer, and
-    // with "progress & unread" the apps with new notifications. Only what has something to show.
-    val ringMode = shellSettings.icons.ring
-    val iconRings = remember(ringMode) {
-        if (ringMode == LauncherSettings.RING_OFF) null else IconRings(ringMode)
-    }
-    LaunchedEffect(iconRings) {
-        val rings = iconRings ?: return@LaunchedEffect
-        androidx.compose.runtime.snapshotFlow { liveState.value }.collect { live -> rings.update(
-            live.filter { it.progress != null || it.indeterminate || it.chronometerBase != 0L }
-                .groupBy { "${it.packageName}/${it.userSerial}" }
-                .mapValues { (_, items) ->
-                    // A determinate progress first (it says the most), else a timer, else busy.
-                    val a = items.firstOrNull { it.progress != null && !it.indeterminate }
-                        ?: items.firstOrNull { it.chronometerBase != 0L } ?: items.first()
-                    IconRing(
-                        progress = a.progress,
-                        indeterminate = a.indeterminate,
-                        chronometerBase = if (a.progress == null) a.chronometerBase else 0L,
-                        color = a.color,
-                    )
-                },
-        ) }
-    }
-    // Folark's taskbar staying on home (inner display): the dock and the drawer keep clear of it.
-    val taskbarPx by TaskbarSpace.bottomPx.collectAsStateWithLifecycle()
-    val navigationPx = WindowInsets.navigationBars.getBottom(density)
-    // While the keyboard is up the bar steps aside (it would cover the keyboard), so no room is
-    // kept for it either; the drawer and home make room for the keyboard instead.
-    val keyboardUp by rememberKeyboardShown()
-    LaunchedEffect(keyboardUp, screenType) {
-        if (screenType == ScreenType.INNER) TaskbarSpace.setKeyboardOnHome(keyboardUp)
-    }
-    val taskbarInset = if (screenType == ScreenType.INNER && !keyboardUp) {
-        with(density) { (taskbarPx - navigationPx).coerceAtLeast(0).toDp() }
-    } else {
-        0.dp
-    }
+    // Each app's notifications for its long-press menu and sender photos for the dots, nudges and
+    // rings on the icons: provided to home, dock and drawer alike.
+    val popupNotifications = rememberPopupNotifications(
+        enabled = shellSettings.live.popupNotifications,
+        notifications = statusNotifications,
+        dismiss = viewModel::dismissNotification,
+    )
+    val iconNudges = rememberIconNudges(
+        nudges = viewModel.nudges,
+        enabled = shellSettings.icons.nudge && !batterySaver,
+        effect = shellSettings.icons.nudgeEffect,
+        softness = shellSettings.icons.nudgeSoftness,
+    )
+    val iconRings = rememberIconRings(shellSettings.icons.ring, liveState)
     CompositionLocalProvider(
         LocalAppNotifications provides popupNotifications,
         LocalBadgeAvatars provides avatars,
         LocalIconNudges provides iconNudges,
-        org.arkikeskus.launcher.ui.component.LocalIconRings provides iconRings,
-        LocalTaskbarInset provides taskbarInset,
+        LocalIconRings provides iconRings,
+        LocalTaskbarInset provides rememberTaskbarInset(screenType),
     ) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .onSizeChanged { shellHeightPx = it.height.toFloat().coerceAtLeast(1f) }
+            .onSizeChanged { slide.heightPx = it.height.toFloat().coerceAtLeast(1f) }
             .onGloballyPositioned { shellOrigin = it.positionInRoot() },
     ) {
-        // Behind the home screen: this display's own background picture (drawn over the system
-        // wallpaper, which a launcher cannot swap per display without re-theming the whole system),
-        // then the dim layer that keeps icons and labels readable on a busy wallpaper.
-        val backgroundPath = shellSettings.home.backgroundImage
-        // Settings ▸ Theme ▸ Wallpaper follows the hinge: the picture zooms in a little as the phone
-        // folds (and back out as it opens), read in the picture's own layer only.
-        val wallpaperFold = org.arkikeskus.launcher.feature.home.rememberHingeFold(
-            enabled = shellSettings.fold.wallpaperHinge && !batterySaver && !homeCovered,
-        )
-        // Android's own wallpaper behind home (no picture of Folark's): zoomed the same way through
-        // WallpaperManager's zoom, where this Android build lets a launcher call it.
-        val shellView = androidx.compose.ui.platform.LocalView.current
-        if (shellSettings.fold.wallpaperHinge && backgroundPath.isBlank()) {
-            LaunchedEffect(shellView) {
-                try {
-                    androidx.compose.runtime.snapshotFlow { wallpaperFold.value }.collect { setSystemWallpaperZoom(shellView, it * WALLPAPER_ZOOM_OUT) }
-                } finally {
-                    setSystemWallpaperZoom(shellView, 0f)
-                }
-            }
-        }
-        val hingeZoom = Modifier.graphicsLayer {
-            val s = 1f + wallpaperFold.value * WALLPAPER_HINGE_ZOOM
-            scaleX = s
-            scaleY = s
-        }
-        if (backgroundPath.isNotBlank() && isVideoBackground(backgroundPath)) {
-            // A looping silent video, playing only while home is in view (VideoBackground.kt).
-            VideoBackground(
-                path = backgroundPath,
-                playing = !homeCovered && !LocalBatterySaver.current,
-                awakeSeconds = shellSettings.home.videoAwakeSeconds,
-                modifier = Modifier.fillMaxSize().then(hingeZoom),
-            )
-        } else if (backgroundPath.isNotBlank()) {
-            AsyncImage(
-                model = java.io.File(backgroundPath),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().then(hingeZoom),
-            )
-        }
-        if (shellSettings.home.wallpaperDim > 0f) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = shellSettings.home.wallpaperDim)),
-            )
-        }
+        HomeBackground(shellSettings, batterySaver, homeCovered)
         CompositionLocalProvider(LocalHomeCovered provides homeCovered) {
         HomeScreen(
             screenType = screenType,
-            onOpenDrawer = { animateProgress(1f) },
-            onDrawerDrag = { dragDrawer(it) },
-            onDrawerSettle = { settleDrawer(it) },
+            onOpenDrawer = { slide.animateTo(1f) },
+            onDrawerDrag = { slide.drag(it) },
+            onDrawerSettle = { slide.settle(it) },
             onOpenSettings = onOpenSettings,
             homeSignals = homeSignals,
             dragController = dragController,
@@ -393,7 +163,7 @@ fun LauncherShell(
                 // icons and labels don't show through the translucent panel and clash with the grid.
                 .graphicsLayer {
                     if (glassDrawer && !draggingFromDrawer) {
-                        val p = currentProgress
+                        val p = slide.progress
                         alpha = 1f - p
                         val scale = 1f - 0.05f * p
                         scaleX = scale
@@ -403,244 +173,47 @@ fun LauncherShell(
         )
         }
 
-        // What is going on right now (a timer, navigation, a download): a live pill on top of home.
-        // While Android's status bar shows, what it already has a chip for (calls, Live updates)
-        // isn't shown a second time.
-        val liveLayer: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit = {
-        val chipsShown = shellSettings.live.skipSystemChips && !shellSettings.statusBar.hideSystem
-        val live = liveState.value.let { all -> if (chipsShown) all.filterNot { it.systemChip } else all }
-        val cameraClear = rememberCameraClearance()
-        if (shellSettings.live.activities && live.isNotEmpty() && !homeCovered) {
-            var liveIndex by remember { mutableIntStateOf(0) }
-            var liveOpen by remember { mutableStateOf(false) }
-            val shownLive = live[liveIndex % live.size]
-            val canOpenUp = shellSettings.live.expandOnLongPress
-            // Opened up, it closes again on its own after a while without a touch.
-            LaunchedEffect(liveOpen, liveIndex) {
-                if (liveOpen) {
-                    kotlinx.coroutines.delay(LIVE_CARD_IDLE_MS)
-                    liveOpen = false
-                }
-            }
-            if (liveOpen) {
-                // A tap anywhere else closes the card.
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.28f))
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { liveOpen = false },
-                )
-            }
-            AnimatedContent(
-                targetState = liveOpen && canOpenUp,
-                transitionSpec = {
-                    (fadeIn(tween(180)) + scaleIn(tween(260), initialScale = 0.86f, transformOrigin = TransformOrigin(0.5f, 0f)))
-                        .togetherWith(fadeOut(tween(140)) + scaleOut(tween(180), targetScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 0f)))
-                        .using(SizeTransform(clip = false))
-                },
-                contentAlignment = Alignment.TopCenter,
-                label = "live",
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    // Below the status bar, and always below the front camera (with the status
-                    // bar hidden there is no bar to keep clear, but the camera hole is still there).
-                    .padding(top = cameraClear + 4.dp, start = 16.dp, end = 16.dp),
-            ) { open ->
-                if (open) {
-                    LiveCard(
-                        activity = shownLive,
-                        index = liveIndex % live.size,
-                        count = live.size,
-                        onSwitch = { liveIndex = it },
-                        onOpen = {
-                            liveOpen = false
-                            shownLive.contentIntent?.let { openNotificationIntent(context, it) }
-                        },
-                        onAction = { action -> openNotificationIntent(context, action.intent) },
-                    )
-                } else {
-                    LivePill(
-                        // Several at once: a sideways swipe shows the next (or the one before).
-                        modifier = if (live.size < 2) Modifier else Modifier.pointerInput(live.size) {
-                            var dragged = 0f
-                            val step = 36.dp.toPx()
-                            detectHorizontalDragGestures(
-                                onDragStart = { dragged = 0f },
-                                onDragEnd = {
-                                    if (dragged <= -step) liveIndex++
-                                    else if (dragged >= step) liveIndex = (liveIndex - 1 + live.size) % live.size
-                                },
-                            ) { change, amount -> change.consume(); dragged += amount }
-                        },
-                        activity = shownLive,
-                        effect = shellSettings.live.activityEffect,
-                        animate = !batterySaver,
-                        light = false,
-                        extra = live.size - 1,
-                        onClick = { shownLive.contentIntent?.let { openNotificationIntent(context, it) } },
-                        // A long press opens it up; with that off, several at once: it shows the next.
-                        onLongPress = when {
-                            canOpenUp -> ({ liveOpen = true })
-                            live.size > 1 -> ({ liveIndex++ })
-                            else -> null
-                        },
-                    )
-                }
-            }
-        }
-        }
-        liveLayer()
+        LiveActivityLayer(liveState, shellSettings, batterySaver, homeCovered)
 
         // Always compose AppDrawerScreen at fillMaxSize to keep it pre-composed, pre-measured, and pre-laid out.
         // When closed, it is translated completely off-screen (translationY = size.height).
         // Compose's pointer input system respects the graphicsLayer transform, so it will not block pointer events for the HomeScreen.
         AppDrawerScreen(
-            onClose = { animateProgress(0f) },
-            onDrawerDrag = { dragDrawer(it) },
-            onDrawerSettle = { settleDrawer(it) },
+            onClose = { slide.animateTo(0f) },
+            onDrawerDrag = { slide.drag(it) },
+            onDrawerSettle = { slide.settle(it) },
             onOpenSettings = {
-                animateProgress(0f)
+                slide.animateTo(0f)
                 onOpenSettings()
             },
             dragController = dragController,
             homeSignals = homeSignals,
-            drawerOpen = drawerOpen || draggingFromDrawer,
+            drawerOpen = slide.isOpen || draggingFromDrawer,
             drawerHeightFraction = drawerHeightFraction,
             drawerWidthFraction = drawerWidthFraction,
             drawerAlignment = drawerAlignment,
-            drawerProgress = { currentProgress },
-            onDragOutStart = {
-                isDraggingDrawer = false
-                scope.launch { progress.snapTo(0f) }
-            },
+            drawerProgress = { slide.progress },
+            onDragOutStart = { slide.snapClosed() },
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Single floating icon for any in-progress drag (home, dock or drawer), drawn above every
-        // surface so it can travel between them. Positioned by the finger's root coords.
-        val dragged = dragController.draggedApp
-        if (dragged != null && dragController.moving) {
-            // The icon's real size (from the surface it came from), centred where it was grabbed —
-            // not under the finger — so picking it up never makes it jump.
-            val iconDp = dragController.iconSize
-            val sizeDp = iconDp + 4.dp
-            val halfPx = with(density) { (sizeDp / 2).toPx() }
-            // A short lift as the drag begins instead of popping straight to the lifted size.
-            val lift = remember(dragged.key) { androidx.compose.animation.core.Animatable(1f) }
-            LaunchedEffect(dragged.key) {
-                lift.animateTo(
-                    DRAG_LIFT_SCALE,
-                    androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 900f),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .offset {
-                        val p = dragController.rootPosition + dragController.grabOffset
-                        IntOffset(
-                            (p.x - shellOrigin.x - halfPx).roundToInt(),
-                            (p.y - shellOrigin.y - halfPx).roundToInt(),
-                        )
-                    }
-                    .size(sizeDp)
-                    .graphicsLayer {
-                        alpha = 0.92f
-                        scaleX = lift.value
-                        scaleY = lift.value
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                // Match the surfaces' icon style (the floating icon is a sibling of Home/Drawer, outside
-                // their CompositionLocal scopes, so without this it reverts to the plain system icon).
-                CompositionLocalProvider(
-                    LocalIconPack provides iconStyle.iconPack,
-                    LocalIconShape provides iconStyle.shape,
-                    LocalThemedIcons provides iconStyle.themed,
-                ) {
-                    AppIcon(
-                        appItem = dragged,
-                        labelColor = Color.White,
-                        showLabel = false,
-                        iconSize = iconDp,
-                    )
-                }
-            }
-        }
+        DraggedIconLayer(dragController, { shellOrigin }, iconStyle)
 
         // "… removed from home · Undo" after an app was removed or hidden anywhere (AppEdits).
-        org.arkikeskus.launcher.ui.UndoBar(Modifier.align(Alignment.BottomCenter))
+        UndoBar(Modifier.align(Alignment.BottomCenter))
     }
     }
 
-    PredictiveBackHandler(enabled = drawerOpen) { backEvents ->
+    PredictiveBackHandler(enabled = slide.isOpen) { backEvents ->
         try {
             // Scrub the drawer closed live as the system back gesture progresses (0 → 1), so it
             // tracks the finger instead of only animating on release (progress: 1 open → 0 closed).
-            backEvents.collect { ev -> progress.snapTo(1f - ev.progress) }
+            backEvents.collect { ev -> slide.scrubTo(1f - ev.progress) }
             // Commit: the user completed the swipe.
-            animateProgress(0f)
+            slide.animateTo(0f)
         } catch (e: CancellationException) {
             // Cancelled: the user dragged back but then let go to cancel the back gesture.
-            animateProgress(1f)
+            slide.animateTo(1f)
         }
     }
 }
-
-/**
- * Fires a notification's tap action like the notification shade would. Android 14+ no longer lends
- * the sender's right to open an activity; home is in front on the tap, so the grant is ours to give.
- */
-/** How long an opened-up live card stays without a touch. */
-private const val LIVE_CARD_IDLE_MS = 10_000L
-
-private fun openNotificationIntent(context: Context, intent: PendingIntent) {
-    catching {
-        val options = org.arkikeskus.launcher.data.PendingIntents.foregroundStartOptions()
-        intent.send(context, 0, null, null, null, null, options.toBundle())
-    }
-}
-
-/**
- * How far down from the top of the screen the live pill must start: below the status bar when it
- * shows, and below the front camera's hole (the outer screen's camera sits in the middle of the
- * top edge) whether the status bar shows or not.
- */
-@Composable
-private fun rememberCameraClearance(): androidx.compose.ui.unit.Dp {
-    val density = LocalDensity.current
-    val view = androidx.compose.ui.platform.LocalView.current
-    val config = androidx.compose.ui.platform.LocalConfiguration.current
-    // Both read in composition, so a screen switch or the status bar coming and going updates it.
-    val barTop = WindowInsets.statusBars.getTop(density)
-    val cutoutTop = WindowInsets.displayCutout.getTop(density)
-    val holeBottom = remember(cutoutTop, barTop, config.screenWidthDp, config.screenHeightDp, config.orientation) {
-        // The camera hole itself (Android's safe inset can be a little shorter than the hole).
-        val rects = catching { view.rootWindowInsets?.displayCutout?.boundingRects }.getOrNull().orEmpty()
-        val limit = view.rootView.height.takeIf { it > 0 }?.div(4) ?: Int.MAX_VALUE
-        rects.filter { it.top < limit && it.bottom < limit }.maxOfOrNull { it.bottom } ?: 0
-    }
-    return with(density) { maxOf(barTop, cutoutTop, holeBottom).toDp() }
-}
-
-/** How much the home picture grows with the phone folded to 90° (Settings ▸ Wallpaper follows the hinge). */
-private const val WALLPAPER_HINGE_ZOOM = 0.14f
-
-/** The same for Android's own wallpaper, as WallpaperManager's zoom (0 none, 1 the most). */
-private const val WALLPAPER_ZOOM_OUT = 0.8f
-
-/** WallpaperManager's zoom call, looked up once (it runs on every frame of a hinge move); null where hidden. */
-private val wallpaperZoomMethod: java.lang.reflect.Method? by lazy {
-    catching {
-        android.app.WallpaperManager::class.java.getMethod("setWallpaperZoomOut", android.os.IBinder::class.java, Float::class.javaPrimitiveType)
-    }.getOrNull()
-}
-
-/** Android's wallpaper zoom for the window of [view]; quietly nothing where Android won't allow it. */
-private fun setSystemWallpaperZoom(view: android.view.View, zoom: Float) {
-    val token = view.windowToken ?: return
-    val method = wallpaperZoomMethod ?: return
-    catching { method.invoke(android.app.WallpaperManager.getInstance(view.context), token, zoom.coerceIn(0f, 1f)) }
-}
-
-/** How much a dragged icon grows as it is lifted. */
-private const val DRAG_LIFT_SCALE = 1.1f

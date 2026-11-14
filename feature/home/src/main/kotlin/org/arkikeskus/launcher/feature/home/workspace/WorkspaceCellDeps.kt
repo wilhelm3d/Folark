@@ -1,10 +1,13 @@
 package org.arkikeskus.launcher.feature.home.workspace
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.PendingWidget
+import org.arkikeskus.launcher.feature.home.PlacedFolder
+import org.arkikeskus.launcher.feature.home.PlacedShortcut
+import org.arkikeskus.launcher.feature.home.WidgetLook
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.widgets.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.widgets.BadgeCounts
+import org.arkikeskus.launcher.feature.home.widgets.EditingItem
+import org.arkikeskus.launcher.feature.home.widgets.WidgetDragController
 import android.appwidget.AppWidgetHostView
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.geometry.Offset

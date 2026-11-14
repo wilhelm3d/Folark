@@ -1,8 +1,6 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import android.content.Intent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -69,7 +67,7 @@ class BatteryWidgetViewModel @Inject constructor(
  * with its footprint like the other built-ins. Tap opens the system battery screen.
  */
 @Composable
-fun BatteryWidget(
+internal fun BatteryWidget(
     modifier: Modifier = Modifier,
     viewModel: BatteryWidgetViewModel = hiltViewModel(),
 ) {

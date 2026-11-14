@@ -1,7 +1,6 @@
-package org.arkikeskus.launcher.data
+package org.arkikeskus.launcher.data.root
 
 import com.google.common.truth.Truth.assertThat
-import org.arkikeskus.launcher.data.root.RootShell
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before

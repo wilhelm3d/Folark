@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.arkikeskus.launcher.data.ModulePrefs
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.model.LauncherSettings
@@ -113,12 +114,12 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             // The Vector (LSPosed) module asks Folark each time it acts: seen lately = active. It also
             // reports which launcher internals it could hook (compat), so a gesture the user turned on
             // but this launcher build can't provide is shown as "limited" rather than a plain "active".
-            val prefs = remember { context.getSharedPreferences("folark_recents_hook", 0) }
+            val prefs = remember { context.getSharedPreferences(ModulePrefs.FILE, 0) }
             val seenAt = remember(s.recents.replaceSystem, s.recents.navHandleOpensSearch) {
-                prefs.getLong("seen_at", 0L)
+                prefs.getLong(ModulePrefs.SEEN_AT, 0L)
             }
             val compat = remember(s.recents.replaceSystem, s.recents.navHandleOpensSearch) {
-                prefs.getInt("compat", 0)
+                prefs.getInt(ModulePrefs.COMPAT, 0)
             }
             val active = seenAt > 0L && System.currentTimeMillis() - seenAt < 7L * 24 * 3600 * 1000
             // compat == 0 means the module never reported (or predates this), so don't cry "limited".

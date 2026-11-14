@@ -1,10 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
 import org.arkikeskus.launcher.model.WidgetSettings
-
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.arkikeskus.launcher.data.MotoLinks
@@ -163,7 +160,7 @@ private val TextShadow = Shadow(color = Color.Black.copy(alpha = 0.45f), blurRad
  * conditions are drawn over the wallpaper.
  */
 @Composable
-fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewModel = hiltViewModel()) {
+internal fun WeatherDayWidget(modifier: Modifier = Modifier, viewModel: WeatherDayViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val weather by viewModel.weather.collectAsStateWithLifecycle()
     val widgets by viewModel.widgets.collectAsStateWithLifecycle()

@@ -1,7 +1,9 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.widgets.*
-
+import org.arkikeskus.launcher.feature.home.widgets.maximumWidgetCells
+import org.arkikeskus.launcher.feature.home.widgets.minimumWidgetCells
+import org.arkikeskus.launcher.feature.home.widgets.resizeWidgetStartEdge
+import org.arkikeskus.launcher.feature.home.widgets.widgetDropPlacement
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 

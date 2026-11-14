@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.launcher.system
 
+import org.arkikeskus.launcher.model.safeScope
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -16,7 +17,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.shareIn
 
@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.shareIn
 class BatteryMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    private val sharing = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val sharing = safeScope(Dispatchers.Main.immediate)
 
     val status: Flow<BatteryStatus> = callbackFlow {
         val receiver = object : BroadcastReceiver() {

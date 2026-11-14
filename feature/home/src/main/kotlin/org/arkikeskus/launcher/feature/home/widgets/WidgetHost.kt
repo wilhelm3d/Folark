@@ -1,8 +1,6 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetProviderInfo
 import android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_RECONFIGURABLE
@@ -39,7 +37,7 @@ val LocalOrphanWidgetConfigResult = staticCompositionLocalOf<MutableStateFlow<Bo
 /**
  * Default span from API 31+ cell hints and the minimum physical size on this home grid.
  */
-fun defaultWidgetSpans(
+internal fun defaultWidgetSpans(
     provider: AppWidgetProviderInfo, context: Context, cellWidthDp: Float, cellHeightDp: Float,
 ): Pair<Int, Int> {
     val density = context.resources.displayMetrics.density
@@ -51,7 +49,7 @@ fun defaultWidgetSpans(
 }
 
 /** The cell-span limits + allowed axes for resizing a widget, derived from its provider. */
-data class WidgetResizeRange(
+internal data class WidgetResizeRange(
     val minX: Int, val minY: Int, val maxX: Int, val maxY: Int,
     val horizontal: Boolean, val vertical: Boolean,
 ) {
@@ -59,7 +57,7 @@ data class WidgetResizeRange(
 }
 
 /** Resize limits for [info]: min/max cells per axis (provider min/maxResize + grid), allowed axes. */
-fun widgetResizeRange(
+internal fun widgetResizeRange(
     info: AppWidgetProviderInfo,
     context: Context,
     gridColumns: Int,
@@ -86,5 +84,5 @@ fun widgetResizeRange(
 
 /** True if [info] has a configuration activity AND declares the reconfigurable feature (Launcher3's
  *  `isReconfigurable()` gate). Such widgets can be re-configured after placement. */
-fun isReconfigurableWidget(info: AppWidgetProviderInfo): Boolean =
+internal fun isReconfigurableWidget(info: AppWidgetProviderInfo): Boolean =
     info.configure != null && (info.widgetFeatures and WIDGET_FEATURE_RECONFIGURABLE) != 0

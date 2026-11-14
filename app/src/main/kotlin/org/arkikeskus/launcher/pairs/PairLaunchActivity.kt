@@ -1,12 +1,12 @@
 package org.arkikeskus.launcher.pairs
 
+import org.arkikeskus.launcher.model.safeScope
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -22,7 +22,7 @@ import org.arkikeskus.launcher.model.catching
 class PairLaunchActivity : ComponentActivity() {
 
     @Inject lateinit var appRepository: AppRepository
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = safeScope(Dispatchers.Default)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

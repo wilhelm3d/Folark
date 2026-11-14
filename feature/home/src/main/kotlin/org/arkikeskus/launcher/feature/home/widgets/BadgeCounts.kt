@@ -1,8 +1,6 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State

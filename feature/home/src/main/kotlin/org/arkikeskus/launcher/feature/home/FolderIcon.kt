@@ -36,7 +36,7 @@ import org.arkikeskus.launcher.ui.component.badgeAlignment
  * [preview], and the opened folder's grid [openColumns] and [openSize]. The values are the
  * `LauncherSettings.FOLDER_*` constants.
  */
-data class FolderStyle(
+internal data class FolderStyle(
     val shape: String = LauncherSettings.FOLDER_SHAPE_SQUIRCLE,
     val theme: String = LauncherSettings.FOLDER_THEME_GLASS,
     val preview: String = LauncherSettings.FOLDER_PREVIEW_GRID_2,
@@ -47,7 +47,7 @@ data class FolderStyle(
 )
 
 /** The folder style of the display in use; provided by HomeScreen from the settings. */
-val LocalFolderStyle = compositionLocalOf { FolderStyle() }
+internal val LocalFolderStyle = compositionLocalOf { FolderStyle() }
 
 /** The solid background of a folder [theme], or null for Liquid Glass (which is not one colour). */
 @Composable
@@ -96,7 +96,7 @@ internal fun FolderSurface(
  * preview come from [LocalFolderStyle].
  */
 @Composable
-fun FolderIcon(
+internal fun FolderIcon(
     name: String,
     apps: List<AppItem>,
     showLabel: Boolean,

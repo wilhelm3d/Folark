@@ -1,10 +1,8 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
 import org.arkikeskus.launcher.model.WidgetSettings
-
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.MinuteTicker
 import org.arkikeskus.launcher.feature.home.R
-
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import android.content.Intent
@@ -162,7 +160,7 @@ private fun clockLook(style: String): ClockLook = when (style) {
  * already on a home screen simply becomes this one.)
  */
 @Composable
-fun NothingClockWidget(
+internal fun NothingClockWidget(
     modifier: Modifier = Modifier,
     viewModel: NothingClockViewModel = hiltViewModel(),
 ) {

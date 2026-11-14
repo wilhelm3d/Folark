@@ -1,7 +1,9 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.workspace.*
-
+import org.arkikeskus.launcher.feature.home.workspace.emptyPageReturnTarget
+import org.arkikeskus.launcher.feature.home.workspace.explicitPageCountAfterInsert
+import org.arkikeskus.launcher.feature.home.workspace.explicitPageCountAfterRemove
+import org.arkikeskus.launcher.feature.home.workspace.permanentPageCount
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 

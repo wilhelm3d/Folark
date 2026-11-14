@@ -1,9 +1,6 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.taskbar.*
-import org.arkikeskus.launcher.feature.home.widgets.*
-import org.arkikeskus.launcher.feature.home.workspace.*
-
+import org.arkikeskus.launcher.feature.home.widgets.rememberNotificationIcon
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent

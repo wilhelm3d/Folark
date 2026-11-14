@@ -1,8 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.HomeScreen
 import org.arkikeskus.launcher.feature.home.R
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
@@ -13,7 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import org.arkikeskus.launcher.data.MotoLinks
 
 /** Settings ▸ Appearance ▸ Motorola: a tap on the weather opens Motorola Weather (from HomeScreen). */
-val LocalMotoWeatherTap = compositionLocalOf { false }
+internal val LocalMotoWeatherTap = compositionLocalOf { false }
 
 /** Makes the weather text open Motorola Weather, when that is switched on and the phone has it. */
 @Composable

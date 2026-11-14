@@ -1,10 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.MinuteTicker
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.workspace.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
 import android.content.Intent
 import android.provider.CalendarContract
 import androidx.compose.foundation.clickable
@@ -40,7 +37,7 @@ import org.arkikeskus.launcher.model.catching
  * temperature, and date.
  */
 @Composable
-fun SamsungWeatherWidget(
+internal fun SamsungWeatherWidget(
     modifier: Modifier = Modifier,
     viewModel: SmartspaceViewModel = hiltViewModel(),
 ) {

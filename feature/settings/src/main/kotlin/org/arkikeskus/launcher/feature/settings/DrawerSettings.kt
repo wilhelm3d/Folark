@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -357,6 +358,20 @@ internal fun AppDrawerSection(
             subtitle = stringResource(R.string.settings_drawer_clipboard_desc),
             checked = s.drawer.clipboardRow,
             onCheckedChange = { viewModel.setDrawerClipboard(it, screenType) },
+        )
+        ExpressiveRowDivider()
+        // The history behind the clipboard row, the clipboard widget and search.
+        val keepMinutes by viewModel.clipboardKeepMinutes.collectAsStateWithLifecycle()
+        ExpressiveSegmentedControl(
+            title = stringResource(R.string.settings_clipboard_keep),
+            options = listOf(
+                0 to stringResource(R.string.settings_clipboard_keep_always),
+                60 to stringResource(R.string.settings_clipboard_keep_hour),
+                1_440 to stringResource(R.string.settings_clipboard_keep_day),
+                10_080 to stringResource(R.string.settings_clipboard_keep_week),
+            ),
+            selected = keepMinutes,
+            onSelect = { viewModel.setClipboardKeepMinutes(it) },
         )
         ExpressiveRowDivider()
 

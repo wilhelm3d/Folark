@@ -1,9 +1,7 @@
 package org.arkikeskus.launcher.feature.home
 
 import org.arkikeskus.launcher.model.HomeSettings
-
-import org.arkikeskus.launcher.feature.home.workspace.*
-
+import org.arkikeskus.launcher.feature.home.workspace.WorkspacePageOperations
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async

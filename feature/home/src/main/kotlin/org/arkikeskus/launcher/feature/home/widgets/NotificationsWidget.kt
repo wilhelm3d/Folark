@@ -1,8 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.data.PendingIntents
 import org.arkikeskus.launcher.feature.home.R
-
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -135,7 +134,7 @@ class NotificationsWidgetViewModel @Inject constructor(
      *  something predictable, even for a system notification with no action and no launcher activity. */
     fun open(slot: Slot) {
         val pi = slot.notification.contentIntent
-        val sent = pi != null && sendNotificationIntent(context, pi)
+        val sent = pi != null && PendingIntents.sendFromForeground(context, pi)
         if (sent) {
             if (slot.notification.autoCancel) badgeRepository.cancelNotification(slot.notification.key)
             return
@@ -164,7 +163,7 @@ class NotificationsWidgetViewModel @Inject constructor(
  * invisible when there is nothing to show (the grid footprint and long-press edit remain).
  */
 @Composable
-fun NotificationsWidget(
+internal fun NotificationsWidget(
     modifier: Modifier = Modifier,
     viewModel: NotificationsWidgetViewModel = hiltViewModel(),
     screenType: ScreenType = LocalScreenType.current,

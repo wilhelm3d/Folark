@@ -64,10 +64,10 @@ data class WidgetLook(
 }
 
 /** Every customised widget look, by home row id. */
-val LocalWidgetLooks = compositionLocalOf<Map<Long, WidgetLook>> { emptyMap() }
+internal val LocalWidgetLooks = compositionLocalOf<Map<Long, WidgetLook>> { emptyMap() }
 
 /** Applies [look] to a widget's cell box; a null or default look changes nothing. */
-fun Modifier.widgetLook(look: WidgetLook?): Modifier {
+internal fun Modifier.widgetLook(look: WidgetLook?): Modifier {
     if (look == null || look.isDefault) return this
     var m = this
     if (look.padding > 0) m = m.padding(look.padding.dp)
@@ -78,7 +78,7 @@ fun Modifier.widgetLook(look: WidgetLook?): Modifier {
 
 /** The "Widget style" sheet opened from the widget edit bar. Changes are saved as each slider is released. */
 @Composable
-fun WidgetLookDialog(look: WidgetLook, onChange: (WidgetLook?) -> Unit, onDismiss: () -> Unit) {
+internal fun WidgetLookDialog(look: WidgetLook, onChange: (WidgetLook?) -> Unit, onDismiss: () -> Unit) {
     var radius by remember { mutableStateOf(look.radius.toFloat()) }
     var padding by remember { mutableStateOf(look.padding.toFloat()) }
     var opacity by remember { mutableStateOf(look.opacity) }
@@ -135,7 +135,7 @@ fun WidgetLookDialog(look: WidgetLook, onChange: (WidgetLook?) -> Unit, onDismis
  * The home pages' swipe effect. [offset] is how far the page is from the settled position, in
  * pages: positive once it has moved off to the left, negative while it is still to the right.
  */
-fun GraphicsLayerScope.pageScrollTransform(effect: String, offset: Float) {
+internal fun GraphicsLayerScope.pageScrollTransform(effect: String, offset: Float) {
     val o = offset.coerceIn(-1f, 1f)
     val d = abs(o)
     if (d < 0.001f) return

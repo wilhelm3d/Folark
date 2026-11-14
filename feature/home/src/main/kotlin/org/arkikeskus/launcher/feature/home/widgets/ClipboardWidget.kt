@@ -1,8 +1,6 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import android.text.format.DateUtils
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -84,7 +82,7 @@ class ClipboardWidgetViewModel @Inject constructor(
  * As many clips as fit are shown; the header opens the whole list.
  */
 @Composable
-fun ClipboardWidget(modifier: Modifier = Modifier, viewModel: ClipboardWidgetViewModel = hiltViewModel()) {
+internal fun ClipboardWidget(modifier: Modifier = Modifier, viewModel: ClipboardWidgetViewModel = hiltViewModel()) {
     DisposableEffect(viewModel) {
         viewModel.attach()
         onDispose { viewModel.detach() }

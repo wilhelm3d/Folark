@@ -1,8 +1,6 @@
 package org.arkikeskus.launcher.feature.home.workspace
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import org.arkikeskus.launcher.data.HomeLayoutRepository
 
 /**

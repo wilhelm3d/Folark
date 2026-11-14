@@ -1,10 +1,10 @@
 package org.arkikeskus.launcher.feature.home.workspace
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.HomeEntry
+import org.arkikeskus.launcher.feature.home.PlacedApp
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.widgets.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.widgets.EditingItem
+import org.arkikeskus.launcher.feature.home.taskbar.open
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable

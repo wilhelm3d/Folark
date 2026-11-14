@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Code review, second round (14 November)
+- System updates (Settings ▸ Backup & restore): the switch shows whether the updates are really blocked (it read only whether the update app was switched off, and showed "on" while the updates were held back). The update app's own state is shown at once; with root, its real background permission is read a moment later.
+- Clipboard history (Settings ▸ App drawer ▸ Clipboard row): "Keep copied items" for Always (as before), 1 hour, 1 day or 1 week; older items and their pictures go by themselves.
+- Scheduled pairs: their notification shows Folark's own split-screen icon instead of an old Android one.
+- The notification dots, icons and lists are built off the main thread (a burst of notifications no longer holds up the screen); app names are looked up in one shared cache.
+- Root actions (lock, Recents key, notification shade) run on one shared worker instead of a new thread each; background jobs that fail are logged instead of ending the app.
+- The Settings search index is built from the page list wherever it lives, and the build stops if it finds no pages (an empty index would quietly take every setting out of the search).
+- Code: the taskbar is its own module, `:feature:taskbar` (27 files, about 6,000 lines, with its texts, icons and the accessibility service). Its classes keep their names, so an accessibility service the user allowed stays allowed, and root grants it as before.
+- Code: `SettingsRepository` is 720 lines (was 1,723): its 350 setters are in ten files by settings group, and reading the settings is `SettingsRead.kt`. `HomeViewModel` is 643 lines (was 1,043): the home entries, the mapping from stored rows to entries (a plain function, now with tests) and the icon picker (its own ViewModel) are separate.
+- Code: `AppDrawerContent` is 288 lines (was about 800; the list and the grid share one item builder), `SettingsScreen` 197 (was about 750; one state for all its dialogs), `LauncherShell` 165 (was about 490; the drawer's slide is one small class) and `RecentsScreen` 197 (was about 380; picking apps for a split is one small class).
+- Code: `Workspace()` takes two bundles, its settings and its actions, instead of 53 parameters, with no defaults, so a forgotten callback is a compile error rather than a dead tap. Widgets, their placeholders, built-ins and stacks share a `WidgetEntry` interface; the fit, drag and resize checks use one helper.
+- Code: three process-wide objects are injected singletons now (split overlays, "Folark on screen", the module's settings cache); the four that stay process-wide (crash log, root modes, haptics, taskbar host) say why. The modes of Settings ▸ Root are an enum, stored as the same text as before (the first group of the String settings). 70 public declarations of the feature modules that nothing outside used are `internal`.
+- Code: one place for the shell-safety checks (also used by the split history), one name for the module's preferences file, one sender for notification taps (three copies before); a fade that was animated but never drawn is gone.
+
+### Code review (13 November)
+- System updates (Settings ▸ Backup & restore): switching them off remembers each AppOp mode (running in the background, wake locks) of the update apps, and switching them on puts those modes back; it set "allow" before, whatever the phone had.
+- Page bounce (Settings ▸ Home): turning it on or off takes effect at once (it was read only when home first appeared). It also decides whether pulling the first page opens the minus-one screen.
+- App search in the drawer and the split picker: each app name is folded (accents, case, words, initials) once and kept, so a keystroke compares strings instead of normalising every name again. The answers are unchanged (checked against the old matching on 177,000 name and query pairs).
+- Recents no longer finishes itself twice when it closes (Android logged "Duplicate finish request"); the undo bar stops collecting while the screen is stopped.
+- Code: `Workspace()` is about 480 lines (was 1,060) and `HomeScreen()` about 440 (was 1,290). The widget drag, the page gestures and the unfold animation, the entries with their pending moves, the widget bind pipeline, the drag targets, the popups and dialogs, and the frame around the pages (status bar, dock, look settings) are files of their own with the same behaviour. Where a widget fits and what it stacks onto are plain functions with tests.
+- Code: the new module `:core:root` holds everything that runs `su` (RootShell, RootTasks, RootGrants, RootFeatures, SystemTaskbar, SystemUpdates and the RootMain helper) and its tests; the data layer, the screens and the app build on it. "Check screenshots" moved to `ScreenshotCheck` in the data layer.
+- Code: no blank lines inside import blocks and no wildcard imports of Folark's own packages; the three change notices to the Vector module share one helper; the root grants check runs on the app scope.
+- Scheduled pairs: the receiver for boot and time changes is switched on only while a pair has a schedule. Without one, those broadcasts started Folark's whole process for nothing, also in a profile where Folark is installed but never opened (a private space), where a second launcher process then sat in memory. Saving a schedule switches it back on.
+- The scrims of the app drawer, the widget picker and the drawer's folder editor call the newest close callback (their tap detectors live as long as the scrim and kept the first one they saw); the dock's drop highlight follows a replaced drag controller.
+- Build: `-Pfolark.plainDebug` builds the debug APK debuggable and without R8, for the debugger and the Layout Inspector; the default debug build is unchanged. The VerifyError that once made R8 necessary is gone (ART verified all 6,469 Folark classes of a build without R8 on a phone).
+
 ### Moving icons on home
 - The dragged icon keeps the spot it was picked up by and its real size (it used to jump to centre itself under the finger at a fixed 52 dp), and lifts with a short grow.
 - On drop the icon glides into its cell; dropped on App info, Uninstall, Split or the taskbar, or on a full dock, it glides back to where it was.

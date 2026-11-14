@@ -1,10 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
 import org.arkikeskus.launcher.model.WidgetSettings
-
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ActivityManager
@@ -92,6 +89,7 @@ import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
 import javax.inject.Inject
 import org.arkikeskus.launcher.model.catching
+import org.arkikeskus.launcher.data.setNoteWidgetText
 
 /** What the device-status widget shows besides the battery (which has its own live stream). */
 data class DeviceStats(
@@ -339,7 +337,7 @@ internal fun FolarkWidgetSurface(
 
 /** A grid of the apps used most lately; it fills whatever footprint it is given and reorders itself. */
 @Composable
-fun TopAppsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
+internal fun TopAppsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val apps by viewModel.topApps.collectAsStateWithLifecycle()
     FolarkWidgetSurface(theme = widgets.appsTheme, modifier = modifier) { ink ->
@@ -382,7 +380,7 @@ fun TopAppsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewMod
 /** A sticky note: shows the text, a tap opens an editor. One note, shared by every note widget.
  *  A line starting with "[ ] " or "[x] " is a checklist item whose box taps right on the widget. */
 @Composable
-fun NoteWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
+internal fun NoteWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
     val fontSize = when (widgets.noteTextSize) {

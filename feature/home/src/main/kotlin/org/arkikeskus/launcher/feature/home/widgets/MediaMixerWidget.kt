@@ -1,8 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.data.PendingIntents
 import org.arkikeskus.launcher.feature.home.R
-
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -168,7 +167,7 @@ internal class MediaMixerWatcher(private val context: Context) {
     fun open(session: MixerSession) {
         val c = controller(session) ?: return
         val activity = catching { c.sessionActivity }.getOrNull()
-        val opened = activity != null && sendNotificationIntent(context, activity)
+        val opened = activity != null && PendingIntents.sendFromForeground(context, activity)
         if (!opened) {
             catching {
                 context.packageManager.getLaunchIntentForPackage(session.packageName)
@@ -189,7 +188,7 @@ private val MOTO_PER_APP_VOLUME = ComponentName("com.motorola.dynamicvolume", "c
  * Motorola's per-app volume, which can set each app's own level.
  */
 @Composable
-fun MediaMixerWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
+internal fun MediaMixerWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val watcher = remember(context) { MediaMixerWatcher(context) }

@@ -10,7 +10,8 @@ import org.arkikeskus.launcher.model.catching
 /**
  * A local, on-device crash log: an uncaught-exception handler appends to a small file, and
  * Settings ▸ System ▸ Crash log shows it (and clears it). Nothing leaves the phone — it replaces
- * the "adb logcat -b crash into a txt file" dance for the user's own debugging.
+ * the "adb logcat -b crash into a txt file" dance for the user's own debugging. Nothing is kept
+ * in memory (the log is the file); the handler it installs is process-wide by nature.
  */
 object CrashLog {
     private const val FILE = "crash_log.txt"

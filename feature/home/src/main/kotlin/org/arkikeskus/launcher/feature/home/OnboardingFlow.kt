@@ -92,7 +92,7 @@ private val AURORA_AMBER = Color(0xFFB5530F)
  * [onPhoneGranted] lets it restart the telephony callbacks so the signal label appears right away.
  */
 @Composable
-fun OnboardingFlow(
+internal fun OnboardingFlow(
     onFinish: () -> Unit,
     onRestored: () -> Unit,
     onContactsGranted: () -> Unit,

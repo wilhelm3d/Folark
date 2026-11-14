@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.data
 
+import org.arkikeskus.launcher.model.safeScope
 import org.arkikeskus.launcher.model.catching
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -8,7 +9,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +50,7 @@ class AppUsageRepository @Inject constructor(
      */
     private val waiting = MutableStateFlow<Map<String, List<Long>>>(emptyMap())
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = safeScope(Dispatchers.IO)
     private val flushing = Mutex()
     private var flushJob: Job? = null
 

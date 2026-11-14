@@ -1,10 +1,10 @@
 package org.arkikeskus.launcher.feature.home.workspace
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.HomeScreen
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.widgets.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.widgets.BadgeCounts
+import org.arkikeskus.launcher.feature.home.widgets.WithBadge
+import org.arkikeskus.launcher.feature.home.taskbar.open
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -105,7 +105,7 @@ fun Dock(
     val shape = RoundedCornerShape(30.dp)
     // Live drop feedback: highlight when a home icon hovers the dock and there's room (Launcher3's
     // onDragEnter/acceptDrop). derivedStateOf so we recompose only when crossing in/out, not per frame.
-    val highlighted by remember {
+    val highlighted by remember(dragController) {
         derivedStateOf {
             dragController.moving &&
                 (dragController.source == DragSource.Home || dragController.source == DragSource.Drawer) &&

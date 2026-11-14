@@ -56,7 +56,7 @@ import org.arkikeskus.launcher.ui.component.AppIcon
  *  - [revealKey]/[revealAt]: the app that was just added pops in where it landed.
  */
 @Stable
-class HomeEditState {
+internal class HomeEditState {
     var editing by mutableStateOf(false)
         private set
     val selected = mutableStateListOf<String>()
@@ -86,7 +86,7 @@ class HomeEditState {
     }
 }
 
-val LocalHomeEdit = staticCompositionLocalOf<HomeEditState?> { null }
+internal val LocalHomeEdit = staticCompositionLocalOf<HomeEditState?> { null }
 
 /** The edit-mode marks on an app cell: a minus that takes it off home (top start), a tick when selected. */
 @Composable

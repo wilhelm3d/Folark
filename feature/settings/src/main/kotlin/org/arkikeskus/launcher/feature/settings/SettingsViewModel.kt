@@ -2,6 +2,7 @@
 
 package org.arkikeskus.launcher.feature.settings
 
+import org.arkikeskus.launcher.model.RootMode
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -22,22 +23,12 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.arkikeskus.launcher.data.AppRepository
-import org.arkikeskus.launcher.data.HomeLayoutRepository
-import org.arkikeskus.launcher.data.IconPackInfo
-import org.arkikeskus.launcher.data.PairSchedule
-import org.arkikeskus.launcher.data.IconPackRepository
-import org.arkikeskus.launcher.data.SettingsRepository
+import org.arkikeskus.launcher.data.*
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.data.DrawerFolder
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
-import org.arkikeskus.launcher.data.drawerFolders
-import org.arkikeskus.launcher.data.createDrawerFolder
-import org.arkikeskus.launcher.data.renameDrawerFolder
-import org.arkikeskus.launcher.data.moveDrawerFolder
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -92,6 +83,12 @@ class SettingsViewModel @Inject constructor(
     /** Keys currently hidden from the drawer. */
     val hiddenKeys: StateFlow<Set<String>> = repository.hiddenApps
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** Settings ▸ App drawer ▸ Keep copied items, in minutes (0: until newer ones push them out). */
+    val clipboardKeepMinutes: StateFlow<Int> = repository.clipboardKeepMinutes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    fun setClipboardKeepMinutes(value: Int) = update { repository.setClipboardKeepMinutes(value) }
 
     /**
      * Drawer folders, in the order they appear. They are also the drawer's tabs, so this list is the
@@ -386,9 +383,9 @@ class SettingsViewModel @Inject constructor(
     fun setTaskbarAnim(value: String) = update { repository.setTaskbarAnim(value) }
     fun setTaskbarSource(value: String) = update { repository.setTaskbarSource(value) }
     fun setSystemTaskbarMode(value: Int) = update { repository.setSystemTaskbarMode(value) }
-    fun setRootLockMode(value: String) = update { repository.setRootLockMode(value) }
-    fun setRootRecentsMode(value: String) = update { repository.setRootRecentsMode(value) }
-    fun setRootShadeMode(value: String) = update { repository.setRootShadeMode(value) }
+    fun setRootLockMode(value: RootMode) = update { repository.setRootLockMode(value) }
+    fun setRootRecentsMode(value: RootMode) = update { repository.setRootRecentsMode(value) }
+    fun setRootShadeMode(value: RootMode) = update { repository.setRootShadeMode(value) }
     fun setRootKeepDump(value: Boolean) = update { repository.setRootKeepDump(value) }
     fun setRootKeepUsage(value: Boolean) = update { repository.setRootKeepUsage(value) }
     fun setRootKeepSecureSettings(value: Boolean) = update { repository.setRootKeepSecureSettings(value) }

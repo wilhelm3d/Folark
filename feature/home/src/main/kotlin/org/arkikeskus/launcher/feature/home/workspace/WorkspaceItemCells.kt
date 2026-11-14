@@ -1,10 +1,36 @@
 package org.arkikeskus.launcher.feature.home.workspace
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.widgetLook
+import org.arkikeskus.launcher.feature.home.FolderIcon
+import org.arkikeskus.launcher.feature.home.HomeEntry
+import org.arkikeskus.launcher.feature.home.HomeScreen
+import org.arkikeskus.launcher.feature.home.LocalFolderStyle
+import org.arkikeskus.launcher.feature.home.PendingWidget
+import org.arkikeskus.launcher.feature.home.PlacedBuiltin
+import org.arkikeskus.launcher.feature.home.PlacedFolder
+import org.arkikeskus.launcher.feature.home.PlacedShortcut
+import org.arkikeskus.launcher.feature.home.PlacedWidget
+import org.arkikeskus.launcher.feature.home.PlacedWidgetStack
+import org.arkikeskus.launcher.feature.home.ShortcutIconContent
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.widgets.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.widgets.BatteryWidget
+import org.arkikeskus.launcher.feature.home.widgets.BuiltinWidget
+import org.arkikeskus.launcher.feature.home.widgets.EditingItem
+import org.arkikeskus.launcher.feature.home.widgets.InteractiveNotificationWidget
+import org.arkikeskus.launcher.feature.home.widgets.LocalWidgetDragController
+import org.arkikeskus.launcher.feature.home.widgets.NothingClockWidget
+import org.arkikeskus.launcher.feature.home.widgets.NotificationsWidget
+import org.arkikeskus.launcher.feature.home.widgets.PeopleWidget
+import org.arkikeskus.launcher.feature.home.widgets.SamsungNotificationWidget
+import org.arkikeskus.launcher.feature.home.widgets.SamsungWeatherWidget
+import org.arkikeskus.launcher.feature.home.widgets.SmartspaceWidget
+import org.arkikeskus.launcher.feature.home.widgets.WidgetEditOverlay
+import org.arkikeskus.launcher.feature.home.widgets.WidgetResizeRange
+import org.arkikeskus.launcher.feature.home.widgets.WidgetStackContainer
+import org.arkikeskus.launcher.feature.home.widgets.WithBadge
+import org.arkikeskus.launcher.feature.home.widgets.isReconfigurableWidget
+import org.arkikeskus.launcher.feature.home.widgets.widgetRects
+import org.arkikeskus.launcher.feature.home.widgets.widgetResizeRange
 import android.appwidget.AppWidgetManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -102,6 +128,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import org.arkikeskus.launcher.model.catching
+import org.arkikeskus.launcher.feature.home.widgets.widgetDragGesture
 
 // Folders, shortcuts, widgets, placeholders and widget stacks on the home grid (split out of Workspace.kt).
 
@@ -676,24 +703,9 @@ internal fun WorkspaceWidgetEditFrame(
         canFit = { x, y, sx, sy ->
             rectFreeOnGrid(ew.rowId, ew.page, x, y, sx, sy) ||
                 ReorderPlanner.planFit(
-                    effectiveEntries.mapIndexed { i, e ->
-                        val (esx, esy) = when (e) {
-                            is PlacedWidget -> e.spanX to e.spanY
-                            is PendingWidget -> e.spanX to e.spanY
-                            is PlacedBuiltin -> e.spanX to e.spanY
-                            is PlacedWidgetStack -> e.spanX to e.spanY
-                            else -> 1 to 1
-                        }
-                        // The edited row must carry its REAL id so planFit can exclude
-                        // it from its own collision set (widget or built-in alike).
-                        val erow = when (e) {
-                            is PlacedWidget -> e.rowId
-                            is PlacedBuiltin -> e.rowId
-                            is PlacedWidgetStack -> e.rowId
-                            else -> -(i.toLong() + 1)
-                        }
-                        ReorderPlanner.Rect(erow, e.page, e.cellX, e.cellY, esx, esy)
-                    },
+                    // Widget-like rows carry their REAL id, so planFit leaves the edited one out of
+                    // its own collision set (widget or built-in alike).
+                    effectiveEntries.widgetRects(),
                     ew.rowId, ew.page, x, y, sx, sy, columns, rows,
                 ) != null
         },

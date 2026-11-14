@@ -1,10 +1,8 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.PEOPLE_DEFAULT_SPAN_Y
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.workspace.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.taskbar.open
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
@@ -92,7 +90,7 @@ private data class WidgetPreviewData(val remote: RemoteViews? = null, val bitmap
  * and animations. On the OUTER SCREEN, renders a compact 1-pane picker suited for narrow outer screens.
  */
 @Composable
-fun WidgetPickerScreen(
+internal fun WidgetPickerScreen(
     dragController: WidgetDragController,
     columns: Int,
     rows: Int,
@@ -245,6 +243,8 @@ private fun InnerWidgetGalleryPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The scrim's tap detector lives as long as the picker: it must call the newest callback.
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
     val sidebar = settings.drawer.innerSidebar
     val effectiveHeightFraction =
         if (sidebar) 1f else settings.drawer.heightFraction.coerceIn(0.4f, 1.0f)
@@ -301,7 +301,7 @@ private fun InnerWidgetGalleryPanel(
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = (settings.drawer.scrimOpacity * 0.7f).coerceIn(0f, 0.8f)))
                     .pointerInput(Unit) {
-                        detectTapGestures { onDismiss() }
+                        detectTapGestures { currentOnDismiss() }
                     }
             )
         }
@@ -428,7 +428,8 @@ private fun InnerWidgetGalleryPanel(
                                 )
                             }
                             // Installed App Categories
-                            itemsIndexed(appGroups) { index, group ->
+                            // Keyed by app (the groups are one per package), so filtering keeps each pill's state.
+                            itemsIndexed(appGroups, key = { _, group -> group.packageName }) { index, group ->
                                 SidebarCategoryPill(
                                     title = group.label,
                                     bitmapIcon = group.appIcon,

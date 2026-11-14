@@ -14,6 +14,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.arkikeskus.launcher.data.ModulePrefs
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.SplitEvents
 import org.arkikeskus.launcher.data.SplitOutcome
@@ -37,7 +38,11 @@ class RecentsHookState : ContentProvider() {
     @InstallIn(SingletonComponent::class)
     interface Deps {
         fun settingsRepository(): SettingsRepository
+        fun hookStateCache(): HookStateCache
     }
+
+    /** The app's object graph, looked up once (from the first call on). */
+    @Volatile private var deps: Deps? = null
 
     /** One handler per call method, all behind the caller checks they each need. */
     private val handlers: Map<String, (arg: String?, extras: Bundle?) -> Bundle?> by lazy {
@@ -65,18 +70,18 @@ class RecentsHookState : ContentProvider() {
         // Record that the module is alive first, so Folark shows it active even if the settings
         // below are briefly not ready (the launcher may call this very early).
         catching {
-            val edit = context.getSharedPreferences(PREFS, 0).edit()
-                .putLong(SEEN_AT, System.currentTimeMillis())
+            val edit = context.getSharedPreferences(ModulePrefs.FILE, 0).edit()
+                .putLong(ModulePrefs.SEEN_AT, System.currentTimeMillis())
             // Which gesture hooks this launcher build allowed (RecentsHook.HOOK_*); shown in Settings.
             if (extras?.containsKey(RecentsHook.EXTRA_COMPAT) == true) {
-                edit.putInt(COMPAT, extras.getInt(RecentsHook.EXTRA_COMPAT))
+                edit.putInt(ModulePrefs.COMPAT, extras.getInt(RecentsHook.EXTRA_COMPAT))
             }
             edit.apply()
         }
-        ensureCache()
+        val cache = ensureCache()
         return Bundle().apply {
-            putBoolean("replace", HookStateCache.replaceRecents ?: false)
-            putBoolean("search", HookStateCache.navHandleSearch ?: false)
+            putBoolean("replace", cache?.replaceRecents ?: false)
+            putBoolean("search", cache?.navHandleSearch ?: false)
         }
     }
 
@@ -100,27 +105,27 @@ class RecentsHookState : ContentProvider() {
     /** System UI (the module's [StatusBarPaddingHook]) asks how much room to keep at the status bar's ends. */
     private fun statusBarPadding(): Bundle? {
         if (callingPackage != RecentsHook.SYSTEMUI) return null
-        ensureCache()
-        val on = HookStateCache.statusBarOn ?: return null
+        val cache = ensureCache() ?: return null
+        val on = cache.statusBarOn ?: return null
         return Bundle().apply {
             putBoolean(StatusBarPaddingHook.EXTRA_ON, on)
-            putInt(StatusBarPaddingHook.EXTRA_INNER, HookStateCache.statusBarInner ?: 0)
-            putInt(StatusBarPaddingHook.EXTRA_COVER, HookStateCache.statusBarCover ?: 0)
+            putInt(StatusBarPaddingHook.EXTRA_INNER, cache.statusBarInner ?: 0)
+            putInt(StatusBarPaddingHook.EXTRA_COVER, cache.statusBarCover ?: 0)
         }
     }
 
     /** For the module's [DividerStopsHook] (System UI only): whether the divider stops at 30/50/70. */
     private fun dividerStops(): Bundle? {
         if (callingPackage != RecentsHook.SYSTEMUI) return null
-        ensureCache()
+        val cache = ensureCache()
         return Bundle().apply {
-            putBoolean(DividerStopsHook.EXTRA_ON, HookStateCache.dividerOn ?: true)
-            putBoolean(DividerStopsHook.EXTRA_FREE, HookStateCache.dividerFree ?: true)
-            putString(DividerStopsHook.EXTRA_LOCK, HookStateCache.dividerLock ?: "off")
-            putBoolean(DividerStopsHook.EXTRA_MARKS, HookStateCache.dividerMarks ?: true)
-            putBoolean(DividerStopsHook.EXTRA_HAPTICS, HookStateCache.dividerHaptics ?: true)
-            putBoolean(DividerStopsHook.EXTRA_KEEP, HookStateCache.keepSplitSize ?: true)
-            putBoolean(DividerStopsHook.EXTRA_PEEK_FLING, HookStateCache.peekFlingClose ?: false)
+            putBoolean(DividerStopsHook.EXTRA_ON, cache?.dividerOn ?: true)
+            putBoolean(DividerStopsHook.EXTRA_FREE, cache?.dividerFree ?: true)
+            putString(DividerStopsHook.EXTRA_LOCK, cache?.dividerLock ?: "off")
+            putBoolean(DividerStopsHook.EXTRA_MARKS, cache?.dividerMarks ?: true)
+            putBoolean(DividerStopsHook.EXTRA_HAPTICS, cache?.dividerHaptics ?: true)
+            putBoolean(DividerStopsHook.EXTRA_KEEP, cache?.keepSplitSize ?: true)
+            putBoolean(DividerStopsHook.EXTRA_PEEK_FLING, cache?.peekFlingClose ?: false)
         }
     }
 
@@ -136,27 +141,30 @@ class RecentsHookState : ContentProvider() {
             ),
         )
         catching {
-            context.getSharedPreferences(PREFS, 0).edit().putLong(UNLOCK_SEEN_AT, System.currentTimeMillis()).apply()
+            context.getSharedPreferences(ModulePrefs.FILE, 0).edit().putLong(ModulePrefs.UNLOCK_SEEN_AT, System.currentTimeMillis()).apply()
         }
         return null
     }
 
     /**
-     * The cache has every answer as soon as the app's settings stream has run once. Before that
-     * (the app may have been started by the module's question itself), one short blocking read
-     * fills it; afterwards the stream keeps it current and no binder thread ever waits.
+     * The app's mirror of the settings the module asks for ([HookStateCache]). It has every answer
+     * as soon as the app's settings stream has run once. Before that (the app may have been started
+     * by the module's question itself), one short blocking read fills it; afterwards the stream
+     * keeps it current and no binder thread ever waits. Null only while the app's object graph
+     * can't be reached; never throws (the callers are the system launcher and System UI).
      */
-    private fun ensureCache() {
-        if (HookStateCache.replaceRecents != null) return
-        val context = context ?: return
+    private fun ensureCache(): HookStateCache? {
+        val context = context ?: return null
+        val deps = deps ?: catching { EntryPointAccessors.fromApplication(context, Deps::class.java) }.getOrNull()
+            ?.also { deps = it } ?: return null
+        val cache = deps.hookStateCache()
+        if (cache.replaceRecents != null) return cache
         catching {
             runBlocking { kotlinx.coroutines.withTimeoutOrNull(PROVIDER_WAIT_MS) {
-                HookStateCache.update(
-                    EntryPointAccessors.fromApplication(context, Deps::class.java)
-                        .settingsRepository().settings(ScreenType.INNER).first(),
-                )
+                cache.update(deps.settingsRepository().settings(ScreenType.INNER).first())
             } }
         }
+        return cache
     }
 
     override fun onCreate(): Boolean = true
@@ -170,11 +178,6 @@ class RecentsHookState : ContentProvider() {
         /** Watched by the module in the launcher: changes when Replace Android's Recents or the
          *  gesture handle's search switch does, so it asks again (see LauncherApplication). */
         val STATE_URI: Uri = Uri.parse("content://${RecentsHook.STATE_AUTHORITY}/state")
-
-        const val PREFS = "folark_recents_hook"
-        const val SEEN_AT = "seen_at"
-        const val COMPAT = "compat"
-        const val UNLOCK_SEEN_AT = "unlock_seen_at"
     }
 }
 

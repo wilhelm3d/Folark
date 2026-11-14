@@ -43,4 +43,19 @@ class AppMatcherTest {
     }
 
     @Test fun noMatch() = assertTrue(AppMatcher.rank(apps, "zzzz") { it }.isEmpty())
+
+    @Test fun aQueryOfOnlyAccentMarksFindsNothing() {
+        // Folded it is empty, so it must not match everything (nor fall back to the whole list).
+        assertTrue(AppMatcher.rank(apps, "́") { it }.isEmpty())
+        assertNull(AppMatcher.score("Gmail", "́"))
+    }
+
+    @Test fun answersStayTheSameWhenMoreNamesPassThroughThanAreKept() {
+        // The matcher keeps only so many names prepared; one it let go is prepared again, unchanged.
+        val first = AppMatcher.rank(apps, "gm") { it }
+        val many = (1..3_000).map { "App $it" }
+        assertEquals("App 7", AppMatcher.rank(many, "app 7") { it }.first())
+        assertEquals(first, AppMatcher.rank(apps, "gm") { it })
+        assertEquals(AppMatcher.rank(many, "app 12") { it }, AppMatcher.rank(many, "app 12") { it })
+    }
 }

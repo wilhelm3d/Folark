@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.notifications
 
+import org.arkikeskus.launcher.model.safeScope
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -21,10 +22,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -82,7 +83,7 @@ class NotificationDotListenerService : NotificationListenerService() {
     /** Lives while the listener is connected; carries the batch settings + pins into [holdForBatch]. */
     private var settingsJob: Job? = null
     private var hiddenJob: Job? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = safeScope(Dispatchers.Main.immediate)
 
     @Volatile private var batchEnabled = false
     @Volatile private var batchTimes: List<Int> = emptyList()
@@ -127,8 +128,6 @@ class NotificationDotListenerService : NotificationListenerService() {
         persistScope.launch { catching { settingsRepository.setHeldNotifications(snapshot) } }
     }
 
-    private val persistScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     private val userManager by lazy { getSystemService(UserManager::class.java) }
 
     /** Keys that have already fired a heads-up, so a FLAG_ONLY_ALERT_ONCE re-post doesn't re-trigger.
@@ -160,6 +159,12 @@ class NotificationDotListenerService : NotificationListenerService() {
     }
 
     private companion object {
+        /**
+         * Saves the held notifications. One for the whole process, not one per listener: a save
+         * started as a listener stops must still land, and a scope per listener would outlive it.
+         */
+        val persistScope = safeScope(Dispatchers.IO)
+
         /** Notification categories that are about something going on now. */
         val LIVE_CATEGORIES = setOf(
             Notification.CATEGORY_CALL,
@@ -388,7 +393,18 @@ class NotificationDotListenerService : NotificationListenerService() {
     private fun refreshLiveOnly() {
         liveRefreshQueued = false
         if (!connected || !heldLoaded) return
-        val active = catching { activeNotifications }.getOrNull() ?: return
+        // A full rebuild under way publishes the live list too.
+        if (refreshJob?.isActive == true) return
+        liveJob?.cancel()
+        liveJob = scope.launch {
+            val live = withContext(buildDispatcher) { buildLive() } ?: return@launch
+            if (connected) badgeRepository.setLive(live)
+        }
+    }
+
+    /** The live activities among the active notifications, most important first; null when Android can't be read. */
+    private fun buildLive(): List<LiveActivity>? {
+        val active = catching { activeNotifications }.getOrNull() ?: return null
         val live = ArrayList<LiveActivity>()
         for (sbn in active) {
             if (sbn == null) continue
@@ -397,8 +413,22 @@ class NotificationDotListenerService : NotificationListenerService() {
             val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
             catching { liveEntry(sbn, serial) }.getOrNull()?.let(live::add)
         }
-        badgeRepository.setLive(live.sortedWith(compareByDescending<LiveActivity> { livePriority(it) }.thenByDescending { it.postTime }))
+        return live.sortedWith(liveOrder)
     }
+
+    private val liveOrder = compareByDescending<LiveActivity> { livePriority(it) }.thenByDescending { it.postTime }
+
+    /**
+     * The rebuilds under way. Reading Android's list copies every active notification over Binder,
+     * and building the dots, icons, people tiles and live list from it is real work: both happen off
+     * the main thread, which the listener shares with the home screen. A newer rebuild replaces one
+     * still under way.
+     */
+    private var refreshJob: Job? = null
+    private var liveJob: Job? = null
+
+    /** Where a rebuild is read and built: off the main thread (the listener test builds in place). */
+    internal var buildDispatcher: CoroutineDispatcher = Dispatchers.Default
 
     /** The notification came in on a channel muted from the notifications widget. */
     private fun isHiddenChannel(sbn: StatusBarNotification): Boolean {
@@ -546,17 +576,72 @@ class NotificationDotListenerService : NotificationListenerService() {
     private fun refresh() {
         if (!connected || !heldLoaded) return
         lastFullRefreshAt = android.os.SystemClock.uptimeMillis()
-        val active = catching { activeNotifications }.getOrNull()
-        if (active == null) {
-            // A transient Binder failure: keep the last good snapshot (a stale removal self-heals on
-            // the next post/remove callback) but leave a trail so a persistent failure is visible.
-            Log.w(TAG, "activeNotifications unavailable; keeping the previous snapshot")
-            if (snapshotRetriesLeft > 0) {
-                snapshotRetriesLeft--
-                handler.postDelayed(retryRefresh, SNAPSHOT_RETRY_DELAY_MS)
+        // What the main thread owns, copied for the build: the held deadlines and the batch switches.
+        val held = HashMap(heldUntil)
+        val ready = settingsReady
+        val batch = batchEnabled
+        liveJob?.cancel()
+        refreshJob?.cancel()
+        refreshJob = scope.launch {
+            val snapshot = withContext(buildDispatcher) { buildSnapshot(held, ready, batch) }
+            if (snapshot == null) {
+                // A transient Binder failure: keep the last good snapshot (a stale removal self-heals on
+                // the next post/remove callback) but leave a trail so a persistent failure is visible.
+                Log.w(TAG, "activeNotifications unavailable; keeping the previous snapshot")
+                if (snapshotRetriesLeft > 0) {
+                    snapshotRetriesLeft--
+                    handler.postDelayed(retryRefresh, SNAPSHOT_RETRY_DELAY_MS)
+                }
+                return@launch
             }
-            return
+            publish(snapshot)
         }
+    }
+
+    /** One rebuild's results: built off the main thread ([buildSnapshot]), published on it ([publish]). */
+    private class Snapshot(
+        val counts: Map<String, Int>,
+        val icons: List<StatusNotification>,
+        val all: List<StatusNotification>,
+        val live: List<LiveActivity>,
+        val people: List<org.arkikeskus.launcher.data.PersonTileState>,
+        val activeKeys: Set<String>,
+        /** Held deadlines to forget: delivered now, or their notification is gone for good. */
+        val forget: Map<String, Long>,
+    )
+
+    /** Main thread: forgets the deadlines the build found done, publishes, lays the next delivery. */
+    private fun publish(s: Snapshot) {
+        if (!connected) return
+        // Only a deadline the main thread didn't change while the snapshot was built.
+        var changed = false
+        for ((key, until) in s.forget) {
+            if (heldUntil[key] == until) {
+                heldUntil.remove(key)
+                changed = true
+            }
+        }
+        if (changed) persistHeld()
+        badgeRepository.setBadges(s.counts)
+        badgeRepository.setIcons(s.icons)
+        badgeRepository.setAllNotifications(s.all)
+        badgeRepository.setLive(s.live)
+        badgeRepository.setPeople(s.people)
+        handler.removeCallbacks(deliverBatch)
+        if (settingsReady) {
+            heldUntil.filterKeys { it in s.activeKeys }.values.minOrNull()?.let { until ->
+                handler.postDelayed(deliverBatch, (until - System.currentTimeMillis()).coerceAtLeast(1L))
+            }
+        }
+    }
+
+    /**
+     * Off the main thread: reads Android's active notifications and builds everything the launcher
+     * shows from them. [heldUntil], [settingsReady] and [batchEnabled] are the main thread's values
+     * at the start (copied). Null when Android's list can't be read.
+     */
+    private fun buildSnapshot(heldUntil: Map<String, Long>, settingsReady: Boolean, batchEnabled: Boolean): Snapshot? {
+        val active = catching { activeNotifications }.getOrNull() ?: return null
         val ranking = catching { currentRanking }.getOrNull()
         val tmp = Ranking()
         val counts = HashMap<String, Int>()
@@ -571,10 +656,8 @@ class NotificationDotListenerService : NotificationListenerService() {
         val released = heldUntil.filter { (key, until) ->
             settingsReady && key in activeKeys && (!batchEnabled || now >= until)
         }
-        if (released.isNotEmpty()) {
-            released.keys.forEach(heldUntil::remove)
-            persistHeld()
-        }
+        // Released ones are delivered with this snapshot: they no longer count as held below.
+        val held = heldUntil - released.keys
         for (sbn in active) {
             if (sbn == null) continue
             val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
@@ -586,14 +669,14 @@ class NotificationDotListenerService : NotificationListenerService() {
             // other real (icon-worthy, not ongoing) notification becomes an app-grouped entry.
             val person = catching { personEntry(sbn, serial, ranking, tmp) }.getOrNull()
             when {
-                person != null -> people.add(person.copy(heldUntil = heldUntil[sbn.key] ?: 0L))
+                person != null -> people.add(person.copy(heldUntil = held[sbn.key] ?: 0L))
                 isIconWorthy(sbn) && (sbn.notification.flags and Notification.FLAG_ONGOING_EVENT) == 0 ->
                     catching { appEntry(sbn, serial) }.getOrNull()?.let(people::add)
             }
             // Live pill: what is going on right now (never held: it is about this moment).
             catching { liveEntry(sbn, serial) }.getOrNull()?.let(live::add)
             // Only launcher surfaces wait. Android's shade, sound and heads-up remain unchanged.
-            if (sbn.key in heldUntil) continue
+            if (sbn.key in held) continue
             // Dots: strict badge-worthy filter (meaningful home-icon badges).
             if (isBadgeWorthy(sbn, ranking, tmp)) {
                 counts[key] = (counts[key] ?: 0) + 1
@@ -645,8 +728,7 @@ class NotificationDotListenerService : NotificationListenerService() {
             }
         }
         Log.d(TAG, "badge snapshot: ${counts.size} app(s) badged")
-        badgeRepository.setBadges(counts)
-        badgeRepository.setIcons(
+        val icons = (
             visual.map { (k, v) ->
                 // Visual icon = newest notification; tap action = newest OPENABLE notification, so a
                 // newer intentless post never buries an older tappable one. count = app's total.
@@ -657,37 +739,34 @@ class NotificationDotListenerService : NotificationListenerService() {
                     contentIntent = open?.contentIntent,
                     autoCancel = open?.autoCancel ?: false,
                 )
-            }.sortedByDescending { it.postTime },
+            }.sortedByDescending { it.postTime }
         )
-        badgeRepository.setAllNotifications(allNotifs.sortedByDescending { it.postTime })
-        badgeRepository.setLive(live.sortedWith(compareByDescending<LiveActivity> { livePriority(it) }.thenByDescending { it.postTime }))
         // Migration: earlier betas snoozed in Android. Those existing snoozes cannot be released
         // through the public listener API; keep showing them until Android delivers them.
-        if (heldUntil.isNotEmpty()) {
+        var stale: Map<String, Long> = emptyMap()
+        if (held.isNotEmpty()) {
             val snoozed = catching { snoozedNotifications }.getOrNull().orEmpty().filterNotNull()
             val snoozedKeys = snoozed.map { it.key }.toSet()
             for (sbn in snoozed) {
                 if (sbn.key in activeKeys) continue
-                val until = heldUntil[sbn.key] ?: continue
+                val until = held[sbn.key] ?: continue
                 val serial = catching { userManager?.getSerialNumberForUser(sbn.user) }.getOrNull() ?: 0L
                 val entry = catching { personEntry(sbn, serial, ranking, tmp) }.getOrNull() ?: continue
                 people.add(entry.copy(heldUntil = until))
             }
             // Forget entries whose notification is gone for good (delivered and then dismissed, or
             // cancelled by its app while snoozed), so the persisted map doesn't grow forever.
-            val stale = heldUntil.filter { (k, until) -> k !in activeKeys && k !in snoozedKeys && now > until + RELEASE_SLACK_MS }
-            if (stale.isNotEmpty()) {
-                stale.keys.forEach { heldUntil.remove(it) }
-                persistHeld()
-            }
+            stale = held.filter { (k, until) -> k !in activeKeys && k !in snoozedKeys && now > until + RELEASE_SLACK_MS }
         }
-        badgeRepository.setPeople(PeopleGrouping.group(people))
-        handler.removeCallbacks(deliverBatch)
-        if (settingsReady) {
-            heldUntil.filterKeys { it in activeKeys }.values.minOrNull()?.let { until ->
-                handler.postDelayed(deliverBatch, (until - now).coerceAtLeast(1L))
-            }
-        }
+        return Snapshot(
+            counts = counts,
+            icons = icons,
+            all = allNotifs.sortedByDescending { it.postTime },
+            live = live.sortedWith(liveOrder),
+            people = PeopleGrouping.group(people),
+            activeKeys = activeKeys,
+            forget = released + stale,
+        )
     }
 
     /**
@@ -819,11 +898,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         // Some apps repeat the title at the start of the text; the tile already shows the title.
         val text = if (title != null && body != null) body.removePrefix(title).trim().ifEmpty { body } else body
         if (title == null && text == null) return null
-        val label = appLabels.getOrPut(sbn.packageName) {
-            catching {
-                packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
-            }.getOrDefault(sbn.packageName)
-        }
+        val label = appLabel(sbn.packageName)
         val reply = replyAction(n, conversationOnly = false)
         return PersonEntry(
             key = sbn.key,
@@ -841,8 +916,11 @@ class NotificationDotListenerService : NotificationListenerService() {
         )
     }
 
-    /** App labels by package, filled lazily; a label rarely changes while the listener lives. */
-    private val appLabels = HashMap<String, String>()
+    /**
+     * App labels by package, filled lazily and emptied when any package changes (an update can
+     * rename an app). Concurrent: read while a snapshot is built, emptied by the package receiver.
+     */
+    private val appLabels = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     private fun refreshMailPackages() {
         packageRefreshJob?.cancel()
@@ -1013,9 +1091,7 @@ class NotificationDotListenerService : NotificationListenerService() {
         else -> 1
     }
 
-    private val labels = HashMap<String, String>()
-
-    private fun appLabel(pkg: String): String = labels.getOrPut(pkg) {
+    private fun appLabel(pkg: String): String = appLabels.getOrPut(pkg) {
         catching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }
             .getOrDefault(pkg)
     }

@@ -31,7 +31,7 @@ object RootTasks {
         if (wanted.isEmpty()) return emptyMap()
         val dir = java.io.File(context.cacheDir, "recents_files").apply { mkdirs() }
         val out = dir.absolutePath
-        if (out.any { it == '\'' || it == '"' || it == '`' || it == '$' || it == ' ' }) return emptyMap()
+        if (!ShellSafe.isQuotable(out)) return emptyMap()
         dir.listFiles()?.forEach { it.delete() }
         val script = wanted.entries.groupBy({ it.value }, { it.key }).entries.joinToString(" ; ") { (user, ids) ->
             "find /data/system_ce/$user/snapshots -maxdepth 3 -type f 2>/dev/null | " +
@@ -65,7 +65,7 @@ object RootTasks {
         val apk = context.applicationInfo.sourceDir ?: return emptyMap()
         val dir = java.io.File(context.cacheDir, "recents_shots").apply { mkdirs() }
         val path = dir.absolutePath
-        if ((apk + path).any { it == '\'' || it == '"' || it == '`' || it == '$' || it == ' ' }) return emptyMap()
+        if (!ShellSafe.isQuotable(apk + path)) return emptyMap()
         // What the helper says when something fails is kept for Settings ▸ Recents ▸ Check screenshots.
         RootShell.run(
             "CLASSPATH='$apk' app_process /system/bin ${RootMain::class.java.name} snapshots '$path' ${ids.joinToString(" ")} 2>'$path/helper.log'; chmod 644 '$path/helper.log'",
@@ -81,48 +81,13 @@ object RootTasks {
     }
 
     /**
-     * Settings ▸ Recents ▸ Check screenshots: every step of getting an app's screenshot, and what
-     * each one answered, as text to read or copy. Blocking: call off the main thread.
-     */
-    fun diagnose(context: Context): String = buildString {
-        appendLine("Folark screenshot check")
-        appendLine("Root switch (Settings ▸ Root): " + if (RootShell.enabled) "on" else "OFF")
-        val rootOk = RootShell.available(recheck = true)
-        appendLine("1. Root: " + if (rootOk) "yes" else "NO (su refused or missing)")
-        appendLine("   id: " + (RootShell.run("id")?.trim() ?: "-"))
-        val tasks = org.arkikeskus.launcher.data.OpenTasks.list(context)
-        if (tasks == null) {
-            appendLine("2. Open apps: CAN'T READ (no DUMP grant)")
-            return@buildString
-        }
-        appendLine("2. Open apps: ${tasks.size}")
-        tasks.take(4).forEach { appendLine("   #${it.taskId} ${it.packageName} user ${it.userId}") }
-        if (!rootOk) return@buildString
-        val first = tasks.firstOrNull() ?: return@buildString
-        val dir = "/data/system_ce/${first.userId}/snapshots"
-        appendLine("3. Folder $dir:")
-        val listing = RootShell.run("ls -la $dir 2>&1 | head -8; echo '   inside:'; find $dir -mindepth 2 -maxdepth 3 2>&1 | head -12; echo \"   files for #${first.taskId}:\"; find $dir -name '${first.taskId}*' 2>&1 | head -6")
-        appendLine(listing?.trimEnd()?.prependIndent("   ") ?: "   (no answer)")
-        val file = snapshot(first.taskId, first.userId)
-        appendLine("4. File for #${first.taskId}: " + (file?.let { "${it.size} bytes" } ?: "none"))
-        val fromSystem = snapshotsFromSystem(context, listOf(first.taskId))
-        appendLine("5. From the task manager: " + (fromSystem[first.taskId]?.let { "${it.size} bytes" } ?: "none"))
-        val log = catching { java.io.File(java.io.File(context.cacheDir, "recents_shots"), "helper.log").readText() }.getOrNull()
-        if (!log.isNullOrBlank()) appendLine("   helper said:\n" + log.trim().lines().take(12).joinToString("\n") { "   $it" })
-        val decoded = (file ?: fromSystem[first.taskId])?.let {
-            android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)
-        }
-        appendLine("6. Picture: " + (decoded?.let { "${it.width}×${it.height}" } ?: "can't be read"))
-    }
-
-    /**
      * Removes task [taskId] from Recents, as swiping its card away would: a small helper in Folark's
      * own package runs as root and asks Android's task manager directly ([RootMain]).
      */
     fun removeTask(context: Context, taskId: Int): Boolean {
         if (taskId < 0) return false
         val apk = context.applicationInfo.sourceDir ?: return false
-        if (apk.any { it == '\'' || it == '"' || it == '`' || it == '$' }) return false
+        if (!ShellSafe.isQuotable(apk, allowSpaces = true)) return false
         val out = RootShell.run(
             "CLASSPATH='$apk' app_process /system/bin ${RootMain::class.java.name} remove-task $taskId",
             HELPER_TIMEOUT_MS,
@@ -135,7 +100,7 @@ object RootTasks {
         val ids = taskIds.filter { it >= 0 }
         if (ids.isEmpty()) return true
         val apk = context.applicationInfo.sourceDir ?: return false
-        if (apk.any { it == '\'' || it == '"' || it == '`' || it == '$' }) return false
+        if (!ShellSafe.isQuotable(apk, allowSpaces = true)) return false
         val out = RootShell.run(
             "CLASSPATH='$apk' app_process /system/bin ${RootMain::class.java.name} remove-tasks ${ids.joinToString(" ")}",
             HELPER_TIMEOUT_MS,
@@ -150,7 +115,7 @@ object RootTasks {
      * resets that when the app changes state, so it is given again each time Recents opens).
      */
     fun protect(packages: Collection<String>): Set<String> {
-        val safe = packages.filter { PACKAGE.matches(it) }
+        val safe = packages.filter { ShellSafe.isName(it) }
         if (safe.isEmpty()) return emptySet()
         val script = safe.joinToString("; ") { p ->
             "if ! cmd deviceidle whitelist | grep -q \",$p,\"; then cmd deviceidle whitelist +$p >/dev/null 2>&1 && echo added:$p; fi; " +
@@ -163,7 +128,7 @@ object RootTasks {
 
     /** Takes back what [protect] did for [packageName]; [exempted]: Folark added its exemption. */
     fun unprotect(packageName: String, exempted: Boolean) {
-        if (!PACKAGE.matches(packageName)) return
+        if (!ShellSafe.isName(packageName)) return
         val script = buildString {
             if (exempted) append("cmd deviceidle whitelist -$packageName >/dev/null 2>&1; ")
             // The priority itself is not written back: 0 would rank the app as if it were on screen.
@@ -178,7 +143,7 @@ object RootTasks {
      * ("pkg" and "pkg:service"), from one `ps` call. Empty without root.
      */
     fun memoryKb(packages: Collection<String>): Map<String, Long> {
-        val wanted = packages.filter { PACKAGE.matches(it) }.toSet()
+        val wanted = packages.filter { ShellSafe.isName(it) }.toSet()
         if (wanted.isEmpty()) return emptyMap()
         val out = RootShell.run("ps -A -o RSS,NAME") ?: return emptyMap()
         return parseMemory(out, wanted)
@@ -199,11 +164,10 @@ object RootTasks {
 
     /** Stops [packageName] completely (its tasks stay listed until Android tidies them up). */
     fun forceStop(packageName: String): Boolean {
-        if (!PACKAGE.matches(packageName)) return false
+        if (!ShellSafe.isName(packageName)) return false
         return RootShell.run("am force-stop $packageName") != null
     }
 
-    private val PACKAGE = Regex("^[A-Za-z0-9_.]+$")
     private val WHITESPACE = Regex("\\s+")
     private const val MIN_JPEG_BYTES = 64
     private const val HELPER_TIMEOUT_MS = 10_000L

@@ -10,6 +10,7 @@ import org.arkikeskus.launcher.data.HomeLayoutRepository
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.data.setDockColumns
 
 /**
  * The first-run experience, split out of [HomeViewModel]: decided ONCE per install — on an empty

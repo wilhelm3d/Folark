@@ -1,10 +1,14 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.HomeEntry
+import org.arkikeskus.launcher.feature.home.PendingWidget
+import org.arkikeskus.launcher.feature.home.PlacedBuiltin
+import org.arkikeskus.launcher.feature.home.PlacedWidget
+import org.arkikeskus.launcher.feature.home.PlacedWidgetStack
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.workspace.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.WidgetEntry
+import org.arkikeskus.launcher.feature.home.workspace.Workspace
+import org.arkikeskus.launcher.feature.home.workspace.pushWidgetSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -363,7 +367,7 @@ internal fun WidgetStackContainer(
 
 /** How widget stacks are drawn (Settings ▸ Appearance): corner radius in dp, the page indicator
  *  (`LauncherSettings.STACK_INDICATOR_*`) and whether the options pill shows. */
-data class StackStyle(
+internal data class StackStyle(
     val cornerRadius: Int = 24,
     val indicator: String = LauncherSettings.STACK_INDICATOR_DOTS,
     val showPill: Boolean = false,
@@ -371,11 +375,7 @@ data class StackStyle(
     val autoRotateSeconds: Int = 0,
 )
 
-val LocalStackStyle = androidx.compose.runtime.compositionLocalOf { StackStyle() }
+internal val LocalStackStyle = androidx.compose.runtime.compositionLocalOf { StackStyle() }
 
-private fun HomeEntry.stackChildRowId(): Long? = when (this) {
-    is PlacedWidget -> rowId
-    is PlacedBuiltin -> rowId
-    is PendingWidget -> rowId
-    else -> null
-}
+/** The home_items row id of a widget inside a stack (null for anything a stack cannot hold). */
+private fun HomeEntry.stackChildRowId(): Long? = if (this is WidgetEntry && this !is PlacedWidgetStack) rowId else null

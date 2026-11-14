@@ -1,8 +1,8 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.data.PendingIntents
+import org.arkikeskus.launcher.feature.home.MinuteTicker
 import org.arkikeskus.launcher.feature.home.R
-
 import android.Manifest
 import android.app.RemoteInput
 import android.content.Context
@@ -272,7 +272,7 @@ class PeopleWidgetViewModel @Inject constructor(
         if (live != null) {
             val target = live.delivered.firstOrNull { it.contentIntent != null }
             val intent = target?.contentIntent
-            if (target != null && intent != null && sendNotificationIntent(context, intent)) {
+            if (target != null && intent != null && PendingIntents.sendFromForeground(context, intent)) {
                 if (target.autoCancel) badgeRepository.cancelNotification(target.key)
                 return
             }
@@ -292,7 +292,7 @@ class PeopleWidgetViewModel @Inject constructor(
     /** The dialer's own "call back" action when a missed call offered one, else dial the number. */
     fun call(tile: Tile) {
         val callBack = tile.live?.delivered?.firstNotNullOfOrNull { it.callBack }
-        if (callBack != null && sendNotificationIntent(context, callBack)) return
+        if (callBack != null && PendingIntents.sendFromForeground(context, callBack)) return
         val number = tile.number ?: return
         start(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))))
     }
@@ -360,7 +360,7 @@ class PeopleWidgetViewModel @Inject constructor(
  * message; swipe sideways dismisses; long-press offers reply / call / pin.
  */
 @Composable
-fun PeopleWidget(
+internal fun PeopleWidget(
     modifier: Modifier = Modifier,
     viewModel: PeopleWidgetViewModel = hiltViewModel(),
     screenType: ScreenType = LocalScreenType.current,

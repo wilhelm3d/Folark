@@ -1,7 +1,8 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.widgets.*
-
+import org.arkikeskus.launcher.feature.home.widgets.LinkDialog
+import org.arkikeskus.launcher.feature.home.widgets.PeopleWidgetViewModel
+import org.arkikeskus.launcher.feature.home.widgets.ReplyDialog
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed

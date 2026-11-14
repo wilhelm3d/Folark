@@ -3,13 +3,17 @@ package org.arkikeskus.launcher.pairs
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Whether one of Folark's own screens (home, Settings, Recents…) is resumed right now — the
  * user is looking at Folark. Kept from activity callbacks, so it is right in this process and
- * simply false after a cold start (an alarm waking the app finds nothing on screen).
+ * simply false after a cold start (an alarm waking the app finds nothing on screen). One per
+ * process: the app registers it once (LauncherApplication); PairScheduler reads it.
  */
-object FolarkOnScreen : Application.ActivityLifecycleCallbacks {
+@Singleton
+class FolarkOnScreen @Inject constructor() : Application.ActivityLifecycleCallbacks {
     private var count = 0
 
     /** True while at least one Folark activity is resumed (main thread). */

@@ -15,7 +15,7 @@ import org.arkikeskus.launcher.model.catching
  * browser, camera. Each slot resolves the device's DEFAULT handler and is silently skipped when
  * nothing resolves (e.g. a tablet without telephony), so the seed degrades gracefully.
  */
-fun resolveDefaultDockKeys(context: Context, apps: List<AppItem>): List<String> {
+internal fun resolveDefaultDockKeys(context: Context, apps: List<AppItem>): List<String> {
     val pm = context.packageManager
 
     fun defaultPackageFor(intent: Intent): String? =

@@ -14,6 +14,10 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) FileInputStream(keystorePropsFile).use { load(it) }
 }
 
+// `./gradlew :app:assembleDebug -Pfolark.plainDebug` builds the debug APK debuggable and without
+// R8, for the debugger and the Layout Inspector. It is about 79 MB and slow: not for daily use.
+val plainDebug = providers.gradleProperty("folark.plainDebug").isPresent
+
 android {
     namespace = "org.arkikeskus.launcher"
     testOptions.unitTests.isIncludeAndroidResources = true
@@ -57,11 +61,15 @@ android {
 
     buildTypes {
         debug {
-            isDebuggable = false
-            // R8 ON: without it the dexer mis-lays-out LauncherSettings' huge generated constructor
-            // and ART rejects the class (VerifyError). The Vector module is kept intact via the
-            // -keep rules in proguard-rules.pro instead of by turning R8 off.
-            isMinifyEnabled = true
+            // Built like release by default (R8 on, not debuggable): it runs at release speed, and
+            // CI's assembleDebug exercises the same shrinking rules as a release. The Vector module
+            // is kept intact via the -keep rules in proguard-rules.pro.
+            // R8 is no longer needed for the build to run: the VerifyError it once worked around
+            // (the dexer mis-laid LauncherSettings' huge generated constructor) is gone. ART verified
+            // all 6,469 Folark classes of a build without R8 on a phone (13 November).
+            // So `-Pfolark.plainDebug` gives a plain debug build (see [plainDebug] above).
+            isDebuggable = plainDebug
+            isMinifyEnabled = !plainDebug
             vcsInfo {
                 include = false
             }
@@ -103,10 +111,12 @@ dependencies {
     implementation(project(":hook"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:data"))
+    implementation(project(":core:root"))
     implementation(project(":core:model"))
     implementation(project(":core:ui"))
     implementation(project(":core:launcher"))
     implementation(project(":feature:home"))
+    implementation(project(":feature:taskbar"))
     implementation(project(":feature:appdrawer"))
     implementation(project(":feature:settings"))
 

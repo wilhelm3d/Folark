@@ -1,8 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.data.PendingIntents
 import org.arkikeskus.launcher.feature.home.R
-
 import android.Manifest
 import android.content.ComponentName
 import android.content.Context
@@ -200,7 +199,7 @@ internal class MediaSessionWatcher(private val context: Context) {
         val current = controller ?: return
         // Sent with the background-start opt-in; a plain send() is silently blocked on Android 14+.
         val activity = catching { current.sessionActivity }.getOrNull()
-        val opened = activity != null && sendNotificationIntent(context, activity)
+        val opened = activity != null && PendingIntents.sendFromForeground(context, activity)
         if (!opened) {
             catching {
                 context.packageManager.getLaunchIntentForPackage(current.packageName)
@@ -213,7 +212,7 @@ internal class MediaSessionWatcher(private val context: Context) {
 
 /** Now playing: cover art, track and artist with previous / play-pause / next. */
 @Composable
-fun NowPlayingWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
+internal fun NowPlayingWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val watcher = remember(context) { MediaSessionWatcher(context) }
@@ -319,7 +318,7 @@ private fun MediaButton(icon: Int, description: Int, tint: Color, size: Dp, onCl
 
 /** Device status: ring gauges for the battery, storage, memory and connected Bluetooth devices. */
 @Composable
-fun DeviceStatsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
+internal fun DeviceStatsWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsViewModel = hiltViewModel()) {
     val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val battery by viewModel.battery.collectAsStateWithLifecycle()
     val stats by viewModel.deviceStats.collectAsStateWithLifecycle()

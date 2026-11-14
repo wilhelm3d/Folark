@@ -31,7 +31,7 @@ import org.arkikeskus.launcher.ui.drawer.rememberDrawerColors
  * without leaving the settings (or folding the phone to see the other display).
  */
 @Composable
-fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
+internal fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
     val colors = rememberDrawerColors(
         theme = s.drawer.themeTint,
         accentArgb = s.drawer.accentColor,

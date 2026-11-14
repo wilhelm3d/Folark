@@ -1,8 +1,6 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import android.annotation.SuppressLint
 import android.content.Context
 import org.arkikeskus.launcher.data.root.RootActions
@@ -12,7 +10,7 @@ import org.arkikeskus.launcher.data.root.RootFeatures
  * Opens the system notification shade via the hidden StatusBarManager API. Requires the normal
  * EXPAND_STATUS_BAR permission. No-ops on OEMs that don't expose the method.
  */
-object NotificationShade {
+internal object NotificationShade {
     /** Pulls the shade down, Android's way or with root (Settings ▸ Root). */
     fun expand(context: Context) {
         RootActions.run(

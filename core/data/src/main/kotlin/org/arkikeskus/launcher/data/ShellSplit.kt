@@ -1,12 +1,11 @@
 package org.arkikeskus.launcher.data
 
 import android.Manifest
-import android.app.AppOpsManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Debug
 import android.os.ParcelFileDescriptor
-import android.os.Process
+import org.arkikeskus.launcher.data.root.RootGrants
 import org.arkikeskus.launcher.data.root.RootShell
 import java.io.File
 import org.arkikeskus.launcher.model.catching
@@ -35,18 +34,7 @@ object ShellSplit {
         context.checkSelfPermission(Manifest.permission.DUMP) == PackageManager.PERMISSION_GRANTED &&
             hasUsageAccess(context)
 
-    // unsafeCheckOpNoThrow is deprecated on new Android, but it is the only call that answers
-    // for another app-op mode than this app's own process state; its replacement needs API 36.
-    @Suppress("DEPRECATION")
-    fun hasUsageAccess(context: Context): Boolean = catching {
-        val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
-        when (appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)) {
-            AppOpsManager.MODE_ALLOWED -> true
-            AppOpsManager.MODE_DEFAULT ->
-                context.checkSelfPermission(Manifest.permission.PACKAGE_USAGE_STATS) == PackageManager.PERMISSION_GRANTED
-            else -> false
-        }
-    }.getOrDefault(false)
+    fun hasUsageAccess(context: Context): Boolean = RootGrants.hasUsageAccess(context)
 
     fun hasDump(context: Context): Boolean =
         context.checkSelfPermission(Manifest.permission.DUMP) == PackageManager.PERMISSION_GRANTED

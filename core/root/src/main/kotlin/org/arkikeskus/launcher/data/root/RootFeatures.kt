@@ -2,18 +2,24 @@ package org.arkikeskus.launcher.data.root
 
 import android.os.Handler
 import android.os.Looper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RootMode
+import org.arkikeskus.launcher.model.safeScope
 
 /**
  * Settings ▸ Root, as plain values any part of Folark can read without waiting (the taskbar, the
  * accessibility service, the home gestures). Kept up to date from the settings by the app.
+ * Process-wide on purpose: Android creates the accessibility service and the grant check runs in
+ * onResume, and none of them can wait for DataStore; the app's settings stream is the one writer.
  */
 object RootFeatures {
-    @Volatile var lockMode: String = LauncherSettings.ROOT_MODE_FALLBACK
+    @Volatile var lockMode: RootMode = RootMode.FALLBACK
         private set
-    @Volatile var recentsMode: String = LauncherSettings.ROOT_MODE_FALLBACK
+    @Volatile var recentsMode: RootMode = RootMode.FALLBACK
         private set
-    @Volatile var shadeMode: String = LauncherSettings.ROOT_MODE_FALLBACK
+    @Volatile var shadeMode: RootMode = RootMode.FALLBACK
         private set
     @Volatile var keep: Set<String> = emptySet()
         private set
@@ -37,9 +43,9 @@ object RootFeatures {
 /**
  * Does something either Android's way (the accessibility service, a system call) or with root,
  * as Settings ▸ Root says for it:
- * - [LauncherSettings.ROOT_MODE_OFF]: Android's way only.
- * - [LauncherSettings.ROOT_MODE_FALLBACK]: Android's way, and root when that can't (the service is off).
- * - [LauncherSettings.ROOT_MODE_ALWAYS]: root, and Android's way when root isn't there.
+ * - [RootMode.OFF]: Android's way only.
+ * - [RootMode.FALLBACK]: Android's way, and root when that can't (the service is off).
+ * - [RootMode.ALWAYS]: root, and Android's way when root isn't there.
  *
  * Root commands run on their own thread (never the main thread); true means it was done or is on
  * its way.
@@ -47,10 +53,10 @@ object RootFeatures {
 object RootActions {
     private val main = Handler(Looper.getMainLooper())
 
-    fun run(mode: String, android: () -> Boolean, rootCommand: String): Boolean {
-        if (!RootShell.enabled || mode == LauncherSettings.ROOT_MODE_OFF) return android()
+    fun run(mode: RootMode, android: () -> Boolean, rootCommand: String): Boolean {
+        if (!RootShell.enabled || mode == RootMode.OFF) return android()
         if (RootShell.lastKnown == false && !RootShell.recheckDue()) return android()
-        if (mode == LauncherSettings.ROOT_MODE_ALWAYS) {
+        if (mode == RootMode.ALWAYS) {
             inBackground(rootCommand) { ok -> if (!ok) main.post { android() } }
             return true
         }
@@ -59,11 +65,14 @@ object RootActions {
         return true
     }
 
+    /** Root commands of the gestures and keys: off the main thread, one shared pool, failures logged. */
+    private val worker = safeScope(Dispatchers.IO)
+
     private fun inBackground(command: String, done: (Boolean) -> Unit) {
-        Thread {
+        worker.launch {
             val ok = RootShell.available() && RootShell.run(command) != null
             done(ok)
-        }.apply { name = "folark-root"; isDaemon = true }.start()
+        }
     }
 
     /** Android's keys, as root types them: lock (sleep), and the recents key. */

@@ -1,8 +1,6 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -15,10 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-val LocalTonalWidgets = staticCompositionLocalOf { false }
+internal val LocalTonalWidgets = staticCompositionLocalOf { false }
 
 /** How solid the widget cards are (Settings ▸ Widget background): 0 = see-through, 1 = as themed. */
-val LocalWidgetBackgroundAlpha = staticCompositionLocalOf { 1f }
+internal val LocalWidgetBackgroundAlpha = staticCompositionLocalOf { 1f }
 
 /** Below this the card no longer carries dark text, so widget text turns white (it sits on the wallpaper). */
 internal const val WIDGET_LIGHT_TEXT_BELOW = 0.5f

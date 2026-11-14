@@ -1,10 +1,6 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.workspace.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -48,7 +44,7 @@ import androidx.compose.ui.Alignment
  * notification title & body snippet, and unread count badge.
  */
 @Composable
-fun SamsungNotificationWidget(
+internal fun SamsungNotificationWidget(
     modifier: Modifier = Modifier,
     viewModel: NotificationsWidgetViewModel = hiltViewModel(),
     screenType: ScreenType = LocalScreenType.current,

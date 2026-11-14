@@ -28,9 +28,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.CrashLog
+import org.arkikeskus.launcher.data.ModulePrefs
 import org.arkikeskus.launcher.data.ModuleTools
 import org.arkikeskus.launcher.data.SplitThree
-import org.arkikeskus.launcher.data.root.RootTasks
+import org.arkikeskus.launcher.data.ScreenshotCheck
 import org.arkikeskus.launcher.model.LauncherSettings
 import java.text.DateFormat
 import java.util.Date
@@ -44,7 +45,7 @@ import org.arkikeskus.launcher.model.catching
  *    native three-app split is currently running.
  *  - **Crash log**: the on-device log of Folark's own uncaught exceptions ([CrashLog]).
  *  - **Module log**: what the module wrote inside System UI and the system launcher (root).
- *  - **Check screenshots**: every step of getting a task screenshot, and what each answered ([RootTasks.diagnose]).
+ *  - **Check screenshots**: every step of getting a task screenshot, and what each answered ([ScreenshotCheck]).
  *
  * The four lived on three different pages; a bug report wants them together.
  */
@@ -68,12 +69,6 @@ internal fun SupportPage(s: LauncherSettings, viewModel: SettingsViewModel) {
 
 // ---------------------------------------------------------------------- module status
 
-/** The Vector module's own prefs file in Folark (the module notes when it last asked; RecentsHookState). */
-private const val HOOK_PREFS = "folark_recents_hook"
-private const val HOOK_SEEN_AT = "seen_at"
-private const val HOOK_COMPAT = "compat"
-private const val HOOK_UNLOCK_SEEN_AT = "unlock_seen_at"
-
 /** RecentsHook.HOOK_* bits, reported by the module in the system launcher. */
 private const val HOOK_MAIN = 1
 private const val HOOK_SEARCH = 2
@@ -85,11 +80,11 @@ private fun ModuleStatusRow() {
     // Re-read on every tap of the row (the module writes when it next asks).
     var refreshAt by remember { mutableStateOf(0) }
     val status = remember(refreshAt) {
-        val prefs = context.getSharedPreferences(HOOK_PREFS, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(ModulePrefs.FILE, Context.MODE_PRIVATE)
         Status(
-            seenAt = prefs.getLong(HOOK_SEEN_AT, 0L),
-            unlockSeenAt = prefs.getLong(HOOK_UNLOCK_SEEN_AT, 0L),
-            compat = prefs.getInt(HOOK_COMPAT, 0),
+            seenAt = prefs.getLong(ModulePrefs.SEEN_AT, 0L),
+            unlockSeenAt = prefs.getLong(ModulePrefs.UNLOCK_SEEN_AT, 0L),
+            compat = prefs.getInt(ModulePrefs.COMPAT, 0),
             splitLive = SplitThree.running(context),
         )
     }
@@ -245,7 +240,7 @@ private fun ScreenshotCheckRow() {
                 running = true
                 scope.launch {
                     report = withContext(Dispatchers.IO) {
-                        catching { RootTasks.diagnose(context) }
+                        catching { ScreenshotCheck.run(context) }
                             .getOrElse { "Check failed: ${it.javaClass.simpleName}: ${it.message}" }
                     }
                     running = false

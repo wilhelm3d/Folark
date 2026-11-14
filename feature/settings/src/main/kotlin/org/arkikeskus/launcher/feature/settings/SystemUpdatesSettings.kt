@@ -2,6 +2,7 @@ package org.arkikeskus.launcher.feature.settings
 
 import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,8 +25,12 @@ internal fun SystemUpdatesRow() {
     val context = LocalContext.current
     if (!remember { SystemUpdates.available(context) }) return
     val scope = rememberCoroutineScope()
+    // What can be told at once; the full answer (the OTA app's AppOps, with root) follows.
     var enabled by remember { mutableStateOf(SystemUpdates.enabled(context)) }
     var working by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        enabled = withContext(Dispatchers.IO) { SystemUpdates.allowed(context) }
+    }
     ExpressiveSwitchRow(
         title = stringResource(R.string.settings_system_updates),
         subtitle = stringResource(
@@ -39,7 +44,7 @@ internal fun SystemUpdatesRow() {
                 scope.launch {
                     val ok = withContext(Dispatchers.IO) { SystemUpdates.setEnabled(context, want) }
                     // Show the real state afterwards: if root refused, it stays as it was.
-                    enabled = withContext(Dispatchers.IO) { SystemUpdates.enabled(context) }
+                    enabled = withContext(Dispatchers.IO) { SystemUpdates.allowed(context) }
                     working = false
                     if (!ok) {
                         Toast.makeText(context, R.string.settings_system_updates_need_root, Toast.LENGTH_SHORT).show()

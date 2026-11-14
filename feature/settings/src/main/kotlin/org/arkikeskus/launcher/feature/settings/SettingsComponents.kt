@@ -61,10 +61,10 @@ import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import kotlin.math.abs
 
 /** True when the settings use the Studio look (Settings ▸ Appearance ▸ Settings look). */
-val LocalSettingsStudio = staticCompositionLocalOf { false }
+internal val LocalSettingsStudio = staticCompositionLocalOf { false }
 
 /** The Studio look: dark charcoal, whatever the system theme. */
-val StudioExpressivePalette = ExpressivePalette(
+internal val StudioExpressivePalette = ExpressivePalette(
     bg = Color(0xFF0B0C0F),
     surfaceHi = Color(0xFF17191E),
     text = Color(0xFFEDEEF0),
@@ -78,7 +78,7 @@ val StudioExpressivePalette = ExpressivePalette(
 
 /** M3 Expressive Rounded Section Container Card */
 @Composable
-fun ExpressiveCategoryContainer(
+internal fun ExpressiveCategoryContainer(
     title: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
@@ -153,7 +153,7 @@ fun ExpressiveCategoryContainer(
 
 /** Divider between setting rows inside a container */
 @Composable
-fun ExpressiveRowDivider() {
+internal fun ExpressiveRowDivider() {
     val palette = LocalExpressivePalette.current
     HorizontalDivider(
         modifier = Modifier.padding(vertical = 8.dp),
@@ -164,7 +164,7 @@ fun ExpressiveRowDivider() {
 
 /** Expressive Setting Switch Row */
 @Composable
-fun ExpressiveSwitchRow(
+internal fun ExpressiveSwitchRow(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
@@ -232,7 +232,7 @@ fun ExpressiveSwitchRow(
 
 /** Expressive Setting Stepper Row (+ / - numeric control) */
 @Composable
-fun ExpressiveStepperRow(
+internal fun ExpressiveStepperRow(
     title: String,
     value: Int,
     min: Int,
@@ -323,7 +323,7 @@ private const val DRAG_VALUE_HOLD_MS = 400L
 
 /** Expressive Setting Slider Row */
 @Composable
-fun ExpressiveSliderRow(
+internal fun ExpressiveSliderRow(
     title: String,
     value: Float,
     onValueChange: (Float) -> Unit,
@@ -440,7 +440,7 @@ fun ExpressiveSliderRow(
 
 /** Expressive Action Card (Sub-screen trigger or click action) */
 @Composable
-fun ExpressiveActionItem(
+internal fun ExpressiveActionItem(
     title: String,
     description: String,
     onClick: () -> Unit,
@@ -498,7 +498,7 @@ fun ExpressiveActionItem(
 
 /** Expressive Segmented Control Row */
 @Composable
-fun <T> ExpressiveSegmentedControl(
+internal fun <T> ExpressiveSegmentedControl(
     options: List<Pair<T, String>>,
     selected: T,
     onSelect: (T) -> Unit,
@@ -596,7 +596,7 @@ fun <T> ExpressiveSegmentedControl(
  * so a found setting is never hidden in it.
  */
 @Composable
-fun ColumnScope.SettingsAdvanced(content: @Composable ColumnScope.() -> Unit) {
+internal fun ColumnScope.SettingsAdvanced(content: @Composable ColumnScope.() -> Unit) {
     val palette = LocalExpressivePalette.current
     val focus = LocalSettingsFocus.current
     var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
@@ -647,7 +647,7 @@ fun ColumnScope.SettingsAdvanced(content: @Composable ColumnScope.() -> Unit) {
 
 /** A small heading between groups of rows inside one card. */
 @Composable
-fun SettingsGroupHeading(text: String) {
+internal fun SettingsGroupHeading(text: String) {
     val studio = LocalSettingsStudio.current
     Text(
         text = text.uppercase(),

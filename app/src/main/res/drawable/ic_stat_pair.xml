@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon of a scheduled app pair: two panes side by side (white; Android tints it). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M4,4h7c0.55,0 1,0.45 1,1v14c0,0.55 -0.45,1 -1,1H4c-0.55,0 -1,-0.45 -1,-1V5c0,-0.55 0.45,-1 1,-1zM5,6v12h5V6zM14,4h6c0.55,0 1,0.45 1,1v14c0,0.55 -0.45,1 -1,1h-6c-0.55,0 -1,-0.45 -1,-1V5c0,-0.55 0.45,-1 1,-1zM15,6v12h4V6z" />
+</vector>

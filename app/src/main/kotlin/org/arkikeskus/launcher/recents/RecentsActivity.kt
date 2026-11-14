@@ -138,10 +138,13 @@ class RecentsActivity : ComponentActivity() {
         if (toggle && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) leave()
     }
 
-    /** Recents is a passing screen: leaving it ends it, so it never waits in the background. */
+    /**
+     * Recents is a passing screen: leaving it ends it, so it never waits in the background. Not again
+     * when [leave] already did (a second finish() only made Android log a duplicate request).
+     */
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) finish()
+        if (!isChangingConfigurations && !isFinishing) finish()
     }
 
     private fun leave() {

@@ -5,7 +5,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
-import org.arkikeskus.launcher.data.ShellSplit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import android.app.AppOpsManager
+import android.os.Process
 import org.arkikeskus.launcher.model.catching
 
 /**
@@ -32,7 +36,7 @@ object RootGrants {
     /** Whether [grant] is in place now (no root needed to look). Null when Android can't tell. */
     fun granted(context: Context, grant: String): Boolean? = when (grant) {
         DUMP -> has(context, Manifest.permission.DUMP)
-        USAGE -> ShellSplit.hasUsageAccess(context)
+        USAGE -> hasUsageAccess(context)
         SECURE_SETTINGS -> has(context, Manifest.permission.WRITE_SECURE_SETTINGS)
         NOTIFICATIONS -> secureList(context, "enabled_notification_listeners")
             .any { ComponentName.unflattenFromString(it)?.packageName == context.packageName }
@@ -41,10 +45,24 @@ object RootGrants {
         else -> null // Widgets: Android has no way to ask.
     }
 
+    /** Whether Folark has Usage access (the taskbar's recent apps and the split commands). No root needed to look. */
+    // unsafeCheckOpNoThrow is deprecated on new Android, but it is the only call that answers
+    // for another app-op mode than this app's own process state; its replacement needs API 36.
+    @Suppress("DEPRECATION")
+    fun hasUsageAccess(context: Context): Boolean = catching {
+        val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
+        when (appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)) {
+            AppOpsManager.MODE_ALLOWED -> true
+            AppOpsManager.MODE_DEFAULT ->
+                context.checkSelfPermission(Manifest.permission.PACKAGE_USAGE_STATS) == PackageManager.PERMISSION_GRANTED
+            else -> false
+        }
+    }.getOrDefault(false)
+
     /** Gives [grant] with root; true when root did it. */
     fun grant(context: Context, grant: String): Boolean {
         val pkg = context.packageName
-        if (!SAFE.matches(pkg)) return false
+        if (!ShellSafe.isName(pkg)) return false
         val command = when (grant) {
             DUMP -> "pm grant $pkg android.permission.DUMP"
             USAGE -> "pm grant $pkg android.permission.PACKAGE_USAGE_STATS; appops set $pkg GET_USAGE_STATS allow"
@@ -53,7 +71,7 @@ object RootGrants {
             ACCESSIBILITY -> {
                 val mine = "$pkg/$ACCESSIBILITY_SERVICE"
                 val list = secureList(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-                    .filter { it.isNotBlank() && it != mine && SAFE_COMPONENT.matches(it) } + mine
+                    .filter { it.isNotBlank() && it != mine && ShellSafe.isComponent(it) } + mine
                 "settings put secure enabled_accessibility_services '${list.joinToString(":")}'; settings put secure accessibility_enabled 1"
             }
             WIDGETS -> "cmd appwidget grantbind --package $pkg --user current"
@@ -71,13 +89,13 @@ object RootGrants {
      */
     fun grantRuntime(context: Context, includePersonal: Boolean = false): Boolean {
         val pkg = context.packageName
-        if (!SAFE.matches(pkg)) return false
+        if (!ShellSafe.isName(pkg)) return false
         val wanted = runtimePermissions(context).filter { includePersonal || it !in PERSONAL_DATA }
         val missing = wanted.filter { !has(context, it) }
         if (missing.isEmpty()) return true
         if (!RootShell.available()) return false
         for (perm in missing) {
-            if (!SAFE.matches(perm)) continue
+            if (!ShellSafe.isName(perm)) continue
             RootShell.run("pm grant $pkg $perm")
         }
         return wanted.all { has(context, it) }
@@ -129,7 +147,7 @@ object RootGrants {
     /** "Display over other apps", which the taskbar draws with. */
     fun allowOverlay(context: Context): Boolean {
         val pkg = context.packageName
-        if (!SAFE.matches(pkg)) return false
+        if (!ShellSafe.isName(pkg)) return false
         if (catching { android.provider.Settings.canDrawOverlays(context) }.getOrDefault(false)) return true
         return RootShell.available() && RootShell.run("appops set $pkg SYSTEM_ALERT_WINDOW allow") != null
     }
@@ -137,7 +155,7 @@ object RootGrants {
     /** Makes Folark the default home app. */
     fun makeDefaultHome(context: Context): Boolean {
         val pkg = context.packageName
-        if (!SAFE.matches(pkg)) return false
+        if (!ShellSafe.isName(pkg)) return false
         return RootShell.available() && RootShell.run("cmd package set-home-activity $pkg/$HOME") != null
     }
 
@@ -147,21 +165,22 @@ object RootGrants {
      * Gives back the grants Settings ▸ Root keeps, if Android took any away (at most once a
      * minute; root is only asked when something is missing).
      */
-    fun restoreIfNeeded(context: Context) {
+    fun restoreIfNeeded(context: Context, scope: CoroutineScope) {
         val keep = RootFeatures.keep
         if (keep.isEmpty() || !RootShell.enabled) return
         val now = System.currentTimeMillis()
         if (now - lastRestore < RESTORE_EVERY_MS) return
         lastRestore = now
         val app = context.applicationContext
-        Thread {
+        // On [scope] (the app's, which logs a failure instead of ending the process), off its caller's thread.
+        scope.launch(Dispatchers.IO) {
             val missing = keep.filter { if (it == WIDGETS) !widgetsDone else granted(app, it) != true }
-            if (missing.isEmpty() || !RootShell.available()) return@Thread
+            if (missing.isEmpty() || !RootShell.available()) return@launch
             for (g in missing) {
                 val ok = grant(app, g)
                 if (g == WIDGETS && ok) widgetsDone = true
             }
-        }.apply { name = "folark-root-grants"; isDaemon = true }.start()
+        }
     }
 
     /** Widgets can't be checked, so they are given once per run of Folark. */
@@ -174,7 +193,5 @@ object RootGrants {
         catching { Settings.Secure.getString(context.contentResolver, key) }.getOrNull()
             ?.split(':')?.filter { it.isNotBlank() }.orEmpty()
 
-    private val SAFE = Regex("^[A-Za-z0-9_.]+$")
-    private val SAFE_COMPONENT = Regex("^[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+$")
     private const val RESTORE_EVERY_MS = 60_000L
 }

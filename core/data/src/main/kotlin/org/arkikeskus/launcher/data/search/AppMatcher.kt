@@ -11,34 +11,74 @@ import java.text.Normalizer
  * capitals); anywhere in the name; the letters in order with gaps ("gml" → Gmail); and one typo
  * (a wrong, missing, extra or swapped letter) in a word, for four or more letters typed
  * ("spotfy" → Spotify). Case and accents don't matter ("cafe" finds Café).
+ *
+ * A name is folded (accents and case removed, split into words, initials taken) once and kept, so
+ * a keystroke costs a few string comparisons per app instead of normalising every name again.
  */
 object AppMatcher {
 
     /** Higher is better; null when [label] doesn't match [query] at all. */
     fun score(label: String, query: String): Int? {
-        val q = fold(query.trim())
-        if (q.isEmpty()) return null
-        val name = fold(label)
-        val words = name.split(SEPARATORS).filter { it.isNotEmpty() }
-        val bonus = (64 - label.length).coerceIn(0, 63) // shorter names first within a kind
-        return when {
-            name.startsWith(q) -> 6000 + bonus
-            words.any { it.startsWith(q) } -> 5000 + bonus
-            q.length >= 2 && initials(label).startsWith(q) -> 4000 + bonus
-            name.contains(q) -> 3000 + bonus
-            q.length >= 3 && inOrder(name.replace(" ", ""), q.replace(" ", "")) -> 2000 + bonus
-            q.length >= 4 && words.any { w -> oneTypo(w.take(q.length + 1), q) || oneTypo(w.take(q.length), q) } -> 1000 + bonus
-            else -> null
-        }
+        val needle = Needle.of(query) ?: return null
+        return score(prepared(label), needle)
     }
 
     /** [items] that match [query], best first (ties keep their order). */
     fun <T> rank(items: List<T>, query: String, label: (T) -> String): List<T> {
         if (query.isBlank()) return items
-        return items.mapIndexedNotNull { i, item -> score(label(item), query)?.let { Triple(item, it, i) } }
+        // Nothing left of a query that was only accent marks: nothing matches it.
+        val needle = Needle.of(query) ?: return emptyList()
+        return items.mapIndexedNotNull { i, item -> score(prepared(label(item)), needle)?.let { Triple(item, it, i) } }
             .sortedWith(compareByDescending<Triple<T, Int, Int>> { it.second }.thenBy { it.third })
             .map { it.first }
     }
+
+    private fun score(name: Prepared, needle: Needle): Int? {
+        val q = needle.text
+        return when {
+            name.folded.startsWith(q) -> 6000 + name.bonus
+            name.words.any { it.startsWith(q) } -> 5000 + name.bonus
+            q.length >= 2 && name.initials.startsWith(q) -> 4000 + name.bonus
+            name.folded.contains(q) -> 3000 + name.bonus
+            q.length >= 3 && inOrder(name.compact, needle.compact) -> 2000 + name.bonus
+            q.length >= 4 && name.words.any { w -> oneTypo(w.take(q.length + 1), q) || oneTypo(w.take(q.length), q) } -> 1000 + name.bonus
+            else -> null
+        }
+    }
+
+    /** What was typed, folded once for every name it is compared with. */
+    private class Needle private constructor(val text: String) {
+        /** [text] without spaces, for the letters-in-order match. */
+        val compact = text.replace(" ", "")
+
+        companion object {
+            /** Null when nothing is left to look for. */
+            fun of(query: String): Needle? = fold(query.trim()).takeIf { it.isNotEmpty() }?.let(::Needle)
+        }
+    }
+
+    /** One app name, ready to be compared with any number of queries. */
+    private class Prepared(label: String) {
+        /** Lower case, without accents. */
+        val folded = fold(label)
+        val words = folded.split(SEPARATORS).filter { it.isNotEmpty() }
+        val initials = initials(label)
+        val compact = folded.replace(" ", "")
+        /** Shorter names first within a kind. */
+        val bonus = (64 - label.length).coerceIn(0, 63)
+    }
+
+    /**
+     * The prepared names, most recently used last. A drawer holds a few hundred apps, so this stays
+     * small; a renamed app is simply prepared again under its new name.
+     */
+    private val cache = object : LinkedHashMap<String, Prepared>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Prepared>) = size > MAX_PREPARED
+    }
+
+    private fun prepared(label: String): Prepared = synchronized(cache) { cache.getOrPut(label) { Prepared(label) } }
+
+    private const val MAX_PREPARED = 1024
 
     private val SEPARATORS = Regex("[\\s\\-_.:/&+()]+")
     private val MARKS = Regex("\\p{Mn}+")

@@ -1,8 +1,14 @@
 package org.arkikeskus.launcher.feature.home.workspace
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.HomeEntry
+import org.arkikeskus.launcher.feature.home.PendingWidget
+import org.arkikeskus.launcher.feature.home.PlacedApp
+import org.arkikeskus.launcher.feature.home.PlacedBuiltin
+import org.arkikeskus.launcher.feature.home.PlacedFolder
+import org.arkikeskus.launcher.feature.home.PlacedShortcut
+import org.arkikeskus.launcher.feature.home.PlacedWidget
+import org.arkikeskus.launcher.feature.home.PlacedWidgetStack
 import org.arkikeskus.launcher.feature.home.R
-
 import android.appwidget.AppWidgetManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -35,7 +41,6 @@ internal class DropTargetCache {
     var valid: Boolean = false
 }
 
-/** The home_items row id of a widget inside a stack (null for anything a stack cannot hold). */
 /** Who an entry is, for its place in the page's composition (not where it sits). */
 internal fun HomeEntry.slotKey(): String = when (this) {
     is PlacedApp -> "app:" + app.key

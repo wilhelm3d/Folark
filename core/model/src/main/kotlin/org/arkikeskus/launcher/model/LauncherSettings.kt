@@ -369,11 +369,6 @@ data class LauncherSettings(
         const val PRESS_NONE = "none"
         val PRESS_EFFECTS = listOf(PRESS_SHRINK, PRESS_BOUNCE, PRESS_GLOW, PRESS_RIPPLE, PRESS_TILT, PRESS_JELLY, PRESS_NONE)
 
-        /** Settings ▸ Root: Android's way only, root when Android's way can't, or root first. */
-        const val ROOT_MODE_OFF = "off"
-        const val ROOT_MODE_FALLBACK = "fallback"
-        const val ROOT_MODE_ALWAYS = "always"
-        val ROOT_MODES = listOf(ROOT_MODE_OFF, ROOT_MODE_FALLBACK, ROOT_MODE_ALWAYS)
         const val TASKBAR_SPLIT_SIDE_LEFT = "left"
         const val TASKBAR_SPLIT_SIDE_RIGHT = "right"
 

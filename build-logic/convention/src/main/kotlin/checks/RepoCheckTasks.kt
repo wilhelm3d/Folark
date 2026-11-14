@@ -57,6 +57,11 @@ abstract class GenerateSettingsIndexTask : DefaultTask() {
     @TaskAction
     fun generate() {
         val files = sources.files.filter { it.isFile && it.name.endsWith(".kt") }.associate { it.name to it.readText() }
+        // No pages found means the page picker moved or was renamed: an empty index would quietly
+        // take every single setting out of the search, so the build stops instead.
+        check(SettingsIndexGenerator.categoryCount(files) > 0) {
+            "Settings search index: no category pages found (SettingsCategoryPage's `when`), the index would be empty"
+        }
         val text = SettingsIndexGenerator.generate(files)
         val out = File(indexPath.get())
         if (!out.exists() || out.readText() != text) {

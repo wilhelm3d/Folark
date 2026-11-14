@@ -4,14 +4,18 @@ import java.io.File
 
 /**
  * Builds SettingsSearchIndex.kt from the settings screens' own code (formerly
- * tools/gen_settings_index.py, same rules): each `SettingsCategory.X -> SomeSection(` in
- * SettingsScreen.kt is a category's page; its rows are the `title = stringResource(R.string.…)`
+ * tools/gen_settings_index.py, same rules): each `SettingsCategory.X -> SomeSection(` in the
+ * function [PAGE_PICKER] (in whichever file it lives) is a category's page; its rows are the
+ * `title = stringResource(R.string.…)`
  * (with the subtitle or description after it) and the `Text(stringResource(R.string.settings_…))`
  * headings in that page's function and in every settings function it calls, however deep.
  * Pure Kotlin, so it can be tested without Gradle.
  */
 object SettingsIndexGenerator {
     const val INDEX_FILE = "SettingsSearchIndex.kt"
+
+    /** The function whose `when` picks each category's page (SettingsCategoryPage.kt). */
+    private const val PAGE_PICKER = "SettingsCategoryPage"
 
     private val DECL = Regex(
         """^(?:@Composable\s*\n)?(?:(?:internal|private|public)\s+)?fun\s+(?:[A-Za-z_.<>]+\.)?([A-Za-z_]\w*)\s*\(""",
@@ -25,23 +29,8 @@ object SettingsIndexGenerator {
 
     /** The index file's text, from [sources]: file name → content of each .kt file of the settings package. */
     fun generate(sources: Map<String, String>): String {
-        val functions = LinkedHashMap<String, String>()
-        val roots = LinkedHashMap<String, MutableList<String>>()
-        for ((name, src) in sources.entries.sortedBy { it.key }) {
-            if (!name.endsWith(".kt") || name == INDEX_FILE) continue
-            if (name == "SettingsScreen.kt") {
-                for (m in ROOTS.findAll(src)) {
-                    val list = roots.getOrPut(m.groupValues[1]) { mutableListOf() }
-                    if (m.groupValues[2] !in list) list += m.groupValues[2]
-                }
-            }
-            val starts = DECL.findAll(src).map { it.range.first to it.groupValues[1] }.toList()
-            starts.forEachIndexed { i, (at, fn) ->
-                val end = if (i + 1 < starts.size) starts[i + 1].first else src.length
-                // The whole screen: its dialogs would pull everything into every category.
-                if (fn != "SettingsScreen") functions[fn] = functions.getOrElse(fn) { "" } + src.substring(at, end)
-            }
-        }
+        val functions = functions(sources)
+        val roots = roots(functions)
         val index = mutableListOf<Triple<String, String, String?>>()
         val seen = HashSet<Pair<String, String>>()
         for ((cat, fns) in roots) {
@@ -78,8 +67,32 @@ object SettingsIndexGenerator {
     }
 
     /** How many categories [sources] has pages for (for the task's log line). */
-    fun categoryCount(sources: Map<String, String>): Int =
-        sources["SettingsScreen.kt"]?.let { src -> ROOTS.findAll(src).map { it.groupValues[1] }.toSet().size } ?: 0
+    fun categoryCount(sources: Map<String, String>): Int = roots(functions(sources)).size
+
+    /** Every function in [sources] by name, with its text up to the next declaration. */
+    private fun functions(sources: Map<String, String>): Map<String, String> {
+        val functions = LinkedHashMap<String, String>()
+        for ((name, src) in sources.entries.sortedBy { it.key }) {
+            if (!name.endsWith(".kt") || name == INDEX_FILE) continue
+            val starts = DECL.findAll(src).map { it.range.first to it.groupValues[1] }.toList()
+            starts.forEachIndexed { i, (at, fn) ->
+                val end = if (i + 1 < starts.size) starts[i + 1].first else src.length
+                // The whole screen: its dialogs would pull everything into every category.
+                if (fn != "SettingsScreen") functions[fn] = functions.getOrElse(fn) { "" } + src.substring(at, end)
+            }
+        }
+        return functions
+    }
+
+    /** Each category's page functions, in the order [PAGE_PICKER] names them. */
+    private fun roots(functions: Map<String, String>): Map<String, List<String>> {
+        val roots = LinkedHashMap<String, MutableList<String>>()
+        for (m in ROOTS.findAll(functions[PAGE_PICKER].orEmpty())) {
+            val list = roots.getOrPut(m.groupValues[1]) { mutableListOf() }
+            if (m.groupValues[2] !in list) list += m.groupValues[2]
+        }
+        return roots
+    }
 
     /** (title, subtitle or null) in the order they appear in [body]. */
     private fun rows(body: String): List<Pair<String, String?>> {

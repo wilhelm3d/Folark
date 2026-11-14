@@ -1,8 +1,7 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.feature.home.MinuteTicker
 import org.arkikeskus.launcher.feature.home.R
-
 import android.Manifest
 import android.content.ContentUris
 import android.content.Intent
@@ -129,7 +128,7 @@ class SmartspaceViewModel @Inject constructor(
  * calendar's day view, and the event itself. The v2 weather slot goes beside the date row.
  */
 @Composable
-fun SmartspaceWidget(
+internal fun SmartspaceWidget(
     modifier: Modifier = Modifier,
     screenType: ScreenType = LocalScreenType.current,
     viewModel: SmartspaceViewModel = hiltViewModel(),

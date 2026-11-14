@@ -1,5 +1,6 @@
 package org.arkikeskus.launcher.feature.settings
 
+import org.arkikeskus.launcher.model.RootMode
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.runtime.Composable
@@ -137,13 +138,13 @@ internal fun RootSection(s: LauncherSettings, viewModel: SettingsViewModel) {
 }
 
 @Composable
-private fun RootModeRow(title: Int, subtitle: Int, selected: String, onSelect: (String) -> Unit) {
+private fun RootModeRow(title: Int, subtitle: Int, selected: RootMode, onSelect: (RootMode) -> Unit) {
     ExpressiveSegmentedControl(
         title = stringResource(title),
         options = listOf(
-            LauncherSettings.ROOT_MODE_OFF to stringResource(R.string.settings_root_mode_off),
-            LauncherSettings.ROOT_MODE_FALLBACK to stringResource(R.string.settings_root_mode_fallback),
-            LauncherSettings.ROOT_MODE_ALWAYS to stringResource(R.string.settings_root_mode_always),
+            RootMode.OFF to stringResource(R.string.settings_root_mode_off),
+            RootMode.FALLBACK to stringResource(R.string.settings_root_mode_fallback),
+            RootMode.ALWAYS to stringResource(R.string.settings_root_mode_always),
         ),
         selected = selected,
         onSelect = onSelect,

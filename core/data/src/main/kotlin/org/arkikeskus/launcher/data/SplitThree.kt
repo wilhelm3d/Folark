@@ -88,7 +88,6 @@ object SplitThree {
     const val METHOD_RESULT = "split3_result"
 
     private const val SYSTEMUI = "com.android.systemui"
-    private const val PREFS = "folark_recents_hook"
     private const val READY_AT = "split3_ready_at"
     private const val READY_FOR_MS = 14L * 24 * 3600 * 1000
     private const val TIMEOUT_MS = 4_500L
@@ -111,7 +110,7 @@ object SplitThree {
     private val values = ConcurrentHashMap<String, Int>()
     private val kinds = ConcurrentHashMap<String, String>()
 
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, 0)
+    private fun prefs(context: Context) = context.getSharedPreferences(ModulePrefs.FILE, 0)
 
     /**
      * System UI (Folark's module there) has started. True when it started right after one of

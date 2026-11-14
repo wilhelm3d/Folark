@@ -1,9 +1,6 @@
 package org.arkikeskus.launcher.feature.home
 
-import org.arkikeskus.launcher.feature.home.taskbar.*
-import org.arkikeskus.launcher.feature.home.widgets.*
-import org.arkikeskus.launcher.feature.home.workspace.*
-
+import org.arkikeskus.launcher.feature.home.widgets.BadgeCounts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Dialog
@@ -67,7 +64,7 @@ import org.arkikeskus.launcher.ui.component.isDefaultOrBlankFolderName
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun FolderDialog(
+internal fun FolderDialog(
     folder: PlacedFolder,
     badges: BadgeCounts,
     badgeShowCount: Boolean,
@@ -212,7 +209,7 @@ fun FolderDialog(
  * apps already placed on the home screen.
  */
 @Composable
-fun HomeAddToFolderDialog(
+internal fun HomeAddToFolderDialog(
     app: AppItem,
     folders: List<PlacedFolder>,
     companions: List<AppItem>,

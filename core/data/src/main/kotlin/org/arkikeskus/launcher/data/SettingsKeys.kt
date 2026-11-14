@@ -171,6 +171,7 @@ internal object Keys {
     val CLOCK_MINUTE_OPACITY = floatPreferencesKey("clock_minute_opacity")
     val WEATHER_WIDGET_ANIMATED = booleanPreferencesKey("weather_widget_animated")
     val WEATHER_AWAKE_SECONDS = intPreferencesKey("weather_awake_seconds")
+    val CLIPBOARD_KEEP_MINUTES = intPreferencesKey("clipboard_keep_minutes")
     val VIDEO_AWAKE_SECONDS = intPreferencesKey("video_awake_seconds")
     val ADD_NEW_APPS = booleanPreferencesKey("add_new_apps_to_home")
     val NEW_APPS = stringPreferencesKey("new_apps")

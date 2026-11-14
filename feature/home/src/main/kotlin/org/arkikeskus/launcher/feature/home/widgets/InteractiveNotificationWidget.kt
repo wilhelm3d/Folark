@@ -1,10 +1,10 @@
 package org.arkikeskus.launcher.feature.home.widgets
 
-import org.arkikeskus.launcher.feature.home.*
+import org.arkikeskus.launcher.data.PendingIntents
 import org.arkikeskus.launcher.feature.home.R
-import org.arkikeskus.launcher.feature.home.workspace.*
-import org.arkikeskus.launcher.feature.home.taskbar.*
-
+import org.arkikeskus.launcher.feature.home.taskbar.isPinned
+import org.arkikeskus.launcher.feature.home.taskbar.open
+import org.arkikeskus.launcher.feature.home.taskbar.pinnedKeys
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -126,7 +126,7 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
             // Sent the way a tap in the shade sends it: Android 14+ otherwise blocks the app from
             // opening its screen, since the launcher's right to start an activity isn't passed on.
             val sent = if (context != null) {
-                sendNotificationIntent(context, pendingIntent)
+                PendingIntents.sendFromForeground(context, pendingIntent)
             } else {
                 catching { pendingIntent.send() }.isSuccess
             }
@@ -151,7 +151,7 @@ class InteractiveNotificationWidgetViewModel @Inject constructor(
 }
 
 @Composable
-fun InteractiveNotificationWidget(
+internal fun InteractiveNotificationWidget(
     modifier: Modifier = Modifier,
     viewModel: InteractiveNotificationWidgetViewModel = hiltViewModel()
 ) {
@@ -271,7 +271,7 @@ fun InteractiveNotificationWidget(
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun InteractiveNotificationItem(
+internal fun InteractiveNotificationItem(
     notification: StatusNotification,
     isPinned: Boolean,
     onCancel: () -> Unit,

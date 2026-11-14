@@ -49,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -116,12 +117,14 @@ internal fun FolderPopover(
         label = "folderPopover",
     )
 
+    // The scrim's tap detector keeps the first close() it saw: it must still reach the newest callback.
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
     fun close() {
         if (closing) return
         closing = true
         scope.launch {
             delay(170)
-            onDismiss()
+            currentOnDismiss()
         }
     }
 
