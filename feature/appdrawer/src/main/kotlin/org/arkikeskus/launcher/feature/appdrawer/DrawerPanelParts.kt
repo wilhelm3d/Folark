@@ -348,6 +348,7 @@ internal fun BoxScope.DrawerIndexOverlay(
     DrawerIndexBar(
         position = position,
         scale = scale,
+        available = remember(apps) { apps.mapTo(HashSet()) { drawerLetterOf(it) } },
         onLetterSelected = { char ->
             val targetIndex = letterScrollTarget(char, apps, letterRuns, itemsAbove)
             coroutineScope.launch {

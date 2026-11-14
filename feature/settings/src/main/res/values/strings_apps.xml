@@ -127,6 +127,8 @@
     <string name="settings_drawer_bottom_space">Space below the drawer</string>
     <string name="settings_drawer_bottom_space_desc">Lifts the drawer above a system taskbar that covers its bottom edge</string>
     <string name="settings_drawer_letter_headers">Letter headings in the app list</string>
+    <string name="settings_drawer_letter_tiles">Compact letters</string>
+    <string name="settings_drawer_letter_tiles_desc">Each letter takes one place in the grid, before its apps, instead of a row of its own</string>
     <string name="settings_drawer_letter_popup">Large letter while using the A-Z bar</string>
     <string name="settings_drawer_letter_popup_desc">Shows the letter under your finger in the middle of the drawer</string>
     <string name="settings_drawer_swipe_tabs">Swipe sideways to change tab</string>

@@ -52,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -386,42 +387,37 @@ internal fun DeviceStatsWidget(modifier: Modifier = Modifier, viewModel: FolarkW
                     StatGauge(gauge, ink, diameter, showLabels, showNames)
                 }
                 if (needsBluetoothPermission) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clickable {
+                    // Laid out like the rings beside it: an empty ring, "Allow" where the percentage goes.
+                    StatGauge(
+                        StatGaugeData(
+                            label = stringResource(R.string.status_desc_bluetooth),
+                            fraction = 0f,
+                            color = ink,
+                            icon = R.drawable.ic_status_bluetooth,
+                            value = stringResource(R.string.stats_widget_bluetooth_allow),
+                        ),
+                        ink, diameter, showLabels, showNames,
+                        modifier = Modifier.clickable(role = Role.Button) {
                             catching { askBluetooth.launch(Manifest.permission.BLUETOOTH_CONNECT) }
                         },
-                    ) {
-                        Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_status_bluetooth),
-                                contentDescription = null,
-                                tint = ink,
-                                modifier = Modifier.size(diameter * 0.5f),
-                            )
-                        }
-                        if (showLabels) {
-                            Text(
-                                text = stringResource(R.string.stats_widget_bluetooth_allow),
-                                color = ink.copy(alpha = 0.8f),
-                                fontSize = 11.sp,
-                                maxLines = 1,
-                            )
-                        }
-                    }
+                    )
                 }
             }
         }
     }
 }
 
-/** One ring of the device status widget. [sub] is an extra small line under the percentage. */
+/**
+ * One ring of the device status widget. [sub] is an extra small line under the percentage;
+ * [value] stands in for the percentage (the Bluetooth permission tile says "Allow" there).
+ */
 private data class StatGaugeData(
     val label: String,
     val fraction: Float,
     val color: Color,
     val icon: Int,
     val sub: String? = null,
+    val value: String? = null,
 )
 
 /** "Full in 42 min", or over an hour "Full in 1 h 05 min". */
@@ -433,9 +429,16 @@ private fun fullInText(context: android.content.Context, minutes: Int): String =
 private val MAX_GAUGE_DIAMETER = 46.dp
 
 @Composable
-private fun StatGauge(gauge: StatGaugeData, ink: Color, diameter: Dp, showPercent: Boolean, showName: Boolean) {
+private fun StatGauge(
+    gauge: StatGaugeData,
+    ink: Color,
+    diameter: Dp,
+    showPercent: Boolean,
+    showName: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val clamped = gauge.fraction.coerceIn(0f, 1f)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
                 val stroke = size.minDimension * 0.1f
@@ -459,7 +462,7 @@ private fun StatGauge(gauge: StatGaugeData, ink: Color, diameter: Dp, showPercen
         }
         if (showPercent) {
             Text(
-                text = "${(clamped * 100).toInt()}%",
+                text = gauge.value ?: "${(clamped * 100).toInt()}%",
                 color = ink,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,

@@ -6,9 +6,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.BroadcastReceiver
 import android.content.Intent
-import android.content.pm.ActivityInfo
-import android.content.pm.ApplicationInfo
-import android.content.pm.ResolveInfo
+import android.content.ComponentName
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Looper
 import android.os.Process
@@ -44,6 +43,7 @@ import org.robolectric.shadows.ShadowNotificationListenerService
 import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter.from
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30, 35], application = Application::class)
@@ -91,9 +91,11 @@ class NotificationDotListenerServiceTest {
         // MIN_FULL_REBUILD_MS (250): run the queued refresh now, so assertions see the state the
         // device reaches one floor later. Still short of the 500 ms snapshot retry and the 1 s
         // quiet-update refresh, and far short of the (hour-away) batch delivery.
-        shadowOf(Looper.getMainLooper()).idle(300L)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
     }
 
+    // The public constructor is deprecated for apps, but a test has no other way to make one.
+    @Suppress("DEPRECATION")
     private fun sbn(notification: Notification) = StatusBarNotification(
         "chat.app", "chat.app", 1, null, 1000, 0, 0, notification, Process.myUserHandle(), System.currentTimeMillis(),
     )
@@ -186,16 +188,18 @@ class NotificationDotListenerServiceTest {
         val notification = sbn(NotificationCompat.Builder(context, "mail")
             .setContentTitle("Sender").setContentText("Subject").build())
         assertThat(person(notification)).isNull()
-        val resolveInfo = ResolveInfo().apply {
-            activityInfo = ActivityInfo().apply {
-                packageName = "chat.app"
-                name = "MailActivity"
-                applicationInfo = ApplicationInfo().apply { packageName = "chat.app" }
-            }
+        // chat.app now has a mail activity: one that answers ACTION_SENDTO with a mailto: address.
+        val mailActivity = ComponentName("chat.app", "chat.app.MailActivity")
+        shadowOf(context.packageManager).apply {
+            addActivityIfNotPresent(mailActivity)
+            addIntentFilterForActivity(
+                mailActivity,
+                IntentFilter(Intent.ACTION_SENDTO).apply {
+                    addCategory(Intent.CATEGORY_DEFAULT)
+                    addDataScheme("mailto")
+                },
+            )
         }
-        shadowOf(context.packageManager).addResolveInfoForIntent(
-            Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:someone@example.com")), resolveInfo,
-        )
         ReflectionHelpers.getField<BroadcastReceiver>(service, "packageReceiver")
             .onReceive(context, Intent(Intent.ACTION_PACKAGE_ADDED, Uri.parse("package:chat.app")))
         ReflectionHelpers.getField<Job>(service, "packageRefreshJob").join()

@@ -161,6 +161,7 @@ internal fun readSettings(p: Preferences, screenType: ScreenType): LauncherSetti
             handleStyle = storedChoice(p[Keys.drawerHandleStyle(screenType)], DrawerHandle.BAR),
             bottomSpace = (p[Keys.drawerBottomSpace(screenType)] ?: 0).coerceIn(0, LauncherSettings.MAX_DRAWER_BOTTOM_SPACE),
             letterHeaders = p[Keys.drawerLetterHeaders(screenType)] ?: false,
+            letterTiles = p[Keys.drawerLetterTiles(screenType)] ?: false,
             largeLetterPopup = p[Keys.drawerLargeLetterPopup(screenType)] ?: true,
             swipeTabs = p[Keys.drawerSwipeTabs(screenType)] ?: true,
             flickClose = p[Keys.drawerFlickClose(screenType)] ?: false,
@@ -230,7 +231,7 @@ internal fun readSettings(p: Preferences, screenType: ScreenType): LauncherSetti
             avatars = p[Keys.DOT_AVATARS] ?: true,
         ),
         folders = FolderSettings(
-            shape = storedChoice(p[Keys.folderShape(screenType)], FolderShape.SQUIRCLE),
+            shape = storedChoice(p[Keys.folderShape(screenType)], FolderShape.ICON),
             theme = storedChoice(p[Keys.folderTheme(screenType)], FolderTheme.GLASS),
             preview = storedChoice(p[Keys.folderPreview(screenType)], FolderPreview.GRID_2),
             openColumns = (p[Keys.folderOpenColumns(screenType)] ?: 4)

@@ -526,6 +526,7 @@ class SettingsViewModel @Inject constructor(
     fun setAzIndexScale(value: Float, screenType: ScreenType = _screenType.value) = update { repository.setAzIndexScale(value, screenType) }
     fun setDrawerBottomSpace(value: Int, screenType: ScreenType = _screenType.value) = update { repository.setDrawerBottomSpace(value, screenType) }
     fun setDrawerLetterHeaders(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerLetterHeaders(value, screenType) }
+    fun setDrawerLetterTiles(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerLetterTiles(value, screenType) }
     fun setDrawerLargeLetterPopup(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerLargeLetterPopup(value, screenType) }
     fun setDrawerSwipeTabs(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerSwipeTabs(value, screenType) }
     fun setDrawerFlickClose(value: Boolean, screenType: ScreenType = _screenType.value) = update { repository.setDrawerFlickClose(value, screenType) }

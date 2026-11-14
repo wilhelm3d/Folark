@@ -6,7 +6,7 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class FolderSettings(
     /** Home folders: tile shape, colour theme and what the closed tile previews. */
-    val shape: FolderShape = FolderShape.SQUIRCLE,
+    val shape: FolderShape = FolderShape.ICON,
     val theme: FolderTheme = FolderTheme.GLASS,
     val preview: FolderPreview = FolderPreview.GRID_2,
     /** Home folders, opened: columns of the app grid and the overall size (icons + sheet height). */
@@ -36,8 +36,9 @@ enum class FolderPreview(override val stored: String) : StoredChoice {
     COVER("cover"),
 }
 
-/** A closed folder's shape. */
+/** A closed folder's shape; [ICON] follows the app icons' shape (Settings ▸ Icons). */
 enum class FolderShape(override val stored: String) : StoredChoice {
+    ICON("icon"),
     SQUIRCLE("squircle"),
     CIRCLE("circle"),
     SQUARE("square"),

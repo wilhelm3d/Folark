@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
@@ -54,13 +53,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.arkikeskus.launcher.data.IconShapes
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.FolderShape
 import org.arkikeskus.launcher.model.FolderTheme
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.PopupTheme
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LiquidGlassContainer
+import org.arkikeskus.launcher.ui.component.folderTileGap
+import org.arkikeskus.launcher.ui.component.folderTileInset
+import org.arkikeskus.launcher.ui.component.folderTileShape
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.DarkExpressivePalette
 import org.arkikeskus.launcher.ui.expressive.ExpressivePalette
@@ -409,15 +411,10 @@ private fun WidgetCard(s: LauncherSettings, modifier: Modifier, solid: Boolean =
 /** A folder tile as home draws it: shape, theme (glass with frost and tint, or a solid colour). */
 @Composable
 private fun FolderTile(s: LauncherSettings, apps: List<AppItem>, size: Dp) {
-    val scale = size / 52.dp
-    val circle = s.folders.shape == FolderShape.CIRCLE
-    val shape: Shape = when (s.folders.shape) {
-        FolderShape.CIRCLE -> CircleShape
-        FolderShape.SQUARE -> RoundedCornerShape(6.dp * scale)
-        else -> RoundedCornerShape(15.dp * scale)
-    }
-    val inset = (if (circle) 10.dp else 6.dp) * scale
-    val gap = 2.dp * scale
+    val iconOutline = remember(s.icons.shape) { IconShapes.pathData(s.icons.shape) }
+    val shape = remember(s.folders.shape, iconOutline, size) { folderTileShape(s.folders.shape, iconOutline, size) }
+    val inset = folderTileInset(s.folders.shape, s.icons.shape, size)
+    val gap = folderTileGap(size)
     val mini = (size - inset * 2 - gap) / 2
     val inside: @Composable () -> Unit = {
         Column(

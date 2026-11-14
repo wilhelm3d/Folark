@@ -49,6 +49,7 @@ suspend fun SettingsRepository.setDrawerBottomSpace(value: Int, screenType: Scre
     it[Keys.drawerBottomSpace(screenType)] = value.coerceIn(0, LauncherSettings.MAX_DRAWER_BOTTOM_SPACE)
 }
 suspend fun SettingsRepository.setDrawerLetterHeaders(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerLetterHeaders(screenType)] = value }
+suspend fun SettingsRepository.setDrawerLetterTiles(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerLetterTiles(screenType)] = value }
 suspend fun SettingsRepository.setDrawerLargeLetterPopup(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerLargeLetterPopup(screenType)] = value }
 suspend fun SettingsRepository.setDrawerSwipeTabs(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerSwipeTabs(screenType)] = value }
 suspend fun SettingsRepository.setDrawerFlickClose(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.drawerFlickClose(screenType)] = value }

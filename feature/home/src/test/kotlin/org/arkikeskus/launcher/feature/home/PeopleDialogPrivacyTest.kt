@@ -6,7 +6,7 @@ import org.arkikeskus.launcher.feature.home.widgets.ReplyDialog
 import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import org.arkikeskus.launcher.data.PinnedPerson
 import org.arkikeskus.launcher.model.PeoplePrivacy

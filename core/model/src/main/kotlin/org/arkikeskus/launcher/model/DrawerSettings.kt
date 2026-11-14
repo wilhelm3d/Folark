@@ -25,6 +25,9 @@ data class DrawerSettings(
     val bottomSpace: Int = 0,
     /** Small "A", "B", "C" headings between the apps of the full list. */
     val letterHeaders: Boolean = false,
+    /** With [letterHeaders] in the grid: each letter is one cell before its apps instead of a whole row,
+     *  so the apps run on without half-empty rows. */
+    val letterTiles: Boolean = false,
     /** Show the letter under the finger large in the middle of the drawer while using the A-Z bar. */
     val largeLetterPopup: Boolean = true,
     /** A sideways swipe on the app list moves between the drawer's folder tabs. */

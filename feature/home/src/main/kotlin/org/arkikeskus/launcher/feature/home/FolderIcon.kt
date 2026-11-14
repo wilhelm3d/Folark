@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.arkikeskus.launcher.data.IconShapes
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.FolderPreview
 import org.arkikeskus.launcher.model.FolderShape
@@ -31,16 +32,20 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.AppLabel
+import org.arkikeskus.launcher.ui.component.LocalIconShape
 import org.arkikeskus.launcher.ui.component.LiquidGlassContainer
 import org.arkikeskus.launcher.ui.component.NotificationBadge
 import org.arkikeskus.launcher.ui.component.badgeAlignment
+import org.arkikeskus.launcher.ui.component.folderTileGap
+import org.arkikeskus.launcher.ui.component.folderTileInset
+import org.arkikeskus.launcher.ui.component.folderTileShape
 
 /**
  * How home folders look (Settings ▸ Grid ▸ Folders): the closed tile's [shape], colour [theme] and
  * [preview], and the opened folder's grid [openColumns] and [openSize].
  */
 internal data class FolderStyle(
-    val shape: FolderShape = FolderShape.SQUIRCLE,
+    val shape: FolderShape = FolderShape.ICON,
     val theme: FolderTheme = FolderTheme.GLASS,
     val preview: FolderPreview = FolderPreview.GRID_2,
     val openColumns: Int = 4,
@@ -120,16 +125,12 @@ internal fun FolderIcon(
             // EVERYTHING inside scales with the tile — padding and gap included. A fixed padding/gap
             // with linearly scaled icons inverted the margin below ~45dp tiles (6–7 columns on a
             // narrow screen), squeezing the preview asymmetrically out of its card.
-            val scale = size / 52.dp
-            val circle = style.shape == FolderShape.CIRCLE
-            val tileShape: Shape = when (style.shape) {
-                FolderShape.CIRCLE -> CircleShape
-                FolderShape.SQUARE -> RoundedCornerShape(6.dp * scale)
-                else -> RoundedCornerShape(15.dp * scale)
-            }
-            // A circle cuts the corners off, so its preview sits further in.
-            val inset = (if (circle) 10.dp else 6.dp) * scale
-            val gap = 2.dp * scale
+            // "Like icons" takes the icons' own outline, so a folder matches the apps beside it.
+            val iconShape = LocalIconShape.current
+            val iconOutline = remember(iconShape) { IconShapes.pathData(iconShape) }
+            val tileShape = remember(style.shape, iconOutline, size) { folderTileShape(style.shape, iconOutline, size) }
+            val inset = folderTileInset(style.shape, iconShape, size)
+            val gap = folderTileGap(size)
             FolderSurface(
                 theme = style.theme,
                 shape = tileShape,

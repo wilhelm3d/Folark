@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Folders, themed icons, compact letters (14 November)
+- Home folders: the new folder shape "Like icons" (Settings ▸ Dock & folders ▸ Folder shape) is the default. A closed folder takes the outline of the icon shape (cookie, diamond, square, …) instead of always being a rounded square, and its little icons sit far enough in that the corners don't cut them. The Theme preview shows the same. Squircle, circle and square stay as they were; a folder that was set to squircle keeps it.
+- Themed icons for apps without a monochrome icon: when an app's own artwork fills most of the icon (a full-bleed disc or picture), the glyph is cut out of a tinted plate instead of being drawn as a solid blob, so these icons look like the real themed ones beside them. Small logos on a blank background are drawn as before.
+- App drawer ▸ "Compact letters" (grid with letter headings): each letter is one cell before its apps, as tall as the icons and level with them, so the grid runs on instead of breaking into a short row per letter. Off by default; per screen.
+- The A–Z bar draws the letters that have apps clearly and the others faint, and the whole strip takes a finger (the padding round the letters was outside the touch area).
+- Measured on the razr fold, nothing to change: a cold start to home takes 243–253 ms folded and 288–299 ms unfolded (the baseline profile covers all of Folark's code), and in the background Folark drops to about 155 MB, with Coil and Recents already giving their memory back when Android asks.
+- Tests: screenshot tests for the folder shapes (three icon shapes) and the drawer's letters, each on the outer and the inner display size; the references are in `src/test/screenshots`, `-Pfolark.recordScreenshots` renews them. The four deprecated test calls are replaced (Compose test rule v2, `idleFor`, an intent filter instead of a canned resolve result).
+
+### Review, third round (14 November)
+- Device status widget: the Bluetooth tile that asks for the permission looks like the rings beside it (an empty ring, "Allow" where the percentage goes, "Bluetooth" as its name) instead of a bare icon on a lower line; screen readers announce it as a button.
+
 ### Settings with fixed choices are enums (14 November)
 - Code: the 90 remaining String settings with a fixed set of choices (drawer, dock, folders, icons, dots, home gestures, fold, Recents, taskbar, widgets, motion, fonts, the split picker) are enums now, 68 in all next to the Root modes. Each one keeps the text it was always stored as (`StoredChoice.stored`), so settings, backups and the Vector module's divider lock read back exactly as before; a test pins every stored text.
 - A stored value that is not one of the choices reads as that setting's default everywhere. Some settings were read unchecked before (minus-one screen, icon rings, settings style, the taskbar handles and media icon, among others), and a damaged value could leave them showing no choice at all.

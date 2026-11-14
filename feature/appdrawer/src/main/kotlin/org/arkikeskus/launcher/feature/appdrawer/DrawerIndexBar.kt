@@ -32,7 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +67,26 @@ internal fun DrawerLetterHeader(letter: Char) {
     )
 }
 
+/**
+ * Settings ▸ App drawer ▸ Compact letters: the letter as one grid cell before its apps, as tall as
+ * their icons ([iconSize]) and level with them, so the grid runs on instead of breaking per letter.
+ */
+@Composable
+internal fun DrawerLetterTile(letter: Char, iconSize: Dp) {
+    val fontSize = with(LocalDensity.current) { (iconSize * 0.42f).toSp() }
+    Box(
+        modifier = Modifier.fillMaxWidth().height(iconSize).semantics { heading() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = letter.toString(),
+            color = LocalAccent.current,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
 @Composable
 internal fun DrawerIndexBar(
     position: AzPosition,
@@ -70,6 +94,8 @@ internal fun DrawerIndexBar(
     modifier: Modifier = Modifier,
     /** Settings ▸ App drawer ▸ index bar size: scales the letters and the strip they sit in. */
     scale: Float = 1f,
+    /** The letters that have apps: drawn clearly, the others faint (null: all alike). */
+    available: Set<Char>? = null,
     /** When set, the letter under the finger is reported here (null on release) and the bar draws
      *  no bubble of its own: the drawer shows it large instead. */
     onActiveLetter: ((Char?) -> Unit)? = null,
@@ -137,7 +163,7 @@ internal fun DrawerIndexBar(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .padding(vertical = 12.dp, horizontal = 4.dp * scale)
+                    .padding(vertical = 12.dp)
                     .onSizeChanged { barSize = it }
                     .pointerInput(Unit) {
                         detectTapGestures(
@@ -158,7 +184,9 @@ internal fun DrawerIndexBar(
                             onDragCancel = { dragEnded() },
                             onDrag = { change, amount -> dragStep(change.position, amount) },
                         )
-                    },
+                    }
+                    // Inside the touch area: the whole strip takes a finger, not just the letters.
+                    .padding(horizontal = 4.dp * scale),
                 verticalArrangement = Arrangement.SpaceEvenly,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -169,7 +197,11 @@ internal fun DrawerIndexBar(
                             fontSize = 10.sp * scale,
                             fontWeight = if (selectedLetter == char) FontWeight.ExtraBold else FontWeight.Medium,
                         ),
-                        color = if (selectedLetter == char) LocalAccent.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        color = when {
+                            selectedLetter == char -> LocalAccent.current
+                            available == null || char in available -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        },
                     )
                 }
             }
@@ -177,7 +209,7 @@ internal fun DrawerIndexBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp * scale)
+                    .padding(horizontal = 12.dp)
                     .onSizeChanged { barSize = it }
                     .pointerInput(Unit) {
                         detectTapGestures(
@@ -198,7 +230,9 @@ internal fun DrawerIndexBar(
                             onDragCancel = { dragEnded() },
                             onDrag = { change, amount -> dragStep(change.position, amount) },
                         )
-                    },
+                    }
+                    // Inside the touch area: the whole strip takes a finger, not just the letters.
+                    .padding(vertical = 4.dp * scale),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -209,7 +243,11 @@ internal fun DrawerIndexBar(
                             fontSize = 10.sp * scale,
                             fontWeight = if (selectedLetter == char) FontWeight.ExtraBold else FontWeight.Medium,
                         ),
-                        color = if (selectedLetter == char) LocalAccent.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        color = when {
+                            selectedLetter == char -> LocalAccent.current
+                            available == null || char in available -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        },
                     )
                 }
             }

@@ -378,6 +378,7 @@ fun AppDrawerScreen(
             drawerHandleStyle = uiState.drawerHandleStyle,
             drawerBottomSpace = uiState.drawerBottomSpace,
             drawerLetterHeaders = uiState.drawerLetterHeaders,
+            drawerLetterTiles = uiState.drawerLetterTiles,
             drawerLargeLetterPopup = uiState.drawerLargeLetterPopup,
             drawerSwipeTabs = uiState.drawerSwipeTabs,
             drawerFlickClose = uiState.drawerFlickClose,
@@ -642,6 +643,7 @@ private fun AppDrawerContent(
     drawerHandleStyle: DrawerHandle = DrawerHandle.BAR,
     drawerBottomSpace: Int = 0,
     drawerLetterHeaders: Boolean = false,
+    drawerLetterTiles: Boolean = false,
     drawerLargeLetterPopup: Boolean = true,
     drawerSwipeTabs: Boolean = true,
     drawerFlickClose: Boolean = false,
@@ -780,7 +782,8 @@ private fun AppDrawerContent(
                     )
                 } else {
                     browse(
-                        clipboardRow, frequentApps, columns, folderTiles, letterRuns, onFolderClick, privateSpace, colors,
+                        clipboardRow, frequentApps, columns, folderTiles, letterRuns,
+                        drawerLetterTiles && drawerLayoutMode != DrawerLayout.LIST, onFolderClick, privateSpace, colors,
                         hiddenCount, hiddenLock, onHiddenApps,
                     )
                 }

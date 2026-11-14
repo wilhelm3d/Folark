@@ -51,6 +51,7 @@ internal object Keys {
     fun azIndexScale(type: ScreenType) = floatPreferencesKey(if (type == ScreenType.OUTER) "az_index_scale" else "az_index_scale_inner")
     fun drawerBottomSpace(type: ScreenType) = intPreferencesKey(if (type == ScreenType.OUTER) "drawer_bottom_space" else "drawer_bottom_space_inner")
     fun drawerLetterHeaders(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_letter_headers" else "drawer_letter_headers_inner")
+    fun drawerLetterTiles(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_letter_tiles" else "drawer_letter_tiles_inner")
     fun drawerLargeLetterPopup(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_large_letter_popup" else "drawer_large_letter_popup_inner")
     fun drawerSwipeTabs(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_swipe_tabs" else "drawer_swipe_tabs_inner")
     fun drawerFlickClose(type: ScreenType) = booleanPreferencesKey(if (type == ScreenType.OUTER) "drawer_flick_close" else "drawer_flick_close_inner")

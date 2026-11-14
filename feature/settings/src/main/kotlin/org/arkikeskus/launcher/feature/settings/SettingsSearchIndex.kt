@@ -196,6 +196,7 @@ internal val SETTINGS_SEARCH_INDEX: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.settings_drawer_az_hold_scroll, R.string.settings_drawer_az_hold_scroll_desc, SettingsCategory.APP_DRAWER),
     SettingsSearchEntry(R.string.settings_drawer_height, 0, SettingsCategory.APP_DRAWER),
     SettingsSearchEntry(R.string.settings_drawer_letter_headers, 0, SettingsCategory.APP_DRAWER),
+    SettingsSearchEntry(R.string.settings_drawer_letter_tiles, R.string.settings_drawer_letter_tiles_desc, SettingsCategory.APP_DRAWER),
     SettingsSearchEntry(R.string.settings_drawer_swipe_tabs, R.string.settings_drawer_swipe_tabs_desc, SettingsCategory.APP_DRAWER),
     SettingsSearchEntry(R.string.settings_drawer_handle, 0, SettingsCategory.APP_DRAWER),
     SettingsSearchEntry(R.string.settings_drawer_bottom_space, R.string.settings_drawer_bottom_space_desc, SettingsCategory.APP_DRAWER),

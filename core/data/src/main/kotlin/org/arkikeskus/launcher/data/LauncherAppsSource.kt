@@ -90,6 +90,29 @@ private const val MIN_CONTRAST = 28
 private const val MIN_GLYPH_SHARE = 0.015f
 private const val MAX_GLYPH_SHARE = 0.55f
 
+/** A made-up glyph covering more than this of what the mask shows is drawn inside out. */
+private const val INVERT_ABOVE_SHARE = 0.5f
+
+/**
+ * The share of the visible part of a [edge]-square glyph that [pixels] draw (alpha over half). On an
+ * [adaptive] foreground only the middle shows through the mask, two thirds of each side, taken as
+ * the circle every icon shape contains; a plain icon's glyph is inset to show whole.
+ */
+internal fun visibleShare(pixels: IntArray, edge: Int, adaptive: Boolean): Float {
+    val c = (edge - 1) / 2f
+    val r = if (adaptive) edge / 3f else edge / 2f
+    var inside = 0
+    var drawn = 0
+    for (y in 0 until edge) for (x in 0 until edge) {
+        val dx = x - c
+        val dy = y - c
+        if (dx * dx + dy * dy > r * r) continue
+        inside++
+        if (pixels[y * edge + x] ushr 24 > 128) drawn++
+    }
+    return if (inside == 0) 0f else drawn.toFloat() / inside
+}
+
 @Singleton
 class LauncherAppsSource @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -692,6 +715,7 @@ class LauncherAppsSource @Inject constructor(
         artwork.draw(Canvas(bitmap))
         val pixels = IntArray(edge * edge)
         bitmap.getPixels(pixels, 0, edge, 0, 0, edge, edge)
+        val artAlpha = IntArray(pixels.size) { Color.alpha(pixels[it]) }
 
         // How much of the square the artwork covers, and its average brightness there.
         var solid = 0
@@ -716,6 +740,17 @@ class LauncherAppsSource @Inject constructor(
                 // Soft edges of faint differences are dropped so noise doesn't smear the glyph.
                 val keep = if (stand < 40) 0 else stand
                 pixels[i] = ((Color.alpha(c) * keep / 255 * tintAlpha / 255).coerceIn(0, 255) shl 24) or tint
+            }
+        }
+
+        // A glyph that covers most of what the mask shows reads as a tinted disc with the logo cut
+        // out of it, unlike every other themed icon. Turned inside out (the artwork's own outline
+        // minus the glyph), the logo is drawn in the glyph colour on the plate like the rest.
+        if (visibleShare(pixels, edge, adaptive != null) > INVERT_ABOVE_SHARE) {
+            for (i in pixels.indices) {
+                val glyphAlpha = Color.alpha(pixels[i])
+                val inverted = (artAlpha[i] * tintAlpha / 255 - glyphAlpha).coerceIn(0, 255)
+                pixels[i] = (inverted shl 24) or tint
             }
         }
 

@@ -53,6 +53,7 @@
     <string name="settings_folder_theme_light">Light</string>
     <string name="settings_folder_theme_accent">Accent</string>
     <string name="settings_folder_shape">Shape</string>
+    <string name="settings_folder_shape_icon">Like icons</string>
     <string name="settings_folder_shape_squircle">Rounded</string>
     <string name="settings_folder_shape_circle">Circle</string>
     <string name="settings_folder_shape_square">Square</string>

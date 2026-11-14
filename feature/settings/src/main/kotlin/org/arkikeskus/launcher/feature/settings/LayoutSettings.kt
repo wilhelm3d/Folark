@@ -363,6 +363,7 @@ internal fun FoldersCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_folder_shape),
             options = listOf(
+                FolderShape.ICON to stringResource(R.string.settings_folder_shape_icon),
                 FolderShape.SQUIRCLE to stringResource(R.string.settings_folder_shape_squircle),
                 FolderShape.CIRCLE to stringResource(R.string.settings_folder_shape_circle),
                 FolderShape.SQUARE to stringResource(R.string.settings_folder_shape_square),

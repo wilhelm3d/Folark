@@ -108,7 +108,7 @@ class StoredChoicesTest {
         ),
         FolderAnimation.entries.toList() to listOf("sheet", "zoom", "fade", "none"),
         FolderPreview.entries.toList() to listOf("grid2", "grid3", "cover"),
-        FolderShape.entries.toList() to listOf("squircle", "circle", "square"),
+        FolderShape.entries.toList() to listOf("icon", "squircle", "circle", "square"),
         FolderTheme.entries.toList() to listOf("glass", "dark", "light", "accent"),
         FontChoice.entries.toList() to listOf(
             "default", "ndot", "ntype", "space_grotesk", "serif", "monospace", "condensed", "light", "medium", "casual",

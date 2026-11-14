@@ -244,6 +244,16 @@ internal fun AppDrawerSection(
             checked = s.drawer.letterHeaders,
             onCheckedChange = { viewModel.setDrawerLetterHeaders(it, screenType) },
         )
+        // The grid only: a list has a row per app anyway.
+        if (s.drawer.letterHeaders && s.drawer.layoutMode == DrawerLayout.GRID) {
+            ExpressiveRowDivider()
+            ExpressiveSwitchRow(
+                title = stringResource(R.string.settings_drawer_letter_tiles),
+                subtitle = stringResource(R.string.settings_drawer_letter_tiles_desc),
+                checked = s.drawer.letterTiles,
+                onCheckedChange = { viewModel.setDrawerLetterTiles(it, screenType) },
+            )
+        }
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_drawer_swipe_tabs),

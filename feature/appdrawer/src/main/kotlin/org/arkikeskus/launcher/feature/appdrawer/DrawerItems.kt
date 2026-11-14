@@ -146,6 +146,8 @@ internal fun DrawerItems.browse(
     columns: Int,
     folderTiles: List<DrawerFolderUi>,
     letterRuns: List<Pair<Char?, List<AppItem>>>,
+    /** Each letter as a grid cell before its apps (Compact letters) instead of a row. */
+    letterTiles: Boolean,
     onFolderClick: (DrawerFolderUi) -> Unit,
     space: PrivateSpaceDrawer?,
     colors: DrawerColors,
@@ -184,7 +186,10 @@ internal fun DrawerItems.browse(
         }
     }
     letterRuns.forEachIndexed { runIndex, (letter, runApps) ->
-        if (letter != null) row("letter-$runIndex", "letter") { DrawerLetterHeader(letter) }
+        if (letter != null) {
+            if (letterTiles) cell("letter-$runIndex", "letter-tile") { DrawerLetterTile(letter, deps.iconSize) }
+            else row("letter-$runIndex", "letter") { DrawerLetterHeader(letter) }
+        }
         appItems(runApps)
     }
     if (deps.sourceTab == null) {

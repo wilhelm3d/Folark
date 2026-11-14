@@ -5,6 +5,11 @@ plugins {
 android {
     namespace = "org.arkikeskus.launcher.feature.home"
     testOptions.unitTests.isIncludeAndroidResources = true
+    // Screenshot references (src/test/screenshots): -Pfolark.recordScreenshots writes them anew.
+    testOptions.unitTests.all {
+        it.systemProperty("folark.recordScreenshots", project.hasProperty("folark.recordScreenshots").toString())
+        it.inputs.files(project.fileTree("src/test/screenshots"))
+    }
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
