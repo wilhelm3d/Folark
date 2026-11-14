@@ -30,6 +30,7 @@
     <string name="settings_split_native_paused">Native split paused</string>
     <string name="settings_split_native_paused_desc">System UI restarted at %1$s right after a split request, so the split commands are used instead. Tap to allow native split again.</string>
     <string name="settings_drop_zones">Drop zones</string>
+    <string name="settings_drop_zones_hint">These zones are where a Recents card lands: long-press a card in Recents and drag it to a screen edge.</string>
     <string name="settings_drop_zones_desc">Where a dragged app can be dropped: in Recents, from the taskbar, and on the home screen\'s drop bar (left, right, three). Tap a zone to switch it off or on</string>
     <string name="settings_drop_zone_left">Left half</string>
     <string name="settings_drop_zone_right">Right half</string>

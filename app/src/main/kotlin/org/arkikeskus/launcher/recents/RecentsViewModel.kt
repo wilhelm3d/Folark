@@ -347,7 +347,6 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    private fun RecentsCard.splitApp(i: Int) = SplitApp(tasks[i].packageName, apps.getOrNull(i), tasks[i].taskId)
 
     fun close(card: RecentsCard) {
         Haptics.play(context, Haptics.Event.CLOSE)
@@ -374,102 +373,12 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Saves the split [card] as a scene: its apps in order, and (with the Vector module) where the
-     * divider is now, so the scene opens the same way.
-     */
-    fun saveAsPair(card: RecentsCard): Boolean {
-        if (!canSave(card)) return false
-        appScope.launch { scene(card)?.let { appRepository.saveAppPair(it) } }
-        return true
-    }
+    /** Saving a split card as a scene: an app pair, a home shortcut, a taskbar pin. */
+    private val scenes = RecentsScenes(context, appRepository, settingsRepository, homeLayoutRepository, appScope)
 
-    /**
-     * The split [card] (two or three apps) as a scene with a shortcut on the home screen of
-     * [screen]: the same scene again when it was saved before (same apps), else a new one.
-     */
-    fun addToHome(card: RecentsCard, screen: ScreenType): Boolean {
-        if (!canSave(card)) return false
-        appScope.launch {
-            val fresh = scene(card) ?: return@launch
-            val known = appRepository.appPairs.first().firstOrNull {
-                it.app1Key == fresh.app1Key && it.app2Key == fresh.app2Key && it.app3Key == fresh.app3Key
-            }
-            val pair = known ?: fresh.also { appRepository.saveAppPair(it) }
-            val s = settingsRepository.settings(screen).first()
-            homeLayoutRepository.addShortcut(
-                pair.app1Package,
-                org.arkikeskus.launcher.data.local.HomeItemEntity.appPairShortcutId(pair.id),
-                pair.app1UserSerial,
-                s.home.columns, s.home.rows, screen,
-            )
-        }
-        return true
-    }
-
-    /** The split [card] pinned on the taskbar as one scene (the same scene when saved before). */
-    fun pinSplitToTaskbar(card: RecentsCard) {
-        if (!canSave(card)) return
-        appScope.launch {
-            // Settings ▸ Taskbar ▸ Lock taskbar apps: nothing joins the bar.
-            if (settingsRepository.settings(ScreenType.INNER).first().taskbar.pinsLocked) {
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, org.arkikeskus.launcher.R.string.recents_taskbar_locked, android.widget.Toast.LENGTH_SHORT).show()
-                }
-                return@launch
-            }
-            val fresh = scene(card) ?: return@launch
-            val known = appRepository.appPairs.first().firstOrNull {
-                it.app1Key == fresh.app1Key && it.app2Key == fresh.app2Key && it.app3Key == fresh.app3Key
-            }
-            val pair = known ?: fresh.also { appRepository.saveAppPair(it) }
-            val pinned = settingsRepository.settings(ScreenType.INNER).first().taskbar.pinnedPairs
-            if (pair.id !in pinned) settingsRepository.setTaskbarPairs(pinned + pair.id)
-            Haptics.play(context, Haptics.Event.SPLIT)
-        }
-    }
-
-    private fun canSave(card: RecentsCard): Boolean = card.apps.size in 2..3 && card.apps.none { it == null }
-
-    /** The scene [card] makes: its apps in order, with the layout the split has now. */
-    private suspend fun scene(card: RecentsCard): AppPair? {
-        val apps = card.apps
-        if (apps.size !in 2..3 || apps.any { it == null }) return null
-        val (a, b) = apps.requireNoNulls()
-        val c = apps.getOrNull(2)
-        val firstTask = card.tasks.firstOrNull()?.taskId ?: -1
-        val layout = if (c == null) SplitThree.layoutForSnap(SplitThree.currentSnap(context, firstTask)) else AppPair.LAYOUT_EVEN
-        return AppPair(
-            id = java.util.UUID.randomUUID().toString(),
-            name = apps.filterNotNull().joinToString(" + ") { it.label },
-            app1Key = a.key, app1Package = a.packageName, app1ClassName = a.className, app1UserSerial = a.userSerial,
-            app2Key = b.key, app2Package = b.packageName, app2ClassName = b.className, app2UserSerial = b.userSerial,
-            app3Key = c?.key.orEmpty(), app3Package = c?.packageName.orEmpty(),
-            app3ClassName = c?.className.orEmpty(), app3UserSerial = c?.userSerial ?: 0L,
-            peek = layout == AppPair.LAYOUT_PEEK,
-            layout = layout,
-            // A trio saved from a three-pane split opens as one again.
-            thirdMode = if (c != null && card.tasks.size >= 3) AppPair.THIRD_PANE else AppPair.THIRD_AUTO,
-            // S11: the divider places as they are now (a free size, three apps' sizes, peek).
-            sizes = dividerPlaces(card)?.joinToString(",").orEmpty(),
-        )
-    }
-
-    /**
-     * The split's divider places in thousandths, from where Android laid its tasks out (left to
-     * right); null when it didn't say, or for plain half and half.
-     */
-    private fun dividerPlaces(card: RecentsCard): List<Int>? {
-        val bounds = card.tasks.map { it.bounds ?: return null }
-        if (bounds.size !in 2..3) return null
-        val sideBySide = bounds.map { it[0] }.distinct().size == bounds.size
-        val sorted = bounds.sortedBy { if (sideBySide) it[0] else it[1] }
-        val start = if (sideBySide) sorted.first()[0] else sorted.first()[1]
-        val end = if (sideBySide) sorted.last()[2] else sorted.last()[3]
-        val span = (end - start).takeIf { it > 0 } ?: return null
-        val places = sorted.dropLast(1).map { b -> (((if (sideBySide) b[2] else b[3]) - start).toLong() * 1000 / span).toInt() }
-        return places.takeUnless { SplitSizes.isEven(it) }
-    }
+    fun saveAsPair(card: RecentsCard): Boolean = scenes.saveAsPair(card)
+    fun addToHome(card: RecentsCard, screen: ScreenType): Boolean = scenes.addToHome(card, screen)
+    fun pinSplitToTaskbar(card: RecentsCard) = scenes.pinSplitToTaskbar(card)
 
     fun togglePin(card: RecentsCard) {
         val pin = !card.pinned
@@ -518,174 +427,30 @@ class RecentsViewModel @Inject constructor(
         appScope.launch { splitCoordinator.exit(keep) }
     }
 
-    /**
-     * Split view: [picked][0] left and [picked][1] right as one split (any older split is closed
-     * first, see [SplitCoordinator.pair]); a third joins as a third pane ([thirdInSplit] with
-     * Android's three-way split through the module when [threeApp]) or else floats, and a fourth floats.
-     */
-    fun openTogether(picked: List<RecentsCard>, thirdInSplit: Boolean, threeApp: Boolean = false) {
-        if (picked.size < 2) return
-        appScope.launch {
-            val formed = splitCoordinator.pair(first = picked[1].splitApp(0), second = picked[0].splitApp(0), firstOnRight = true)
-            if (!formed) {
-                openSingleTask(picked[0].tasks.first(), picked[0].apps.firstOrNull())
-                return@launch
-            }
-            if (picked.size >= 3) {
-                val tileThird = thirdInSplit && settings.value.launch.threeAppNative
-                val joined = tileThird && splitCoordinator.addThird(picked[2].splitApp(0), native = threeApp)
-                if (!joined) popUp(picked[2])
-            }
-            if (picked.size >= 4) {
-                delay(SPLIT_STEP_MS)
-                popUp(picked[3])
-            }
-        }
-    }
+    /** Making split views and peek views from cards (RecentsSplitActions.kt). */
+    private val splitActions = RecentsSplitActions(context, splitCoordinator, appScope, settings, object : RecentsSplitActions.Host {
+        override fun open(card: RecentsCard) = this@RecentsViewModel.open(card)
+        override fun popUp(card: RecentsCard) = this@RecentsViewModel.popUp(card)
+        override suspend fun openNow(card: RecentsCard) = this@RecentsViewModel.openNow(card)
+        override fun openSingleTask(task: OpenTask, app: AppItem?) = this@RecentsViewModel.openSingleTask(task, app)
+    })
 
-    /**
-     * [third] dropped on the split [pair]: the pair made again (left and right as on the card) and
-     * the third added once it has settled, as the split drawer does — bringing the old split back
-     * first left System UI no split to add to (the third app floated, Recents went home).
-     */
-    fun addThird(pair: RecentsCard, third: RecentsCard) {
-        if (third.tasks.isEmpty()) return
-        if (pair.tasks.size < 2) {
-            openTogether(listOf(pair, third), thirdInSplit = true, threeApp = true)
-            return
-        }
-        appScope.launch {
-            // Paused by the crash guard: three panes can't be made, and the person is told why
-            // instead of finding the third app floating.
-            if (SplitThree.paused(context)) {
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, org.arkikeskus.launcher.hook.R.string.split_native_paused, android.widget.Toast.LENGTH_LONG).show()
-                }
-            }
-            val got = splitCoordinator.three(pair.splitApp(0), pair.splitApp(1), third.splitApp(0), native = true)
-            when (got) {
-                0 -> openNow(pair)
-                2 -> popUp(third)
-            }
-        }
-    }
-
-    fun replacePane(target: RecentsCard, paneIndex: Int, with: RecentsCard) {
-        if (paneIndex !in target.tasks.indices || target.tasks.size < 2) return
-        if (with.tasks.first().taskId in target.tasks.map { it.taskId }) return
-        val panes = target.tasks.indices.map { i ->
-            if (i == paneIndex) with
-            else RecentsCard(
-                tasks = listOf(target.tasks[i]),
-                apps = listOf(target.apps.getOrNull(i)),
-                label = target.apps.getOrNull(i)?.label ?: target.tasks[i].packageName,
-                inactiveMs = target.tasks[i].inactiveMs,
-            )
-        }
-        openTogether(panes, thirdInSplit = true, threeApp = true)
-    }
-
-    fun placeAtEdge(card: RecentsCard, edge: Int) {
-        when (edge) {
-            EDGE_TOP -> open(card)
-            EDGE_BOTTOM -> popUp(card)
-            EDGE_LEFT, EDGE_RIGHT -> {
-                if (card.tasks.isEmpty()) return
-                appScope.launch { splitCoordinator.openPicker(card.splitApp(0), firstOnRight = edge == EDGE_RIGHT) }
-            }
-            EDGE_THREE -> {
-                if (card.tasks.isEmpty()) return
-                appScope.launch { splitCoordinator.openPicker(card.splitApp(0), firstOnRight = false, three = true) }
-            }
-        }
-    }
+    fun openTogether(picked: List<RecentsCard>, thirdInSplit: Boolean, threeApp: Boolean = false) = splitActions.openTogether(picked, thirdInSplit, threeApp)
+    fun addThird(pair: RecentsCard, third: RecentsCard) = splitActions.addThird(pair, third)
+    fun replacePane(target: RecentsCard, paneIndex: Int, with: RecentsCard) = splitActions.replacePane(target, paneIndex, with)
+    fun placeAtEdge(card: RecentsCard, edge: Int) = splitActions.placeAtEdge(card, edge)
+    fun openAttached(main: RecentsCard, peek: RecentsCard, side: RecentsAttachedSide, peekFraction: Float, screen: android.graphics.Rect) =
+        splitActions.openAttached(main, peek, side, peekFraction, screen)
+    fun nativeSplitSelect(card: RecentsCard) = splitActions.nativeSplitSelect(card)
+    fun nativeThreeAppSelect(card: RecentsCard) = splitActions.nativeThreeAppSelect(card)
+    fun openPeekThree(picked: List<RecentsCard>, onTwo: (RecentsCard, RecentsCard) -> Unit) = splitActions.openPeekThree(picked, onTwo)
+    fun peekSplit(card: RecentsCard, side: RecentsAttachedSide, screen: android.graphics.Rect, peekFraction: Float) =
+        splitActions.peekSplit(card, side, screen, peekFraction)
 
     fun canSplit(): Boolean = ShellSplit.hasDump(context)
 
     fun recheckRoot() {
         viewModelScope.launch(Dispatchers.IO) { RootShell.available(recheck = true) }
-    }
-
-    /**
-     * Attached (peek) view: clears stale split state first, pairs [main] and [peek], and snaps to
-     * Motorola's peek target (or drags the divider to a safe non-dismiss peek fraction).
-     */
-    fun openAttached(main: RecentsCard, peek: RecentsCard, side: RecentsAttachedSide, peekFraction: Float, screen: android.graphics.Rect) {
-        val mainTask = main.tasks.firstOrNull() ?: return
-        val peekTask = peek.tasks.firstOrNull() ?: return
-        val left = side != RecentsAttachedSide.RIGHT
-        appScope.launch {
-            // The peeking app on its side, the main app on the other.
-            val formed = splitCoordinator.pair(
-                first = SplitApp(peekTask.packageName, peek.apps.firstOrNull(), peekTask.taskId),
-                second = SplitApp(mainTask.packageName, main.apps.firstOrNull(), mainTask.taskId),
-                firstOnRight = !left,
-            )
-            if (!formed) return@launch
-            peekInto(left, screen, peekFraction)
-        }
-    }
-
-    fun nativeSplitSelect(card: RecentsCard) {
-        val task = card.tasks.firstOrNull()?.taskId ?: return
-        val index = if (settings.value.recents.attachedSide == RecentsAttachedSide.RIGHT) 1 else 0
-        appScope.launch {
-            openNow(card)
-            SplitThree.splitSelect(context, task, index)
-        }
-    }
-
-    fun nativeThreeAppSelect(card: RecentsCard) {
-        appScope.launch {
-            openNow(card)
-            SplitThree.selectThird(context, 3)
-        }
-    }
-
-    /**
-     * Peek view of three ([picked]: the big app first, then the two at the edges): a three-app
-     * split made, then Motorola's three-app peek (the middle app big, a strip of each other one at
-     * the screen's edges). Without the module or a third pane, as two-app peek view.
-     */
-    fun openPeekThree(picked: List<RecentsCard>, onTwo: (RecentsCard, RecentsCard) -> Unit) {
-        if (picked.size < 3) return
-        appScope.launch {
-            // The first pick ends up in the middle (Motorola's index 1): [edge, big] then the other edge.
-            val formed = splitCoordinator.pair(first = picked[1].splitApp(0), second = picked[0].splitApp(0), firstOnRight = false)
-            val joined = formed && splitCoordinator.addThird(picked[2].splitApp(0), native = true, orSideStage = false, peek = true)
-            if (!joined) withContext(Dispatchers.Main) { onTwo(picked[0], picked[1]) }
-        }
-    }
-
-    fun peekSplit(card: RecentsCard, side: RecentsAttachedSide, screen: android.graphics.Rect, peekFraction: Float) {
-        val left = side != RecentsAttachedSide.RIGHT
-        appScope.launch {
-            openNow(card)
-            // A three-app split: Motorola's three-app peek (the middle app big, the others at the edges).
-            if (card.tasks.size >= 3) {
-                if (SplitThree.ready(context) && SplitThree.snap(context, SplitThree.SNAP_THREE_PEEK)) return@launch
-            }
-            peekInto(left, screen, peekFraction)
-        }
-    }
-
-    /**
-     * Turns the split showing now into peek view, the app on the [left] side peeking in, the way
-     * Settings ▸ Recents ▸ Native peek says: on, System UI's own peek snap (Folark's module) first;
-     * off (the default), the divider dragged like a finger, which some ROMs handle far more
-     * reliably. Either way the other route is the fallback when the first one cannot be taken
-     * (no module; no root and no accessibility service to drag with).
-     */
-    private suspend fun peekInto(left: Boolean, screen: android.graphics.Rect, peekFraction: Float) {
-        val native = settings.value.recents.attachedNative
-        if (native && splitCoordinator.snapPeek(peekOnLeft = left)) return
-        delay(ATTACH_SETTLE_MS)
-        val safeFraction = peekFraction.coerceIn(0.18f, 0.30f)
-        val y = screen.exactCenterY()
-        val from = screen.exactCenterX()
-        val to = if (left) screen.left + screen.width() * safeFraction else screen.right - screen.width() * safeFraction
-        if (DividerDrag.drag(from, y, to, y)) return
-        if (!native) splitCoordinator.snapPeek(peekOnLeft = left)
     }
 
     fun toggleMute(card: RecentsCard) {
@@ -711,7 +476,5 @@ class RecentsViewModel @Inject constructor(
         const val NO_PICTURE_KEEP_MS = 20_000L
         fun thumbnailBudget(): Int = (Runtime.getRuntime().maxMemory() / 8).coerceAtMost(48L * 1024 * 1024).toInt()
 
-        const val SPLIT_STEP_MS = 200L
-        const val ATTACH_SETTLE_MS = 350L
     }
 }

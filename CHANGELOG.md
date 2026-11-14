@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Recents: few cards, menu, pictures from the other screen (14 November)
+- Recents (Folark look): when all open apps fit in one row, they stand in the middle of the screen and grow into the room of the empty columns (up to 1.8 times, never taller than the screen allows), instead of sitting small in the bottom-left corner. With two apps on the inner screen they are now about twice as big; a full row or more keeps the grid as before. Both screens.
+- The long-press menu on a card is nearly solid: the card's picture no longer shows through its lower rows.
+- "Lock / Unlock" in that menu is "Pin / Unpin", with a push pin instead of a padlock, as on the pinned card and in Settings.
+- "Split screen (pick app)" is "Split with Motorola's picker" ("Add app with Motorola's picker" on a split), so it no longer reads like Folark's own Split screen above it. It is not offered on the outer screen, where the app came to the front but Motorola's picker never appeared; Folark's own Split screen works there.
+- A card's picture taken on the other screen (an inner-screen app in a tall outer card, or the other way round) is shown whole over a dimmed fill of itself instead of cut to a middle strip. Pictures that nearly fit are cropped as before.
+- Code: `RecentsScreen.kt` is 428 lines (was 1,093; the drag layer and the card pieces are their own files), `RecentsViewModel.kt` about 480 (was 717; saving scenes and making split views are `RecentsScenes` and `RecentsSplitActions`), `SplitPickerDrawer.kt` 327 (was 903; effects and parts split out), and the module's `SplitThreeHook.kt` 579 (was 943; WM Shell reflection, the divider and the answers to Folark are `ShellCalls`, `DividerSnaps` and `ToFolark`). Nothing changed in what they do. Tests for the few-cards size and the picture fit.
+
 ### Folders, themed icons, compact letters (14 November)
 - Home folders: the new folder shape "Like icons" (Settings ▸ Dock & folders ▸ Folder shape) is the default. A closed folder takes the outline of the icon shape (cookie, diamond, square, …) instead of always being a rounded square, and its little icons sit far enough in that the corners don't cut them. The Theme preview shows the same. Squircle, circle and square stay as they were; a folder that was set to squircle keeps it.
 - Themed icons for apps without a monochrome icon: when an app's own artwork fills most of the icon (a full-bleed disc or picture), the glyph is cut out of a tinted plate instead of being drawn as a solid blob, so these icons look like the real themed ones beside them. Small logos on a blank background are drawn as before.

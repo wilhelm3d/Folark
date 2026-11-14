@@ -10,9 +10,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import org.arkikeskus.launcher.launcher.system.FoldStateMonitor
 import org.arkikeskus.launcher.designsystem.theme.LauncherTheme
+import org.arkikeskus.launcher.model.FoldState
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
 import org.arkikeskus.launcher.model.catching
@@ -26,6 +31,10 @@ import org.arkikeskus.launcher.model.catching
 class RecentsActivity : ComponentActivity() {
 
     private val viewModel: RecentsViewModel by viewModels()
+
+    /** The fold state of the display this Recents window is on: decides cover vs main behaviour
+     *  (aero edge placement, per-screen recents columns) — not the window's width. */
+    @Inject lateinit var foldStateMonitor: FoldStateMonitor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +52,11 @@ class RecentsActivity : ComponentActivity() {
             val thumbnails by viewModel.thumbnails.collectAsStateWithLifecycle()
             val memory by viewModel.memory.collectAsStateWithLifecycle()
             val mutedApps by viewModel.mutedApps.collectAsStateWithLifecycle()
+            // Cover vs main: the fold state of the display this window is on (not its width —
+            // a folded main panel can be narrower than 600 dp and still be the big screen).
+            val foldState = remember { foldStateMonitor.foldStateFlow(this, lifecycleScope) }
+                .collectAsStateWithLifecycle().value
+            val onCover = foldState == FoldState.CLOSED
             // Liquid Glass: Android blurs whatever is behind Recents (home, or the app).
             val blurPx = if (settings.recents.glass) (settings.recents.glassBlur * resources.displayMetrics.density).toInt() else 0
             LaunchedEffect(blurPx) {
@@ -61,6 +75,7 @@ class RecentsActivity : ComponentActivity() {
                     thumbnails = thumbnails,
                     memory = memory,
                     settings = settings,
+                    onCover = onCover,
                     onOpen = { card -> viewModel.open(card); leave() },
                     onClose = viewModel::close,
                     onCloseAll = { viewModel.closeAll(); leave() },

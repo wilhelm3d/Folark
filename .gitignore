@@ -69,3 +69,9 @@ folark_full_codebase.txt
 # Local AI review notes and agent plans (kept on disk, not in the repository)
 *.artifact.md
 /.agent/
+
+# Video build artifacts: everything in video/ except the page source (index.html)
+# is regenerable with tools/render-all.sh. The bundled ffmpeg build stays out too.
+video/*
+!video/index.html
+tools/ffmpeg/

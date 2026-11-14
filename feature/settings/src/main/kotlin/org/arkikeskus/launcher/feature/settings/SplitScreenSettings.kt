@@ -117,6 +117,15 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         SplitCheckRow(s.recents.splitEngine)
         ExpressiveRowDivider()
         DropZonesRow(s.recents.dropZones, onToggle = { zone, on -> viewModel.setDropZone(zone, on) })
+        // Where these zones come from: a long-press-dragged Recents card dropped at a screen edge
+        // (inner screen). Without the pointer, the gesture is undiscoverable.
+        ExpressiveRowDivider()
+        Text(
+            text = stringResource(R.string.settings_drop_zones_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+        )
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_drop_zone_haptics),

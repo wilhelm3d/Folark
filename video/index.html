@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Folark — 40s feature film</title>
+<style>
+/* ================= Folark 40s film — cinematic style =================
+   1080x1620 stage, 10 scenes, deterministic ?shot=<ms> freezing.
+   Palette: ink #F2F8F9, dim #7E9AA0, accent #FF8A5C, teal #25D0C0. */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#03060a;overflow:hidden}
+body{font-family:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;color:#F2F8F9}
+#stage{position:relative;width:1080px;height:1620px;overflow:hidden;background:#03060a;transform-origin:0 0}
+.glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;pointer-events:none}
+.glow.g1{width:900px;height:900px;left:-260px;top:-220px;background:radial-gradient(circle,rgba(255,122,69,.16),transparent 62%);animation:glowDrift 26s ease-in-out infinite alternate}
+.glow.g2{width:820px;height:820px;right:-240px;bottom:-180px;background:radial-gradient(circle,rgba(37,208,192,.13),transparent 62%);animation:glowDrift 31s ease-in-out infinite alternate-reverse}
+@keyframes glowDrift{from{transform:translate(0,0)}to{transform:translate(70px,46px)}}
+.vign{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 50% 42%,transparent 58%,rgba(0,0,0,.5) 100%)}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.05;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.6) 0 1px,transparent 1px 3px);mix-blend-mode:overlay}
+
+/* ---------- persistent chrome ---------- */
+.brand{position:absolute;left:56px;top:46px;font-family:"Cascadia Mono",Consolas,monospace;font-size:15px;letter-spacing:.42em;color:#5F7A80;z-index:50}
+.brand small{color:#FF8A5C;letter-spacing:.2em;margin-left:10px;font-size:12px}
+.prog{position:absolute;left:56px;right:56px;bottom:64px;height:2px;background:rgba(255,255,255,.07);border-radius:2px;z-index:50}
+.prog i{display:block;height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#FF9E6C,#FF6B3D);box-shadow:0 0 12px rgba(255,122,69,.7)}
+.tc{position:absolute;right:56px;bottom:52px;font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;letter-spacing:.18em;color:#5F7A80;z-index:50}
+
+/* ---------- captions ---------- */
+.cap{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:40}
+.cap.on{opacity:1}
+.caphead{position:absolute;left:64px;top:118px}
+.kick{font-family:"Cascadia Mono",Consolas,monospace;font-size:15px;letter-spacing:.4em;text-transform:uppercase;color:#FF8A5C;opacity:0;animation:kickIn .5s ease-out .08s both}
+.cap .h1{font-size:96px;font-weight:275;line-height:1.04;letter-spacing:-.028em;color:#F2F8F9;margin-top:20px;opacity:0;animation:rise .7s cubic-bezier(.16,1,.3,1) .18s both;text-shadow:0 24px 70px rgba(0,0,0,.65)}
+.cap .h1 em{font-style:normal;color:#FF8A5C}
+.cap .sub{font-size:22px;font-weight:300;color:#9FB6B9;margin-top:18px;letter-spacing:.01em;opacity:0;animation:rise .6s ease-out .3s both}
+.cap .dims{display:flex;gap:12px;margin-top:26px;opacity:0;animation:rise .6s ease-out .42s both;flex-wrap:wrap}
+.cap .dims span{font-family:"Cascadia Mono",Consolas,monospace;font-size:13px;letter-spacing:.14em;color:#25D0C0;border:1px solid rgba(37,208,192,.35);border-radius:20px;padding:9px 18px;background:rgba(37,208,192,.06)}
+@keyframes kickIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+
+/* ---------- device frames (correct Razr proportions) ---------- */
+/* main: 1080x2640 → 460 x 1124   cover: 1056x1066 → 384 x 387 */
+.dev{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10}
+.devmain{width:460px;height:1124px;border-radius:34px;background:#05080b;border:3px solid #2A343B;box-shadow:0 80px 160px -60px #000,0 0 120px -40px rgba(255,122,69,.28),inset 0 0 2px rgba(255,255,255,.14);overflow:hidden;position:relative}
+.devmain .cam{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#0A0E11;border:1px solid #1C2429;z-index:5}
+.devmain .hinge{position:absolute;left:0;right:0;top:561px;height:2px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.09) 30%,rgba(255,255,255,.09) 70%,transparent);z-index:4}
+.devcover{width:384px;height:388px;border-radius:30px;background:#05080b;border:3px solid #2A343B;box-shadow:0 70px 150px -60px #000,0 0 110px -36px rgba(255,122,69,.3),inset 0 0 2px rgba(255,255,255,.14);overflow:hidden;position:relative}
+.devcover .cam{position:absolute;top:12px;left:14px;width:9px;height:9px;border-radius:50%;background:#0A0E11;border:1px solid #1C2429}
+.screenfill{position:absolute;inset:0;background:#04070a;overflow:hidden}
+
+/* ---------- status bar inside screens ---------- */
+.status{position:absolute;top:10px;left:0;right:0;display:flex;justify-content:space-between;padding:0 26px;font-size:13px;color:rgba(242,248,249,.85);font-weight:600;z-index:6}
+.status .r{display:flex;gap:8px;align-items:center}
+.status .r i{width:15px;height:10px;border-radius:3px;background:rgba(242,248,249,.75);display:inline-block}
+
+/* ---------- dot-matrix clock (cover) ---------- */
+.fclock{font-family:"Cascadia Mono",Consolas,monospace;font-size:64px;font-weight:700;letter-spacing:.02em;color:#EAF7F8;text-align:center}
+.fclock i{display:inline-block;width:14px}
+.fdate{font-family:"Cascadia Mono",Consolas,monospace;font-size:13px;letter-spacing:.3em;color:#7FA2A8;text-align:center;margin-top:10px}
+.fword{font-family:"Cascadia Mono",Consolas,monospace;font-size:11px;letter-spacing:.5em;color:#4E666C;text-align:center;margin-top:22px}
+.fdot{display:flex;gap:9px;justify-content:center;margin-top:16px}
+.fdot i{width:9px;height:9px;border-radius:50%;background:rgba(150,225,235,.7);animation:fdot 1.6s ease-in-out infinite}
+.fdot i:nth-child(2){animation-delay:.14s}.fdot i:nth-child(3){animation-delay:.28s}.fdot i:nth-child(4){animation-delay:.42s}
+@keyframes fdot{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+
+/* ---------- icon tiles ---------- */
+.ic{display:inline-flex;align-items:center;justify-content:center;border-radius:22%;background:linear-gradient(150deg,var(--g1),var(--g2));box-shadow:0 6px 16px -6px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.25)}
+.ic em{font-style:normal;color:rgba(255,255,255,.92);font-weight:700}
+.s40{width:40px;height:40px}.s40 em{font-size:18px}
+.s44{width:44px;height:44px}.s44 em{font-size:19px}
+.s56{width:56px;height:56px}.s56 em{font-size:24px}
+.s34{width:34px;height:34px}.s34 em{font-size:15px}
+
+/* ---------- home scene ---------- */
+.homewrap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:26px}
+.smart{margin:0 22px 18px;border-radius:20px;padding:18px 20px;background:linear-gradient(160deg,rgba(18,50,60,.72),rgba(5,10,12,.55));border:1px solid rgba(255,255,255,.07);}
+.smart .big{font-size:44px;font-weight:275;letter-spacing:-.02em;color:#EAF7F8}
+.smart .row{display:flex;justify-content:space-between;margin-top:10px;font-size:13px;color:#9FB6B9}
+.smart .row b{color:#25D0C0;font-weight:600}
+.hgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px 10px;padding:0 20px}
+.happ{display:flex;flex-direction:column;align-items:center;gap:6px}
+.happ span{font-size:11.5px;color:rgba(242,248,249,.82)}
+.dock{margin:16px 22px 0;height:74px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-evenly;}
+.dots3{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.dots3 i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.28)}
+.dots3 i.on{background:#FF8A5C;width:22px;border-radius:4px}
+.hfloat{position:absolute;top:0;left:0;right:0;bottom:0;animation:homeDrift 5.2s ease-in-out both}
+@keyframes homeDrift{0%{transform:scale(1) translateY(0)}55%{transform:scale(1.024) translateY(-8px)}100%{transform:scale(1.01) translateY(-4px)}}
+
+/* ---------- drawer scene ---------- */
+.drawwrap{position:absolute;inset:0;padding-top:44px}
+.dsearch{margin:10px 20px 14px;height:44px;border-radius:22px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;padding:0 18px;color:#7E9AA0;font-size:14px;gap:10px}
+.dgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 8px;padding:0 18px}
+.dapp{display:flex;flex-direction:column;align-items:center;gap:5px}
+.dapp span{font-size:11px;color:rgba(242,248,249,.78);max-width:88px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ftile{width:100%;aspect-ratio:1;border-radius:24%;background:linear-gradient(160deg,#12323C,#05090B);border:1px solid rgba(255,255,255,.12);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;padding:5px;overflow:hidden}
+.ftile i{border-radius:18%;background:linear-gradient(150deg,#3B6EA8,#1D3F66)}
+.ftile i:nth-child(2){background:linear-gradient(150deg,#2F8F5B,#1A5236)}
+.ftile i:nth-child(3){background:linear-gradient(150deg,#C24A6E,#7C2D48)}
+.ftile i:nth-child(4){background:linear-gradient(150deg,#F2C55C,#C08A1E)}
+.azrail{position:absolute;right:6px;top:120px;bottom:40px;display:flex;flex-direction:column;justify-content:space-around;font-family:"Cascadia Mono",Consolas,monospace;font-size:10px;color:rgba(126,154,160,.75);padding:8px 0}
+.drawerfloat{position:absolute;inset:0;animation:drawerRise 3.8s cubic-bezier(.16,1,.3,1) both}
+@keyframes drawerRise{0%{transform:translateY(60px);opacity:0}14%{transform:translateY(0);opacity:1}86%{opacity:1}100%{transform:translateY(-26px);opacity:.4}}
+
+/* ---------- split scenes ---------- */
+.splitwrap{position:absolute;inset:0;padding-top:44px;display:flex;flex-direction:column}
+.splitbody{position:relative;flex:1;display:flex;overflow:hidden}
+.pane{position:relative;overflow:hidden;background:#0A1216;border:1px solid rgba(255,255,255,.05);box-sizing:border-box}
+.pane .ptop{position:absolute;top:8px;left:0;right:0;display:flex;align-items:center;gap:8px;padding:0 14px;font-size:12px;color:rgba(242,248,249,.85);font-weight:600;z-index:3}
+.pane .pdots{margin-left:auto;display:flex;gap:4px}
+.pane .pdots i{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.4)}
+.paneart{position:absolute;inset:34px 10px 10px;border-radius:14px;opacity:.9}
+.art-browse{background:linear-gradient(160deg,#12232E,#0A141B);position:relative;overflow:hidden}
+.art-browse .brow{height:22px;margin:10px 12px;border-radius:11px;background:rgba(255,255,255,.08)}
+.art-browse .bimg{height:34%;margin:0 12px;border-radius:12px;background:linear-gradient(140deg,#3B6EA8,#1D3F66)}
+.art-browse .bl{height:10px;border-radius:5px;background:rgba(255,255,255,.08);margin:9px 12px 0}
+.art-chat{background:#0B141B;position:relative;overflow:hidden;padding:12px 10px;display:flex;flex-direction:column;gap:8px}
+.art-chat .in,.art-chat .out{height:26px;border-radius:13px}
+.art-chat .in{width:58%;background:rgba(76,154,245,.32)}
+.art-chat .out{width:48%;align-self:flex-end;background:rgba(47,143,91,.36)}
+.art-map{background:
+  linear-gradient(115deg,transparent 46%,rgba(255,138,92,.22) 46% 54%,transparent 54%),
+  linear-gradient(30deg,transparent 40%,rgba(37,208,192,.14) 40% 48%,transparent 48%),
+  radial-gradient(circle at 30% 26%,rgba(37,208,192,.3),transparent 26%),
+  radial-gradient(circle at 74% 66%,rgba(255,138,92,.3),transparent 30%),#0B141B}
+.art-music{background:linear-gradient(160deg,#0F1D14,#0A0F0C);position:relative;overflow:hidden}
+.art-music .disc{width:34%;aspect-ratio:1;border-radius:50%;margin:16% auto 0;background:radial-gradient(circle,#12291B 30%,#0A1B12 32%);border:2px solid rgba(56,217,123,.3)}
+.art-music .ml{height:9px;border-radius:5px;background:rgba(255,255,255,.09);margin:10px 14px 0}
+.art-mail{background:#0B141B;padding:12px 10px;display:flex;flex-direction:column;gap:9px}
+.art-mail .ml2{height:24px;border-radius:10px;background:rgba(238,107,92,.2)}
+.divider{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.22);z-index:6}
+.divider .grip{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:52px;border-radius:6px;background:#FF8A5C;box-shadow:0 0 16px rgba(255,138,92,.65)}
+.ticks{position:absolute;top:0;bottom:0;left:0;right:0;z-index:5;pointer-events:none}
+.ticks i{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.12)}
+.ticks b{position:absolute;top:calc(50% - 12px);transform:translateX(-50%);font-size:13px;color:#25D0C0;font-weight:700}
+.splitanim .pane{animation:panewin 1.05s cubic-bezier(.16,1,.3,1) both}
+.splitanim .divider{animation:panewin 1.05s cubic-bezier(.16,1,.3,1) both}
+.splitwrap .stagecut{position:absolute;inset:0;display:flex;flex-direction:column}
+.stepper{position:absolute;left:0;right:0;bottom:16px;display:flex;justify-content:center;gap:8px;z-index:8}
+.stepper b{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;letter-spacing:.1em;color:#7E9AA0;padding:6px 12px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+.stepper b.on{color:#0D1215;background:#FF8A5C;border-color:#FF8A5C;font-weight:700}
+
+/* ---------- gesture scene ---------- */
+.gestwrap{position:absolute;inset:0;padding-top:44px}
+.gapp{position:absolute;inset:60px 0 0;overflow:hidden}
+.gzone{position:absolute;top:0;bottom:0;right:0;width:20%;background:linear-gradient(270deg,rgba(255,138,92,.28),rgba(255,138,92,.04) 70%);border-left:1px solid rgba(255,138,92,.5);display:flex;align-items:center;justify-content:center}
+.gzone b{font-size:13px;color:#FFB183;font-weight:700;letter-spacing:.08em;writing-mode:vertical-rl}
+.ghostic{position:absolute;top:46%;right:24%;transform:translate(-50%,-50%);z-index:7}
+.gcap{position:absolute;left:0;right:0;bottom:26px;text-align:center;font-size:15px;color:#9FB6B9}
+.gsnap{position:absolute;inset:60px 0 0;display:flex;animation:gsnapIn .9s cubic-bezier(.16,1,.3,1) 1.9s both}
+@keyframes gsnapIn{from{transform:translateX(100%)}to{transform:none}}
+.gsnap .p1{width:33%;position:relative;overflow:hidden;border-right:2px solid #FF8A5C}
+.gsnap .p2{flex:1;position:relative;overflow:hidden}
+
+/* ---------- recents ---------- */
+.recwrap{position:absolute;inset:0;padding-top:44px;display:flex;flex-direction:column;justify-content:center}
+.cards{position:relative;height:760px;margin-top:30px}
+.card{position:absolute;top:0;left:50%;width:420px;height:640px;border-radius:26px;background:#0A1216;border:1px solid rgba(255,255,255,.09);box-shadow:0 40px 90px -40px #000;overflow:hidden;transform-origin:50% 60%}
+.card .chead{display:flex;align-items:center;gap:10px;padding:14px 16px;font-size:14px;font-weight:600;color:rgba(242,248,249,.9)}
+.card .cbody{position:absolute;inset:52px 12px 12px;border-radius:16px}
+.styles{display:flex;gap:10px;justify-content:center;margin-top:26px}
+.styles span{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;letter-spacing:.12em;color:#7E9AA0;padding:8px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.08)}
+.styles span.on{color:#0D1215;background:#25D0C0;border-color:#25D0C0;font-weight:700}
+
+/* ---------- taskbar ---------- */
+.tbwrap{position:absolute;inset:0;padding-top:44px}
+.tbapp{position:absolute;inset:60px 0 0;overflow:hidden}
+.handles{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:space-between;padding:0 30px;z-index:6}
+.handles i{width:64px;height:3px;border-radius:2px;background:rgba(255,255,255,.3)}
+.taskbar{position:absolute;left:14px;right:14px;bottom:16px;border-radius:24px;background:rgba(10,16,20,.86);border:1px solid rgba(255,255,255,.1);;padding:10px 14px 8px;z-index:7}
+.tbrow{display:flex;align-items:center;gap:10px}
+.tbrow .ic{position:relative}
+.rundot{position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:#25D0C0}
+.tbsep{width:1px;height:30px;background:rgba(255,255,255,.12);margin:0 4px}
+.sptile{width:40px;height:32px;border-radius:9px;display:flex;overflow:hidden;border:1px solid rgba(255,255,255,.16)}
+.sptile div{flex:1;background:linear-gradient(160deg,#3B6EA8,#1D3F66)}
+.sptile div+div{background:linear-gradient(160deg,#2F8F5B,#1A5236);border-left:1px solid rgba(0,0,0,.5)}
+.tbnow{display:flex;align-items:center;gap:12px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)}
+.tbnow .art{width:34px;height:34px;border-radius:9px;background:linear-gradient(150deg,#38D97B,#0C5B34);display:flex;align-items:center;justify-content:center;color:#fff}
+.tbnow .meta{flex:1;min-width:0}
+.tbnow .meta b{display:block;font-size:13px;color:#F2F8F9}
+.tbnow .meta small{font-size:11px;color:#7E9AA0}
+.tbeq{display:flex;gap:3px;align-items:flex-end;height:16px}
+.tbeq i{width:3px;background:#25D0C0;border-radius:2px;animation:eq 0.8s ease-in-out infinite alternate}
+.tbeq i:nth-child(1){height:6px}.tbeq i:nth-child(2){height:12px;animation-delay:.1s}.tbeq i:nth-child(3){height:9px;animation-delay:.2s}.tbeq i:nth-child(4){height:15px;animation-delay:.3s}.tbeq i:nth-child(5){height:7px;animation-delay:.4s}.tbeq i:nth-child(6){height:11px;animation-delay:.5s}
+@keyframes eq{from{transform:scaleY(.4)}to{transform:scaleY(1)}}
+
+/* ---------- themes ---------- */
+.themewrap{position:absolute;inset:0;padding-top:44px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.themechips{display:flex;gap:14px;margin-top:34px}
+.themechips span{width:52px;height:52px;border-radius:50%;border:3px solid transparent;animation:chipcycle 4.4s ease-in-out infinite}
+.themechips span:nth-child(1){background:linear-gradient(140deg,#FFB183,#FF6B3D);animation-delay:0s}
+.themechips span:nth-child(2){background:linear-gradient(140deg,#7FD8CC,#25D0C0);animation-delay:.55s}
+.themechips span:nth-child(3){background:linear-gradient(140deg,#D7DEE4,#5F7A80);animation-delay:1.1s}
+.themechips span:nth-child(4){background:linear-gradient(140deg,#1A1F24,#03060A);border-color:rgba(255,255,255,.25);animation-delay:1.65s}
+@keyframes chipcycle{0%,22%{transform:scale(.92);border-color:transparent}8%,16%{transform:scale(1.14);border-color:#F2F8F9}32%,100%{transform:scale(.92);border-color:transparent}}
+.shapewrap{display:flex;gap:26px;margin-top:44px}
+.shapewrap .ic{animation:shapeMorph 4.4s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes shapeMorph{0%,100%{border-radius:50%}50%{border-radius:14%}}
+.themecap{margin-top:36px;font-family:"Cascadia Mono",Consolas,monospace;font-size:13px;letter-spacing:.22em;color:#7E9AA0;animation:capcycle 4.4s ease-in-out infinite}
+@keyframes capcycle{0%,100%{opacity:.55}25%,75%{opacity:1}}
+
+/* ---------- end card ---------- */
+#stageEnd{position:absolute;inset:0;z-index:60;display:none;background:#000}
+body.ending #stageEnd{display:block}
+body.ending .cap,body.ending .prog,body.ending .tc,body.ending .brand{opacity:0!important}
+body.ending .dev{opacity:0!important;transition:opacity .3s}
+.endword,.endmark,.enddims{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;line-height:1}
+.endword{font-family:Gabriola,"Old English Text MT","Monotype Corsiva","Segoe Script",cursive;font-size:300px;color:#F4FBFB;text-shadow:0 0 52px rgba(180,230,240,.2);animation:endWord 7.4s cubic-bezier(.4,0,.2,1) both}
+.endmark{font-family:Gabriola,"Old English Text MT","Monotype Corsiva","Segoe Script",cursive;font-size:340px;color:#F18A55;text-shadow:0 0 80px rgba(255,122,69,.35),0 0 26px rgba(255,150,100,.3);animation:endMark 7.4s cubic-bezier(.4,0,.2,1) both}
+.enddims{top:auto;transform:none;bottom:150px;font-family:"Cascadia Mono",Consolas,monospace;font-size:14px;letter-spacing:.3em;color:#5F7A80;animation:endDims 7.4s ease-out both}
+@keyframes endWord{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.9)}
+  9%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  36%{opacity:1;transform:translate(-50%,-50%) scale(1.012)}
+  46%{opacity:0;transform:translate(-50%,-50%) scale(1.035)}
+  100%{opacity:0}
+}
+@keyframes endMark{
+  0%,44%{opacity:0;transform:translate(-50%,-50%) scale(.88)}
+  56%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  92%{opacity:1;transform:translate(-50%,-50%) scale(1.02)}
+  100%{opacity:.85;transform:translate(-50%,-50%) scale(1.02)}
+}
+@keyframes endDims{0%,40%{opacity:0}58%,100%{opacity:1}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="glow g1"></div><div class="glow g2"></div>
+  <div class="screen" id="screen"></div>
+  <div id="stageEnd"><div class="endword">Folark</div><div class="endmark">AQ</div><div class="enddims">RAZR 50 ULTRA — 1056 × 1066 — 1080 × 2640</div></div>
+  <div class="vign"></div>
+  <div class="brand">FOLARK <small>2.2.4</small></div>
+  <div class="prog"><i id="progbar"></i></div>
+  <div class="tc">00:00 / 00:40</div>
+</div>
+
+<!-- captions: one per scene group -->
+<section class="cap" data-group="cover"><div class="caphead">
+  <div class="kick">00 — Cover</div>
+  <div class="h1">Folded.</div>
+  <div class="sub">Everything works without opening — clock, widgets, the whole launcher.</div>
+  <div class="dims"><span>3.6″ cover</span><span>1056 × 1066</span></div>
+</div></section>
+<section class="cap" data-group="unfold"><div class="caphead">
+  <div class="kick">Unfold</div>
+  <div class="h1">Open it.</div>
+  <div class="sub">The same launcher, recomposed for the big screen.</div>
+  <div class="dims"><span>6.9″ main</span><span>1080 × 2640</span><span>165 Hz</span></div>
+</div></section>
+<section class="cap" data-group="home"><div class="caphead">
+  <div class="kick">01 — Home</div>
+  <div class="h1">Built for<br>the <em>big</em> screen.</div>
+  <div class="sub">Widgets, dock and wallpaper zoom that follow the hinge.</div>
+</div></section>
+<section class="cap" data-group="drawer"><div class="caphead">
+  <div class="kick">02 — App drawer</div>
+  <div class="h1">Every app,<br>one swipe.</div>
+  <div class="sub">4 layouts, folders, search — everything one gesture away.</div>
+</div></section>
+<section class="cap" data-group="split"><div class="caphead">
+  <div class="kick">03 — Split screen</div>
+  <div class="h1">Two apps.<br>Three. <em>More.</em></div>
+  <div class="sub">30 / 70, 50 / 50, thirds, Peek — sizes that stay put.</div>
+</div></section>
+<section class="cap" data-group="gesture"><div class="caphead">
+  <div class="kick">04 — Gestures</div>
+  <div class="h1">Drag.<br>Drop. <em>Split.</em></div>
+  <div class="sub">Pull an app past the edge — the divider snaps to ⅓, ½, ⅔.</div>
+</div></section>
+<section class="cap" data-group="recents"><div class="caphead">
+  <div class="kick">05 — Recents</div>
+  <div class="h1">Eleven ways<br>to look back.</div>
+  <div class="sub">Cards, carousel, deck, arc — pick the style that fits.</div>
+</div></section>
+<section class="cap" data-group="taskbar"><div class="caphead">
+  <div class="kick">06 — Taskbar</div>
+  <div class="h1">The bar that<br><em>floats</em> over apps.</div>
+  <div class="sub">Badges, a split tile and live music — everywhere.</div>
+</div></section>
+<section class="cap" data-group="themes"><div class="caphead">
+  <div class="kick">07 — Themes &amp; icons</div>
+  <div class="h1">Dress it<br>your <em>way</em>.</div>
+  <div class="sub">Four themes, five icon shapes, colours from the wallpaper.</div>
+</div></section>
+
+<script>
+/* ================= icon set ================= */
+const IC = {
+  chrome:  {n:'Chrome',   g1:'#4A8CF7', g2:'#C3382E', s:'C'},
+  msg:     {n:'Messages', g1:'#4C9AF5', g2:'#1F5FBF', s:'M'},
+  maps:    {n:'Maps',     g1:'#4CB77A', g2:'#1E6B45', s:'◈'},
+  photos:  {n:'Photos',   g1:'#F4826B', g2:'#C24A6E', s:'P'},
+  spotify: {n:'Spotify',  g1:'#38D97B', g2:'#0C5B34', s:'♫'},
+  mail:    {n:'Gmail',    g1:'#EE6B5C', g2:'#B02B24', s:'M'},
+  cal:     {n:'Calendar', g1:'#5A96F6', g2:'#1F4FA8', s:'31'},
+  notes:   {n:'Notes',    g1:'#F2C55C', g2:'#C08A1E', s:'N'},
+  files:   {n:'Files',    g1:'#5B8DBF', g2:'#2A4E6E', s:'▤'},
+  settings:{n:'Settings', g1:'#6D7E8B', g2:'#38464F', s:'⚙'},
+  play:    {n:'Play',     g1:'#4F8BF7', g2:'#B0372E', s:'▶'},
+};
+function icon(a, cls){ return `<i class="ic ${cls||'s44'}" style="--g1:${a.g1};--g2:${a.g2}"><em>${a.s}</em></i>`; }
+function status(t){ return `<div class="status"><span>${t}</span><span class="r"><i></i><i></i><i style="width:18px;border-radius:4px"></i></span></div>`; }
+function paneArt(a){
+  if(a.t==='browser') return `<div class="paneart art-browse"><div class="brow"></div><div class="bimg"></div><div class="bl" style="width:72%"></div><div class="bl" style="width:50%"></div><div class="bl" style="width:62%"></div></div>`;
+  if(a.t==='chat')    return `<div class="paneart art-chat"><div class="in"></div><div class="out"></div><div class="in" style="width:64%"></div><div class="out" style="width:40%"></div><div class="in"></div></div>`;
+  if(a.t==='map')     return `<div class="paneart art-map"></div>`;
+  if(a.t==='gallery') return `<div class="paneart" style="background:linear-gradient(140deg,${a.g1},${a.g2})"></div>`;
+  if(a.t==='music')   return `<div class="paneart art-music"><div class="disc"></div><div class="ml" style="width:60%"></div><div class="ml" style="width:38%"></div></div>`;
+  return `<div class="paneart art-mail"><div class="ml2"></div><div class="ml2" style="opacity:.6"></div><div class="ml2" style="opacity:.35"></div></div>`;
+}
+function pane(a, w, opts){ opts = opts||{};
+  return `<div class="pane" style="--w:${w};width:${w}%;${opts.style||''}">
+    <div class="ptop">${icon(a,'s34')}<span>${a.n}</span><div class="pdots"><i></i><i></i><i></i></div></div>
+    ${paneArt(a)}
+  </div>`;
+}
+
+/* ================= scene renderers ================= */
+function screenCover(){
+  return `<div class="dev devcover">
+    <div class="cam"></div>
+    <div class="screenfill" style="background:radial-gradient(90% 60% at 50% 30%,#12323C,#05090B 78%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+      <div class="fclock">9:41</div>
+      <div class="fdate">THU 11 NOV</div>
+      <div class="fdot"><i></i><i></i><i></i><i></i></div>
+      <div class="fword">FOLARK</div>
+    </div>
+  </div>`;
+}
+function screenUnfold(){
+  return `<div class="dev" style="animation:none">
+    <div class="devmain" style="animation:devRise 1s cubic-bezier(.16,1,.3,1) .35s both">
+      <div class="cam"></div><div class="hinge"></div>
+      <div class="screenfill" style="background:radial-gradient(80% 40% at 50% 34%,#12323C,#05090B 76%);display:flex;align-items:center;justify-content:center">
+        <div class="fclock" style="font-size:40px;opacity:.85">9:41</div>
+      </div>
+    </div>
+    <div class="fl" style="position:absolute;left:-40px;top:40%;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(255,138,92,.5),transparent 60%);filter:blur(6px);animation:flash 1s ease-out .25s both"></div>
+  </div>
+  <div class="dev devcover" style="animation:coverFly 1s cubic-bezier(.5,0,.4,1) .15s both;position:absolute;left:calc(50% - 192px);top:calc(50% - 194px);transform:none;z-index:12">
+    <div class="cam"></div>
+    <div class="screenfill" style="background:radial-gradient(90% 60% at 50% 30%,#12323C,#05090B 78%)"></div>
+  </div>
+  <style>
+    @keyframes devRise{from{opacity:0;transform:translateY(40px) scale(.62,.9)}to{opacity:1;transform:none}}
+    @keyframes coverFly{from{opacity:1;transform:none}to{opacity:0;transform:translate(180px,-260px) scale(.5) rotate(-8deg)}}
+    @keyframes flash{from{opacity:0;transform:scale(.5)}60%{opacity:1}to{opacity:0;transform:scale(1.6)}}
+    .fl{left:calc(50% - 60px)!important;top:calc(50% - 60px)!important}
+  </style>`;
+}
+function screenHome(){
+  const grid = [[IC.play,'Play'],[IC.mail,'Gmail'],[IC.photos,'Photos'],[IC.files,'Files'],[IC.cal,'Calendar'],[IC.yt,'YouTube'],[IC.notes,'Notes'],[IC.settings,'Settings'],[IC.chrome,'Chrome'],[IC.msg,'Messages'],[IC.maps,'Maps'],[IC.spotify,'Spotify']];
+  return `<div class="dev devmain" style="animation:devIn .9s cubic-bezier(.16,1,.3,1) both">
+    <div class="cam"></div><div class="hinge"></div>
+    <div class="screenfill"><div class="hfloat">
+      ${status('9:44')}
+      <div class="homewrap">
+        <div class="smart">
+          <div class="big">9:41</div>
+          <div class="row"><span>Thu 11 Nov · Clear 18°</span><b>Sunset 16:42</b></div>
+        </div>
+        <div class="hgrid">${grid.map(a=>`<div class="happ">${icon(a,'s56')}<span>${a.n}</span></div>`).join('')}</div>
+        <div class="dock">${[IC.play,IC.chrome,IC.msg,IC.settings].map(a=>icon(a,'s44')).join('')}</div>
+        <div class="dots3"><i class="on"></i><i></i><i></i></div>
+      </div>
+    </div></div>
+  </div>`;
+}
+function screenDrawer(){
+  const grid = [[IC.chrome,'Chrome'],[IC.msg,'Messages'],[IC.maps,'Maps'],[IC.photos,'Photos'],[IC.spotify,'Spotify'],[IC.mail,'Gmail'],[IC.cal,'Calendar'],[IC.notes,'Notes'],[IC.files,'Files'],[IC.settings,'Settings'],[IC.play,'Play']];
+  return `<div class="dev devmain" style="animation:devIn .9s cubic-bezier(.16,1,.3,1) both">
+    <div class="cam"></div><div class="hinge"></div>
+    <div class="screenfill"><div class="drawerfloat">
+      ${status('9:47')}
+      <div class="drawwrap">
+        <div class="dsearch">⌕ Search apps</div>
+        <div class="dgrid">
+          ${grid.slice(0,7).map(a=>`<div class="dapp">${icon(a,'s44')}<span>${a.n}</span></div>`).join('')}
+          <div class="dapp"><div class="ftile"><i></i><i></i><i></i><i></i></div><span>Social</span></div>
+          ${grid.slice(7).map(a=>`<div class="dapp">${icon(a,'s44')}<span>${a.n}</span></div>`).join('')}
+          <div class="dapp">${icon(IC.maps,'s44')}<span>Maps</span></div>
+        </div>
+        <div class="azrail">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').slice(0,14).map(c=>`<span>${c}</span>`).join('')}</div>
+      </div>
+    </div></div>
+  </div>`;
+}
+function screenSplit(){
+  const steps = [
+    {t:'30 / 70', body:`${pane(IC.chrome,30,{style:'animation:sw30 1s cubic-bezier(.16,1,.3,1) .1s both'})}${pane(IC.maps,70,{style:'animation:sw70 1s cubic-bezier(.16,1,.3,1) .1s both'})}<div class="divider" style="left:30%;animation:sw30 1s cubic-bezier(.16,1,.3,1) .1s both"><span class="grip"></span></div>`, ticks:'<i style="left:33.33%"></i><b style="left:33.33%">⅓</b><i style="left:50%"></i><b style="left:50%">½</b><i style="left:66.66%"></i><b style="left:66.66%">⅔</b>'},
+    {t:'50 / 50', body:`${pane(IC.msg,50,{style:'animation:pw50 1s cubic-bezier(.16,1,.3,1) both'})}${pane(IC.chrome,50,{style:'animation:pw50b 1s cubic-bezier(.16,1,.3,1) both'})}<div class="divider" style="left:50%;animation:pd50 1s cubic-bezier(.16,1,.3,1) both"><span class="grip"></span></div>`, ticks:'<i style="left:33.33%"></i><i style="left:66.66%"></i>'},
+    {t:'33 / 33 / 33', body:`${pane(IC.chrome,33.4,{style:'animation:pw33 1s cubic-bezier(.16,1,.3,1) both'})}${pane(IC.maps,33.3,{style:'animation:pw33 1s cubic-bezier(.16,1,.3,1) .12s both'})}${pane(IC.msg,33.3,{style:'animation:pw33 1s cubic-bezier(.16,1,.3,1) .24s both'})}<div class="divider" style="left:33.4%;animation:pd33a 1s cubic-bezier(.16,1,.3,1) .12s both"><span class="grip"></span></div><div class="divider" style="left:66.7%;animation:pd33b 1s cubic-bezier(.16,1,.3,1) .24s both"><span class="grip"></span></div>`, ticks:''},
+    {t:'Peek', body:`<div class="pane" style="width:15%;filter:brightness(.55)">${paneArt(IC.maps)}<div class="ptop"></div></div>${pane(IC.chrome,70,{style:'animation:pw50b 1s cubic-bezier(.16,1,.3,1) both'})}<div class="divider" style="left:15%;animation:pd15 1s cubic-bezier(.16,1,.3,1) both"><span class="grip"></span></div>`, ticks:''},
+    {t:'Pop-up', body:`${pane(IC.notes,100)}<div class="poppane"><div class="ptop">${icon(IC.photos,'s34')}<span>Photos</span><div class="pdots"><i></i><i></i><i></i></div></div><div class="paneart" style="background:linear-gradient(140deg,#F4826B,#C24A6E)"></div></div>`, ticks:''},
+  ];
+  const seg = [1500,1200,1300,1000,1200], total = seg.reduce((a,b)=>a+b,0);
+  let acc = 0;
+  const layers = steps.map((st,i)=>{
+    const at = acc, dur = seg[i]; acc += dur;
+    const vis = `animation:layerVis ${total}ms steps(1,end) both;animation-delay:${-at}ms`;
+    return `<div class="stagecut splitanim" style="${vis}">${status('9:52')}<div class="splitbody">${st.body}</div>
+      <div class="ticks" style="animation:none">${st.ticks}</div>
+      <div class="stepper">${steps.map((s2,j)=>`<b class="${j===i?'on':''}">${s2.t}</b>`).join('')}</div></div>`;
+  }).join('');
+  return `<div class="dev devmain" style="animation:devIn .9s cubic-bezier(.16,1,.3,1) both">
+    <div class="cam"></div><div class="hinge"></div>
+    <div class="screenfill" style="padding-top:30px">${layers}</div>
+  </div>
+  <style>
+    @keyframes layerVis{from,to{opacity:0}0.001%,99.999%{opacity:1}}
+    @keyframes sw30{from{left:0;width:100%}to{left:30%;width:30%}}
+    @keyframes sw70{from{left:30%;width:70%}to{left:70%;width:70%}}
+    @keyframes pw50{from{width:30%}to{width:50%}}
+    @keyframes pw50b{from{width:70%}to{width:50%}}
+    @keyframes pd50{from{left:30%}to{left:50%}}
+    @keyframes pw33{from{width:50%}to{width:33.3%}}
+    @keyframes pd33a{from{left:50%}to{left:33.4%}}
+    @keyframes pd33b{from{left:50%}to{left:66.7%}}
+    @keyframes pd15{from{left:50%}to{left:15%}}
+    @keyframes devIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+    .poppane{position:absolute;right:8%;top:16%;width:42%;height:52%;border-radius:18px;background:#0A1216;border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 70px -20px #000;overflow:hidden;animation:pw50 1s cubic-bezier(.16,1,.3,1) both;z-index:5}
+  </style>`;
+}
+function screenGesture(){
+  return `<div class="dev devmain" style="animation:devIn .9s cubic-bezier(.16,1,.3,1) both">
+    <div class="cam"></div><div class="hinge"></div>
+    <div class="screenfill">
+      <div class="gestwrap">
+        ${status('9:52')}
+        <div class="gapp">${pane(IC.chrome,100,{style:'height:100%'})}</div>
+        <div class="gzone"><b>DROP TO SPLIT</b></div>
+        <div class="ghostic">${icon(IC.msg,'s56')}</div>
+        <div class="gsnap">${pane(IC.msg,33,{style:'height:100%'})}<div style="flex:1;position:relative;overflow:hidden">${paneArt(IC.maps)}</div></div>
+      </div>
+      <div class="gcap">Pull an app past the edge — the divider snaps to ⅓, ½, ⅔</div>
+    </div>
+  </div>`;
+}
+function screenRecents(){
+  const cards = [
+    {a:IC.chrome, n:'Chrome',   x:-210, s:.86, o:.55},
+    {a:IC.msg,    n:'Messages', x:-60,  s:1,   o:1},
+    {a:IC.maps,   n:'Maps',     x:150,  s:.86, o:.55},
+    {a:IC.notes,  n:'Notes',    x:330,  s:.78, o:.34},
+  ];
+  return `<div class="dev devmain" style="animation:devIn .9s cubic-bezier(.16,1,.3,1) both">
+    <div class="cam"></div><div class="hinge"></div>
+    <div class="screenfill"><div class="recwrap">
+      ${status('9:54')}
+      <div class="cards" style="animation:cardsDrift 4.2s cubic-bezier(.3,0,.2,1) both">
+        ${cards.map(c=>`<div class="card" style="left:calc(50% + ${c.x}px);transform:translateX(-50%) scale(${c.s});opacity:${c.o};z-index:${Math.round(10+c.s*10)}">
+          <div class="chead">${icon(c.a,'s34')}<span>${c.n}</span></div>
+          <div class="cbody">${paneArt(c.a)}</div>
+        </div>`).join('')}
+      </div>
+      <div class="styles"><span class="on">CARDS</span><span>CAROUSEL</span><span>DECK</span><span>ARC</span></div>
+    </div></div>
+  </div>
+  <style>@keyframes cardsDrift{0%{transform:translateX(90px);opacity:.6}30%{transform:none;opacity:1}75%{transform:translateX(-70px)}100%{transform:translateX(-130px);opacity:.5}}</style>`;
+}
+function screenTaskbar(){
+  return `<div class="dev devmain" style="animation:devIn .9s cubic-bezier(.16,1,.3,1) both">
+    <div class="cam"></div><div class="hinge"></div>
+    <div class="screenfill"><div class="tbwrap">
+      <div class="tbapp">${pane(IC.maps,100,{style:'height:100%'})}</div>
+      <div class="handles"><i></i><i></i></div>
+      <div class="taskbar">
+        <div class="tbrow">
+          ${[IC.chrome,IC.msg,IC.maps,IC.photos].map(a=>`<div style="position:relative">${icon(a,'s44')}<span class="rundot"></span></div>`).join('')}
+          <div class="tbsep"></div>
+          <div class="sptile"><div></div><div></div></div>
+          ${[IC.notes,IC.mail].map(a=>icon(a,'s44')).join('')}
+          <div style="margin-left:auto;color:#7E9AA0">⌄</div>
+        </div>
+        <div class="tbnow">
+          <div class="art">♫</div>
+          <div class="meta"><b>Glass Houses</b><small>Folark Sessions</small></div>
+          <div class="tbeq"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div style="color:#7E9AA0;display:flex;gap:10px"><span>⏮</span><span>⏸</span><span>⏭</span></div>
+        </div>
+      </div>
+    </div></div>
+  </div>`;
+}
+function screenThemes(){
+  const shapes = [IC.chrome,IC.msg,IC.maps,IC.photos,IC.spotify,IC.mail];
+  return `<div class="dev devmain" style="animation:devIn .9s cubic-bezier(.16,1,.3,1) both">
+    <div class="cam"></div><div class="hinge"></div>
+    <div class="screenfill" style="background:radial-gradient(90% 50% at 50% 24%,#141B22,#05080B 76%)"><div class="themewrap">
+      ${status('9:58')}
+      <div class="shapewrap">${shapes.map(a=>icon(a,'s56')).join('')}</div>
+      <div class="themechips"><span></span><span></span><span></span><span></span></div>
+      <div class="themecap">ORANGE · TEAL · MONO · AMOLED</div>
+    </div></div>
+  </div>`;
+}
+
+/* ================= timeline (40.000 s) ================= */
+const T = [
+  {id:'cover',   dur:1800, group:'cover',   screen:screenCover},
+  {id:'unfold',  dur:2400, group:'unfold',  screen:screenUnfold},
+  {id:'home',    dur:5200, group:'home',    screen:screenHome},
+  {id:'drawer',  dur:3800, group:'drawer',  screen:screenDrawer},
+  {id:'split',   dur:5200, group:'split',   screen:screenSplit},
+  {id:'gesture', dur:3600, group:'gesture', screen:screenGesture},
+  {id:'recents', dur:4200, group:'recents', screen:screenRecents},
+  {id:'taskbar', dur:3800, group:'taskbar', screen:screenTaskbar},
+  {id:'themes',  dur:4600, group:'themes',  screen:screenThemes},
+  {id:'outro',   dur:7400, group:'end',     screen:()=>'<div></div>'},
+];
+const TOTAL = T.reduce((a,b)=>a+b.dur,0);
+
+/* ================= harness (deterministic) ================= */
+const screenEl = document.getElementById('screen');
+const caps = [...document.querySelectorAll('.cap')];
+const progEl = document.getElementById('progbar');
+const tcEl = document.querySelector('.tc');
+let currentIdx = -1, start = 0, rafId = 0;
+
+function at(ms){
+  let i=0, acc=0;
+  while(i<T.length && acc + T[i].dur <= ms){ acc += T[i].dur; i++; }
+  return { idx: Math.min(i, T.length-1), local: ms-acc };
+}
+function mount(idx){
+  const s = T[idx];
+  screenEl.innerHTML = s.screen();
+  caps.forEach(c=>c.classList.toggle('on', c.dataset.group === s.group));
+  document.body.classList.toggle('ending', s.id === 'outro');
+}
+function progress(ms){
+  const p = Math.max(0, Math.min(1, ms/TOTAL));
+  progEl.style.width = (p*100).toFixed(3)+'%';
+  const sec = Math.min(40, Math.floor(Math.max(0,ms)/1000));
+  tcEl.textContent = '00:'+String(sec).padStart(2,'0')+' / 00:40';
+}
+function tick(){
+  const ms = performance.now()-start;
+  if(ms >= TOTAL){ progress(TOTAL); return; }
+  const a = at(ms);
+  if(a.idx !== currentIdx){ currentIdx = a.idx; mount(a.idx); }
+  progress(ms);
+  rafId = requestAnimationFrame(tick);
+}
+window.play = function(){
+  cancelAnimationFrame(rafId);
+  currentIdx = -1;
+  start = performance.now();
+  tick();
+};
+window.seek = function(ms){
+  cancelAnimationFrame(rafId);
+  const a = at(ms);
+  currentIdx = a.idx;
+  mount(a.idx);
+  progress(ms);
+};
+window.TOTAL = TOTAL;
+
+function fit(){
+  const k = Math.min(innerWidth/1080, innerHeight/1619);
+  document.getElementById('stage').style.transform = `scale(${k})`;
+}
+addEventListener('resize', fit);
+if(window.ResizeObserver) new ResizeObserver(fit).observe(document.documentElement);
+fit();
+let fitFrames = 0;
+(function fitLoop(){ fit(); if(fitFrames++ < 90) requestAnimationFrame(fitLoop); })();
+
+const qT = /[?&]t=(\d+)/.exec(location.search);
+if(qT) window.seek(+qT[1]);
+
+/* ?shot=<ms> renders one deterministic frame: mount, then pin every animation. */
+window.freezeAt = function(ms){
+  window.seek(ms);
+  const a = at(ms);
+  const dur = (T[a.idx] && T[a.idx].dur) || 0;
+  const local = dur <= 600 ? Math.min(dur, Math.max(a.local, 170)) : a.local;
+  const pin = () => document.getAnimations().forEach(an=>{
+    try{ an.pause(); an.currentTime = (an.animationName === 'glowDrift') ? ms : local; }catch(e){}
+  });
+  pin();
+  requestAnimationFrame(pin);
+  return local;
+};
+const qShot = /[?&]shot=(\d+)/.exec(location.search);
+if(qShot) window.freezeAt(+qShot[1]);
+</script>
+</body>
+</html>

@@ -39,16 +39,16 @@
     <string name="recents_close_all_pins_too">Close all (pins too)</string>
     <string name="recents_menu_split">Split screen</string>
     <string name="recents_menu_freeform">Freeform</string>
-    <string name="recents_menu_lock">Lock</string>
-    <string name="recents_menu_unlock">Unlock</string>
+    <string name="recents_menu_pin">Pin</string>
+    <string name="recents_menu_unpin">Unpin</string>
     <string name="recents_menu_close">Close app</string>
     <string name="recents_menu_open">Open</string>
     <string name="recents_menu_unsplit">Full screen</string>
     <string name="recents_menu_info">App info</string>
     <string name="recents_menu_mute">Mute</string>
     <string name="recents_menu_unmute">Unmute</string>
-    <string name="recents_menu_native_split">Split screen (pick app)</string>
-    <string name="recents_menu_native_third">Add app (pick)</string>
+    <string name="recents_menu_native_split">Split with Motorola\'s picker</string>
+    <string name="recents_menu_native_third">Add app with Motorola\'s picker</string>
     <string name="recents_edge_left">Open in left split</string>
     <string name="recents_edge_right">Open in right split</string>
     <string name="recents_edge_top">Open in fullscreen</string>
@@ -76,5 +76,6 @@
         <item quantity="other">Pick %d more apps</item>
     </plurals>
     <string name="settings_reset_notice">A damaged settings file had to be reset, so Folark\'s settings are back to their defaults. Your home layout is untouched — a backup can restore the rest (Settings ▸ Backup &amp; restore).</string>
+    <string name="recents_scene_unavailable">These apps can\'t be saved as a split right now — try again once the split is showing</string>
     <string name="recents_taskbar_locked">Taskbar apps are locked (Settings ▸ Taskbar)</string>
 </resources>

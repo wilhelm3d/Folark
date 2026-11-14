@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -81,13 +82,19 @@ internal fun RecentsEnv.sizeScale(): Float = settings.recents.cardHeight / 300f
 internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int) {
     val corner = env.corner
     val overlay = env.settings.recents.cardLayout == RecentsCardLayout.OVERLAY
+    // All cards fit in one row: a row in the middle, the cards grown into the room the empty
+    // columns leave (two apps on the inner screen no longer sit small in its bottom-left corner).
+    if (cards.isNotEmpty() && cards.size <= columns.coerceAtLeast(1)) {
+        FolarkFewCards(cards, env, columns.coerceAtLeast(1), overlay)
+        return
+    }
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns.coerceAtLeast(1)),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         // Sit the cards at the bottom (near the taskbar) rather than pinned to the top with a big
         // empty area below; when there are enough to scroll, this has no effect.
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.Bottom),
-        contentPadding = PaddingValues(bottom = 96.dp),
+        contentPadding = PaddingValues(bottom = FOLARK_BOTTOM),
         modifier = Modifier.fillMaxSize(),
     ) {
         itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
@@ -105,6 +112,64 @@ internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int
                     CardTitle(card, env)
                     CardPicture(card, env, Modifier.fillMaxWidth().height(env.settings.recents.cardHeight.dp), (corner.value * 0.6f).dp)
                     CardActions(card, env)
+                }
+            }
+        }
+    }
+}
+
+/** The gap between Folark cards, and the room kept free under them (as in the grid). */
+private val FOLARK_GAP = 14.dp
+private val FOLARK_BOTTOM = 96.dp
+/** A few cards grow at most this much over their grid size. */
+internal const val FEW_CARDS_MAX_GROW = 1.8f
+/** Title row and buttons of a framed card, beside its picture. */
+private val FRAME_EXTRA = 120.dp
+
+/**
+ * How much a row of [count] cards may grow over their size in a grid of [columns] (≥ 1): as wide
+ * as the row allows, no taller than the room above the bottom margin, at most [FEW_CARDS_MAX_GROW].
+ * Never smaller than the grid size.
+ */
+internal fun fewCardsGrow(count: Int, columns: Int, width: Float, height: Float, gap: Float, cardHeight: Float): Float {
+    if (count <= 0 || columns <= 0 || width <= 0f || cardHeight <= 0f) return 1f
+    val gridWidth = (width - gap * (columns - 1)) / columns
+    if (gridWidth <= 0f) return 1f
+    val byWidth = (width - gap * (count - 1)) / count / gridWidth
+    val byHeight = height / cardHeight
+    return minOf(FEW_CARDS_MAX_GROW, byWidth, byHeight).coerceAtLeast(1f)
+}
+
+/** [FolarkTheme] with all cards in one row: centred both ways, grown by [fewCardsGrow]. */
+@Composable
+private fun FolarkFewCards(cards: List<RecentsCard>, env: RecentsEnv, columns: Int, overlay: Boolean) {
+    val corner = env.corner
+    BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = FOLARK_BOTTOM), contentAlignment = Alignment.Center) {
+        val cardHeight = env.settings.recents.cardHeight.dp
+        val room = if (overlay) maxHeight else maxHeight - FRAME_EXTRA
+        val gridWidth = (maxWidth - FOLARK_GAP * (columns - 1)) / columns
+        val grow = fewCardsGrow(cards.size, columns, maxWidth.value, room.value, FOLARK_GAP.value, cardHeight.value)
+        val width = gridWidth * grow
+        val pictureHeight = (cardHeight * grow).coerceAtMost(room)
+        Row(horizontalArrangement = Arrangement.spacedBy(FOLARK_GAP), verticalAlignment = Alignment.CenterVertically) {
+            cards.forEachIndexed { index, card ->
+                key(card.key) {
+                    if (overlay) {
+                        OverlayCard(card, env, Modifier.width(width).then(env.cardModifier(card, index, cards.size, sideSwipes = true)), pictureHeight)
+                    } else {
+                        Column(
+                            Modifier
+                                .width(width)
+                                .then(env.cardModifier(card, index, cards.size, sideSwipes = true))
+                                .envSurface(env, RoundedCornerShape(corner), card in env.picked)
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            CardTitle(card, env)
+                            CardPicture(card, env, Modifier.fillMaxWidth().height(pictureHeight), (corner.value * 0.6f).dp)
+                            CardActions(card, env)
+                        }
+                    }
                 }
             }
         }
@@ -279,7 +344,7 @@ internal fun CompactTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: In
         columns = GridCells.Fixed(columns.coerceAtLeast(1)),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(bottom = 96.dp),
+        contentPadding = PaddingValues(bottom = FOLARK_BOTTOM),
     ) {
         itemsIndexed(cards, key = { _, c -> c.key }) { index, card ->
             Row(

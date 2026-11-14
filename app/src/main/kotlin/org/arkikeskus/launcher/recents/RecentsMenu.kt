@@ -86,6 +86,10 @@ internal class RecentsMenuState {
 }
 
 /** Where the menu grows from, as a fraction of its own size (set while it is placed). */
+/** The menu's glass tint: nearly solid, never fully. */
+private const val MENU_TINT = 0.84f
+private const val MENU_TINT_MAX = 0.96f
+
 private class Pivot {
     var x = 0.5f
     var y = 0f
@@ -93,8 +97,8 @@ private class Pivot {
 
 /**
  * A card's long-press menu, in Liquid Glass. It names the app at the top, then the things you can
- * do with it: Open, Split screen, Freeform, Lock, App info, Close app — each shown only where it
- * can be done (Close needs root and isn't offered for a locked app). It grows out of the point
+ * do with it: Open, Split screen, Freeform, Pin, App info, Close app — each shown only where it
+ * can be done (Close needs root and isn't offered for a pinned app). It grows out of the point
  * under the finger with a little spring, its rows slide in one after another, and it shrinks back
  * toward that point when it closes (Settings ▸ Recents ▸ Animate the long-press menu; off: it just
  * appears and goes). A tap outside closes it.
@@ -112,7 +116,9 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
         add(MenuItem(R.string.recents_menu_peek, Glyph.PEEK) { if (card.isSplit) env.onPeekSplit(card) else env.onPeekPick(card) })
         // Motorola's own split picker (only when native three-app split is on): pick the other app
         // from the system's picker instead of Folark's. On a split, pick the third; else pick a second.
-        if (env.settings.launch.threeAppNative) {
+        // Not on the outer screen: there the app came to the front but Motorola's picker never
+        // appeared (checked on the razr fold); Folark's own Split screen above does the same there.
+        if (env.settings.launch.threeAppNative && !env.coverScreen) {
             if (card.isSplit) add(MenuItem(R.string.recents_menu_native_third, Glyph.SPLIT3) { env.onNativeThird(card) })
             else add(MenuItem(R.string.recents_menu_native_split, Glyph.SPLIT) { env.onNativeSplit(card) })
         }
@@ -124,7 +130,7 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
         if (card.isSplit && card.apps.none { it == null }) {
             add(MenuItem(if (card.tasks.size >= 3) R.string.recents_menu_home_three else R.string.recents_menu_home_two, Glyph.HOME) { env.onAddToHome(card) })
         }
-        add(MenuItem(if (card.pinned) R.string.recents_menu_unlock else R.string.recents_menu_lock, Glyph.LOCK) { env.onTogglePin(card) })
+        add(MenuItem(if (card.pinned) R.string.recents_menu_unpin else R.string.recents_menu_pin, Glyph.PIN) { env.onTogglePin(card) })
         add(MenuItem(R.string.recents_menu_info, Glyph.INFO) { env.onAppInfo(card) })
         // Persistent per-app mute: stays muted across restarts (appops PLAY_AUDIO on root).
         run {
@@ -175,7 +181,9 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
                 .width(248.dp)
                 .liquidGlass(
                     shape = shape,
-                    tint = Color(0xFF1B2326).copy(alpha = 0.5f + tint),
+                    // Nearly solid: the menu often lies over a card, whose picture showed through
+                    // and ran into the menu's lower rows.
+                    tint = Color(0xFF1B2326).copy(alpha = (MENU_TINT + tint).coerceAtMost(MENU_TINT_MAX)),
                     highlight = 1f,
                     rimBottom = 0.22f,
                 )
@@ -222,7 +230,7 @@ internal fun RecentsMenuLayer(menu: RecentsMenuState, env: RecentsEnv) {
 
 private class MenuItem(val label: Int, val glyph: Glyph, val danger: Boolean = false, val action: () -> Unit)
 
-private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, LOCK, INFO, CLOSE, SAVE, MUTE, UNMUTE, HOME }
+private enum class Glyph { OPEN, SPLIT, SPLIT3, PEEK, FREEFORM, UNSPLIT, PIN, INFO, CLOSE, SAVE, MUTE, UNMUTE, HOME }
 
 /**
  * Places the menu just below [at], centred on it, always fully on screen (above it if no room
@@ -243,7 +251,7 @@ private fun Modifier.placeNear(at: Offset, pivot: Pivot): Modifier = layout { me
 }
 
 /** Line icons in the style of the menu in the picture: split, a floating window, a padlock, ✕. */
-private fun DrawScope.drawGlyph(glyph: Glyph, color: Color, locked: Boolean) {
+private fun DrawScope.drawGlyph(glyph: Glyph, color: Color, pinned: Boolean) {
     val w = size.width
     val stroke = Stroke(width = w * 0.09f, cap = StrokeCap.Round)
     val r = CornerRadius(w * 0.12f)
@@ -302,16 +310,12 @@ private fun DrawScope.drawGlyph(glyph: Glyph, color: Color, locked: Boolean) {
             drawRoundRect(color, Offset(w * 0.06f, w * 0.1f), Size(w * 0.88f, w * 0.8f), r, style = stroke)
             drawRoundRect(color, Offset(w * 0.34f, w * 0.34f), Size(w * 0.44f, w * 0.38f), CornerRadius(w * 0.08f))
         }
-        Glyph.LOCK -> {
-            drawRoundRect(color, Offset(w * 0.16f, w * 0.44f), Size(w * 0.68f, w * 0.5f), r, style = stroke)
-            // The shackle: closed when locked, swung open when not.
-            val left = w * 0.3f
-            val right = w * 0.7f
-            val top = w * 0.1f
-            drawArc(color, 180f, 180f, false, Offset(left, top), Size(right - left, w * 0.36f), style = stroke)
-            drawLine(color, Offset(left, top + w * 0.18f), Offset(left, w * 0.44f), stroke.width, StrokeCap.Round)
-            drawLine(color, Offset(right, top + w * 0.18f), Offset(right, if (locked) w * 0.44f else w * 0.32f), stroke.width, StrokeCap.Round)
-            drawCircle(color, w * 0.06f, Offset(w * 0.5f, w * 0.68f))
+        Glyph.PIN -> {
+            // A push pin, as on a pinned card's title: its head filled while pinned (Unpin), an
+            // outline while not (Pin).
+            drawLine(color, Offset(w * 0.5f, w * 0.5f), Offset(w * 0.14f, w * 0.86f), stroke.width, StrokeCap.Round)
+            if (pinned) drawCircle(color, w * 0.24f, Offset(w * 0.62f, w * 0.38f))
+            else drawCircle(color, w * 0.22f, Offset(w * 0.62f, w * 0.38f), style = stroke)
         }
         Glyph.CLOSE -> {
             drawLine(color, Offset(w * 0.2f, w * 0.2f), Offset(w * 0.8f, w * 0.8f), stroke.width, StrokeCap.Round)

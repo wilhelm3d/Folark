@@ -215,7 +215,7 @@ internal fun RecentsCardsArea(
     state: RecentsState,
     settings: LauncherSettings,
     env: RecentsEnv,
-    wide: Boolean,
+    onCover: Boolean,
     side: Dp,
     accent: Color,
     modifier: Modifier,
@@ -237,14 +237,14 @@ internal fun RecentsCardsArea(
                 RecentsTheme.IPAD -> IpadTheme(state.cards, env)
                 RecentsTheme.CAROUSEL -> CarouselTheme(state.cards, env)
                 RecentsTheme.DECK -> DeckTheme(state.cards, env)
-                RecentsTheme.COMPACT -> CompactTheme(state.cards, env, if (wide) settings.recents.columnsInner.coerceAtMost(3) else 1)
+                RecentsTheme.COMPACT -> CompactTheme(state.cards, env, if (onCover) 1 else settings.recents.columnsInner.coerceAtMost(3))
                 RecentsTheme.SWITCHER -> SwitcherTheme(state.cards, env)
                 RecentsTheme.STACK -> StackTheme(state.cards, env)
                 RecentsTheme.ARC -> ArcTheme(state.cards, env)
                 RecentsTheme.PORTRAIT -> PortraitTheme(state.cards, env)
                 RecentsTheme.SPOTLIGHT -> SpotlightTheme(state.cards, env)
                 RecentsTheme.GALLERY -> GalleryTheme(state.cards, env)
-                else -> FolarkTheme(state.cards, env, if (wide) settings.recents.columnsInner else settings.recents.columnsOuter)
+                else -> FolarkTheme(state.cards, env, if (onCover) settings.recents.columnsOuter else settings.recents.columnsInner)
             }
         }
     }
