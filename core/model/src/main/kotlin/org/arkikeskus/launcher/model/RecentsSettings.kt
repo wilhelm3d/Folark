@@ -6,7 +6,7 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class RecentsSettings(
     /** Folark's own Recents screen (all shared by both displays): opened by the taskbar's Recents
-     *  button ([LauncherSettings.TASKBAR_RECENTS_FOLARK]) or a home gesture ([LauncherSettings.GESTURE_RECENTS]). */
+     *  button ([TaskbarRecentsButton.FOLARK]) or a home gesture ([HomeGesture.RECENTS]). */
     val enabled: Boolean = true,
     /** Android's own Recents (swipe up and hold, the stock taskbar, the Recents key) hands over to
      *  Folark Recents as soon as it opens (through Folark's accessibility service). */
@@ -23,13 +23,13 @@ data class RecentsSettings(
     val cardHeight: Int = 300,
     val cornerDp: Int = 26,
     val backdropDim: Float = 0.85f,
-    /** Newest first ([LauncherSettings.RECENTS_SORT_RECENT]) or by name ([LauncherSettings.RECENTS_SORT_NAME]). */
-    val sort: String = LauncherSettings.RECENTS_SORT_RECENT,
+    /** Newest first ([RecentsSort.RECENT]) or by name ([RecentsSort.NAME]). */
+    val sort: RecentsSort = RecentsSort.RECENT,
     /** When each app was last used, under its name. */
     val showTime: Boolean = true,
-    /** Card look: [LauncherSettings.RECENTS_CARD_HEADER] (app row above the picture) or [LauncherSettings.RECENTS_CARD_OVERLAY]
+    /** Card look: [RecentsCardLayout.HEADER] (app row above the picture) or [RecentsCardLayout.OVERLAY]
      *  (the picture fills the card, the app icon floats on top — a cleaner, borderless look). */
-    val cardLayout: String = LauncherSettings.RECENTS_CARD_OVERLAY,
+    val cardLayout: RecentsCardLayout = RecentsCardLayout.OVERLAY,
     /** Borderless cards: the app's name under each card. */
     val overlayLabels: Boolean = true,
     /** The app's icon floating on each card (overlay card looks). */
@@ -57,16 +57,16 @@ data class RecentsSettings(
     val groupSplits: Boolean = true,
     /** With root: how much memory each card's app is using, as a small label on the card. */
     val memoryBadge: Boolean = false,
-    /** Recents animations: how the cards come in (RECENTS_ENTER_*), how a card picked for split
-     *  view answers (RECENTS_SELECT_*), and how fast both play (1 = normal, higher = faster). */
-    val enterAnimation: String = LauncherSettings.RECENTS_ENTER_RISE,
-    val selectAnimation: String = LauncherSettings.RECENTS_SELECT_POP,
+    /** Recents animations: how the cards come in ([RecentsEnter]), how a card picked for split
+     *  view answers ([RecentsSelect]), and how fast both play (1 = normal, higher = faster). */
+    val enterAnimation: RecentsEnter = RecentsEnter.RISE,
+    val selectAnimation: RecentsSelect = RecentsSelect.POP,
     val animationSpeed: Float = 1f,
-    /** How Recents' buttons (and its menu) answer a press: one of PRESS_*. */
-    val pressAnimation: String = LauncherSettings.PRESS_SHRINK,
-    /** Recents look: one of RECENTS_THEME_*; Liquid Glass on top of any of them (how much the
+    /** How Recents' buttons (and its menu) answer a press: one of [PressEffect]. */
+    val pressAnimation: PressEffect = PressEffect.SHRINK,
+    /** Recents look: one of [RecentsTheme]; Liquid Glass on top of any of them (how much the
      *  backdrop is blurred, dp, and how milky the glass is). */
-    val theme: String = LauncherSettings.RECENTS_THEME_FOLARK,
+    val theme: RecentsTheme = RecentsTheme.FOLARK,
     val glass: Boolean = false,
     val glassBlur: Int = 28,
     val glassTint: Float = 0.16f,
@@ -81,26 +81,26 @@ data class RecentsSettings(
     val btnUnsplit: Boolean = true,
     val btnSplitView: Boolean = true,
     val btnCloseAll: Boolean = true,
-    /** What a gesture on a Recents card does: one of RECENTS_ACTION_*. Swipes left / right
+    /** What a gesture on a Recents card does: one of [RecentsAction]. Swipes left / right
      *  (fling the card off the side of the screen) in the looks that scroll up and down
      *  (Folark, Compact, Stack, Bento, Switcher); swipes up / down in every look but Compact
      *  and Stack (where up and down scroll). */
-    val swipeUpAction: String = LauncherSettings.RECENTS_ACTION_CLOSE,
-    val swipeDownAction: String = LauncherSettings.RECENTS_ACTION_NONE,
-    val swipeLeftAction: String = LauncherSettings.RECENTS_ACTION_CLOSE,
-    val swipeRightAction: String = LauncherSettings.RECENTS_ACTION_CLOSE,
-    val longPressAction: String = LauncherSettings.RECENTS_ACTION_MENU,
-    val doubleTapAction: String = LauncherSettings.RECENTS_ACTION_SPLIT,
+    val swipeUpAction: RecentsAction = RecentsAction.CLOSE,
+    val swipeDownAction: RecentsAction = RecentsAction.NONE,
+    val swipeLeftAction: RecentsAction = RecentsAction.CLOSE,
+    val swipeRightAction: RecentsAction = RecentsAction.CLOSE,
+    val longPressAction: RecentsAction = RecentsAction.MENU,
+    val doubleTapAction: RecentsAction = RecentsAction.SPLIT,
     /** The outer screen has its own gestures (below); off: the ones above work on both screens.
      *  Made for one hand on the small screen: pull a card down to open it, double tap for a
      *  pop-up window (split screen rarely fits there). */
     val outerGestures: Boolean = true,
-    val outerSwipeUpAction: String = LauncherSettings.RECENTS_ACTION_CLOSE,
-    val outerSwipeDownAction: String = LauncherSettings.RECENTS_ACTION_OPEN,
-    val outerSwipeLeftAction: String = LauncherSettings.RECENTS_ACTION_CLOSE,
-    val outerSwipeRightAction: String = LauncherSettings.RECENTS_ACTION_CLOSE,
-    val outerLongPressAction: String = LauncherSettings.RECENTS_ACTION_MENU,
-    val outerDoubleTapAction: String = LauncherSettings.RECENTS_ACTION_POPUP,
+    val outerSwipeUpAction: RecentsAction = RecentsAction.CLOSE,
+    val outerSwipeDownAction: RecentsAction = RecentsAction.OPEN,
+    val outerSwipeLeftAction: RecentsAction = RecentsAction.CLOSE,
+    val outerSwipeRightAction: RecentsAction = RecentsAction.CLOSE,
+    val outerLongPressAction: RecentsAction = RecentsAction.MENU,
+    val outerDoubleTapAction: RecentsAction = RecentsAction.POPUP,
     /** The outer screen has a Recents look of its own: [outerLook] is these settings with the
      *  outer screen's theme, cards, glass, buttons and animations (each one the unfolded
      *  screen's until changed for the outer screen). */
@@ -112,7 +112,7 @@ data class RecentsSettings(
     val pinned: Set<String> = emptySet(),
     val btnPin: Boolean = true,
     val pinKeepAlive: Boolean = true,
-    val attachedSide: String = LauncherSettings.RECENTS_ATTACHED_LEFT,
+    val attachedSide: RecentsAttachedSide = RecentsAttachedSide.LEFT,
     val attachedPeek: Float = 0.12f,
     /** Peek view via SystemUI's own snap (Folark's module). Off by default: Folark instead drags
      *  the divider like a finger, which some ROMs handle far more reliably (the module's cold
@@ -130,8 +130,8 @@ data class RecentsSettings(
     val dividerStops: Boolean = true,
     /** The split divider stays where it is let go, for two apps and three (needs the module). */
     val freeDivider: Boolean = true,
-    /** Divider lock: one of DIVIDER_LOCK_* (which splits' dividers can't be dragged). */
-    val dividerLock: String = LauncherSettings.DIVIDER_LOCK_OFF,
+    /** Divider lock: one of [DividerLock] (which splits' dividers can't be dragged). */
+    val dividerLock: DividerLock = DividerLock.OFF,
     /** Faint marks at ⅓, ½, ⅔ while the divider is dragged, and a let-go near one lands on it. */
     val dividerMarks: Boolean = true,
     /** A haptic tick when the dragged divider passes ⅓, ½ or ⅔. */
@@ -153,3 +153,130 @@ data class RecentsSettings(
     /** Long-press a notification (Folark's widgets, the taskbar) to open it beside the last app. */
     val notificationSplit: Boolean = true,
 )
+
+/** Which splits keep their divider where it was put. */
+enum class DividerLock(override val stored: String) : StoredChoice {
+    OFF("off"),
+    TWO("two"),
+    THREE("three"),
+    ALL("all"),
+}
+
+/** Button press animations: sink in, overshoot, a halo, a spreading ring, lean in, wobble. */
+enum class PressEffect(override val stored: String) : StoredChoice {
+    SHRINK("shrink"),
+    BOUNCE("bounce"),
+    GLOW("glow"),
+    RIPPLE("ripple"),
+    TILT("tilt"),
+    JELLY("jelly"),
+    NONE("none"),
+}
+
+/** What a gesture on a Recents card does. */
+enum class RecentsAction(override val stored: String) : StoredChoice {
+    NONE("none"),
+
+    /** A menu on the card: split screen, freeform, lock, close. */
+    MENU("menu"),
+
+    CLOSE("close"),
+    SPLIT("split"),
+    POPUP("popup"),
+    UNSPLIT("unsplit"),
+    PIN("pin"),
+    INFO("info"),
+    OPEN("open"),
+
+    /** Peek view: one app big, another peeking in from the edge (on a split card: that split). */
+    PEEK("peek"),
+
+    /** Split 3 apps: pick two more (needs the three-app split switch and the SystemUI hook). */
+    SPLIT3("split3"),
+
+    /** Closes every other unpinned app (needs root, like Close). */
+    CLOSE_OTHERS("close_others"),
+
+    /** Same as the Close all button. */
+    CLOSE_ALL("close_all"),
+}
+
+/** The side attached Recents opens from. */
+enum class RecentsAttachedSide(override val stored: String) : StoredChoice {
+    LEFT("left"),
+    RIGHT("right"),
+}
+
+/** Where a Recents card shows the app's name and icon. */
+enum class RecentsCardLayout(override val stored: String) : StoredChoice {
+    HEADER("header"),
+    OVERLAY("overlay"),
+}
+
+/**
+ * Recents entrances: up from below, out of the distance, falling in diagonally, turning over,
+ * fanning out from a stack, coming into focus, and more.
+ */
+enum class RecentsEnter(override val stored: String) : StoredChoice {
+    RISE("rise"),
+    ZOOM("zoom"),
+    CASCADE("cascade"),
+    FLIP("flip"),
+    FAN("fan"),
+    FOCUS("focus"),
+
+    /** A ripple running across the cards: each rises with a little overshoot, left to right. */
+    WAVE("wave"),
+
+    /** Each card swings down into place from its top edge, like a sign on a hinge. */
+    SWING("swing"),
+
+    /** Cards fall in from above and settle with a bounce. */
+    DROP("drop"),
+
+    NONE("none"),
+}
+
+/**
+ * A card picked for split view: a hop, a spreading ring, lifted up, leaning to its side, a
+ * breathing halo, a little shake.
+ */
+enum class RecentsSelect(override val stored: String) : StoredChoice {
+    POP("pop"),
+    RING("ring"),
+    LIFT("lift"),
+    TILT("tilt"),
+    GLOW("glow"),
+    JIGGLE("jiggle"),
+    NONE("none"),
+}
+
+/** The order of the Recents cards. */
+enum class RecentsSort(override val stored: String) : StoredChoice {
+    RECENT("recent"),
+    NAME("name"),
+}
+
+/**
+ * Recents themes: Folark's card grid, iPad (big windows in a row), Carousel (one big card in the
+ * middle), Deck (overlapping cards), Compact (a list), Switcher (big icons), and more.
+ */
+enum class RecentsTheme(override val stored: String) : StoredChoice {
+    FOLARK("folark"),
+    IPAD("ipad"),
+    CAROUSEL("carousel"),
+    DECK("deck"),
+    COMPACT("compact"),
+    SWITCHER("switcher"),
+    STACK("stack"),
+    ARC("arc"),
+
+    /** Tall rounded cards you snap sideways, the app's icon and name above each. */
+    PORTRAIT("portrait"),
+
+    /** The middle card large and centred, its icon and name above it; neighbours peek in. */
+    SPOTLIGHT("spotlight"),
+
+    /** A row of larger cards, two or three in view, for the unfolded screen. */
+    GALLERY("gallery"),
+}

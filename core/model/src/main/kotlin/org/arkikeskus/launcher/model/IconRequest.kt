@@ -23,7 +23,7 @@ package org.arkikeskus.launcher.model
  * In the key too, so a folder's thumbnail and a large home icon each cache a bitmap of their own
  * size instead of sharing one that is too big for the first and too soft for the second.
  *
- * [shape] is the icon shape (LauncherSettings.ICON_SHAPE_*; empty = the system's), in the key too.
+ * [shape] is the icon shape, in the key too.
  */
 data class IconRequest(
     val app: AppItem,
@@ -33,7 +33,7 @@ data class IconRequest(
     val epoch: Int = 0,
     val customIcon: String = "",
     val sizePx: Int = 0,
-    val shape: String = "",
+    val shape: IconShape = IconShape.SYSTEM,
 )
 
 /** The few sizes icons are rasterized at — steps, so near-equal sizes share one cached bitmap. */

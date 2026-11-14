@@ -16,18 +16,18 @@ data class SplitPickerLook(
     val labels: Boolean = true,
     /** Drawer folders as the first row; their apps then aren't listed again below. Off: every app in the grid. */
     val folders: Boolean = true,
-    /** The row of recently used apps at the top: one of RECENTS_*. */
-    val recents: String = RECENTS_ICONS,
+    /** The row of recently used apps at the top. */
+    val recents: PickerRecents = PickerRecents.ICONS,
     /** How many recent apps that row shows. */
     val recentsCount: Int = 5,
-    /** Order of the apps: one of SORT_*. */
-    val sort: String = SORT_NAME,
+    /** Order of the apps. */
+    val sort: PickerSort = PickerSort.NAME,
     /** A search field at the top. */
     val search: Boolean = false,
     /** How solid the drawer's background is (0 see-through … 1 solid). */
     val opacity: Float = 0.95f,
-    /** How the picked app opens in the picker's half: one of OPEN_*. */
-    val openAnim: String = OPEN_ZOOM,
+    /** How the picked app opens in the picker's half. */
+    val openAnim: PickerOpen = PickerOpen.ZOOM,
     /** A row of the apps you marked as favorites ([favoriteKeys], in the order added). */
     val favorites: Boolean = true,
     val favoriteKeys: List<String> = emptyList(),
@@ -39,25 +39,6 @@ data class SplitPickerLook(
     val longPress: Boolean = true,
 ) {
     companion object {
-        const val RECENTS_OFF = "off"
-        const val RECENTS_ICONS = "icons"
-        /** Small screenshots of the apps (needs root; icons without it). */
-        const val RECENTS_PREVIEWS = "previews"
-        val RECENTS_STYLES = listOf(RECENTS_OFF, RECENTS_ICONS, RECENTS_PREVIEWS)
-
-        const val SORT_NAME = "name"
-        /** Most used first (Folark's own usage count). */
-        const val SORT_USAGE = "usage"
-        val SORTS = listOf(SORT_NAME, SORT_USAGE)
-
-        /** The tapped icon grows to fill the picker's half, then the app opens over it. */
-        const val OPEN_ZOOM = "zoom"
-        /** The app fades in over the picker. */
-        const val OPEN_FADE = "fade"
-        /** Android's own opening animation. */
-        const val OPEN_NONE = "none"
-        val OPEN_ANIMS = listOf(OPEN_ZOOM, OPEN_FADE, OPEN_NONE)
-
         const val MIN_COLUMNS = 3
         const val MAX_COLUMNS = 7
         const val MIN_ICON = 32
@@ -67,4 +48,33 @@ data class SplitPickerLook(
         const val MIN_OPACITY = 0.5f
         const val MAX_OPACITY = 1f
     }
+}
+
+/** The split picker's row of recently used apps. */
+enum class PickerRecents(override val stored: String) : StoredChoice {
+    OFF("off"),
+    ICONS("icons"),
+
+    /** Small screenshots of the apps (needs root; icons without it). */
+    PREVIEWS("previews"),
+}
+
+/** The order of the split picker's apps. */
+enum class PickerSort(override val stored: String) : StoredChoice {
+    NAME("name"),
+
+    /** Most used first (Folark's own usage count). */
+    USAGE("usage"),
+}
+
+/** How the app picked in the split picker opens in its half. */
+enum class PickerOpen(override val stored: String) : StoredChoice {
+    /** The tapped icon grows to fill the picker's half, then the app opens over it. */
+    ZOOM("zoom"),
+
+    /** The app fades in over the picker. */
+    FADE("fade"),
+
+    /** Android's own opening animation. */
+    NONE("none"),
 }

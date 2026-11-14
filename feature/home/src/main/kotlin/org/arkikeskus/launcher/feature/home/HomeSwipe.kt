@@ -17,7 +17,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.HomeGesture
 import org.arkikeskus.launcher.ui.HomeDragController
 import kotlin.math.abs
 
@@ -45,12 +45,12 @@ import kotlin.math.abs
  */
 @Composable
 internal fun Modifier.pixelHomeSwipe(
-    swipeUpAction: String,
-    swipeDownAction: String,
+    swipeUpAction: HomeGesture,
+    swipeDownAction: HomeGesture,
     dragController: HomeDragController,
     onDrawerDrag: (Float) -> Unit,
     onDrawerSettle: (Float) -> Unit,
-    onAction: (String) -> Unit,
+    onAction: (HomeGesture) -> Unit,
     leftEdgeEnabled: Boolean = false,
     atLeftEdge: () -> Boolean = { false },
     onLeftEdgeAction: () -> Unit = {},
@@ -141,7 +141,7 @@ internal fun Modifier.pixelHomeSwipe(
                                     swipedApp = iconApp
                                     mode = 5
                                     change.consume()
-                                } else if ((action == LauncherSettings.GESTURE_DRAWER || action == LauncherSettings.GESTURE_SEARCH) &&
+                                } else if ((action == HomeGesture.DRAWER || action == HomeGesture.SEARCH) &&
                                     down.position.y > size.height * 0.15f
                                 ) {
                                     mode = 1
@@ -154,7 +154,7 @@ internal fun Modifier.pixelHomeSwipe(
                             }
                             dy > 0f -> {
                                 val action = latestSwipeDownAction
-                                if (action != LauncherSettings.GESTURE_NONE) {
+                                if (action != HomeGesture.NONE) {
                                     mode = 3
                                     change.consume()
                                     latestOnAction(action)

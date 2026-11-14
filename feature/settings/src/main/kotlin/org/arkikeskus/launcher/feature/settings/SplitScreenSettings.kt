@@ -69,7 +69,11 @@ import org.arkikeskus.launcher.data.SplitDiagnostics
 import org.arkikeskus.launcher.data.SplitHistory
 import org.arkikeskus.launcher.data.SplitThree
 import org.arkikeskus.launcher.model.DropZones
+import org.arkikeskus.launcher.model.DividerLock
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PickerOpen
+import org.arkikeskus.launcher.model.PickerRecents
+import org.arkikeskus.launcher.model.PickerSort
 import org.arkikeskus.launcher.model.SplitPickerLook
 import kotlin.math.roundToInt
 import org.arkikeskus.launcher.model.catching
@@ -173,10 +177,10 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_split_divider_lock),
             options = listOf(
-                LauncherSettings.DIVIDER_LOCK_OFF to stringResource(R.string.settings_split_divider_lock_off),
-                LauncherSettings.DIVIDER_LOCK_TWO to stringResource(R.string.settings_split_divider_lock_two),
-                LauncherSettings.DIVIDER_LOCK_THREE to stringResource(R.string.settings_split_divider_lock_three),
-                LauncherSettings.DIVIDER_LOCK_ALL to stringResource(R.string.settings_split_divider_lock_all),
+                DividerLock.OFF to stringResource(R.string.settings_split_divider_lock_off),
+                DividerLock.TWO to stringResource(R.string.settings_split_divider_lock_two),
+                DividerLock.THREE to stringResource(R.string.settings_split_divider_lock_three),
+                DividerLock.ALL to stringResource(R.string.settings_split_divider_lock_all),
             ),
             selected = s.recents.dividerLock,
             onSelect = viewModel::setSplitDividerLock,
@@ -283,17 +287,17 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_split_picker_recents),
             options = listOf(
-                SplitPickerLook.RECENTS_OFF to stringResource(R.string.settings_split_picker_recents_off),
-                SplitPickerLook.RECENTS_ICONS to stringResource(R.string.settings_split_picker_recents_icons),
-                SplitPickerLook.RECENTS_PREVIEWS to stringResource(R.string.settings_split_picker_recents_previews),
+                PickerRecents.OFF to stringResource(R.string.settings_split_picker_recents_off),
+                PickerRecents.ICONS to stringResource(R.string.settings_split_picker_recents_icons),
+                PickerRecents.PREVIEWS to stringResource(R.string.settings_split_picker_recents_previews),
             ),
             selected = look.recents,
             onSelect = viewModel::setSplitPickerRecents,
         )
-        if (look.recents == SplitPickerLook.RECENTS_PREVIEWS) {
+        if (look.recents == PickerRecents.PREVIEWS) {
             Hint(stringResource(R.string.settings_split_picker_recents_previews_desc))
         }
-        if (look.recents != SplitPickerLook.RECENTS_OFF) {
+        if (look.recents != PickerRecents.OFF) {
             ExpressiveRowDivider()
             ExpressiveStepperRow(
                 title = stringResource(R.string.settings_split_picker_recents_count),
@@ -347,8 +351,8 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_split_picker_sort),
             options = listOf(
-                SplitPickerLook.SORT_NAME to stringResource(R.string.settings_split_picker_sort_name),
-                SplitPickerLook.SORT_USAGE to stringResource(R.string.settings_split_picker_sort_usage),
+                PickerSort.NAME to stringResource(R.string.settings_split_picker_sort_name),
+                PickerSort.USAGE to stringResource(R.string.settings_split_picker_sort_usage),
             ),
             selected = look.sort,
             onSelect = viewModel::setSplitPickerSort,
@@ -366,9 +370,9 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_split_picker_open_anim),
             options = listOf(
-                SplitPickerLook.OPEN_ZOOM to stringResource(R.string.settings_split_picker_open_zoom),
-                SplitPickerLook.OPEN_FADE to stringResource(R.string.settings_split_picker_open_fade),
-                SplitPickerLook.OPEN_NONE to stringResource(R.string.settings_split_picker_open_none),
+                PickerOpen.ZOOM to stringResource(R.string.settings_split_picker_open_zoom),
+                PickerOpen.FADE to stringResource(R.string.settings_split_picker_open_fade),
+                PickerOpen.NONE to stringResource(R.string.settings_split_picker_open_none),
             ),
             selected = look.openAnim,
             onSelect = viewModel::setSplitPickerOpenAnim,
@@ -376,8 +380,8 @@ internal fun SplitScreenSection(s: LauncherSettings, viewModel: SettingsViewMode
         Hint(
             stringResource(
                 when (look.openAnim) {
-                    SplitPickerLook.OPEN_FADE -> R.string.settings_split_picker_open_fade_desc
-                    SplitPickerLook.OPEN_NONE -> R.string.settings_split_picker_open_none_desc
+                    PickerOpen.FADE -> R.string.settings_split_picker_open_fade_desc
+                    PickerOpen.NONE -> R.string.settings_split_picker_open_none_desc
                     else -> R.string.settings_split_picker_open_zoom_desc
                 },
             ),
@@ -635,10 +639,10 @@ private fun PickerMock(look: SplitPickerLook, accent: Color, modifier: Modifier,
     var box by remember { mutableStateOf(Rect.Zero) }
     var tile by remember { mutableStateOf<Rect?>(null) }
     val p = remember { Animatable(0f) }
-    val anim = if (ValueAnimator.areAnimatorsEnabled()) look.openAnim else SplitPickerLook.OPEN_NONE
+    val anim = if (ValueAnimator.areAnimatorsEnabled()) look.openAnim else PickerOpen.NONE
     LaunchedEffect(anim) {
         p.snapTo(0f)
-        if (anim == SplitPickerLook.OPEN_NONE) return@LaunchedEffect
+        if (anim == PickerOpen.NONE) return@LaunchedEffect
         while (true) {
             // Only while it can be seen (E28).
             if (visible != null) org.arkikeskus.launcher.ui.component.awaitOnScreen(visible)
@@ -648,7 +652,7 @@ private fun PickerMock(look: SplitPickerLook, accent: Color, modifier: Modifier,
             p.animateTo(0f, tween(PREVIEW_RESET_MS))
         }
     }
-    val zoom = anim == SplitPickerLook.OPEN_ZOOM
+    val zoom = anim == PickerOpen.ZOOM
     Box(
         modifier
             .clip(RoundedCornerShape(16.dp))
@@ -676,8 +680,8 @@ private fun PickerMock(look: SplitPickerLook, accent: Color, modifier: Modifier,
                     repeat(3) { i -> Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(mockColor(from + i))) }
                 }
             }
-            if (look.recents != SplitPickerLook.RECENTS_OFF) {
-                val previews = look.recents == SplitPickerLook.RECENTS_PREVIEWS
+            if (look.recents != PickerRecents.OFF) {
+                val previews = look.recents == PickerRecents.PREVIEWS
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally)) {
                     repeat(look.recentsCount.coerceAtMost(if (previews) 4 else 5)) { i ->
                         if (previews) {

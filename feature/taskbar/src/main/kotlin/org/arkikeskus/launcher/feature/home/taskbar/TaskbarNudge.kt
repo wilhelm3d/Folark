@@ -11,7 +11,7 @@ import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.view.View
 import android.view.animation.LinearInterpolator
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.NudgeEffect
 import org.arkikeskus.launcher.ui.component.IconNudge
 import org.arkikeskus.launcher.ui.component.NudgeFrame
 
@@ -19,7 +19,7 @@ import org.arkikeskus.launcher.ui.component.NudgeFrame
  * Plays a notification nudge on a taskbar icon: the same movement and ring as on home
  * ([IconNudge]), with the view's own transform and a ring drawn in its overlay.
  */
-internal fun playTaskbarNudge(view: View, effect: String, color: Int, softness: Float) {
+internal fun playTaskbarNudge(view: View, effect: NudgeEffect, color: Int, softness: Float) {
     running.remove(view)?.cancel()
     val frame = NudgeFrame()
     val ring = NudgeRing(color)
@@ -28,7 +28,7 @@ internal fun playTaskbarNudge(view: View, effect: String, color: Int, softness: 
     val ownFilter = image?.colorFilter
     view.overlay.add(ring)
     view.pivotX = view.width / 2f
-    view.pivotY = if (effect == LauncherSettings.NUDGE_BOUNCE) view.height.toFloat() else view.height / 2f
+    view.pivotY = if (effect == NudgeEffect.BOUNCE) view.height.toFloat() else view.height / 2f
     val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = IconNudge.DURATION_MS.toLong()
         interpolator = LinearInterpolator()
@@ -40,7 +40,7 @@ internal fun playTaskbarNudge(view: View, effect: String, color: Int, softness: 
             view.scaleY = frame.scaleY
             view.rotation = frame.rotation
             ring.update(frame, view.width, view.height)
-            if (image != null && effect == LauncherSettings.NUDGE_TINT) {
+            if (image != null && effect == NudgeEffect.TINT) {
                 image.colorFilter = if (frame.tintAlpha > 0f) {
                     android.graphics.PorterDuffColorFilter(
                         android.graphics.Color.argb(
@@ -57,7 +57,7 @@ internal fun playTaskbarNudge(view: View, effect: String, color: Int, softness: 
                 view.translationX = 0f; view.translationY = 0f
                 view.scaleX = 1f; view.scaleY = 1f; view.rotation = 0f
                 view.overlay.remove(ring)
-                if (image != null && effect == LauncherSettings.NUDGE_TINT) image.colorFilter = ownFilter
+                if (image != null && effect == NudgeEffect.TINT) image.colorFilter = ownFilter
             }
             override fun onAnimationEnd(animation: android.animation.Animator) = done()
             override fun onAnimationCancel(animation: android.animation.Animator) = done()

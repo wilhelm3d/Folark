@@ -19,11 +19,11 @@ fun LauncherSettings.withLiquidGlass(): LauncherSettings {
             glassBlurRadius = lerp(12f, 50f),
             glassDarkTint = lerp(0.6f, 0.18f),
         ),
-        folders = folders.copy(theme = LauncherSettings.FOLDER_THEME_GLASS),
-        appearance = appearance.copy(popupTheme = LauncherSettings.POPUP_THEME_GLASS),
+        folders = folders.copy(theme = FolderTheme.GLASS),
+        appearance = appearance.copy(popupTheme = PopupTheme.GLASS),
         widgets = widgets.copy(clockGlassEffect = true),
         taskbar = taskbar.copy(
-            theme = LauncherSettings.TASKBAR_THEME_GLASS,
+            theme = TaskbarTheme.GLASS,
             opacity = lerp(0.95f, 0.45f),
         ),
         recents = recents.copy(

@@ -22,10 +22,9 @@ data class RootSettings(
 
 /**
  * How a system action (locking, Android's Recents key, the notification shade) is done, as
- * Settings ▸ Root says for it. [stored] is the value kept in the settings store (and in backups),
- * the same text the settings always used.
+ * Settings ▸ Root says for it.
  */
-enum class RootMode(val stored: String) {
+enum class RootMode(override val stored: String) : StoredChoice {
     /** Android's way only. */
     OFF("off"),
 
@@ -34,10 +33,4 @@ enum class RootMode(val stored: String) {
 
     /** Root, and Android's way when root isn't there. */
     ALWAYS("always"),
-    ;
-
-    companion object {
-        /** The mode stored as [value]; anything else (nothing stored, an old or garbled value) is [FALLBACK]. */
-        fun from(value: String?): RootMode = entries.firstOrNull { it.stored == value } ?: FALLBACK
-    }
 }

@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.BatterySaverMode
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.BadgeStyle
@@ -308,7 +309,7 @@ private fun IconsPreview(s: LauncherSettings) {
 @Composable
 private fun MotionPreview(s: LauncherSettings) {
     val speed = s.motion.animationSpeed.coerceIn(0.25f, 4f)
-    val saver = s.motion.batterySaverMode == LauncherSettings.BATTERY_SAVER_ON
+    val saver = s.motion.batterySaverMode == BatterySaverMode.ON
     val cycle = (2600 / speed).roundToInt().coerceAtLeast(600)
     val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
     val transition = rememberInfiniteTransition(label = "motion")

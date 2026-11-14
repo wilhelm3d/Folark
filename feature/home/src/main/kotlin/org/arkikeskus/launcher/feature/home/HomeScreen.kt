@@ -42,7 +42,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.HomeGesture
+import org.arkikeskus.launcher.model.IconSwipe
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.catching
 import org.arkikeskus.launcher.ui.AppActions
@@ -180,7 +181,7 @@ fun HomeScreen(
     val badgeShowCount = settings.dots.showCount
     val badgeScale = settings.dots.scale
 
-    fun executeAction(action: String) =
+    fun executeAction(action: HomeGesture) =
         runHomeGesture(context, action, settings.recents.enabled, onOpenDrawer, widgets.message)
 
     // Half folded (and the setting on): where the hinge is decides the layout, see HalfFold.kt.
@@ -212,8 +213,8 @@ fun HomeScreen(
                 // vertical swipe before the intro overlay could swallow it.
                 // Edit home pauses them too: there an icon moves as soon as it is dragged, so a
                 // swipe that starts on one must not open the drawer or the shade instead.
-                swipeUpAction = if (showOnboarding || homeEdit.editing) LauncherSettings.GESTURE_NONE else settings.home.swipeUpAction,
-                swipeDownAction = if (showOnboarding || homeEdit.editing) LauncherSettings.GESTURE_NONE else settings.home.swipeDownAction,
+                swipeUpAction = if (showOnboarding || homeEdit.editing) HomeGesture.NONE else settings.home.swipeUpAction,
+                swipeDownAction = if (showOnboarding || homeEdit.editing) HomeGesture.NONE else settings.home.swipeDownAction,
                 dragController = dragController,
                 onDrawerDrag = onDrawerDrag,
                 onDrawerSettle = onDrawerSettle,
@@ -230,18 +231,18 @@ fun HomeScreen(
                 },
                 onRightEdgeAction = viewModel::onRightSwipe,
                 // Swipe up on an app icon (Settings ▸ Gestures): instead of opening the drawer.
-                iconSwipeEnabled = settings.home.iconSwipeUpAction != LauncherSettings.ICON_SWIPE_NONE &&
+                iconSwipeEnabled = settings.home.iconSwipeUpAction != IconSwipe.NONE &&
                     !settings.home.desktopLocked && !showOnboarding && !homeEdit.editing,
                 onIconSwipe = { app, at ->
                     when (settings.home.iconSwipeUpAction) {
-                        LauncherSettings.ICON_SWIPE_MENU -> {
+                        IconSwipe.MENU -> {
                             menuTarget = AppMenuTarget(
                                 app, IntOffset(at.x.roundToInt(), at.y.roundToInt()), DragSource.Home,
                                 at.y > windowHeightPx / 2,
                             )
                         }
-                        LauncherSettings.ICON_SWIPE_FLOATING -> viewModel.launchFloating(app)
-                        LauncherSettings.ICON_SWIPE_SPLIT -> {
+                        IconSwipe.FLOATING -> viewModel.launchFloating(app)
+                        IconSwipe.SPLIT -> {
                             dragController.splitRequest = app
                         }
                         else -> Unit
@@ -294,7 +295,7 @@ fun HomeScreen(
                 onEmptyAreaMenu = { anchor, above -> homeOptions = anchor to above },
                 onEmptyAreaDoubleTap = {
                     val action = settings.home.doubleTapAction
-                    if (action != LauncherSettings.GESTURE_NONE) {
+                    if (action != HomeGesture.NONE) {
                         executeAction(action)
                     }
                 },

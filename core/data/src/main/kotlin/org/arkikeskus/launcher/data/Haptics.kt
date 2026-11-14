@@ -8,7 +8,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.View
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.HapticsStrength
 import org.arkikeskus.launcher.model.catching
 
 /**
@@ -65,8 +65,8 @@ object Haptics {
         val vibrator = vibrator(context) ?: return
         if (!vibrator.hasVibrator()) return
         val scale = when (settings.hapticsStrength) {
-            LauncherSettings.HAPTICS_LIGHT -> 0.45f
-            LauncherSettings.HAPTICS_STRONG -> 1f
+            HapticsStrength.LIGHT -> 0.45f
+            HapticsStrength.STRONG -> 1f
             else -> 0.72f
         }
         val effect = composition(vibrator, event, scale) ?: fallback(event)
@@ -84,7 +84,7 @@ object Haptics {
     fun play(view: View, event: Event) = play(view.context, event)
 
     /** A sample of [event] at the chosen strength, for the settings page (ignores the per-event switches). */
-    fun preview(context: Context, event: Event, strength: String) {
+    fun preview(context: Context, event: Event, strength: HapticsStrength) {
         val before = settings
         settings = before.copy(hapticsEnabled = true, hapticsLaunch = true, hapticsSplit = true, hapticsClose = true, hapticsRecents = true, hapticsDrag = true, hapticsStrength = strength)
         try {

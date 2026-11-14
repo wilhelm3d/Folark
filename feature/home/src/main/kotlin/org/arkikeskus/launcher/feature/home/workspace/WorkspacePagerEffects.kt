@@ -22,7 +22,7 @@ import org.arkikeskus.launcher.feature.home.PlacedFolder
 import org.arkikeskus.launcher.feature.home.PlacedShortcut
 import org.arkikeskus.launcher.feature.home.ShortcutIconContent
 import org.arkikeskus.launcher.feature.home.widgets.WidgetDragController
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.MinusOne
 import org.arkikeskus.launcher.model.catching
 
 // What the pager does on its own, apart from the cells: pages returning from the spare one, resting
@@ -88,9 +88,10 @@ internal fun pageOverscrollPx(pagerState: PagerState, enabled: Boolean): Float {
 }
 
 /** Pulling the first page far enough opens the screen to the left of home (Settings ▸ Home ▸ minus-one screen). */
-internal fun openMinusOneScreen(context: Context, minusOneScreen: String) {
+internal fun openMinusOneScreen(context: Context, minusOneScreen: MinusOne) {
     when (minusOneScreen) {
-        LauncherSettings.MINUS_ONE_GOOGLE -> {
+        MinusOne.NONE -> {}
+        MinusOne.GOOGLE -> {
             catching {
                 context.startActivity(
                     Intent("com.google.android.googlequicksearchbox.TEXT_ASSIST")
@@ -99,7 +100,7 @@ internal fun openMinusOneScreen(context: Context, minusOneScreen: String) {
                 )
             }
         }
-        LauncherSettings.MINUS_ONE_SMART_FEED -> {
+        MinusOne.SMART_FEED -> {
             catching {
                 context.startActivity(
                     Intent("com.motorola.smartfeed.action.START")

@@ -26,7 +26,7 @@ data class LiveActivity(
     /** A ticking time: the clock time it counts from (or to, when [countDown]); 0 = none. */
     val chronometerBase: Long,
     val countDown: Boolean,
-    /** Progress 0..1, or null when it has none; [indeterminate] for a busy bar without an end. */
+    /** Progress 0..1, or null when it has none; [indeterminate] when it is busy with no known end. */
     val progress: Float?,
     val indeterminate: Boolean,
     val category: String?,

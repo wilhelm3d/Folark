@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.SplitApp
 import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.TaskbarSplitSide
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.SUGGEST_MS
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.UNDO_ABOVE_BAR_DP
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.UNDO_MS
@@ -34,7 +34,7 @@ internal fun AppTaskbar.launchApp(app: AppItem) {
  * most recent app goes beside it. When no split can be made the app just opens, with a note on
  * where to set split screen up.
  */
-internal fun AppTaskbar.openSplit(app: AppItem, right: Boolean = setup?.splitSide != LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT, peek: Boolean = false) {
+internal fun AppTaskbar.openSplit(app: AppItem, right: Boolean = setup?.splitSide != TaskbarSplitSide.LEFT, peek: Boolean = false) {
     val coordinator = split ?: return launchApp(app)
     val partner = if (homeVisible) recents.firstOrNull { it.key != app.key } else null
     if (homeVisible && partner == null) {

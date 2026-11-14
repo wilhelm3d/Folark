@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.R
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsTheme
 
 // What Recents shows around the cards (split out of RecentsScreen.kt): picking apps for a split
 // view, the header with its buttons, the cards in the chosen theme, and the bar while picking.
@@ -233,16 +234,16 @@ internal fun RecentsCardsArea(
                 color = Muted, fontSize = 16.sp, modifier = Modifier.align(Alignment.Center),
             )
             else -> when (settings.recents.theme) {
-                LauncherSettings.RECENTS_THEME_IPAD -> IpadTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_CAROUSEL -> CarouselTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_DECK -> DeckTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_COMPACT -> CompactTheme(state.cards, env, if (wide) settings.recents.columnsInner.coerceAtMost(3) else 1)
-                LauncherSettings.RECENTS_THEME_SWITCHER -> SwitcherTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_STACK -> StackTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_ARC -> ArcTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_PORTRAIT -> PortraitTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_SPOTLIGHT -> SpotlightTheme(state.cards, env)
-                LauncherSettings.RECENTS_THEME_GALLERY -> GalleryTheme(state.cards, env)
+                RecentsTheme.IPAD -> IpadTheme(state.cards, env)
+                RecentsTheme.CAROUSEL -> CarouselTheme(state.cards, env)
+                RecentsTheme.DECK -> DeckTheme(state.cards, env)
+                RecentsTheme.COMPACT -> CompactTheme(state.cards, env, if (wide) settings.recents.columnsInner.coerceAtMost(3) else 1)
+                RecentsTheme.SWITCHER -> SwitcherTheme(state.cards, env)
+                RecentsTheme.STACK -> StackTheme(state.cards, env)
+                RecentsTheme.ARC -> ArcTheme(state.cards, env)
+                RecentsTheme.PORTRAIT -> PortraitTheme(state.cards, env)
+                RecentsTheme.SPOTLIGHT -> SpotlightTheme(state.cards, env)
+                RecentsTheme.GALLERY -> GalleryTheme(state.cards, env)
                 else -> FolarkTheme(state.cards, env, if (wide) settings.recents.columnsInner else settings.recents.columnsOuter)
             }
         }
@@ -251,13 +252,13 @@ internal fun RecentsCardsArea(
 
 /** Themes whose cards scroll sideways and so run to the screen's edges. */
 private val EDGE_TO_EDGE_THEMES = setOf(
-    LauncherSettings.RECENTS_THEME_IPAD,
-    LauncherSettings.RECENTS_THEME_CAROUSEL,
-    LauncherSettings.RECENTS_THEME_DECK,
-    LauncherSettings.RECENTS_THEME_ARC,
-    LauncherSettings.RECENTS_THEME_PORTRAIT,
-    LauncherSettings.RECENTS_THEME_SPOTLIGHT,
-    LauncherSettings.RECENTS_THEME_GALLERY,
+    RecentsTheme.IPAD,
+    RecentsTheme.CAROUSEL,
+    RecentsTheme.DECK,
+    RecentsTheme.ARC,
+    RecentsTheme.PORTRAIT,
+    RecentsTheme.SPOTLIGHT,
+    RecentsTheme.GALLERY,
 )
 
 /**

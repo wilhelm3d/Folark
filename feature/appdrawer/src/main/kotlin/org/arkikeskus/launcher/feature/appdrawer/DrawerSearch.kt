@@ -28,6 +28,7 @@ import org.arkikeskus.launcher.ui.drawer.DrawerStyleSpec
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.ExpressiveCard
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
+import org.arkikeskus.launcher.model.SearchEngine
 import org.arkikeskus.launcher.model.catching
 
 // The drawer's search field and its result rows (calculator, contacts, web search) (split out of AppDrawerScreen.kt).
@@ -103,7 +104,7 @@ private const val GEMINI_SEARCH_URL = "https://www.google.com/search?udm=50&q="
 internal fun launchWebSearch(
     context: android.content.Context,
     query: String,
-    engine: String = org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_SYSTEM,
+    engine: SearchEngine = SearchEngine.SYSTEM,
 ) {
     if (query.isBlank()) return
     webSearchUrl(engine, query)?.let { url ->
@@ -143,13 +144,13 @@ internal fun launchWebSearch(
 }
 
 /** The results page of a named engine; null for Android's own search (handled by an intent). */
-internal fun webSearchUrl(engine: String, query: String): String? {
+internal fun webSearchUrl(engine: SearchEngine, query: String): String? {
     val q = android.net.Uri.encode(query)
     return when (engine) {
-        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_GOOGLE -> "https://www.google.com/search?q=$q"
-        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_DUCKDUCKGO -> "https://duckduckgo.com/?q=$q"
-        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_BING -> "https://www.bing.com/search?q=$q"
-        org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_STARTPAGE -> "https://www.startpage.com/sp/search?query=$q"
+        SearchEngine.GOOGLE -> "https://www.google.com/search?q=$q"
+        SearchEngine.DUCKDUCKGO -> "https://duckduckgo.com/?q=$q"
+        SearchEngine.BING -> "https://www.bing.com/search?q=$q"
+        SearchEngine.STARTPAGE -> "https://www.startpage.com/sp/search?query=$q"
         else -> null
     }
 }

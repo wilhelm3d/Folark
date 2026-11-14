@@ -28,6 +28,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PressEffect
+import org.arkikeskus.launcher.model.RecentsEnter
+import org.arkikeskus.launcher.model.RecentsSelect
 import org.arkikeskus.launcher.ui.component.recentsEnter
 import org.arkikeskus.launcher.ui.component.recentsSelect
 import org.arkikeskus.launcher.ui.component.pressClick
@@ -35,26 +38,26 @@ import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 
 private val ENTER_LABELS = listOf(
-    LauncherSettings.RECENTS_ENTER_RISE to R.string.settings_recents_enter_rise,
-    LauncherSettings.RECENTS_ENTER_ZOOM to R.string.settings_recents_enter_zoom,
-    LauncherSettings.RECENTS_ENTER_CASCADE to R.string.settings_recents_enter_cascade,
-    LauncherSettings.RECENTS_ENTER_FLIP to R.string.settings_recents_enter_flip,
-    LauncherSettings.RECENTS_ENTER_FAN to R.string.settings_recents_enter_fan,
-    LauncherSettings.RECENTS_ENTER_FOCUS to R.string.settings_recents_enter_focus,
-    LauncherSettings.RECENTS_ENTER_WAVE to R.string.settings_recents_enter_wave,
-    LauncherSettings.RECENTS_ENTER_SWING to R.string.settings_recents_enter_swing,
-    LauncherSettings.RECENTS_ENTER_DROP to R.string.settings_recents_enter_drop,
-    LauncherSettings.RECENTS_ENTER_NONE to R.string.settings_recents_anim_none,
+    RecentsEnter.RISE to R.string.settings_recents_enter_rise,
+    RecentsEnter.ZOOM to R.string.settings_recents_enter_zoom,
+    RecentsEnter.CASCADE to R.string.settings_recents_enter_cascade,
+    RecentsEnter.FLIP to R.string.settings_recents_enter_flip,
+    RecentsEnter.FAN to R.string.settings_recents_enter_fan,
+    RecentsEnter.FOCUS to R.string.settings_recents_enter_focus,
+    RecentsEnter.WAVE to R.string.settings_recents_enter_wave,
+    RecentsEnter.SWING to R.string.settings_recents_enter_swing,
+    RecentsEnter.DROP to R.string.settings_recents_enter_drop,
+    RecentsEnter.NONE to R.string.settings_recents_anim_none,
 )
 
 private val SELECT_LABELS = listOf(
-    LauncherSettings.RECENTS_SELECT_POP to R.string.settings_recents_select_pop,
-    LauncherSettings.RECENTS_SELECT_RING to R.string.settings_recents_select_ring,
-    LauncherSettings.RECENTS_SELECT_LIFT to R.string.settings_recents_select_lift,
-    LauncherSettings.RECENTS_SELECT_TILT to R.string.settings_recents_select_tilt,
-    LauncherSettings.RECENTS_SELECT_GLOW to R.string.settings_recents_select_glow,
-    LauncherSettings.RECENTS_SELECT_JIGGLE to R.string.settings_recents_select_jiggle,
-    LauncherSettings.RECENTS_SELECT_NONE to R.string.settings_recents_anim_none,
+    RecentsSelect.POP to R.string.settings_recents_select_pop,
+    RecentsSelect.RING to R.string.settings_recents_select_ring,
+    RecentsSelect.LIFT to R.string.settings_recents_select_lift,
+    RecentsSelect.TILT to R.string.settings_recents_select_tilt,
+    RecentsSelect.GLOW to R.string.settings_recents_select_glow,
+    RecentsSelect.JIGGLE to R.string.settings_recents_select_jiggle,
+    RecentsSelect.NONE to R.string.settings_recents_anim_none,
 )
 
 /**
@@ -112,18 +115,18 @@ internal fun RecentsMotionRows(s: LauncherSettings, viewModel: SettingsViewModel
 }
 
 private val PRESS_LABELS = listOf(
-    LauncherSettings.PRESS_SHRINK to R.string.settings_recents_press_shrink,
-    LauncherSettings.PRESS_BOUNCE to R.string.settings_recents_press_bounce,
-    LauncherSettings.PRESS_GLOW to R.string.settings_recents_press_glow,
-    LauncherSettings.PRESS_RIPPLE to R.string.settings_recents_press_ripple,
-    LauncherSettings.PRESS_TILT to R.string.settings_recents_press_tilt,
-    LauncherSettings.PRESS_JELLY to R.string.settings_recents_press_jelly,
-    LauncherSettings.PRESS_NONE to R.string.settings_recents_anim_none,
+    PressEffect.SHRINK to R.string.settings_recents_press_shrink,
+    PressEffect.BOUNCE to R.string.settings_recents_press_bounce,
+    PressEffect.GLOW to R.string.settings_recents_press_glow,
+    PressEffect.RIPPLE to R.string.settings_recents_press_ripple,
+    PressEffect.TILT to R.string.settings_recents_press_tilt,
+    PressEffect.JELLY to R.string.settings_recents_press_jelly,
+    PressEffect.NONE to R.string.settings_recents_anim_none,
 )
 
 /** Three buttons to press, answering with the chosen effect. */
 @Composable
-internal fun PressPreview(effect: String, speed: Float) {
+internal fun PressPreview(effect: PressEffect, speed: Float) {
     val accent = LocalAccent.current
     val palette = LocalExpressivePalette.current
     androidx.compose.runtime.CompositionLocalProvider(
@@ -151,7 +154,7 @@ internal fun PressPreview(effect: String, speed: Float) {
 }
 
 @Composable
-internal fun RecentsMotionPreview(enter: String, select: String, speed: Float) {
+internal fun RecentsMotionPreview(enter: RecentsEnter, select: RecentsSelect, speed: Float) {
     val palette = LocalExpressivePalette.current
     val accent = LocalAccent.current
     var play by remember { mutableIntStateOf(0) }

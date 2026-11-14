@@ -49,7 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.AzPosition
+import org.arkikeskus.launcher.model.DrawerAlignment
 import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalIconSizeScale
@@ -155,14 +156,14 @@ internal fun drawerPanelShape(
     styleCorner: Dp,
     heightFraction: Float,
     widthFraction: Float,
-    alignment: String,
+    alignment: DrawerAlignment,
 ): RoundedCornerShape {
     val customCorner = cornerRadius >= 0
     val corner = if (customCorner) cornerRadius.dp else styleCorner
     return when {
         !sidebar && !customCorner && heightFraction >= 1.0f && widthFraction >= 1.0f -> RoundedCornerShape(0.dp)
         !sidebar -> RoundedCornerShape(topStart = corner, topEnd = corner)
-        alignment == LauncherSettings.DRAWER_ALIGNMENT_LEFT -> RoundedCornerShape(topEnd = corner, bottomEnd = corner)
+        alignment == DrawerAlignment.LEFT -> RoundedCornerShape(topEnd = corner, bottomEnd = corner)
         else -> RoundedCornerShape(topStart = corner, bottomStart = corner)
     }
 }
@@ -249,7 +250,7 @@ internal fun Modifier.swipeToChangeTab(
     enabled: Boolean,
     tabs: List<Pair<Long, String>>,
     searching: Boolean,
-    azIndexPosition: String,
+    azIndexPosition: AzPosition,
     indexStrip: Dp,
     dragController: HomeDragController,
     selectedTab: () -> Long?,
@@ -260,8 +261,8 @@ internal fun Modifier.swipeToChangeTab(
     val stripPx = indexStrip.toPx()
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        val onBar = (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM && down.position.y > size.height - stripPx) ||
-            (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_TOP && down.position.y < stripPx)
+        val onBar = (azIndexPosition == AzPosition.HORIZONTAL_BOTTOM && down.position.y > size.height - stripPx) ||
+            (azIndexPosition == AzPosition.HORIZONTAL_TOP && down.position.y < stripPx)
         var total = Offset.Zero
         var claimed = false
         while (true) {
@@ -324,7 +325,7 @@ internal fun letterScrollTarget(
  */
 @Composable
 internal fun BoxScope.DrawerIndexOverlay(
-    position: String,
+    position: AzPosition,
     scale: Float,
     apps: List<AppItem>,
     letterRuns: List<Pair<Char?, List<AppItem>>>,
@@ -339,9 +340,9 @@ internal fun BoxScope.DrawerIndexOverlay(
     // The letter under the finger on the A-Z bar, shown large in the middle of the list.
     var activeLetter by remember { mutableStateOf<Char?>(null) }
     val alignModifier = when (position) {
-        LauncherSettings.AZ_POSITION_VERTICAL_LEFT -> Modifier.align(Alignment.CenterStart)
-        LauncherSettings.AZ_POSITION_HORIZONTAL_TOP -> Modifier.align(Alignment.TopCenter)
-        LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM -> Modifier.align(Alignment.BottomCenter)
+        AzPosition.VERTICAL_LEFT -> Modifier.align(Alignment.CenterStart)
+        AzPosition.HORIZONTAL_TOP -> Modifier.align(Alignment.TopCenter)
+        AzPosition.HORIZONTAL_BOTTOM -> Modifier.align(Alignment.BottomCenter)
         else -> Modifier.align(Alignment.CenterEnd)
     }
     DrawerIndexBar(

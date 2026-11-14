@@ -30,8 +30,17 @@ import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.data.search.SearchAggregator
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.AzPosition
+import org.arkikeskus.launcher.model.DrawerAlignment
+import org.arkikeskus.launcher.model.DrawerHandle
+import org.arkikeskus.launcher.model.DrawerLayout
+import org.arkikeskus.launcher.model.DrawerStyle
+import org.arkikeskus.launcher.model.DrawerTheme
+import org.arkikeskus.launcher.model.IconShape
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.SearchEngine
+import org.arkikeskus.launcher.model.SearchPosition
 import org.arkikeskus.launcher.model.SearchResult
 import org.arkikeskus.launcher.model.SearchResults
 import javax.inject.Inject
@@ -65,7 +74,7 @@ data class AppDrawerUiState(
     val notificationDotScale: Float = 1f,
     val useThemedIcons: Boolean = false,
     val iconPackPackage: String = "",
-    val iconShape: String = "",
+    val iconShape: IconShape = IconShape.SYSTEM,
     val calc: SearchResult.Calculation? = null,
     val settingResults: List<SearchResult.Setting> = emptyList(),
     val contactResults: List<SearchResult.Contact> = emptyList(),
@@ -90,7 +99,7 @@ data class AppDrawerUiState(
     val actionResults: List<SearchResult.Action> = emptyList(),
     val searchWeb: Boolean = true,
     /** Which engine the web row opens (Settings ▸ Search ▸ Web search engine). */
-    val searchWebEngine: String = LauncherSettings.SEARCH_ENGINE_SYSTEM,
+    val searchWebEngine: SearchEngine = SearchEngine.SYSTEM,
     /** Apps hidden from the list (shown under "Hidden apps" at its end), and whether that needs the fingerprint. */
     val hiddenApps: List<AppItem> = emptyList(),
     val hiddenLock: Boolean = false,
@@ -110,12 +119,12 @@ data class AppDrawerUiState(
     /** Labels may wrap onto a second line (Settings ▸ App drawer ▸ Two-line labels). */
     val twoLineLabels: Boolean = true,
     val drawerOpensAtTop: Boolean = true,
-    val drawerSearchPosition: String = LauncherSettings.SEARCH_TOP,
+    val drawerSearchPosition: SearchPosition = SearchPosition.TOP,
     val drawerIndexBarEnabled: Boolean = true,
-    val azIndexPosition: String = LauncherSettings.AZ_POSITION_VERTICAL_RIGHT,
+    val azIndexPosition: AzPosition = AzPosition.VERTICAL_RIGHT,
     val azIndexScale: Float = 1f,
     val drawerCornerRadius: Int = LauncherSettings.DRAWER_CORNER_AUTO,
-    val drawerHandleStyle: String = LauncherSettings.DRAWER_HANDLE_BAR,
+    val drawerHandleStyle: DrawerHandle = DrawerHandle.BAR,
     val drawerBottomSpace: Int = 0,
     val drawerLetterHeaders: Boolean = false,
     val drawerLargeLetterPopup: Boolean = true,
@@ -125,16 +134,16 @@ data class AppDrawerUiState(
     val drawerScrimOpacity: Float = 0.5f,
     val glassBlurRadius: Float = 25f,
     val glassDarkTint: Float = 0.45f,
-    val drawerStyle: String = LauncherSettings.DRAWER_STYLE_STANDARD_GRID,
-    val drawerThemeTint: String = LauncherSettings.DRAWER_THEME_SYSTEM,
+    val drawerStyle: DrawerStyle = DrawerStyle.STANDARD_GRID,
+    val drawerThemeTint: DrawerTheme = DrawerTheme.SYSTEM,
     val drawerAccentColor: Int = LauncherSettings.DEFAULT_DRAWER_ACCENT,
     val drawerCustomColor: Int = LauncherSettings.DEFAULT_DRAWER_CUSTOM_COLOR,
     val drawerGlassEnabled: Boolean = false,
     val drawerPanelOpacity: Float = LauncherSettings.DEFAULT_DRAWER_PANEL_OPACITY,
     val drawerHeightFraction: Float = 1.0f,
     val drawerWidthFraction: Float = 1.0f,
-    val drawerAlignment: String = LauncherSettings.DRAWER_ALIGNMENT_CENTER,
-    val drawerLayoutMode: String = LauncherSettings.DRAWER_LAYOUT_GRID,
+    val drawerAlignment: DrawerAlignment = DrawerAlignment.CENTER,
+    val drawerLayoutMode: DrawerLayout = DrawerLayout.GRID,
     val dpiAppDrawer: Float = 1f,
     val innerSidebarAppDrawer: Boolean = false,
 )

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.LiveHingeStyle
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.liveHingeEffect
 import org.arkikeskus.launcher.ui.component.liveHingeTimedMs
@@ -118,7 +119,7 @@ internal fun LiveHingeRows(s: LauncherSettings, viewModel: SettingsViewModel, in
 
 /** The mini home screen opening with the chosen effect, as if the phone were unfolded slowly. */
 @Composable
-private fun LiveHingePreview(s: LauncherSettings, style: String, speed: Float, blurDp: Float, frost: Float) {
+private fun LiveHingePreview(s: LauncherSettings, style: LiveHingeStyle, speed: Float, blurDp: Float, frost: Float) {
     val palette = LocalExpressivePalette.current
     val opening = remember { Animatable(1f) }
     var plays by remember { mutableIntStateOf(0) }
@@ -154,14 +155,14 @@ private fun LiveHingePreview(s: LauncherSettings, style: String, speed: Float, b
 }
 
 private val LIVE_STYLES = listOf(
-    LauncherSettings.LIVE_HINGE_STYLE_PAGES to R.string.settings_live_hinge_style_pages,
-    LauncherSettings.LIVE_HINGE_STYLE_WATER to R.string.settings_live_hinge_style_water,
-    LauncherSettings.LIVE_HINGE_STYLE_INK to R.string.settings_live_hinge_style_ink,
-    LauncherSettings.LIVE_HINGE_STYLE_FADE to R.string.settings_live_hinge_style_fade,
-    LauncherSettings.LIVE_HINGE_STYLE_DROP to R.string.settings_live_hinge_style_drop,
-    LauncherSettings.LIVE_HINGE_STYLE_DOORS to R.string.settings_live_hinge_style_doors,
-    LauncherSettings.LIVE_HINGE_STYLE_PORTAL to R.string.settings_live_hinge_style_portal,
-    LauncherSettings.LIVE_HINGE_STYLE_ZOOM to R.string.settings_live_hinge_style_zoom,
+    LiveHingeStyle.PAGES to R.string.settings_live_hinge_style_pages,
+    LiveHingeStyle.WATER to R.string.settings_live_hinge_style_water,
+    LiveHingeStyle.INK to R.string.settings_live_hinge_style_ink,
+    LiveHingeStyle.FADE to R.string.settings_live_hinge_style_fade,
+    LiveHingeStyle.DROP to R.string.settings_live_hinge_style_drop,
+    LiveHingeStyle.DOORS to R.string.settings_live_hinge_style_doors,
+    LiveHingeStyle.PORTAL to R.string.settings_live_hinge_style_portal,
+    LiveHingeStyle.ZOOM to R.string.settings_live_hinge_style_zoom,
 )
 
 private const val PREVIEW_PAUSE_MS = 350L

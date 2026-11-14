@@ -59,7 +59,24 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.arkikeskus.launcher.model.AppOpenAnimation
+import org.arkikeskus.launcher.model.BatterySaverMode
+import org.arkikeskus.launcher.model.ClockMinuteColor
+import org.arkikeskus.launcher.model.ClockStyle
+import org.arkikeskus.launcher.model.DotColor
+import org.arkikeskus.launcher.model.DotPosition
+import org.arkikeskus.launcher.model.DotShape
+import org.arkikeskus.launcher.model.FolderAnimation
+import org.arkikeskus.launcher.model.FontChoice
+import org.arkikeskus.launcher.model.IconSwipe
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PageEffect
+import org.arkikeskus.launcher.model.PopupTheme
+import org.arkikeskus.launcher.model.SearchEngine
+import org.arkikeskus.launcher.model.SizeChoice
+import org.arkikeskus.launcher.model.StackIndicator
+import org.arkikeskus.launcher.model.ThemePreset
+import org.arkikeskus.launcher.model.WidgetTheme
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import org.arkikeskus.launcher.ui.component.LocalScreenType
@@ -89,10 +106,10 @@ internal fun ThemePresetsCard(
         subtitle = stringResource(R.string.settings_theme_presets_desc),
     ) {
         listOf(
-            Triple(LauncherSettings.THEME_PRESET_GLASS, R.string.settings_theme_preset_glass, R.string.settings_theme_preset_glass_desc),
-            Triple(LauncherSettings.THEME_PRESET_DARK, R.string.settings_theme_preset_dark, R.string.settings_theme_preset_dark_desc),
-            Triple(LauncherSettings.THEME_PRESET_LIGHT, R.string.settings_theme_preset_light, R.string.settings_theme_preset_light_desc),
-            Triple(LauncherSettings.THEME_PRESET_MONO, R.string.settings_theme_preset_mono, R.string.settings_theme_preset_mono_desc),
+            Triple(ThemePreset.GLASS, R.string.settings_theme_preset_glass, R.string.settings_theme_preset_glass_desc),
+            Triple(ThemePreset.DARK, R.string.settings_theme_preset_dark, R.string.settings_theme_preset_dark_desc),
+            Triple(ThemePreset.LIGHT, R.string.settings_theme_preset_light, R.string.settings_theme_preset_light_desc),
+            Triple(ThemePreset.MONO, R.string.settings_theme_preset_mono, R.string.settings_theme_preset_mono_desc),
         ).forEachIndexed { index, (preset, title, description) ->
             if (index > 0) ExpressiveRowDivider()
             ExpressiveActionItem(
@@ -123,11 +140,11 @@ internal fun MenusAndStacksCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_popup_theme),
             options = listOf(
-                LauncherSettings.POPUP_THEME_CLASSIC to stringResource(R.string.settings_popup_theme_classic),
-                LauncherSettings.POPUP_THEME_MATERIAL to stringResource(R.string.settings_popup_theme_material),
-                LauncherSettings.POPUP_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
-                LauncherSettings.POPUP_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
-                LauncherSettings.POPUP_THEME_GLASS to stringResource(R.string.settings_folder_theme_glass),
+                PopupTheme.CLASSIC to stringResource(R.string.settings_popup_theme_classic),
+                PopupTheme.MATERIAL to stringResource(R.string.settings_popup_theme_material),
+                PopupTheme.DARK to stringResource(R.string.settings_folder_theme_dark),
+                PopupTheme.LIGHT to stringResource(R.string.settings_folder_theme_light),
+                PopupTheme.GLASS to stringResource(R.string.settings_folder_theme_glass),
             ),
             selected = s.appearance.popupTheme,
             onSelect = { viewModel.setPopupTheme(it, screenType) },
@@ -158,9 +175,9 @@ internal fun MenusAndStacksCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_stack_indicator),
             options = listOf(
-                LauncherSettings.STACK_INDICATOR_DOTS to stringResource(R.string.settings_stack_indicator_dots),
-                LauncherSettings.STACK_INDICATOR_BAR to stringResource(R.string.settings_stack_indicator_bar),
-                LauncherSettings.STACK_INDICATOR_NONE to stringResource(R.string.settings_stack_indicator_none),
+                StackIndicator.DOTS to stringResource(R.string.settings_stack_indicator_dots),
+                StackIndicator.BAR to stringResource(R.string.settings_stack_indicator_bar),
+                StackIndicator.NONE to stringResource(R.string.settings_stack_indicator_none),
             ),
             selected = s.widgets.stackIndicator,
             onSelect = { viewModel.setStackIndicator(it, screenType) },
@@ -321,29 +338,29 @@ internal fun TypographySection(
     screenType: ScreenType = LocalScreenType.current,
 ) {
     // Which fonts this phone can show (the Motorola ones are files on the phone), checked once.
-    val phoneFonts = remember { LauncherSettings.FONT_FAMILIES.associateWith { LauncherFontFamily.isAvailable(it) } }
+    val phoneFonts = remember { FontChoice.BODY.associateWith { LauncherFontFamily.isAvailable(it) } }
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_typography),
         icon = Icons.Rounded.AutoAwesome,
         subtitle = stringResource(R.string.settings_typography_desc),
     ) {
         val fontOptions = listOf(
-            LauncherSettings.FONT_FAMILY_DEFAULT to stringResource(R.string.settings_font_default),
-            LauncherSettings.FONT_FAMILY_NDOT to stringResource(R.string.settings_font_ndot),
-            LauncherSettings.FONT_FAMILY_NTYPE to stringResource(R.string.settings_font_ntype),
-            LauncherSettings.FONT_FAMILY_SPACE_GROTESK to stringResource(R.string.settings_font_space_grotesk),
-            LauncherSettings.FONT_FAMILY_SERIF to stringResource(R.string.settings_font_serif),
-            LauncherSettings.FONT_FAMILY_MONOSPACE to stringResource(R.string.settings_font_monospace),
-            LauncherSettings.FONT_FAMILY_CONDENSED to stringResource(R.string.settings_font_condensed),
-            LauncherSettings.FONT_FAMILY_LIGHT to stringResource(R.string.settings_font_light),
-            LauncherSettings.FONT_FAMILY_MEDIUM to stringResource(R.string.settings_font_medium),
-            LauncherSettings.FONT_FAMILY_CASUAL to stringResource(R.string.settings_font_casual),
-            LauncherSettings.FONT_FAMILY_SMALLCAPS to stringResource(R.string.settings_font_smallcaps),
-            LauncherSettings.FONT_FAMILY_CURSIVE to stringResource(R.string.settings_font_cursive),
-            LauncherSettings.FONT_FAMILY_MOTO_ROOKERY to stringResource(R.string.settings_font_moto_rookery),
-            LauncherSettings.FONT_FAMILY_MOTO_WORK_SANS to stringResource(R.string.settings_font_moto_work_sans),
-            LauncherSettings.FONT_FAMILY_MOTO_EXO2 to stringResource(R.string.settings_font_moto_exo2),
-            LauncherSettings.FONT_FAMILY_MOTO_ROBOTO_SLAB to stringResource(R.string.settings_font_moto_roboto_slab),
+            FontChoice.DEFAULT to stringResource(R.string.settings_font_default),
+            FontChoice.NDOT to stringResource(R.string.settings_font_ndot),
+            FontChoice.NTYPE to stringResource(R.string.settings_font_ntype),
+            FontChoice.SPACE_GROTESK to stringResource(R.string.settings_font_space_grotesk),
+            FontChoice.SERIF to stringResource(R.string.settings_font_serif),
+            FontChoice.MONOSPACE to stringResource(R.string.settings_font_monospace),
+            FontChoice.CONDENSED to stringResource(R.string.settings_font_condensed),
+            FontChoice.LIGHT to stringResource(R.string.settings_font_light),
+            FontChoice.MEDIUM to stringResource(R.string.settings_font_medium),
+            FontChoice.CASUAL to stringResource(R.string.settings_font_casual),
+            FontChoice.SMALLCAPS to stringResource(R.string.settings_font_smallcaps),
+            FontChoice.CURSIVE to stringResource(R.string.settings_font_cursive),
+            FontChoice.MOTO_ROOKERY to stringResource(R.string.settings_font_moto_rookery),
+            FontChoice.MOTO_WORK_SANS to stringResource(R.string.settings_font_moto_work_sans),
+            FontChoice.MOTO_EXO2 to stringResource(R.string.settings_font_moto_exo2),
+            FontChoice.MOTO_ROBOTO_SLAB to stringResource(R.string.settings_font_moto_roboto_slab),
         ).filter { (key, _) -> phoneFonts.getValue(key) }
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_font_family),
@@ -357,7 +374,7 @@ internal fun TypographySection(
         // Headings apart from the text: pixel titles over plain text, or plain titles over a pixel font.
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_heading_font),
-            options = listOf(LauncherSettings.FONT_FAMILY_SAME to stringResource(R.string.settings_heading_font_same)) + fontOptions,
+            options = listOf(FontChoice.SAME to stringResource(R.string.settings_heading_font_same)) + fontOptions,
             selected = s.appearance.headingFont,
             onSelect = { viewModel.setAppHeadingFont(it, screenType) },
             icon = null,
@@ -428,16 +445,16 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_clock_style),
             options = listOf(
-                LauncherSettings.CLOCK_STYLE_CLASSIC to stringResource(R.string.settings_clock_style_classic),
-                LauncherSettings.CLOCK_STYLE_DUO to stringResource(R.string.settings_clock_style_duo),
-                LauncherSettings.CLOCK_STYLE_LIGHT to stringResource(R.string.settings_clock_style_light),
-                LauncherSettings.CLOCK_STYLE_DOT to stringResource(R.string.settings_clock_style_dot),
-                LauncherSettings.CLOCK_STYLE_STACKED to stringResource(R.string.settings_clock_style_stacked),
-                LauncherSettings.CLOCK_STYLE_GLASS_PILL to "Glass Pill",
-                LauncherSettings.CLOCK_STYLE_OUTLINE to "Outline",
-                LauncherSettings.CLOCK_STYLE_VERTICAL_STACK to "Vertical Stack",
-                LauncherSettings.CLOCK_STYLE_NEUMORPHIC to "Embossed Glass",
-                LauncherSettings.CLOCK_STYLE_NOTHING_NDOT to "Nothing NDot 57",
+                ClockStyle.CLASSIC to stringResource(R.string.settings_clock_style_classic),
+                ClockStyle.DUO to stringResource(R.string.settings_clock_style_duo),
+                ClockStyle.LIGHT to stringResource(R.string.settings_clock_style_light),
+                ClockStyle.DOT to stringResource(R.string.settings_clock_style_dot),
+                ClockStyle.STACKED to stringResource(R.string.settings_clock_style_stacked),
+                ClockStyle.GLASS_PILL to "Glass Pill",
+                ClockStyle.OUTLINE to "Outline",
+                ClockStyle.VERTICAL_STACK to "Vertical Stack",
+                ClockStyle.NEUMORPHIC to "Embossed Glass",
+                ClockStyle.NOTHING_NDOT to "Nothing NDot 57",
             ),
             selected = s.widgets.clockStyle,
             onSelect = viewModel::setClockWidgetStyle,
@@ -468,12 +485,12 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_clock_minutes),
             options = listOf(
-                LauncherSettings.CLOCK_MINUTE_STYLE to stringResource(R.string.settings_clock_minutes_style),
-                LauncherSettings.CLOCK_MINUTE_WHITE to stringResource(R.string.settings_clock_minutes_white),
-                LauncherSettings.CLOCK_MINUTE_LIGHT_GREY to stringResource(R.string.settings_clock_minutes_light_grey),
-                LauncherSettings.CLOCK_MINUTE_GREY to stringResource(R.string.settings_clock_minutes_grey),
-                LauncherSettings.CLOCK_MINUTE_DARK_GREY to stringResource(R.string.settings_clock_minutes_dark_grey),
-                LauncherSettings.CLOCK_MINUTE_BLACK to stringResource(R.string.settings_clock_minutes_black),
+                ClockMinuteColor.STYLE to stringResource(R.string.settings_clock_minutes_style),
+                ClockMinuteColor.WHITE to stringResource(R.string.settings_clock_minutes_white),
+                ClockMinuteColor.LIGHT_GREY to stringResource(R.string.settings_clock_minutes_light_grey),
+                ClockMinuteColor.GREY to stringResource(R.string.settings_clock_minutes_grey),
+                ClockMinuteColor.DARK_GREY to stringResource(R.string.settings_clock_minutes_dark_grey),
+                ClockMinuteColor.BLACK to stringResource(R.string.settings_clock_minutes_black),
             ),
             selected = s.widgets.clockMinuteColor,
             onSelect = viewModel::setClockMinuteColor,
@@ -493,10 +510,10 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_widget_media_theme),
             options = listOf(
-                LauncherSettings.WIDGET_THEME_DEFAULT to stringResource(R.string.settings_widget_theme_default),
-                LauncherSettings.WIDGET_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
-                LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
-                LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
+                WidgetTheme.DEFAULT to stringResource(R.string.settings_widget_theme_default),
+                WidgetTheme.DARK to stringResource(R.string.settings_folder_theme_dark),
+                WidgetTheme.LIGHT to stringResource(R.string.settings_folder_theme_light),
+                WidgetTheme.ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
             selected = s.widgets.mediaTheme,
             onSelect = viewModel::setMediaWidgetTheme,
@@ -514,10 +531,10 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_widget_apps_theme),
             options = listOf(
-                LauncherSettings.WIDGET_THEME_DEFAULT to stringResource(R.string.settings_widget_theme_default),
-                LauncherSettings.WIDGET_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
-                LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
-                LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
+                WidgetTheme.DEFAULT to stringResource(R.string.settings_widget_theme_default),
+                WidgetTheme.DARK to stringResource(R.string.settings_folder_theme_dark),
+                WidgetTheme.LIGHT to stringResource(R.string.settings_folder_theme_light),
+                WidgetTheme.ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
             selected = s.widgets.appsTheme,
             onSelect = viewModel::setAppsWidgetTheme,
@@ -535,10 +552,10 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_widget_stats_theme),
             options = listOf(
-                LauncherSettings.WIDGET_THEME_DEFAULT to stringResource(R.string.settings_widget_theme_default),
-                LauncherSettings.WIDGET_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
-                LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
-                LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
+                WidgetTheme.DEFAULT to stringResource(R.string.settings_widget_theme_default),
+                WidgetTheme.DARK to stringResource(R.string.settings_folder_theme_dark),
+                WidgetTheme.LIGHT to stringResource(R.string.settings_folder_theme_light),
+                WidgetTheme.ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
             selected = s.widgets.statsTheme,
             onSelect = viewModel::setStatsWidgetTheme,
@@ -577,10 +594,10 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_widget_note_theme),
             options = listOf(
-                LauncherSettings.WIDGET_THEME_DEFAULT to stringResource(R.string.settings_widget_theme_default),
-                LauncherSettings.WIDGET_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
-                LauncherSettings.WIDGET_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
-                LauncherSettings.WIDGET_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
+                WidgetTheme.DEFAULT to stringResource(R.string.settings_widget_theme_default),
+                WidgetTheme.DARK to stringResource(R.string.settings_folder_theme_dark),
+                WidgetTheme.LIGHT to stringResource(R.string.settings_folder_theme_light),
+                WidgetTheme.ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
             selected = s.widgets.noteTheme,
             onSelect = viewModel::setNoteWidgetTheme,
@@ -591,9 +608,9 @@ internal fun FolarkWidgetsSection(s: LauncherSettings, viewModel: SettingsViewMo
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_widget_note_size),
             options = listOf(
-                LauncherSettings.FOLDER_OPEN_SMALL to stringResource(R.string.settings_folder_open_small),
-                LauncherSettings.FOLDER_OPEN_MEDIUM to stringResource(R.string.settings_folder_open_medium),
-                LauncherSettings.FOLDER_OPEN_LARGE to stringResource(R.string.settings_folder_open_large),
+                SizeChoice.SMALL to stringResource(R.string.settings_folder_open_small),
+                SizeChoice.MEDIUM to stringResource(R.string.settings_folder_open_medium),
+                SizeChoice.LARGE to stringResource(R.string.settings_folder_open_large),
             ),
             selected = s.widgets.noteTextSize,
             onSelect = viewModel::setNoteWidgetTextSize,
@@ -608,9 +625,9 @@ internal fun NotificationDotStyleRows(s: LauncherSettings, viewModel: SettingsVi
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_dot_shape),
         options = listOf(
-            LauncherSettings.DOT_SHAPE_CIRCLE to stringResource(R.string.settings_folder_shape_circle),
-            LauncherSettings.DOT_SHAPE_SQUIRCLE to stringResource(R.string.settings_folder_shape_squircle),
-            LauncherSettings.DOT_SHAPE_SQUARE to stringResource(R.string.settings_folder_shape_square),
+            DotShape.CIRCLE to stringResource(R.string.settings_folder_shape_circle),
+            DotShape.SQUIRCLE to stringResource(R.string.settings_folder_shape_squircle),
+            DotShape.SQUARE to stringResource(R.string.settings_folder_shape_square),
         ),
         selected = s.dots.shape,
         onSelect = { viewModel.setDotShape(it, screenType) },
@@ -620,9 +637,9 @@ internal fun NotificationDotStyleRows(s: LauncherSettings, viewModel: SettingsVi
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_dot_color),
         options = listOf(
-            LauncherSettings.DOT_COLOR_RED to stringResource(R.string.settings_dot_color_red),
-            LauncherSettings.DOT_COLOR_ACCENT to stringResource(R.string.settings_folder_theme_accent),
-            LauncherSettings.DOT_COLOR_WHITE to stringResource(R.string.settings_dot_color_white),
+            DotColor.RED to stringResource(R.string.settings_dot_color_red),
+            DotColor.ACCENT to stringResource(R.string.settings_folder_theme_accent),
+            DotColor.WHITE to stringResource(R.string.settings_dot_color_white),
         ),
         selected = s.dots.color,
         onSelect = { viewModel.setDotColor(it, screenType) },
@@ -632,10 +649,10 @@ internal fun NotificationDotStyleRows(s: LauncherSettings, viewModel: SettingsVi
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_dot_position),
         options = listOf(
-            LauncherSettings.DOT_POSITION_TOP_END to stringResource(R.string.settings_dot_position_top_end),
-            LauncherSettings.DOT_POSITION_TOP_START to stringResource(R.string.settings_dot_position_top_start),
-            LauncherSettings.DOT_POSITION_BOTTOM_END to stringResource(R.string.settings_dot_position_bottom_end),
-            LauncherSettings.DOT_POSITION_BOTTOM_START to stringResource(R.string.settings_dot_position_bottom_start),
+            DotPosition.TOP_END to stringResource(R.string.settings_dot_position_top_end),
+            DotPosition.TOP_START to stringResource(R.string.settings_dot_position_top_start),
+            DotPosition.BOTTOM_END to stringResource(R.string.settings_dot_position_bottom_end),
+            DotPosition.BOTTOM_START to stringResource(R.string.settings_dot_position_bottom_start),
         ),
         selected = s.dots.position,
         onSelect = { viewModel.setDotPosition(it, screenType) },
@@ -648,10 +665,10 @@ internal fun IconSwipeRow(s: LauncherSettings, viewModel: SettingsViewModel, scr
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_icon_swipe),
         options = listOf(
-            LauncherSettings.ICON_SWIPE_NONE to stringResource(R.string.settings_icon_swipe_none),
-            LauncherSettings.ICON_SWIPE_MENU to stringResource(R.string.settings_icon_swipe_menu),
-            LauncherSettings.ICON_SWIPE_FLOATING to stringResource(R.string.settings_icon_swipe_floating),
-            LauncherSettings.ICON_SWIPE_SPLIT to stringResource(R.string.settings_icon_swipe_split),
+            IconSwipe.NONE to stringResource(R.string.settings_icon_swipe_none),
+            IconSwipe.MENU to stringResource(R.string.settings_icon_swipe_menu),
+            IconSwipe.FLOATING to stringResource(R.string.settings_icon_swipe_floating),
+            IconSwipe.SPLIT to stringResource(R.string.settings_icon_swipe_split),
         ),
         selected = s.home.iconSwipeUpAction,
         onSelect = { viewModel.setIconSwipeUpAction(it, screenType) },
@@ -879,11 +896,11 @@ internal fun DrawerSearchRows(s: LauncherSettings, viewModel: SettingsViewModel)
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_search_web_engine),
             options = listOf(
-                LauncherSettings.SEARCH_ENGINE_SYSTEM to stringResource(R.string.settings_search_engine_system),
-                LauncherSettings.SEARCH_ENGINE_GOOGLE to stringResource(R.string.settings_search_engine_google),
-                LauncherSettings.SEARCH_ENGINE_DUCKDUCKGO to stringResource(R.string.settings_search_engine_duckduckgo),
-                LauncherSettings.SEARCH_ENGINE_BING to stringResource(R.string.settings_search_engine_bing),
-                LauncherSettings.SEARCH_ENGINE_STARTPAGE to stringResource(R.string.settings_search_engine_startpage),
+                SearchEngine.SYSTEM to stringResource(R.string.settings_search_engine_system),
+                SearchEngine.GOOGLE to stringResource(R.string.settings_search_engine_google),
+                SearchEngine.DUCKDUCKGO to stringResource(R.string.settings_search_engine_duckduckgo),
+                SearchEngine.BING to stringResource(R.string.settings_search_engine_bing),
+                SearchEngine.STARTPAGE to stringResource(R.string.settings_search_engine_startpage),
             ),
             selected = s.search.webEngine,
             onSelect = viewModel::setSearchWebEngine,
@@ -899,9 +916,9 @@ internal fun FloatingSizeRow(s: LauncherSettings, viewModel: SettingsViewModel) 
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_floating_size),
         options = listOf(
-            LauncherSettings.FLOATING_SIZE_SMALL to stringResource(R.string.settings_folder_open_small),
-            LauncherSettings.FLOATING_SIZE_MEDIUM to stringResource(R.string.settings_folder_open_medium),
-            LauncherSettings.FLOATING_SIZE_LARGE to stringResource(R.string.settings_folder_open_large),
+            SizeChoice.SMALL to stringResource(R.string.settings_folder_open_small),
+            SizeChoice.MEDIUM to stringResource(R.string.settings_folder_open_medium),
+            SizeChoice.LARGE to stringResource(R.string.settings_folder_open_large),
         ),
         selected = s.launch.floatingWindowSize,
         onSelect = viewModel::setFloatingWindowSize,
@@ -948,9 +965,9 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_battery_saver),
         options = listOf(
-            LauncherSettings.BATTERY_SAVER_OFF to stringResource(R.string.settings_battery_saver_off),
-            LauncherSettings.BATTERY_SAVER_AUTO to stringResource(R.string.settings_battery_saver_auto),
-            LauncherSettings.BATTERY_SAVER_ON to stringResource(R.string.settings_battery_saver_on),
+            BatterySaverMode.OFF to stringResource(R.string.settings_battery_saver_off),
+            BatterySaverMode.AUTO to stringResource(R.string.settings_battery_saver_auto),
+            BatterySaverMode.ON to stringResource(R.string.settings_battery_saver_on),
         ),
         selected = s.motion.batterySaverMode,
         onSelect = viewModel::setBatterySaverMode,
@@ -961,7 +978,7 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
         fontSize = 12.sp,
         lineHeight = 16.sp,
     )
-    if (s.motion.batterySaverMode == LauncherSettings.BATTERY_SAVER_AUTO) {
+    if (s.motion.batterySaverMode == BatterySaverMode.AUTO) {
         ExpressiveRowDivider()
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_battery_saver_low),
@@ -990,15 +1007,15 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_app_open_animation),
         options = listOf(
-            LauncherSettings.APP_OPEN_SYSTEM to stringResource(R.string.settings_anim_system),
-            LauncherSettings.APP_OPEN_ICON to stringResource(R.string.settings_anim_icon),
-            LauncherSettings.APP_OPEN_REVEAL to stringResource(R.string.settings_anim_reveal),
-            LauncherSettings.APP_OPEN_ZOOM to stringResource(R.string.settings_anim_zoom),
-            LauncherSettings.APP_OPEN_SLIDE to stringResource(R.string.settings_anim_slide),
-            LauncherSettings.APP_OPEN_FADE to stringResource(R.string.settings_anim_fade),
-            LauncherSettings.APP_OPEN_POP to stringResource(R.string.settings_anim_pop),
-            LauncherSettings.APP_OPEN_UNFOLD to stringResource(R.string.settings_anim_unfold),
-            LauncherSettings.APP_OPEN_NONE to stringResource(R.string.settings_anim_none),
+            AppOpenAnimation.SYSTEM to stringResource(R.string.settings_anim_system),
+            AppOpenAnimation.ICON to stringResource(R.string.settings_anim_icon),
+            AppOpenAnimation.REVEAL to stringResource(R.string.settings_anim_reveal),
+            AppOpenAnimation.ZOOM to stringResource(R.string.settings_anim_zoom),
+            AppOpenAnimation.SLIDE to stringResource(R.string.settings_anim_slide),
+            AppOpenAnimation.FADE to stringResource(R.string.settings_anim_fade),
+            AppOpenAnimation.POP to stringResource(R.string.settings_anim_pop),
+            AppOpenAnimation.UNFOLD to stringResource(R.string.settings_anim_unfold),
+            AppOpenAnimation.NONE to stringResource(R.string.settings_anim_none),
         ),
         selected = s.motion.appOpenAnimation,
         onSelect = viewModel::setAppOpenAnimation,
@@ -1007,10 +1024,10 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_folder_open_animation),
         options = listOf(
-            LauncherSettings.FOLDER_ANIM_SHEET to stringResource(R.string.settings_anim_sheet),
-            LauncherSettings.FOLDER_ANIM_ZOOM to stringResource(R.string.settings_anim_zoom),
-            LauncherSettings.FOLDER_ANIM_FADE to stringResource(R.string.settings_anim_fade),
-            LauncherSettings.FOLDER_ANIM_NONE to stringResource(R.string.settings_anim_none),
+            FolderAnimation.SHEET to stringResource(R.string.settings_anim_sheet),
+            FolderAnimation.ZOOM to stringResource(R.string.settings_anim_zoom),
+            FolderAnimation.FADE to stringResource(R.string.settings_anim_fade),
+            FolderAnimation.NONE to stringResource(R.string.settings_anim_none),
         ),
         selected = s.folders.openAnimation,
         onSelect = viewModel::setFolderOpenAnimation,
@@ -1019,11 +1036,11 @@ internal fun AnimationStyleRows(s: LauncherSettings, viewModel: SettingsViewMode
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_page_scroll_effect),
         options = listOf(
-            LauncherSettings.PAGE_EFFECT_SLIDE to stringResource(R.string.settings_anim_slide),
-            LauncherSettings.PAGE_EFFECT_FADE to stringResource(R.string.settings_anim_fade),
-            LauncherSettings.PAGE_EFFECT_ZOOM to stringResource(R.string.settings_anim_zoom),
-            LauncherSettings.PAGE_EFFECT_CUBE to stringResource(R.string.settings_anim_cube),
-            LauncherSettings.PAGE_EFFECT_STACK to stringResource(R.string.settings_anim_stack),
+            PageEffect.SLIDE to stringResource(R.string.settings_anim_slide),
+            PageEffect.FADE to stringResource(R.string.settings_anim_fade),
+            PageEffect.ZOOM to stringResource(R.string.settings_anim_zoom),
+            PageEffect.CUBE to stringResource(R.string.settings_anim_cube),
+            PageEffect.STACK to stringResource(R.string.settings_anim_stack),
         ),
         selected = s.home.pageScrollEffect,
         onSelect = viewModel::setPageScrollEffect,

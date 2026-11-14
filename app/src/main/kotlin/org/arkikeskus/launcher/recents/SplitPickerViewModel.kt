@@ -39,6 +39,8 @@ import org.arkikeskus.launcher.feature.appdrawer.DrawerFolderUi
 import org.arkikeskus.launcher.feature.appdrawer.SplitRecentItem
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.PickerRecents
+import org.arkikeskus.launcher.model.PickerSort
 import org.arkikeskus.launcher.model.SplitPickerLook
 import javax.inject.Inject
 import org.arkikeskus.launcher.data.drawerFolders
@@ -67,7 +69,7 @@ class SplitPickerViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     val apps: StateFlow<List<AppItem>> = look.map { it.sort }.distinctUntilChanged().flatMapLatest { sort ->
         val usable = appRepository.apps.map { all -> all.filter { !it.isHidden && !it.privateProfile && !it.isArchived } }
-        if (sort == SplitPickerLook.SORT_USAGE) {
+        if (sort == PickerSort.USAGE) {
             combine(usable, appUsageRepository.usage) { apps, usage ->
                 val now = System.currentTimeMillis()
                 apps.sortedWith(
@@ -113,7 +115,7 @@ class SplitPickerViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             val look = settingsRepository.settings(ScreenType.INNER).first().recents.picker
-            if (look.recents == SplitPickerLook.RECENTS_OFF) {
+            if (look.recents == PickerRecents.OFF) {
                 _recents.value = emptyList()
                 return@launch
             }
@@ -127,7 +129,7 @@ class SplitPickerViewModel @Inject constructor(
                 .distinctBy { (_, app) -> app.packageName }
                 .take(look.recentsCount)
                 .toList()
-            val withShots = look.recents == SplitPickerLook.RECENTS_PREVIEWS && RootShell.available()
+            val withShots = look.recents == PickerRecents.PREVIEWS && RootShell.available()
             _recents.value = picked.map { (task, app) -> SplitRecentItem(task.taskId, app, task.inactiveMs) }
             if (withShots) {
                 _recents.value = picked.map { (task, app) ->

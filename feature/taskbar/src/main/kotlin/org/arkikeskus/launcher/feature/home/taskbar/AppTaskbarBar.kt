@@ -56,7 +56,10 @@ import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LiveActivity
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.TaskbarDivider
+import org.arkikeskus.launcher.model.TaskbarMediaPosition
+import org.arkikeskus.launcher.model.TaskbarRecentsButton
+import org.arkikeskus.launcher.model.TaskbarTheme
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.DEFAULT_NUDGE_COLOR
 import kotlin.math.abs
@@ -75,7 +78,7 @@ import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.homeVis
 @SuppressLint("ClickableViewAccessibility")
 internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Boolean = false) {
     val accent = accent(ACCENT_LIGHT)
-    val lightTheme = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+    val lightTheme = s.theme == TaskbarTheme.LIGHT
     val hint = TextView(context).apply {
         setTextColor(Color.BLACK)
         textSize = 13f
@@ -91,7 +94,7 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         barBackground(s)?.let { background = it }
-        val pad = if (s.theme == LauncherSettings.TASKBAR_THEME_CLEAR) dp(4) else dp(10)
+        val pad = if (s.theme == TaskbarTheme.CLEAR) dp(4) else dp(10)
         setPadding(pad, dp(6), pad, dp(6))
         clipChildren = false
         clipToPadding = false
@@ -213,7 +216,7 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
             marginEnd = dp(4) + dp(s.spacingDp) / 2
         })
     }
-    if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_START) addMedia()
+    if (showMedia && s.mediaPosition == TaskbarMediaPosition.START) addMedia()
     s.pinned.forEachIndexed { i, app -> addIcon(app, i) }
     // Fixed scene slots keep their places at the start of the scene run, empty or not.
     val slots = s.sceneSlots.coerceIn(0, MAX_SCENE_SLOTS)
@@ -223,24 +226,24 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
     } else {
         s.pairs.forEach(::addPairIcon)
     }
-    if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE) addMedia()
+    if (showMedia && s.mediaPosition == TaskbarMediaPosition.MIDDLE) addMedia()
     val recentApps = recents.filter { r -> s.pinned.none { it.key == r.key } }
     val livePair = openPair
     if ((s.pinned.isNotEmpty() || s.pairs.isNotEmpty()) && (recentApps.isNotEmpty() || livePair != null) &&
-        s.dividerStyle != LauncherSettings.TASKBAR_DIVIDER_NONE
+        s.dividerStyle != TaskbarDivider.NONE
     ) {
         // The mark between pinned and recent apps, as chosen (Settings ▸ Taskbar).
         val ink = if (lightTheme) Color.argb(90, 0, 0, 0) else Color.argb(110, 255, 255, 255)
         val (w, h) = when (s.dividerStyle) {
-            LauncherSettings.TASKBAR_DIVIDER_BOLD -> dp(3) to (size * 0.6f).toInt()
-            LauncherSettings.TASKBAR_DIVIDER_DOT -> dp(5) to dp(5)
-            LauncherSettings.TASKBAR_DIVIDER_GAP -> dp(6) to dp(1)
+            TaskbarDivider.BOLD -> dp(3) to (size * 0.6f).toInt()
+            TaskbarDivider.DOT -> dp(5) to dp(5)
+            TaskbarDivider.GAP -> dp(6) to dp(1)
             else -> dp(1) to (size * 0.6f).toInt()
         }
         val divider = View(context).apply {
             background = GradientDrawable().apply {
                 cornerRadius = dp(3).toFloat()
-                setColor(if (s.dividerStyle == LauncherSettings.TASKBAR_DIVIDER_GAP) Color.TRANSPARENT else ink)
+                setColor(if (s.dividerStyle == TaskbarDivider.GAP) Color.TRANSPARENT else ink)
             }
         }
         row.addView(divider, LinearLayout.LayoutParams(w, h).apply {
@@ -270,8 +273,8 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
         })
     }
     recentApps.forEach { addIcon(it) }
-    if (showMedia && s.mediaPosition == LauncherSettings.TASKBAR_MEDIA_POS_END) addMedia()
-    val withRecents = s.recentsButton != LauncherSettings.TASKBAR_RECENTS_OFF
+    if (showMedia && s.mediaPosition == TaskbarMediaPosition.END) addMedia()
+    val withRecents = s.recentsButton != TaskbarRecentsButton.OFF
     if (withRecents || s.splitControls) {
         if (row.childCount > 0) {
             row.addView(View(context).apply {
@@ -350,7 +353,7 @@ internal fun AppTaskbar.showBar(s: TaskbarSetup, fixed: Boolean, animateIn: Bool
     // bar opened for a moment, or over home, keeps the glass.
     val blurWorthIt = (homeVisible || !fixed) &&
         context.getSystemService(PowerManager::class.java)?.isPowerSaveMode != true
-    if (blurWorthIt && s.theme == LauncherSettings.TASKBAR_THEME_GLASS && s.glassBlur > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    if (blurWorthIt && s.theme == TaskbarTheme.GLASS && s.glassBlur > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         barLayout.blurBehindRadius = dp(s.glassBlur)
         barLayout.flags = barLayout.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
     }
@@ -389,14 +392,14 @@ internal fun AppTaskbar.publishSpace(barRow: View) {
 /** The bar's backdrop for the chosen theme; null for the see-through one. */
 internal fun AppTaskbar.barBackground(s: TaskbarSetup): Drawable? {
     val alpha = (s.opacity.coerceIn(0f, 1f) * 255).toInt()
-    if (s.theme == LauncherSettings.TASKBAR_THEME_GLASS) return glassBackground(alpha)
-    if (s.theme == LauncherSettings.TASKBAR_THEME_NEON) return neonBackground(alpha)
+    if (s.theme == TaskbarTheme.GLASS) return glassBackground(alpha)
+    if (s.theme == TaskbarTheme.NEON) return neonBackground(alpha)
     val (fill, rim) = when (s.theme) {
-        LauncherSettings.TASKBAR_THEME_CLEAR -> return null
-        LauncherSettings.TASKBAR_THEME_AMOLED -> Color.argb(maxOf(alpha, 235), 0, 0, 0) to Color.argb(28, 255, 255, 255)
-        LauncherSettings.TASKBAR_THEME_FROSTED -> Color.argb((alpha * 0.55f).toInt(), 40, 42, 48) to Color.argb(70, 255, 255, 255)
-        LauncherSettings.TASKBAR_THEME_LIGHT -> Color.argb(alpha, 242, 243, 246) to Color.argb(40, 0, 0, 0)
-        LauncherSettings.TASKBAR_THEME_ACCENT -> {
+        TaskbarTheme.CLEAR -> return null
+        TaskbarTheme.AMOLED -> Color.argb(maxOf(alpha, 235), 0, 0, 0) to Color.argb(28, 255, 255, 255)
+        TaskbarTheme.FROSTED -> Color.argb((alpha * 0.55f).toInt(), 40, 42, 48) to Color.argb(70, 255, 255, 255)
+        TaskbarTheme.LIGHT -> Color.argb(alpha, 242, 243, 246) to Color.argb(40, 0, 0, 0)
+        TaskbarTheme.ACCENT -> {
             val base = accent(ACCENT_DEEP)
             Color.argb(alpha, Color.red(base), Color.green(base), Color.blue(base)) to Color.argb(50, 255, 255, 255)
         }
@@ -509,7 +512,7 @@ internal fun AppTaskbar.pairTile(keys: List<String>, description: String, s: Tas
         contentDescription = description
         background = GradientDrawable().apply {
             cornerRadius = size * 0.28f
-            val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+            val light = s.theme == TaskbarTheme.LIGHT
             setColor(if (light) Color.argb(36, 0, 0, 0) else Color.argb(44, 255, 255, 255))
         }
         setOnClickListener {

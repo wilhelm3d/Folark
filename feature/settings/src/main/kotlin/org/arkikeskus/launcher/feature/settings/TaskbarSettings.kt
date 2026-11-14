@@ -69,7 +69,18 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.data.ShellSplit
+import org.arkikeskus.launcher.model.LaunchGlow
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.TaskbarAnim
+import org.arkikeskus.launcher.model.TaskbarDivider
+import org.arkikeskus.launcher.model.TaskbarHandleStyle
+import org.arkikeskus.launcher.model.TaskbarHandles
+import org.arkikeskus.launcher.model.TaskbarMediaPosition
+import org.arkikeskus.launcher.model.TaskbarMediaShape
+import org.arkikeskus.launcher.model.TaskbarRecentsButton
+import org.arkikeskus.launcher.model.TaskbarSource
+import org.arkikeskus.launcher.model.TaskbarSplitSide
+import org.arkikeskus.launcher.model.TaskbarTheme
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -114,7 +125,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
     ) {
         // Folark's taskbar, or Android's (with the system's gestures and quick switch).
         SystemTaskbarRows(s, viewModel)
-        if (s.taskbar.source == LauncherSettings.TASKBAR_SOURCE_SYSTEM) return@ExpressiveCategoryContainer
+        if (s.taskbar.source == TaskbarSource.SYSTEM) return@ExpressiveCategoryContainer
         ExpressiveRowDivider()
         TaskbarToggle(enabled = s.taskbar.enabled, onSetEnabled = viewModel::setTaskbarEnabled)
         ExpressiveRowDivider()
@@ -142,7 +153,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         }
     }
     // Android's own taskbar chosen: none of Folark's taskbar settings apply.
-    if (s.taskbar.source == LauncherSettings.TASKBAR_SOURCE_SYSTEM) return
+    if (s.taskbar.source == TaskbarSource.SYSTEM) return
 
     ExpressiveCategoryContainer(
         title = stringResource(R.string.settings_tb_group_apps),
@@ -217,9 +228,9 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_taskbar_media_position),
                 options = listOf(
-                    LauncherSettings.TASKBAR_MEDIA_POS_START to stringResource(R.string.settings_taskbar_media_position_start),
-                    LauncherSettings.TASKBAR_MEDIA_POS_MIDDLE to stringResource(R.string.settings_taskbar_media_position_middle),
-                    LauncherSettings.TASKBAR_MEDIA_POS_END to stringResource(R.string.settings_taskbar_media_position_end),
+                    TaskbarMediaPosition.START to stringResource(R.string.settings_taskbar_media_position_start),
+                    TaskbarMediaPosition.MIDDLE to stringResource(R.string.settings_taskbar_media_position_middle),
+                    TaskbarMediaPosition.END to stringResource(R.string.settings_taskbar_media_position_end),
                 ),
                 selected = s.taskbar.mediaPosition,
                 onSelect = viewModel::setTaskbarMediaPosition,
@@ -229,11 +240,11 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_taskbar_divider_style),
                 options = listOf(
-                    LauncherSettings.TASKBAR_DIVIDER_LINE to stringResource(R.string.settings_taskbar_divider_line),
-                    LauncherSettings.TASKBAR_DIVIDER_BOLD to stringResource(R.string.settings_taskbar_divider_bold),
-                    LauncherSettings.TASKBAR_DIVIDER_DOT to stringResource(R.string.settings_taskbar_divider_dot),
-                    LauncherSettings.TASKBAR_DIVIDER_GAP to stringResource(R.string.settings_taskbar_divider_gap),
-                    LauncherSettings.TASKBAR_DIVIDER_NONE to stringResource(R.string.settings_taskbar_divider_none),
+                    TaskbarDivider.LINE to stringResource(R.string.settings_taskbar_divider_line),
+                    TaskbarDivider.BOLD to stringResource(R.string.settings_taskbar_divider_bold),
+                    TaskbarDivider.DOT to stringResource(R.string.settings_taskbar_divider_dot),
+                    TaskbarDivider.GAP to stringResource(R.string.settings_taskbar_divider_gap),
+                    TaskbarDivider.NONE to stringResource(R.string.settings_taskbar_divider_none),
                 ),
                 selected = s.taskbar.dividerStyle,
                 onSelect = viewModel::setTaskbarDividerStyle,
@@ -243,8 +254,8 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_taskbar_media_shape),
                 options = listOf(
-                    LauncherSettings.TASKBAR_MEDIA_SHAPE_CIRCLE to stringResource(R.string.settings_taskbar_media_shape_circle),
-                    LauncherSettings.TASKBAR_MEDIA_SHAPE_ROUNDED to stringResource(R.string.settings_taskbar_media_shape_rounded),
+                    TaskbarMediaShape.CIRCLE to stringResource(R.string.settings_taskbar_media_shape_circle),
+                    TaskbarMediaShape.ROUNDED to stringResource(R.string.settings_taskbar_media_shape_rounded),
                 ),
                 selected = s.taskbar.mediaShape,
                 onSelect = viewModel::setTaskbarMediaShape,
@@ -287,20 +298,20 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_theme),
             options = listOf(
-                LauncherSettings.TASKBAR_THEME_CLEAR to stringResource(R.string.settings_taskbar_theme_clear),
-                LauncherSettings.TASKBAR_THEME_FROSTED to stringResource(R.string.settings_taskbar_theme_frosted),
-                LauncherSettings.TASKBAR_THEME_DARK to stringResource(R.string.settings_taskbar_theme_dark),
-                LauncherSettings.TASKBAR_THEME_LIGHT to stringResource(R.string.settings_taskbar_theme_light),
-                LauncherSettings.TASKBAR_THEME_ACCENT to stringResource(R.string.settings_taskbar_theme_accent),
-                LauncherSettings.TASKBAR_THEME_GLASS to stringResource(R.string.settings_taskbar_theme_glass),
-                LauncherSettings.TASKBAR_THEME_AMOLED to stringResource(R.string.settings_taskbar_theme_amoled),
-                LauncherSettings.TASKBAR_THEME_NEON to stringResource(R.string.settings_taskbar_theme_neon),
+                TaskbarTheme.CLEAR to stringResource(R.string.settings_taskbar_theme_clear),
+                TaskbarTheme.FROSTED to stringResource(R.string.settings_taskbar_theme_frosted),
+                TaskbarTheme.DARK to stringResource(R.string.settings_taskbar_theme_dark),
+                TaskbarTheme.LIGHT to stringResource(R.string.settings_taskbar_theme_light),
+                TaskbarTheme.ACCENT to stringResource(R.string.settings_taskbar_theme_accent),
+                TaskbarTheme.GLASS to stringResource(R.string.settings_taskbar_theme_glass),
+                TaskbarTheme.AMOLED to stringResource(R.string.settings_taskbar_theme_amoled),
+                TaskbarTheme.NEON to stringResource(R.string.settings_taskbar_theme_neon),
             ),
             selected = s.taskbar.theme,
             onSelect = viewModel::setTaskbarTheme,
             icon = null,
         )
-        if (s.taskbar.theme != LauncherSettings.TASKBAR_THEME_CLEAR) {
+        if (s.taskbar.theme != TaskbarTheme.CLEAR) {
             ExpressiveRowDivider()
             ExpressiveSliderRow(
                 title = stringResource(R.string.settings_taskbar_opacity),
@@ -310,7 +321,7 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 valueDisplay = "${(s.taskbar.opacity * 100).roundToInt()}%",
             )
         }
-        if (s.taskbar.theme == LauncherSettings.TASKBAR_THEME_GLASS) {
+        if (s.taskbar.theme == TaskbarTheme.GLASS) {
             ExpressiveRowDivider()
             ExpressiveSliderRow(
                 title = stringResource(R.string.settings_taskbar_glass_blur),
@@ -340,14 +351,14 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_anim),
             options = listOf(
-                LauncherSettings.TASKBAR_ANIM_SLIDE to stringResource(R.string.settings_taskbar_anim_slide),
-                LauncherSettings.TASKBAR_ANIM_FADE to stringResource(R.string.settings_taskbar_anim_fade),
-                LauncherSettings.TASKBAR_ANIM_SCALE to stringResource(R.string.settings_taskbar_anim_scale),
-                LauncherSettings.TASKBAR_ANIM_RISE to stringResource(R.string.settings_taskbar_anim_rise),
-                LauncherSettings.TASKBAR_ANIM_BOUNCE to stringResource(R.string.settings_taskbar_anim_bounce),
-                LauncherSettings.TASKBAR_ANIM_FLIP to stringResource(R.string.settings_taskbar_anim_flip),
-                LauncherSettings.TASKBAR_ANIM_UNFOLD to stringResource(R.string.settings_taskbar_anim_unfold),
-                LauncherSettings.TASKBAR_ANIM_POP to stringResource(R.string.settings_taskbar_anim_pop),
+                TaskbarAnim.SLIDE to stringResource(R.string.settings_taskbar_anim_slide),
+                TaskbarAnim.FADE to stringResource(R.string.settings_taskbar_anim_fade),
+                TaskbarAnim.SCALE to stringResource(R.string.settings_taskbar_anim_scale),
+                TaskbarAnim.RISE to stringResource(R.string.settings_taskbar_anim_rise),
+                TaskbarAnim.BOUNCE to stringResource(R.string.settings_taskbar_anim_bounce),
+                TaskbarAnim.FLIP to stringResource(R.string.settings_taskbar_anim_flip),
+                TaskbarAnim.UNFOLD to stringResource(R.string.settings_taskbar_anim_unfold),
+                TaskbarAnim.POP to stringResource(R.string.settings_taskbar_anim_pop),
             ),
             selected = s.taskbar.taskbarAnim,
             onSelect = viewModel::setTaskbarAnim,
@@ -357,10 +368,10 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_launch_glow),
             options = listOf(
-                LauncherSettings.LAUNCH_GLOW_APP to stringResource(R.string.settings_taskbar_launch_glow_app),
-                LauncherSettings.LAUNCH_GLOW_ACCENT to stringResource(R.string.settings_taskbar_launch_glow_accent),
-                LauncherSettings.LAUNCH_GLOW_WHITE to stringResource(R.string.settings_taskbar_launch_glow_white),
-                LauncherSettings.LAUNCH_GLOW_OFF to stringResource(R.string.settings_taskbar_launch_glow_off),
+                LaunchGlow.APP to stringResource(R.string.settings_taskbar_launch_glow_app),
+                LaunchGlow.ACCENT to stringResource(R.string.settings_taskbar_launch_glow_accent),
+                LaunchGlow.WHITE to stringResource(R.string.settings_taskbar_launch_glow_white),
+                LaunchGlow.OFF to stringResource(R.string.settings_taskbar_launch_glow_off),
             ),
             selected = s.taskbar.launchGlow,
             onSelect = viewModel::setTaskbarLaunchGlow,
@@ -376,10 +387,10 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_handles),
             options = listOf(
-                LauncherSettings.TASKBAR_HANDLES_BOTH to stringResource(R.string.settings_taskbar_handles_both),
-                LauncherSettings.TASKBAR_HANDLES_LEFT to stringResource(R.string.settings_taskbar_handles_left),
-                LauncherSettings.TASKBAR_HANDLES_RIGHT to stringResource(R.string.settings_taskbar_handles_right),
-                LauncherSettings.TASKBAR_HANDLES_CENTER to stringResource(R.string.settings_taskbar_handles_center),
+                TaskbarHandles.BOTH to stringResource(R.string.settings_taskbar_handles_both),
+                TaskbarHandles.LEFT to stringResource(R.string.settings_taskbar_handles_left),
+                TaskbarHandles.RIGHT to stringResource(R.string.settings_taskbar_handles_right),
+                TaskbarHandles.CENTER to stringResource(R.string.settings_taskbar_handles_center),
             ),
             selected = s.taskbar.handles,
             onSelect = viewModel::setTaskbarHandles,
@@ -399,11 +410,11 @@ internal fun TaskbarSection(s: LauncherSettings, viewModel: SettingsViewModel) {
                 ExpressiveSegmentedControl(
                     title = stringResource(R.string.settings_taskbar_handle_style),
                     options = listOf(
-                        LauncherSettings.TASKBAR_HANDLE_LINE to stringResource(R.string.settings_taskbar_handle_line),
-                        LauncherSettings.TASKBAR_HANDLE_ARROW to stringResource(R.string.settings_taskbar_handle_arrow),
-                        LauncherSettings.TASKBAR_HANDLE_DOUBLE to stringResource(R.string.settings_taskbar_handle_double),
-                        LauncherSettings.TASKBAR_HANDLE_DOTS to stringResource(R.string.settings_taskbar_handle_dots),
-                        LauncherSettings.TASKBAR_HANDLE_TEXT to stringResource(R.string.settings_taskbar_handle_text),
+                        TaskbarHandleStyle.LINE to stringResource(R.string.settings_taskbar_handle_line),
+                        TaskbarHandleStyle.ARROW to stringResource(R.string.settings_taskbar_handle_arrow),
+                        TaskbarHandleStyle.DOUBLE to stringResource(R.string.settings_taskbar_handle_double),
+                        TaskbarHandleStyle.DOTS to stringResource(R.string.settings_taskbar_handle_dots),
+                        TaskbarHandleStyle.TEXT to stringResource(R.string.settings_taskbar_handle_text),
                     ),
                     selected = s.taskbar.taskbarHandleStyle,
                     onSelect = viewModel::setTaskbarHandleStyle,
@@ -538,7 +549,7 @@ private fun TaskbarPinnedPicker(
 
 /** A looping demo of the taskbar: it shows, holds, hides to the chosen pull handle, and repeats. */
 @Composable
-internal fun TaskbarPreview(handleStyle: String, handles: String, anim: String) {
+internal fun TaskbarPreview(handleStyle: TaskbarHandleStyle, handles: TaskbarHandles, anim: TaskbarAnim) {
     val accent = MaterialTheme.colorScheme.primary
     var shown by remember { mutableStateOf(true) }
     val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
@@ -552,7 +563,7 @@ internal fun TaskbarPreview(handleStyle: String, handles: String, anim: String) 
         }
     }
     val spec: AnimationSpec<Float> =
-        if (anim == LauncherSettings.TASKBAR_ANIM_BOUNCE || anim == LauncherSettings.TASKBAR_ANIM_POP) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)
+        if (anim == TaskbarAnim.BOUNCE || anim == TaskbarAnim.POP) spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow)
         else tween(300)
     val p by animateFloatAsState(if (shown) 1f else 0f, spec, label = "tbprev")
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).onScreen(visible)) {
@@ -571,9 +582,9 @@ internal fun TaskbarPreview(handleStyle: String, handles: String, anim: String) 
             contentAlignment = Alignment.BottomCenter,
         ) {
             val handleAligns = when (handles) {
-                LauncherSettings.TASKBAR_HANDLES_LEFT -> listOf(Alignment.BottomStart)
-                LauncherSettings.TASKBAR_HANDLES_RIGHT -> listOf(Alignment.BottomEnd)
-                LauncherSettings.TASKBAR_HANDLES_CENTER -> listOf(Alignment.BottomCenter)
+                TaskbarHandles.LEFT -> listOf(Alignment.BottomStart)
+                TaskbarHandles.RIGHT -> listOf(Alignment.BottomEnd)
+                TaskbarHandles.CENTER -> listOf(Alignment.BottomCenter)
                 else -> listOf(Alignment.BottomStart, Alignment.BottomEnd)
             }
             handleAligns.forEach { a ->
@@ -588,16 +599,16 @@ internal fun TaskbarPreview(handleStyle: String, handles: String, anim: String) 
                     .graphicsLayer {
                         val dist = size.height * 1.6f + 60f
                         when (anim) {
-                            LauncherSettings.TASKBAR_ANIM_FADE -> alpha = p
-                            LauncherSettings.TASKBAR_ANIM_SCALE -> { scaleX = 0.82f + 0.18f * p; scaleY = 0.82f + 0.18f * p; alpha = p }
-                            LauncherSettings.TASKBAR_ANIM_RISE -> { translationY = (1f - p) * dist; alpha = p }
-                            LauncherSettings.TASKBAR_ANIM_FLIP -> {
+                            TaskbarAnim.FADE -> alpha = p
+                            TaskbarAnim.SCALE -> { scaleX = 0.82f + 0.18f * p; scaleY = 0.82f + 0.18f * p; alpha = p }
+                            TaskbarAnim.RISE -> { translationY = (1f - p) * dist; alpha = p }
+                            TaskbarAnim.FLIP -> {
                                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
                                 rotationX = (1f - p) * 90f
                                 alpha = p
                             }
-                            LauncherSettings.TASKBAR_ANIM_UNFOLD -> { scaleX = 0.08f + 0.92f * p; alpha = p }
-                            LauncherSettings.TASKBAR_ANIM_POP -> { scaleX = 0.6f + 0.4f * p; scaleY = 0.6f + 0.4f * p; alpha = p }
+                            TaskbarAnim.UNFOLD -> { scaleX = 0.08f + 0.92f * p; alpha = p }
+                            TaskbarAnim.POP -> { scaleX = 0.6f + 0.4f * p; scaleY = 0.6f + 0.4f * p; alpha = p }
                             else -> translationY = (1f - p) * dist // SLIDE, BOUNCE
                         }
                     },
@@ -627,15 +638,15 @@ private fun PreviewBar(accent: Color) {
 }
 
 @Composable
-private fun PreviewHandle(style: String, accent: Color) {
+private fun PreviewHandle(style: TaskbarHandleStyle, accent: Color) {
     val c = Color.White.copy(alpha = 0.82f)
     when (style) {
-        LauncherSettings.TASKBAR_HANDLE_ARROW -> Canvas(Modifier.size(28.dp, 12.dp)) { previewChevrons(1, c) }
-        LauncherSettings.TASKBAR_HANDLE_DOUBLE -> Canvas(Modifier.size(28.dp, 18.dp)) { previewChevrons(2, c) }
-        LauncherSettings.TASKBAR_HANDLE_DOTS -> Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        TaskbarHandleStyle.ARROW -> Canvas(Modifier.size(28.dp, 12.dp)) { previewChevrons(1, c) }
+        TaskbarHandleStyle.DOUBLE -> Canvas(Modifier.size(28.dp, 18.dp)) { previewChevrons(2, c) }
+        TaskbarHandleStyle.DOTS -> Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             repeat(3) { Box(Modifier.size(5.dp).clip(CircleShape).background(c)) }
         }
-        LauncherSettings.TASKBAR_HANDLE_TEXT -> Text(
+        TaskbarHandleStyle.TEXT -> Text(
             stringResource(R.string.settings_taskbar_preview_apps),
             color = c,
             fontSize = 11.sp,
@@ -664,7 +675,7 @@ private fun DrawScope.previewChevrons(count: Int, color: Color) {
 @Composable
 internal fun TaskbarSplitCard(s: LauncherSettings, viewModel: SettingsViewModel) {
     // Android's own taskbar chosen: none of Folark's taskbar settings apply.
-    if (s.taskbar.source == LauncherSettings.TASKBAR_SOURCE_SYSTEM) return
+    if (s.taskbar.source == TaskbarSource.SYSTEM) return
     val context = LocalContext.current
     var splitReady by remember { mutableStateOf(splitPermissionGranted(context)) }
     LifecycleResumeEffect(Unit) {
@@ -696,8 +707,8 @@ internal fun TaskbarSplitCard(s: LauncherSettings, viewModel: SettingsViewModel)
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_split_side),
             options = listOf(
-                LauncherSettings.TASKBAR_SPLIT_SIDE_LEFT to stringResource(R.string.settings_taskbar_split_side_left),
-                LauncherSettings.TASKBAR_SPLIT_SIDE_RIGHT to stringResource(R.string.settings_taskbar_split_side_right),
+                TaskbarSplitSide.LEFT to stringResource(R.string.settings_taskbar_split_side_left),
+                TaskbarSplitSide.RIGHT to stringResource(R.string.settings_taskbar_split_side_right),
             ),
             selected = s.taskbar.splitSide,
             onSelect = viewModel::setTaskbarSplitSide,
@@ -721,10 +732,10 @@ internal fun TaskbarSplitCard(s: LauncherSettings, viewModel: SettingsViewModel)
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_taskbar_recents_button),
             options = listOf(
-                LauncherSettings.TASKBAR_RECENTS_OFF to stringResource(R.string.settings_taskbar_recents_button_off),
-                LauncherSettings.TASKBAR_RECENTS_SYSTEM to stringResource(R.string.settings_taskbar_recents_button_system),
-                LauncherSettings.TASKBAR_RECENTS_DESKTOP to stringResource(R.string.settings_taskbar_recents_button_desktop),
-                LauncherSettings.TASKBAR_RECENTS_FOLARK to stringResource(R.string.settings_taskbar_recents_button_folark),
+                TaskbarRecentsButton.OFF to stringResource(R.string.settings_taskbar_recents_button_off),
+                TaskbarRecentsButton.SYSTEM to stringResource(R.string.settings_taskbar_recents_button_system),
+                TaskbarRecentsButton.DESKTOP to stringResource(R.string.settings_taskbar_recents_button_desktop),
+                TaskbarRecentsButton.FOLARK to stringResource(R.string.settings_taskbar_recents_button_folark),
             ),
             selected = s.taskbar.recentsButton,
             onSelect = viewModel::setTaskbarRecentsButton,

@@ -55,7 +55,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.FolderShape
+import org.arkikeskus.launcher.model.FolderTheme
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PopupTheme
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LiquidGlassContainer
 import org.arkikeskus.launcher.ui.expressive.Accent
@@ -268,7 +271,7 @@ internal fun CornerPreview(settings: LauncherSettings, modifier: Modifier = Modi
 
 /** The long-press menu in the chosen style. */
 @Composable
-internal fun PopupThemePreview(theme: String, modifier: Modifier = Modifier) {
+internal fun PopupThemePreview(theme: PopupTheme, modifier: Modifier = Modifier) {
     PreviewFrame(height = 116.dp, modifier = modifier.padding(vertical = 6.dp)) {
         Backdrop(path = "", blur = 0f, dim = 0.1f)
         MenuCard(theme = theme, modifier = Modifier.align(Alignment.Center).width(180.dp))
@@ -407,10 +410,10 @@ private fun WidgetCard(s: LauncherSettings, modifier: Modifier, solid: Boolean =
 @Composable
 private fun FolderTile(s: LauncherSettings, apps: List<AppItem>, size: Dp) {
     val scale = size / 52.dp
-    val circle = s.folders.shape == LauncherSettings.FOLDER_SHAPE_CIRCLE
+    val circle = s.folders.shape == FolderShape.CIRCLE
     val shape: Shape = when (s.folders.shape) {
-        LauncherSettings.FOLDER_SHAPE_CIRCLE -> CircleShape
-        LauncherSettings.FOLDER_SHAPE_SQUARE -> RoundedCornerShape(6.dp * scale)
+        FolderShape.CIRCLE -> CircleShape
+        FolderShape.SQUARE -> RoundedCornerShape(6.dp * scale)
         else -> RoundedCornerShape(15.dp * scale)
     }
     val inset = (if (circle) 10.dp else 6.dp) * scale
@@ -436,9 +439,9 @@ private fun FolderTile(s: LauncherSettings, apps: List<AppItem>, size: Dp) {
         }
     }
     val solid = when (s.folders.theme) {
-        LauncherSettings.FOLDER_THEME_DARK -> Color(0xE6131418)
-        LauncherSettings.FOLDER_THEME_LIGHT -> Color(0xEBF5F5F7)
-        LauncherSettings.FOLDER_THEME_ACCENT -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
+        FolderTheme.DARK -> Color(0xE6131418)
+        FolderTheme.LIGHT -> Color(0xEBF5F5F7)
+        FolderTheme.ACCENT -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
         else -> null
     }
     if (solid == null) {
@@ -455,11 +458,11 @@ private fun FolderTile(s: LauncherSettings, apps: List<AppItem>, size: Dp) {
 
 /** A long-press menu with two rows, in the colours of menu style [theme]. */
 @Composable
-private fun MenuCard(theme: String, modifier: Modifier = Modifier) {
+private fun MenuCard(theme: PopupTheme, modifier: Modifier = Modifier) {
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
     val scheme = MaterialTheme.colorScheme
     val (palette: ExpressivePalette, accent: Color) = when (theme) {
-        LauncherSettings.POPUP_THEME_MATERIAL -> ExpressivePalette(
+        PopupTheme.MATERIAL -> ExpressivePalette(
             bg = scheme.surface,
             surfaceHi = scheme.surfaceContainerHigh,
             text = scheme.onSurface,
@@ -470,9 +473,9 @@ private fun MenuCard(theme: String, modifier: Modifier = Modifier) {
             btn = scheme.onSurface.copy(alpha = 0.07f),
             shadow = 0.dp,
         ) to scheme.primary
-        LauncherSettings.POPUP_THEME_DARK -> DarkExpressivePalette to Accent
-        LauncherSettings.POPUP_THEME_LIGHT -> LightExpressivePalette to Accent
-        LauncherSettings.POPUP_THEME_GLASS -> DarkExpressivePalette.copy(surfaceHi = Color.Black.copy(alpha = 0.38f)) to Accent
+        PopupTheme.DARK -> DarkExpressivePalette to Accent
+        PopupTheme.LIGHT -> LightExpressivePalette to Accent
+        PopupTheme.GLASS -> DarkExpressivePalette.copy(surfaceHi = Color.Black.copy(alpha = 0.38f)) to Accent
         else -> (if (dark) DarkExpressivePalette else LightExpressivePalette) to Accent
     }
     Column(

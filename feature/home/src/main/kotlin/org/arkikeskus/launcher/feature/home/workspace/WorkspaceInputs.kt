@@ -9,6 +9,8 @@ import org.arkikeskus.launcher.feature.home.PlacedShortcut
 import org.arkikeskus.launcher.feature.home.WidgetLook
 import org.arkikeskus.launcher.feature.home.widgets.WidgetChoice
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.MinusOne
+import org.arkikeskus.launcher.model.PageEffect
 import org.arkikeskus.launcher.model.WidgetPlacement
 
 // What [Workspace] is handed, in two bundles instead of fifty loose parameters: the settings it
@@ -32,11 +34,11 @@ data class WorkspaceSettings(
     /** Book layout: two half-width pages side by side (inner display). */
     val isDualPage: Boolean,
     val pageBounceEnabled: Boolean,
-    /** Swipe effect of the pages (LauncherSettings.PAGE_EFFECT_*). */
-    val pageScrollEffect: String,
+    /** Swipe effect of the pages. */
+    val pageScrollEffect: PageEffect,
     /** Whether a drag past the last page may open a new one (never in the book layout). */
     val allowNewPage: Boolean,
-    val minusOneScreen: String,
+    val minusOneScreen: MinusOne,
     /** The animation speed multiplier (the page settle follows it). */
     val animationSpeed: Float,
 )

@@ -25,7 +25,14 @@ import org.arkikeskus.launcher.data.IconPackRepository
 import org.arkikeskus.launcher.data.LauncherAppsSource
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.local.LauncherDatabase
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.AzPosition
+import org.arkikeskus.launcher.model.DockAlignment
+import org.arkikeskus.launcher.model.DrawerAlignment
+import org.arkikeskus.launcher.model.DrawerLayout
+import org.arkikeskus.launcher.model.DrawerStyle
+import org.arkikeskus.launcher.model.DrawerTheme
+import org.arkikeskus.launcher.model.FoldTransition
+import org.arkikeskus.launcher.model.HomeGesture
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Provider
 import org.junit.After
@@ -134,14 +141,14 @@ class SettingsViewModelTest {
 
         viewModel.setInnerDualPageWorkspace(true)
         viewModel.setInnerSidebarAppDrawer(true)
-        viewModel.setInnerDockAlignment(LauncherSettings.DOCK_ALIGNMENT_FLOATING)
+        viewModel.setInnerDockAlignment(DockAlignment.FLOATING)
 
         testScheduler.advanceUntilIdle()
 
         val settingsInner = viewModel.settings.value
         assertThat(settingsInner.home.innerDualPage).isTrue()
         assertThat(settingsInner.drawer.innerSidebar).isTrue()
-        assertThat(settingsInner.dock.innerAlignment).isEqualTo(LauncherSettings.DOCK_ALIGNMENT_FLOATING)
+        assertThat(settingsInner.dock.innerAlignment).isEqualTo(DockAlignment.FLOATING)
     }
 
     @Test
@@ -152,14 +159,14 @@ class SettingsViewModelTest {
 
         viewModel.setDrawerHeightFraction(0.85f)
         viewModel.setDrawerWidthFraction(0.75f)
-        viewModel.setDrawerAlignment(LauncherSettings.DRAWER_ALIGNMENT_LEFT)
+        viewModel.setDrawerAlignment(DrawerAlignment.LEFT)
 
         testScheduler.advanceUntilIdle()
 
         val outer = viewModel.settings.value
         assertThat(outer.drawer.heightFraction).isEqualTo(0.85f)
         assertThat(outer.drawer.widthFraction).isEqualTo(0.75f)
-        assertThat(outer.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_LEFT)
+        assertThat(outer.drawer.alignment).isEqualTo(DrawerAlignment.LEFT)
 
         viewModel.setScreenType(ScreenType.INNER)
         testScheduler.advanceUntilIdle()
@@ -167,18 +174,18 @@ class SettingsViewModelTest {
         val defaultInner = viewModel.settings.value
         assertThat(defaultInner.drawer.heightFraction).isEqualTo(1.0f)
         assertThat(defaultInner.drawer.widthFraction).isEqualTo(1.0f)
-        assertThat(defaultInner.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_CENTER)
+        assertThat(defaultInner.drawer.alignment).isEqualTo(DrawerAlignment.CENTER)
 
         viewModel.setDrawerHeightFraction(0.65f)
         viewModel.setDrawerWidthFraction(0.55f)
-        viewModel.setDrawerAlignment(LauncherSettings.DRAWER_ALIGNMENT_RIGHT)
+        viewModel.setDrawerAlignment(DrawerAlignment.RIGHT)
 
         testScheduler.advanceUntilIdle()
 
         val inner = viewModel.settings.value
         assertThat(inner.drawer.heightFraction).isEqualTo(0.65f)
         assertThat(inner.drawer.widthFraction).isEqualTo(0.55f)
-        assertThat(inner.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_RIGHT)
+        assertThat(inner.drawer.alignment).isEqualTo(DrawerAlignment.RIGHT)
     }
 
     @Test
@@ -219,23 +226,23 @@ class SettingsViewModelTest {
         viewModel.setScreenType(ScreenType.OUTER)
         backgroundScope.launch { viewModel.settings.collect {} }
 
-        viewModel.setAzIndexPosition(LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM)
+        viewModel.setAzIndexPosition(AzPosition.HORIZONTAL_BOTTOM)
         testScheduler.advanceUntilIdle()
 
         val outer = viewModel.settings.value
-        assertThat(outer.drawer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM)
+        assertThat(outer.drawer.azIndexPosition).isEqualTo(AzPosition.HORIZONTAL_BOTTOM)
 
         viewModel.setScreenType(ScreenType.INNER)
         testScheduler.advanceUntilIdle()
 
         val defaultInner = viewModel.settings.value
-        assertThat(defaultInner.drawer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_VERTICAL_RIGHT)
+        assertThat(defaultInner.drawer.azIndexPosition).isEqualTo(AzPosition.VERTICAL_RIGHT)
 
-        viewModel.setAzIndexPosition(LauncherSettings.AZ_POSITION_VERTICAL_LEFT)
+        viewModel.setAzIndexPosition(AzPosition.VERTICAL_LEFT)
         testScheduler.advanceUntilIdle()
 
         val inner = viewModel.settings.value
-        assertThat(inner.drawer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_VERTICAL_LEFT)
+        assertThat(inner.drawer.azIndexPosition).isEqualTo(AzPosition.VERTICAL_LEFT)
     }
 
     @Test
@@ -270,7 +277,7 @@ class SettingsViewModelTest {
         backgroundScope.launch { viewModel.settings.collect {} }
 
         viewModel.setAquamorphicTouchEnabled(false)
-        viewModel.setFoldTransitionStyle(LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP)
+        viewModel.setFoldTransitionStyle(FoldTransition.BOOK_UNFOLD_SWEEP)
         viewModel.setAppLaunchZoomEnabled(false)
         viewModel.setPageBounceEnabled(false)
 
@@ -278,7 +285,7 @@ class SettingsViewModelTest {
 
         val outer = viewModel.settings.value
         assertThat(outer.motion.aquamorphicTouchEnabled).isFalse()
-        assertThat(outer.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP)
+        assertThat(outer.fold.transitionStyle).isEqualTo(FoldTransition.BOOK_UNFOLD_SWEEP)
         assertThat(outer.motion.appLaunchZoomEnabled).isFalse()
         assertThat(outer.home.pageBounceEnabled).isFalse()
 
@@ -287,12 +294,12 @@ class SettingsViewModelTest {
 
         val defaultInner = viewModel.settings.value
         assertThat(defaultInner.motion.aquamorphicTouchEnabled).isTrue()
-        assertThat(defaultInner.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP)
+        assertThat(defaultInner.fold.transitionStyle).isEqualTo(FoldTransition.BOOK_UNFOLD_SWEEP)
         assertThat(defaultInner.motion.appLaunchZoomEnabled).isTrue()
         assertThat(defaultInner.home.pageBounceEnabled).isTrue()
 
         viewModel.setAquamorphicTouchEnabled(true)
-        viewModel.setFoldTransitionStyle(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE)
+        viewModel.setFoldTransitionStyle(FoldTransition.AQUAMORPHIC_RIPPLE)
         viewModel.setAppLaunchZoomEnabled(true)
         viewModel.setPageBounceEnabled(true)
 
@@ -300,7 +307,7 @@ class SettingsViewModelTest {
 
         val inner = viewModel.settings.value
         assertThat(inner.motion.aquamorphicTouchEnabled).isTrue()
-        assertThat(inner.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE)
+        assertThat(inner.fold.transitionStyle).isEqualTo(FoldTransition.AQUAMORPHIC_RIPPLE)
         assertThat(inner.motion.appLaunchZoomEnabled).isTrue()
         assertThat(inner.home.pageBounceEnabled).isTrue()
     }
@@ -326,10 +333,10 @@ class SettingsViewModelTest {
         viewModel.setShowDockLabels(true)
         viewModel.setDrawerColumns(7)
         viewModel.setDrawerRows(5)
-        viewModel.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI)
-        viewModel.setDrawerThemeTint(LauncherSettings.DRAWER_THEME_ACCENT_TINT)
+        viewModel.setDrawerStyle(DrawerStyle.ONE_UI)
+        viewModel.setDrawerThemeTint(DrawerTheme.ACCENT_TINT)
         viewModel.setDrawerAccentColor(0xFFFF0055.toInt())
-        viewModel.setDrawerLayoutMode(LauncherSettings.DRAWER_LAYOUT_LIST)
+        viewModel.setDrawerLayoutMode(DrawerLayout.LIST)
         viewModel.setDrawerBackgroundBlur(18f)
         viewModel.setDrawerScrimOpacity(0.8f)
         viewModel.setGlassBlurRadius(35f)
@@ -338,9 +345,9 @@ class SettingsViewModelTest {
         viewModel.setDpiAppDrawer(1.2f)
         viewModel.setDpiSettings(1.3f)
         viewModel.setAmoledDark(true)
-        viewModel.setSwipeDownAction(LauncherSettings.GESTURE_SEARCH)
-        viewModel.setDoubleTapAction(LauncherSettings.GESTURE_LOCK)
-        viewModel.setSwipeUpAction(LauncherSettings.GESTURE_NONE)
+        viewModel.setSwipeDownAction(HomeGesture.SEARCH)
+        viewModel.setDoubleTapAction(HomeGesture.LOCK)
+        viewModel.setSwipeUpAction(HomeGesture.NONE)
 
         testScheduler.advanceUntilIdle()
 
@@ -354,10 +361,10 @@ class SettingsViewModelTest {
         assertThat(innerSettings.dock.showLabels).isTrue()
         assertThat(innerSettings.drawer.columns).isEqualTo(7)
         assertThat(innerSettings.drawer.rows).isEqualTo(5)
-        assertThat(innerSettings.drawer.style).isEqualTo(LauncherSettings.DRAWER_STYLE_ONE_UI)
-        assertThat(innerSettings.drawer.themeTint).isEqualTo(LauncherSettings.DRAWER_THEME_ACCENT_TINT)
+        assertThat(innerSettings.drawer.style).isEqualTo(DrawerStyle.ONE_UI)
+        assertThat(innerSettings.drawer.themeTint).isEqualTo(DrawerTheme.ACCENT_TINT)
         assertThat(innerSettings.drawer.accentColor).isEqualTo(0xFFFF0055.toInt())
-        assertThat(innerSettings.drawer.layoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_LIST)
+        assertThat(innerSettings.drawer.layoutMode).isEqualTo(DrawerLayout.LIST)
         assertThat(innerSettings.drawer.backgroundBlur).isEqualTo(18f)
         assertThat(innerSettings.drawer.scrimOpacity).isEqualTo(0.8f)
         assertThat(innerSettings.drawer.glassBlurRadius).isEqualTo(35f)
@@ -366,9 +373,9 @@ class SettingsViewModelTest {
         assertThat(innerSettings.appearance.dpiAppDrawer).isEqualTo(1.2f)
         assertThat(innerSettings.appearance.dpiSettings).isEqualTo(1.3f)
         assertThat(innerSettings.appearance.amoledDark).isTrue()
-        assertThat(innerSettings.home.swipeDownAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
-        assertThat(innerSettings.home.doubleTapAction).isEqualTo(LauncherSettings.GESTURE_LOCK)
-        assertThat(innerSettings.home.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_NONE)
+        assertThat(innerSettings.home.swipeDownAction).isEqualTo(HomeGesture.SEARCH)
+        assertThat(innerSettings.home.doubleTapAction).isEqualTo(HomeGesture.LOCK)
+        assertThat(innerSettings.home.swipeUpAction).isEqualTo(HomeGesture.NONE)
 
         // Verify OUTER settings were NOT altered
         val outerSettings = viewModel.settingsForScreen(ScreenType.OUTER).first()
@@ -408,16 +415,16 @@ class SettingsViewModelTest {
         // Call setters with explicit ScreenType.INNER while active screen is OUTER
         viewModel.setDrawerColumns(7, ScreenType.INNER)
         viewModel.setDrawerRows(5, ScreenType.INNER)
-        viewModel.setDrawerLayoutMode(LauncherSettings.DRAWER_LAYOUT_LIST, ScreenType.INNER)
+        viewModel.setDrawerLayoutMode(DrawerLayout.LIST, ScreenType.INNER)
         viewModel.setDrawerHeightFraction(0.7f, ScreenType.INNER)
         viewModel.setDrawerWidthFraction(0.8f, ScreenType.INNER)
-        viewModel.setDrawerAlignment(LauncherSettings.DRAWER_ALIGNMENT_LEFT, ScreenType.INNER)
-        viewModel.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI, ScreenType.INNER)
-        viewModel.setDrawerThemeTint(LauncherSettings.DRAWER_THEME_ACCENT_TINT, ScreenType.INNER)
+        viewModel.setDrawerAlignment(DrawerAlignment.LEFT, ScreenType.INNER)
+        viewModel.setDrawerStyle(DrawerStyle.ONE_UI, ScreenType.INNER)
+        viewModel.setDrawerThemeTint(DrawerTheme.ACCENT_TINT, ScreenType.INNER)
         viewModel.setGlassBlurRadius(35f, ScreenType.INNER)
         viewModel.setGlassDarkTint(0.65f, ScreenType.INNER)
         viewModel.setDrawerAccentColor(0xFFFF0055.toInt(), ScreenType.INNER)
-        viewModel.setAzIndexPosition(LauncherSettings.AZ_POSITION_VERTICAL_LEFT, ScreenType.INNER)
+        viewModel.setAzIndexPosition(AzPosition.VERTICAL_LEFT, ScreenType.INNER)
         viewModel.setHomeColumns(5, ScreenType.INNER)
         viewModel.setHomeRows(7, ScreenType.INNER)
         viewModel.setDockColumns(6, ScreenType.INNER)
@@ -428,12 +435,12 @@ class SettingsViewModelTest {
         viewModel.setDpiSettings(1.3f, ScreenType.INNER)
         viewModel.setAmoledDark(true, ScreenType.INNER)
         viewModel.setParallaxWallpaper(true, ScreenType.INNER)
-        viewModel.setSwipeUpAction(LauncherSettings.GESTURE_NONE, ScreenType.INNER)
-        viewModel.setSwipeDownAction(LauncherSettings.GESTURE_SEARCH, ScreenType.INNER)
+        viewModel.setSwipeUpAction(HomeGesture.NONE, ScreenType.INNER)
+        viewModel.setSwipeDownAction(HomeGesture.SEARCH, ScreenType.INNER)
         viewModel.setLeftSwipeAppKey("test.app/LeftActivity", ScreenType.INNER)
         viewModel.setRightSwipeAppKey("test.app/RightActivity", ScreenType.INNER)
         viewModel.setAquamorphicTouchEnabled(false, ScreenType.INNER)
-        viewModel.setFoldTransitionStyle(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE, ScreenType.INNER)
+        viewModel.setFoldTransitionStyle(FoldTransition.AQUAMORPHIC_RIPPLE, ScreenType.INNER)
         viewModel.setAppLaunchZoomEnabled(false, ScreenType.INNER)
         viewModel.setPageBounceEnabled(false, ScreenType.INNER)
 
@@ -443,16 +450,16 @@ class SettingsViewModelTest {
         val inner = viewModel.settingsForScreen(ScreenType.INNER).first()
         assertThat(inner.drawer.columns).isEqualTo(7)
         assertThat(inner.drawer.rows).isEqualTo(5)
-        assertThat(inner.drawer.layoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_LIST)
+        assertThat(inner.drawer.layoutMode).isEqualTo(DrawerLayout.LIST)
         assertThat(inner.drawer.heightFraction).isEqualTo(0.7f)
         assertThat(inner.drawer.widthFraction).isEqualTo(0.8f)
-        assertThat(inner.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_LEFT)
-        assertThat(inner.drawer.style).isEqualTo(LauncherSettings.DRAWER_STYLE_ONE_UI)
-        assertThat(inner.drawer.themeTint).isEqualTo(LauncherSettings.DRAWER_THEME_ACCENT_TINT)
+        assertThat(inner.drawer.alignment).isEqualTo(DrawerAlignment.LEFT)
+        assertThat(inner.drawer.style).isEqualTo(DrawerStyle.ONE_UI)
+        assertThat(inner.drawer.themeTint).isEqualTo(DrawerTheme.ACCENT_TINT)
         assertThat(inner.drawer.glassBlurRadius).isEqualTo(35f)
         assertThat(inner.drawer.glassDarkTint).isEqualTo(0.65f)
         assertThat(inner.drawer.accentColor).isEqualTo(0xFFFF0055.toInt())
-        assertThat(inner.drawer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_VERTICAL_LEFT)
+        assertThat(inner.drawer.azIndexPosition).isEqualTo(AzPosition.VERTICAL_LEFT)
         assertThat(inner.home.columns).isEqualTo(5)
         assertThat(inner.home.rows).isEqualTo(7)
         assertThat(inner.dock.columns).isEqualTo(6)
@@ -463,12 +470,12 @@ class SettingsViewModelTest {
         assertThat(inner.appearance.dpiSettings).isEqualTo(1.3f)
         assertThat(inner.appearance.amoledDark).isTrue()
         assertThat(inner.home.parallaxWallpaper).isTrue()
-        assertThat(inner.home.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_NONE)
-        assertThat(inner.home.swipeDownAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
+        assertThat(inner.home.swipeUpAction).isEqualTo(HomeGesture.NONE)
+        assertThat(inner.home.swipeDownAction).isEqualTo(HomeGesture.SEARCH)
         assertThat(inner.home.leftSwipeAppKey).isEqualTo("test.app/LeftActivity")
         assertThat(inner.home.rightSwipeAppKey).isEqualTo("test.app/RightActivity")
         assertThat(inner.motion.aquamorphicTouchEnabled).isFalse()
-        assertThat(inner.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE)
+        assertThat(inner.fold.transitionStyle).isEqualTo(FoldTransition.AQUAMORPHIC_RIPPLE)
         assertThat(inner.motion.appLaunchZoomEnabled).isFalse()
         assertThat(inner.home.pageBounceEnabled).isFalse()
 

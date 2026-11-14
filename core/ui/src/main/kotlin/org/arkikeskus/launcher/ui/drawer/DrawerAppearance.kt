@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.arkikeskus.launcher.model.DrawerStyle
+import org.arkikeskus.launcher.model.DrawerTheme
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.expressive.ExpressivePalette
 
@@ -67,16 +69,16 @@ data class DrawerStyleSpec(
     val handleWidth: Dp,
 )
 
-fun drawerStyleSpec(style: String): DrawerStyleSpec = when (style) {
-    LauncherSettings.DRAWER_STYLE_ONE_UI -> DrawerStyleSpec(
+fun drawerStyleSpec(style: DrawerStyle): DrawerStyleSpec = when (style) {
+    DrawerStyle.ONE_UI -> DrawerStyleSpec(
         corner = 36.dp, searchShape = RoundedCornerShape(50), searchOutlined = false,
         fontFamily = null, handleWidth = 44.dp,
     )
-    LauncherSettings.DRAWER_STYLE_NOTHING_OS -> DrawerStyleSpec(
+    DrawerStyle.NOTHING_OS -> DrawerStyleSpec(
         corner = 14.dp, searchShape = RoundedCornerShape(10.dp), searchOutlined = true,
         fontFamily = FontFamily.Monospace, handleWidth = 28.dp,
     )
-    LauncherSettings.DRAWER_STYLE_MOTO -> DrawerStyleSpec(
+    DrawerStyle.MOTO -> DrawerStyleSpec(
         corner = 24.dp, searchShape = RoundedCornerShape(16.dp), searchOutlined = false,
         fontFamily = null, handleWidth = 36.dp,
     )
@@ -92,7 +94,7 @@ fun readableOn(background: Color): Color =
 
 @Composable
 fun rememberDrawerColors(
-    theme: String,
+    theme: DrawerTheme,
     accentArgb: Int,
     customArgb: Int,
     glass: Boolean,
@@ -106,7 +108,7 @@ fun rememberDrawerColors(
     // Keyed on the configuration: a wallpaper change reaches the app as a configuration change.
     val configuration = LocalConfiguration.current
     val dynamic = remember(theme, dark, configuration) {
-        if (theme == LauncherSettings.DRAWER_THEME_MATERIAL_YOU &&
+        if (theme == DrawerTheme.MATERIAL_YOU &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         ) {
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -117,21 +119,21 @@ fun rememberDrawerColors(
     return remember(theme, accentArgb, customArgb, glass, panelOpacity, dark, scheme, dynamic) {
         val userAccent = Color(accentArgb).copy(alpha = 1f)
         val base = when (theme) {
-            LauncherSettings.DRAWER_THEME_DEFAULT_DARK -> Color(0xFF14161C)
-            LauncherSettings.DRAWER_THEME_OBSIDIAN_BLACK -> Color.Black
-            LauncherSettings.DRAWER_THEME_LIGHT -> Color(0xFFF5F6FA)
-            LauncherSettings.DRAWER_THEME_ACCENT_TINT ->
+            DrawerTheme.DEFAULT_DARK -> Color(0xFF14161C)
+            DrawerTheme.OBSIDIAN_BLACK -> Color.Black
+            DrawerTheme.LIGHT -> Color(0xFFF5F6FA)
+            DrawerTheme.ACCENT_TINT ->
                 lerp(if (dark) Color(0xFF101216) else Color(0xFFF7F8FB), userAccent, if (dark) 0.24f else 0.16f)
-            LauncherSettings.DRAWER_THEME_MONOCHROME -> if (dark) Color(0xFF1A1A1A) else Color(0xFFF1F1F1)
-            LauncherSettings.DRAWER_THEME_CUSTOM -> Color(customArgb).copy(alpha = 1f)
-            LauncherSettings.DRAWER_THEME_MATERIAL_YOU -> dynamic?.surfaceContainer ?: scheme.surface
+            DrawerTheme.MONOCHROME -> if (dark) Color(0xFF1A1A1A) else Color(0xFFF1F1F1)
+            DrawerTheme.CUSTOM -> Color(customArgb).copy(alpha = 1f)
+            DrawerTheme.MATERIAL_YOU -> dynamic?.surfaceContainer ?: scheme.surface
             else -> scheme.surface
         }
         val isLight = base.luminance() > 0.45f
         val content = if (isLight) Color(0xFF14161B) else Color(0xFFF2F4F7)
         val accent = when (theme) {
-            LauncherSettings.DRAWER_THEME_MONOCHROME -> content
-            LauncherSettings.DRAWER_THEME_MATERIAL_YOU -> dynamic?.primary ?: scheme.primary
+            DrawerTheme.MONOCHROME -> content
+            DrawerTheme.MATERIAL_YOU -> dynamic?.primary ?: scheme.primary
             else -> userAccent
         }
         val opacity = panelOpacity.coerceIn(

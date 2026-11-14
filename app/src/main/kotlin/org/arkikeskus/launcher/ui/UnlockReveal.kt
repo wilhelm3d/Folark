@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.UnlockStyle
 import kotlin.math.hypot
 
 /**
@@ -27,24 +27,24 @@ import kotlin.math.hypot
  * - Sweep: home is uncovered from the bottom up behind a soft edge, like a blind going up.
  * - Focus: home comes into focus, from blurred to sharp.
  */
-fun Modifier.unlockReveal(style: String, progress: () -> Float): Modifier = this
+fun Modifier.unlockReveal(style: UnlockStyle, progress: () -> Float): Modifier = this
     .graphicsLayer {
         val t = progress()
         if (t >= 1f) return@graphicsLayer
         val fade = (t * 1.6f).coerceIn(0f, 1f)
         when (style) {
-            LauncherSettings.UNLOCK_STYLE_ZOOM -> {
+            UnlockStyle.ZOOM -> {
                 val k = 1.12f - 0.12f * t
                 scaleX = k; scaleY = k
                 alpha = fade
             }
-            LauncherSettings.UNLOCK_STYLE_RISE -> {
+            UnlockStyle.RISE -> {
                 translationY = (1f - t) * size.height * 0.07f
                 val k = 0.97f + 0.03f * t
                 scaleX = k; scaleY = k
                 alpha = fade
             }
-            LauncherSettings.UNLOCK_STYLE_FOCUS -> {
+            UnlockStyle.FOCUS -> {
                 val k = 1.04f - 0.04f * t
                 scaleX = k; scaleY = k
                 alpha = fade
@@ -53,7 +53,7 @@ fun Modifier.unlockReveal(style: String, progress: () -> Float): Modifier = this
                     renderEffect = RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.CLAMP).asComposeRenderEffect()
                 }
             }
-            LauncherSettings.UNLOCK_STYLE_BLOOM, LauncherSettings.UNLOCK_STYLE_SWEEP -> {
+            UnlockStyle.BLOOM, UnlockStyle.SWEEP -> {
                 // Drawn into its own layer, so the mask below cuts home out over the wallpaper.
                 compositingStrategy = CompositingStrategy.Offscreen
             }
@@ -62,12 +62,12 @@ fun Modifier.unlockReveal(style: String, progress: () -> Float): Modifier = this
     }
     .drawWithContent {
         val t = progress()
-        if (t >= 1f || (style != LauncherSettings.UNLOCK_STYLE_BLOOM && style != LauncherSettings.UNLOCK_STYLE_SWEEP)) {
+        if (t >= 1f || (style != UnlockStyle.BLOOM && style != UnlockStyle.SWEEP)) {
             drawContent()
             return@drawWithContent
         }
         drawContent()
-        if (style == LauncherSettings.UNLOCK_STYLE_BLOOM) {
+        if (style == UnlockStyle.BLOOM) {
             val center = Offset(size.width / 2f, size.height * 0.94f)
             val far = hypot(size.width / 2f, size.height * 0.94f) * 1.1f
             val radius = (far * t).coerceAtLeast(1f)

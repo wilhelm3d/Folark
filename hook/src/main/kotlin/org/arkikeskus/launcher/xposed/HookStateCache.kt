@@ -37,7 +37,7 @@ class HookStateCache @Inject constructor() {
         statusBarCover = s.statusBar.systemPaddingCover
         dividerOn = s.recents.dividerStops
         dividerFree = s.recents.freeDivider
-        dividerLock = s.recents.dividerLock
+        dividerLock = s.recents.dividerLock.stored
         dividerMarks = s.recents.dividerMarks
         dividerHaptics = s.recents.dividerHaptics
         keepSplitSize = s.recents.keepSplitSize

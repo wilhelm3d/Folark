@@ -55,7 +55,8 @@ import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LiveActivity
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.TaskbarRecentsButton
+import org.arkikeskus.launcher.model.TaskbarSource
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.DEFAULT_NUDGE_COLOR
 import kotlin.math.abs
@@ -318,7 +319,7 @@ class AppTaskbar internal constructor(
                 allApps = all
                 TaskbarSetup(
                     // Android's taskbar chosen instead (Settings ▸ Taskbar): Folark's stays away.
-                    enabled = s.taskbar.enabled && s.taskbar.source == LauncherSettings.TASKBAR_SOURCE_FOLARK,
+                    enabled = s.taskbar.enabled && s.taskbar.source == TaskbarSource.FOLARK,
                     pinned = (s.taskbar.pinnedApps ?: favorites).mapNotNull { byKey[it] }.take(MAX_PINNED),
                     recentCount = s.taskbar.recentCount,
                     iconSizeDp = s.taskbar.iconSize,
@@ -361,7 +362,7 @@ class AppTaskbar internal constructor(
                     zones = s.recents.dropZones,
                     // Folark Recents switched off: the button opens Android's again.
                     recentsButton = s.taskbar.recentsButton.let {
-                        if (it == LauncherSettings.TASKBAR_RECENTS_FOLARK && !s.recents.enabled) LauncherSettings.TASKBAR_RECENTS_SYSTEM else it
+                        if (it == TaskbarRecentsButton.FOLARK && !s.recents.enabled) TaskbarRecentsButton.SYSTEM else it
                     },
                     runningApps = s.taskbar.runningApps,
                     runningDots = s.taskbar.runningDots,
@@ -749,8 +750,8 @@ class AppTaskbar internal constructor(
 
     /** Motorola's recents screen, or the recents of its desktop taskbar (Ready For) if chosen and present. */
     internal fun openRecents(s: TaskbarSetup) {
-        if (s.recentsButton == LauncherSettings.TASKBAR_RECENTS_FOLARK && FolarkRecents.open(context)) return
-        if (s.recentsButton == LauncherSettings.TASKBAR_RECENTS_DESKTOP) {
+        if (s.recentsButton == TaskbarRecentsButton.FOLARK && FolarkRecents.open(context)) return
+        if (s.recentsButton == TaskbarRecentsButton.DESKTOP) {
             val intent = Intent(ACTION_DESKTOP_RECENTS)
                 .setPackage(DESKTOP_TASKBAR_PACKAGE)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

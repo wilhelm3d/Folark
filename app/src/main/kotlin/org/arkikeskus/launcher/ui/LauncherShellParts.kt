@@ -60,6 +60,8 @@ import org.arkikeskus.launcher.feature.home.rememberHingeFold
 import org.arkikeskus.launcher.feature.home.taskbar.TaskbarSpace
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.LiveActivity
+import org.arkikeskus.launcher.model.NudgeEffect
+import org.arkikeskus.launcher.model.RingMode
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.catching
 import org.arkikeskus.launcher.ui.component.AppIcon
@@ -126,7 +128,7 @@ internal fun rememberPopupNotifications(
 internal fun rememberIconNudges(
     nudges: Flow<NotificationNudge>,
     enabled: Boolean,
-    effect: String,
+    effect: NudgeEffect,
     softness: Float,
 ): IconNudges? {
     val events = remember { mutableStateMapOf<String, IconNudgeEvent>() }
@@ -142,8 +144,8 @@ internal fun rememberIconNudges(
  * and with "progress & unread" the apps with new notifications. Only what has something to show.
  */
 @Composable
-internal fun rememberIconRings(mode: String, live: State<List<LiveActivity>>): IconRings? {
-    val rings = remember(mode) { if (mode == LauncherSettings.RING_OFF) null else IconRings(mode) }
+internal fun rememberIconRings(mode: RingMode, live: State<List<LiveActivity>>): IconRings? {
+    val rings = remember(mode) { if (mode == RingMode.OFF) null else IconRings(mode) }
     LaunchedEffect(rings) {
         rings ?: return@LaunchedEffect
         snapshotFlow { live.value }.collect { activities ->

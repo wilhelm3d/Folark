@@ -48,7 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsCardLayout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -80,7 +80,7 @@ internal fun RecentsEnv.sizeScale(): Float = settings.recents.cardHeight / 300f
 @Composable
 internal fun FolarkTheme(cards: List<RecentsCard>, env: RecentsEnv, columns: Int) {
     val corner = env.corner
-    val overlay = env.settings.recents.cardLayout == LauncherSettings.RECENTS_CARD_OVERLAY
+    val overlay = env.settings.recents.cardLayout == RecentsCardLayout.OVERLAY
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns.coerceAtLeast(1)),
         horizontalArrangement = Arrangement.spacedBy(14.dp),

@@ -56,7 +56,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PageEffect
 import org.arkikeskus.launcher.ui.DragSource
 import org.arkikeskus.launcher.ui.HomeDragController
 import org.arkikeskus.launcher.ui.component.LocalAppLabelLines
@@ -425,7 +425,7 @@ fun Workspace(
                             val unfold = unfoldProgress()
                             if (unfold < 1f) openOutFromHinge(unfold, isDualPage, page, pagerState)
                             // Two pages are on screen at once in the book layout, so no per-page effect there.
-                            if (!isDualPage && settings.pageScrollEffect != LauncherSettings.PAGE_EFFECT_SLIDE) {
+                            if (!isDualPage && settings.pageScrollEffect != PageEffect.SLIDE) {
                                 pageScrollTransform(
                                     settings.pageScrollEffect,
                                     (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,

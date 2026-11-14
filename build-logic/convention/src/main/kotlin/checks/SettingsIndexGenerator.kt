@@ -17,8 +17,9 @@ object SettingsIndexGenerator {
     /** The function whose `when` picks each category's page (SettingsCategoryPage.kt). */
     private const val PAGE_PICKER = "SettingsCategoryPage"
 
+    // A generic function (`fun <T> ChoicePicker(`) counts too, or its body would join the one above.
     private val DECL = Regex(
-        """^(?:@Composable\s*\n)?(?:(?:internal|private|public)\s+)?fun\s+(?:[A-Za-z_.<>]+\.)?([A-Za-z_]\w*)\s*\(""",
+        """^(?:@Composable\s*\n)?(?:(?:internal|private|public)\s+)?fun\s+(?:<[^()]*?>\s+)?(?:[A-Za-z_.<>]+\.)?([A-Za-z_]\w*)\s*\(""",
         RegexOption.MULTILINE,
     )
     private val TITLE = Regex("""\btitle\s*=\s*stringResource\(R\.string\.(\w+)\)""")

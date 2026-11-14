@@ -16,6 +16,7 @@ import org.arkikeskus.launcher.data.IconPackInfo
 import org.arkikeskus.launcher.data.IconPackRepository
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.IconShape
 import org.arkikeskus.launcher.model.catching
 import javax.inject.Inject
 
@@ -40,7 +41,7 @@ class IconPickerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyMap())
 
     /** Per-app icon shapes, app key → shape, for the picker's shape row. */
-    val iconShapes: StateFlow<Map<String, String>> = settingsRepository.iconShapes
+    val iconShapes: StateFlow<Map<String, IconShape>> = settingsRepository.iconShapes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyMap())
 
     /** Decoded picker icons, "pack|drawable" → bitmap (about 50 KB each at [ICON_PICKER_PX]). */
@@ -74,7 +75,7 @@ class IconPickerViewModel @Inject constructor(
     }
 
     /** Gives [appItem] its own icon [shape]; null follows the global shape again. */
-    fun setIconShape(appItem: AppItem, shape: String?) = viewModelScope.launch {
+    fun setIconShape(appItem: AppItem, shape: IconShape?) = viewModelScope.launch {
         settingsRepository.setIconShape(appItem.key, shape)
     }
 

@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PageEffect
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -135,24 +135,26 @@ internal fun WidgetLookDialog(look: WidgetLook, onChange: (WidgetLook?) -> Unit,
  * The home pages' swipe effect. [offset] is how far the page is from the settled position, in
  * pages: positive once it has moved off to the left, negative while it is still to the right.
  */
-internal fun GraphicsLayerScope.pageScrollTransform(effect: String, offset: Float) {
+internal fun GraphicsLayerScope.pageScrollTransform(effect: PageEffect, offset: Float) {
     val o = offset.coerceIn(-1f, 1f)
     val d = abs(o)
     if (d < 0.001f) return
     when (effect) {
-        LauncherSettings.PAGE_EFFECT_FADE -> alpha = 1f - d
-        LauncherSettings.PAGE_EFFECT_ZOOM -> {
+        // The pager's own slide: nothing to add.
+        PageEffect.SLIDE -> {}
+        PageEffect.FADE -> alpha = 1f - d
+        PageEffect.ZOOM -> {
             val scale = 1f - d * 0.18f
             scaleX = scale
             scaleY = scale
             alpha = 1f - d * 0.6f
         }
-        LauncherSettings.PAGE_EFFECT_CUBE -> {
+        PageEffect.CUBE -> {
             cameraDistance = 20f * density
             transformOrigin = TransformOrigin(if (o > 0f) 1f else 0f, 0.5f)
             rotationY = -o * 90f
         }
-        LauncherSettings.PAGE_EFFECT_STACK -> if (o < 0f) {
+        PageEffect.STACK -> if (o < 0f) {
             // The incoming page waits in place and grows out from under the one sliding away.
             translationX = o * size.width
             val scale = 0.86f + 0.14f * (1f - d)

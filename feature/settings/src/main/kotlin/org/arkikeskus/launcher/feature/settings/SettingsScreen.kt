@@ -48,6 +48,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SettingsStyle
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.DefaultLauncher
 import org.arkikeskus.launcher.ui.component.LocalIconPack
@@ -192,7 +193,7 @@ fun SettingsScreen(
         }
     }
 
-    val studio = s.appearance.settingsStyle == LauncherSettings.SETTINGS_STYLE_STUDIO
+    val studio = s.appearance.settingsStyle == SettingsStyle.STUDIO
     val palette = when {
         studio -> StudioExpressivePalette
         isSystemInDarkTheme() -> DarkExpressivePalette

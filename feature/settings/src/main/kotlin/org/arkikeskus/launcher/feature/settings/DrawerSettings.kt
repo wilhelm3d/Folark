@@ -21,8 +21,15 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.arkikeskus.launcher.model.AzPosition
+import org.arkikeskus.launcher.model.DrawerAlignment
+import org.arkikeskus.launcher.model.DrawerHandle
+import org.arkikeskus.launcher.model.DrawerLayout
+import org.arkikeskus.launcher.model.DrawerStyle
+import org.arkikeskus.launcher.model.DrawerTheme
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.SearchPosition
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import org.arkikeskus.launcher.ui.component.supportsWindowBlur
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -67,10 +74,10 @@ internal fun AppDrawerSection(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_drawer_style),
             options = listOf(
-                LauncherSettings.DRAWER_STYLE_STANDARD_GRID to stringResource(R.string.settings_drawer_style_standard_grid),
-                LauncherSettings.DRAWER_STYLE_ONE_UI to stringResource(R.string.settings_drawer_style_one_ui),
-                LauncherSettings.DRAWER_STYLE_NOTHING_OS to stringResource(R.string.settings_drawer_style_nothing_os),
-                LauncherSettings.DRAWER_STYLE_MOTO to stringResource(R.string.settings_drawer_style_moto),
+                DrawerStyle.STANDARD_GRID to stringResource(R.string.settings_drawer_style_standard_grid),
+                DrawerStyle.ONE_UI to stringResource(R.string.settings_drawer_style_one_ui),
+                DrawerStyle.NOTHING_OS to stringResource(R.string.settings_drawer_style_nothing_os),
+                DrawerStyle.MOTO to stringResource(R.string.settings_drawer_style_moto),
             ),
             selected = s.drawer.style,
             onSelect = { viewModel.setDrawerStyle(it, screenType) },
@@ -79,11 +86,11 @@ internal fun AppDrawerSection(
 
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_drawer_theme_tint),
-            options = LauncherSettings.DRAWER_THEMES.map { it to drawerThemeLabel(it) },
+            options = DrawerTheme.entries.map { it to drawerThemeLabel(it) },
             selected = s.drawer.themeTint,
             onSelect = { theme ->
                 // "Custom" needs a colour first: open the picker, which also selects the theme.
-                if (theme == LauncherSettings.DRAWER_THEME_CUSTOM && s.drawer.themeTint != theme) {
+                if (theme == DrawerTheme.CUSTOM && s.drawer.themeTint != theme) {
                     viewModel.setDrawerThemeTint(theme, screenType)
                     onPickColor(ColorTarget.DRAWER_BACKGROUND)
                 } else {
@@ -91,7 +98,7 @@ internal fun AppDrawerSection(
                 }
             },
         )
-        if (s.drawer.themeTint == LauncherSettings.DRAWER_THEME_CUSTOM) {
+        if (s.drawer.themeTint == DrawerTheme.CUSTOM) {
             ExpressiveRowDivider()
             ColorSwatchRow(
                 title = stringResource(R.string.settings_drawer_custom_color),
@@ -102,8 +109,8 @@ internal fun AppDrawerSection(
             )
         }
         // Monochrome and Material You bring their own accent, so the accent row would do nothing.
-        val themeOwnsAccent = s.drawer.themeTint == LauncherSettings.DRAWER_THEME_MONOCHROME ||
-            s.drawer.themeTint == LauncherSettings.DRAWER_THEME_MATERIAL_YOU
+        val themeOwnsAccent = s.drawer.themeTint == DrawerTheme.MONOCHROME ||
+            s.drawer.themeTint == DrawerTheme.MATERIAL_YOU
         ExpressiveRowDivider()
         if (themeOwnsAccent) {
             Text(
@@ -169,7 +176,7 @@ internal fun AppDrawerSection(
             title = stringResource(R.string.settings_drawer_layout_mode),
             description = stringResource(
                 when (s.drawer.layoutMode) {
-                    LauncherSettings.DRAWER_LAYOUT_LIST -> R.string.settings_drawer_layout_list
+                    DrawerLayout.LIST -> R.string.settings_drawer_layout_list
                     else -> R.string.settings_drawer_layout_grid
                 }
             ),
@@ -194,10 +201,10 @@ internal fun AppDrawerSection(
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_az_index_position),
                 options = listOf(
-                    LauncherSettings.AZ_POSITION_VERTICAL_RIGHT to stringResource(R.string.settings_az_position_vertical_right),
-                    LauncherSettings.AZ_POSITION_VERTICAL_LEFT to stringResource(R.string.settings_az_position_vertical_left),
-                    LauncherSettings.AZ_POSITION_HORIZONTAL_TOP to stringResource(R.string.settings_az_position_horizontal_top),
-                    LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM to stringResource(R.string.settings_az_position_horizontal_bottom),
+                    AzPosition.VERTICAL_RIGHT to stringResource(R.string.settings_az_position_vertical_right),
+                    AzPosition.VERTICAL_LEFT to stringResource(R.string.settings_az_position_vertical_left),
+                    AzPosition.HORIZONTAL_TOP to stringResource(R.string.settings_az_position_horizontal_top),
+                    AzPosition.HORIZONTAL_BOTTOM to stringResource(R.string.settings_az_position_horizontal_bottom),
                 ),
                 selected = s.drawer.azIndexPosition,
                 onSelect = { viewModel.setAzIndexPosition(it, screenType) },
@@ -248,8 +255,8 @@ internal fun AppDrawerSection(
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_drawer_handle),
                 options = listOf(
-                    LauncherSettings.DRAWER_HANDLE_BAR to stringResource(R.string.settings_drawer_handle_bar),
-                    LauncherSettings.DRAWER_HANDLE_ARROW to stringResource(R.string.settings_drawer_handle_arrow),
+                    DrawerHandle.BAR to stringResource(R.string.settings_drawer_handle_bar),
+                    DrawerHandle.ARROW to stringResource(R.string.settings_drawer_handle_arrow),
                 ),
                 selected = s.drawer.handleStyle,
                 onSelect = { viewModel.setDrawerHandleStyle(it, screenType) },
@@ -297,9 +304,9 @@ internal fun AppDrawerSection(
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_drawer_alignment),
                 options = listOf(
-                    LauncherSettings.DRAWER_ALIGNMENT_LEFT to stringResource(R.string.settings_drawer_align_left),
-                    LauncherSettings.DRAWER_ALIGNMENT_CENTER to stringResource(R.string.settings_drawer_align_center),
-                    LauncherSettings.DRAWER_ALIGNMENT_RIGHT to stringResource(R.string.settings_drawer_align_right),
+                    DrawerAlignment.LEFT to stringResource(R.string.settings_drawer_align_left),
+                    DrawerAlignment.CENTER to stringResource(R.string.settings_drawer_align_center),
+                    DrawerAlignment.RIGHT to stringResource(R.string.settings_drawer_align_right),
                 ),
                 selected = s.drawer.alignment,
                 onSelect = { viewModel.setDrawerAlignment(it, screenType) },
@@ -322,8 +329,8 @@ internal fun AppDrawerSection(
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_drawer_search_position),
                 options = listOf(
-                    LauncherSettings.SEARCH_TOP to stringResource(R.string.settings_drawer_search_top),
-                    LauncherSettings.SEARCH_BOTTOM to stringResource(R.string.settings_drawer_search_bottom),
+                    SearchPosition.TOP to stringResource(R.string.settings_drawer_search_top),
+                    SearchPosition.BOTTOM to stringResource(R.string.settings_drawer_search_bottom),
                 ),
                 selected = s.drawer.searchPosition,
                 onSelect = { viewModel.setDrawerSearchPosition(it, screenType) },
@@ -431,15 +438,15 @@ internal fun AppDrawerSection(
 }
 
 @Composable
-private fun drawerThemeLabel(theme: String): String = stringResource(
+private fun drawerThemeLabel(theme: DrawerTheme): String = stringResource(
     when (theme) {
-        LauncherSettings.DRAWER_THEME_MATERIAL_YOU -> R.string.settings_drawer_theme_material_you
-        LauncherSettings.DRAWER_THEME_DEFAULT_DARK -> R.string.settings_drawer_theme_default_dark
-        LauncherSettings.DRAWER_THEME_OBSIDIAN_BLACK -> R.string.settings_drawer_theme_obsidian_black
-        LauncherSettings.DRAWER_THEME_LIGHT -> R.string.settings_drawer_theme_light
-        LauncherSettings.DRAWER_THEME_ACCENT_TINT -> R.string.settings_drawer_theme_accent_tint
-        LauncherSettings.DRAWER_THEME_MONOCHROME -> R.string.settings_drawer_theme_monochrome
-        LauncherSettings.DRAWER_THEME_CUSTOM -> R.string.settings_drawer_theme_custom
+        DrawerTheme.MATERIAL_YOU -> R.string.settings_drawer_theme_material_you
+        DrawerTheme.DEFAULT_DARK -> R.string.settings_drawer_theme_default_dark
+        DrawerTheme.OBSIDIAN_BLACK -> R.string.settings_drawer_theme_obsidian_black
+        DrawerTheme.LIGHT -> R.string.settings_drawer_theme_light
+        DrawerTheme.ACCENT_TINT -> R.string.settings_drawer_theme_accent_tint
+        DrawerTheme.MONOCHROME -> R.string.settings_drawer_theme_monochrome
+        DrawerTheme.CUSTOM -> R.string.settings_drawer_theme_custom
         else -> R.string.settings_drawer_theme_system
     },
 )

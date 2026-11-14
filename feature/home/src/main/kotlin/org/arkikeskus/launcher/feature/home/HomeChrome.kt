@@ -69,6 +69,8 @@ import org.arkikeskus.launcher.feature.home.widgets.NotificationShade
 import org.arkikeskus.launcher.feature.home.widgets.StackStyle
 import org.arkikeskus.launcher.feature.home.workspace.Dock
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.DockAlignment
+import org.arkikeskus.launcher.model.HomeGesture
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.catching
@@ -203,29 +205,28 @@ internal fun Modifier.parallaxAndHingeLayer(
 }
 
 /**
- * Runs the action of a home gesture ([action] is a LauncherSettings.GESTURE_* value, or one of the
- * Motorola ones): the notification shade, the drawer, lock, Recents, or a Motorola feature.
+ * Runs the action of a home gesture ([action], the Motorola ones included): the notification shade, the drawer, lock, Recents, or a Motorola feature.
  */
 internal fun runHomeGesture(
     context: Context,
-    action: String,
+    action: HomeGesture,
     recentsEnabled: Boolean,
     onOpenDrawer: () -> Unit,
     message: (Int) -> Unit,
 ) {
     when (action) {
-        LauncherSettings.GESTURE_NOTIFICATIONS -> NotificationShade.expand(context)
-        LauncherSettings.GESTURE_DRAWER -> onOpenDrawer()
-        LauncherSettings.GESTURE_SEARCH -> onOpenDrawer()
-        LauncherSettings.GESTURE_LOCK -> {
+        HomeGesture.NOTIFICATIONS -> NotificationShade.expand(context)
+        HomeGesture.DRAWER -> onOpenDrawer()
+        HomeGesture.SEARCH -> onOpenDrawer()
+        HomeGesture.LOCK -> {
             if (!LockAccessibilityService.lock()) {
                 message(R.string.double_tap_lock_needs_service)
             }
         }
-        LauncherSettings.GESTURE_RECENTS -> {
+        HomeGesture.RECENTS -> {
             if (!recentsEnabled || !FolarkRecents.open(context)) LockAccessibilityService.openRecents()
         }
-        LauncherSettings.GESTURE_NONE -> {}
+        HomeGesture.NONE -> {}
         // Motorola gestures (MotoLinks): a note, Secure Vault, Ready For, Game Center, ...
         else -> if (!MotoLinks.runGesture(context, action)) message(R.string.gesture_moto_unavailable)
     }
@@ -341,9 +342,9 @@ internal fun ColumnScope.HomeDock(
     val wideScreen = LocalConfiguration.current.screenWidthDp >= 600
     val dockAlignModifier = if (screenType == ScreenType.INNER && wideScreen) {
         when (settings.dock.innerAlignment) {
-            LauncherSettings.DOCK_ALIGNMENT_LEFT -> Modifier.fillMaxWidth(0.6f).align(Alignment.Start)
-            LauncherSettings.DOCK_ALIGNMENT_RIGHT -> Modifier.fillMaxWidth(0.6f).align(Alignment.End)
-            LauncherSettings.DOCK_ALIGNMENT_FLOATING -> Modifier.fillMaxWidth(0.75f).align(Alignment.CenterHorizontally).padding(bottom = 8.dp)
+            DockAlignment.LEFT -> Modifier.fillMaxWidth(0.6f).align(Alignment.Start)
+            DockAlignment.RIGHT -> Modifier.fillMaxWidth(0.6f).align(Alignment.End)
+            DockAlignment.FLOATING -> Modifier.fillMaxWidth(0.75f).align(Alignment.CenterHorizontally).padding(bottom = 8.dp)
             else -> Modifier.fillMaxWidth(0.8f).align(Alignment.CenterHorizontally)
         }
     } else {

@@ -1,22 +1,22 @@
 package org.arkikeskus.launcher.data
 
-import org.arkikeskus.launcher.model.LaunchSettings
-import org.arkikeskus.launcher.model.RootSettings
-import org.arkikeskus.launcher.model.RecentsSettings
-import org.arkikeskus.launcher.model.LiveSettings
-import org.arkikeskus.launcher.model.TaskbarSettings
 import org.arkikeskus.launcher.model.AppearanceSettings
-import org.arkikeskus.launcher.model.MotionSettings
-import org.arkikeskus.launcher.model.FoldSettings
-import org.arkikeskus.launcher.model.StatusBarSettings
-import org.arkikeskus.launcher.model.WidgetSettings
-import org.arkikeskus.launcher.model.FolderSettings
-import org.arkikeskus.launcher.model.DotSettings
-import org.arkikeskus.launcher.model.IconSettings
-import org.arkikeskus.launcher.model.SearchSettings
-import org.arkikeskus.launcher.model.DrawerSettings
-import org.arkikeskus.launcher.model.HomeSettings
 import org.arkikeskus.launcher.model.DockSettings
+import org.arkikeskus.launcher.model.DotSettings
+import org.arkikeskus.launcher.model.DrawerSettings
+import org.arkikeskus.launcher.model.FoldSettings
+import org.arkikeskus.launcher.model.FolderSettings
+import org.arkikeskus.launcher.model.HomeSettings
+import org.arkikeskus.launcher.model.IconSettings
+import org.arkikeskus.launcher.model.LaunchSettings
+import org.arkikeskus.launcher.model.LiveSettings
+import org.arkikeskus.launcher.model.MotionSettings
+import org.arkikeskus.launcher.model.RecentsSettings
+import org.arkikeskus.launcher.model.RootSettings
+import org.arkikeskus.launcher.model.SearchSettings
+import org.arkikeskus.launcher.model.StatusBarSettings
+import org.arkikeskus.launcher.model.TaskbarSettings
+import org.arkikeskus.launcher.model.WidgetSettings
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
@@ -34,12 +34,21 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.arkikeskus.launcher.model.LauncherSettings
-import org.arkikeskus.launcher.model.withLiquidGlass
 import org.arkikeskus.launcher.model.AppPair
+import org.arkikeskus.launcher.model.DotColor
+import org.arkikeskus.launcher.model.DrawerTheme
+import org.arkikeskus.launcher.model.DropZones
+import org.arkikeskus.launcher.model.FolderTheme
+import org.arkikeskus.launcher.model.HomeGesture
+import org.arkikeskus.launcher.model.IconShape
+import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PopupTheme
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.model.SplitPickerLook
-import org.arkikeskus.launcher.model.DropZones
+import org.arkikeskus.launcher.model.StackIndicator
+import org.arkikeskus.launcher.model.ThemePreset
+import org.arkikeskus.launcher.model.storedChoice
+import org.arkikeskus.launcher.model.withLiquidGlass
 import javax.inject.Inject
 import java.util.concurrent.atomic.AtomicReferenceArray
 import javax.inject.Singleton
@@ -266,7 +275,7 @@ class SettingsRepository @Inject constructor(
             if (i <= 0) null else line.substring(0, i) to (line.substring(i + 1).toLongOrNull() ?: return@mapNotNull null)
         }?.toMap() ?: emptyMap()
 
-    suspend fun setIconShape(value: String) = edit { it[Keys.ICON_SHAPE] = value }
+    suspend fun setIconShape(value: IconShape) = edit { it[Keys.ICON_SHAPE] = value.stored }
 
     /** Packages whose battery-optimisation exemption Folark added for a pin (and may take back). */
     suspend fun pinExemptions(): Set<String> = lines(dataStore.data.first()[Keys.RECENTS_PIN_EXEMPT])
@@ -297,37 +306,40 @@ class SettingsRepository @Inject constructor(
      * long-press menus, notification dots, widget-stack indicator and dock together. Every value
      * stays an ordinary setting afterwards and can be changed on its own.
      */
-    suspend fun applyThemePreset(preset: String, screenType: ScreenType) = edit { p ->
-        fun put(drawer: String, glass: Boolean, folder: String, popup: String, dot: String, indicator: String, dock: Float, amoled: Boolean) {
-            p[Keys.drawerThemeTint(screenType)] = drawer
+    suspend fun applyThemePreset(preset: ThemePreset, screenType: ScreenType) = edit { p ->
+        fun put(
+            drawer: DrawerTheme, glass: Boolean, folder: FolderTheme, popup: PopupTheme, dot: DotColor,
+            indicator: StackIndicator, dock: Float, amoled: Boolean,
+        ) {
+            p[Keys.drawerThemeTint(screenType)] = drawer.stored
             p[Keys.drawerGlassEnabled(screenType)] = glass
-            p[Keys.folderTheme(screenType)] = folder
-            p[Keys.popupTheme(screenType)] = popup
-            p[Keys.dotColor(screenType)] = dot
-            p[Keys.stackIndicator(screenType)] = indicator
+            p[Keys.folderTheme(screenType)] = folder.stored
+            p[Keys.popupTheme(screenType)] = popup.stored
+            p[Keys.dotColor(screenType)] = dot.stored
+            p[Keys.stackIndicator(screenType)] = indicator.stored
             p[Keys.dockBackgroundOpacity(screenType)] = dock
             p[Keys.amoledDark(screenType)] = amoled
         }
         when (preset) {
-            LauncherSettings.THEME_PRESET_GLASS -> put(
-                LauncherSettings.DRAWER_THEME_SYSTEM, true, LauncherSettings.FOLDER_THEME_GLASS,
-                LauncherSettings.POPUP_THEME_MATERIAL, LauncherSettings.DOT_COLOR_ACCENT,
-                LauncherSettings.STACK_INDICATOR_DOTS, 0.35f, false,
+            ThemePreset.GLASS -> put(
+                DrawerTheme.SYSTEM, true, FolderTheme.GLASS,
+                PopupTheme.MATERIAL, DotColor.ACCENT,
+                StackIndicator.DOTS, 0.35f, false,
             )
-            LauncherSettings.THEME_PRESET_DARK -> put(
-                LauncherSettings.DRAWER_THEME_OBSIDIAN_BLACK, false, LauncherSettings.FOLDER_THEME_DARK,
-                LauncherSettings.POPUP_THEME_DARK, LauncherSettings.DOT_COLOR_RED,
-                LauncherSettings.STACK_INDICATOR_DOTS, 0.6f, true,
+            ThemePreset.DARK -> put(
+                DrawerTheme.OBSIDIAN_BLACK, false, FolderTheme.DARK,
+                PopupTheme.DARK, DotColor.RED,
+                StackIndicator.DOTS, 0.6f, true,
             )
-            LauncherSettings.THEME_PRESET_LIGHT -> put(
-                LauncherSettings.DRAWER_THEME_LIGHT, false, LauncherSettings.FOLDER_THEME_LIGHT,
-                LauncherSettings.POPUP_THEME_LIGHT, LauncherSettings.DOT_COLOR_RED,
-                LauncherSettings.STACK_INDICATOR_DOTS, 0.5f, false,
+            ThemePreset.LIGHT -> put(
+                DrawerTheme.LIGHT, false, FolderTheme.LIGHT,
+                PopupTheme.LIGHT, DotColor.RED,
+                StackIndicator.DOTS, 0.5f, false,
             )
-            LauncherSettings.THEME_PRESET_MONO -> put(
-                LauncherSettings.DRAWER_THEME_MONOCHROME, false, LauncherSettings.FOLDER_THEME_DARK,
-                LauncherSettings.POPUP_THEME_DARK, LauncherSettings.DOT_COLOR_WHITE,
-                LauncherSettings.STACK_INDICATOR_BAR, 0.4f, false,
+            ThemePreset.MONO -> put(
+                DrawerTheme.MONOCHROME, false, FolderTheme.DARK,
+                PopupTheme.DARK, DotColor.WHITE,
+                StackIndicator.BAR, 0.4f, false,
             )
         }
     }
@@ -342,13 +354,15 @@ class SettingsRepository @Inject constructor(
         p[Keys.CUSTOM_ICONS] = current.entries.joinToString("\n") { "${it.key}\t${it.value}" }
     }
 
-    /** Per-app icon shapes, app key → LauncherSettings.ICON_SHAPE_* (both displays); the rest follow the global shape. */
-    val iconShapes: Flow<Map<String, String>> = keyFlow(Keys.ICON_SHAPES) { parseLabels(it) }
+    /** Per-app icon shapes, app key → shape (both displays); the rest follow the global shape. */
+    val iconShapes: Flow<Map<String, IconShape>> = keyFlow(Keys.ICON_SHAPES) { raw ->
+        parseLabels(raw).mapValues { (_, shape) -> storedChoice(shape, IconShape.SYSTEM) }
+    }
 
-    /** Gives the app [key] its own icon [shape], or (null/blank) returns it to the global one. */
-    suspend fun setIconShape(key: String, shape: String?) = edit { p ->
+    /** Gives the app [key] its own icon [shape], or (null) returns it to the global one. */
+    suspend fun setIconShape(key: String, shape: IconShape?) = edit { p ->
         val current = parseLabels(p[Keys.ICON_SHAPES]).toMutableMap()
-        if (shape.isNullOrBlank()) current.remove(key) else current[key] = shape
+        if (shape == null) current.remove(key) else current[key] = shape.stored
         p[Keys.ICON_SHAPES] = current.entries.joinToString("\n") { "${it.key}\t${it.value}" }
     }
 
@@ -582,8 +596,8 @@ class SettingsRepository @Inject constructor(
         }
         for (type in ScreenType.entries) {
             if (p[Keys.doubleTapToLock(type)] == true) {
-                if (p[Keys.doubleTapAction(type)] == null || p[Keys.doubleTapAction(type)] == LauncherSettings.GESTURE_NONE) {
-                    p[Keys.doubleTapAction(type)] = LauncherSettings.GESTURE_LOCK
+                if (p[Keys.doubleTapAction(type)] == null || p[Keys.doubleTapAction(type)] == HomeGesture.NONE.stored) {
+                    p[Keys.doubleTapAction(type)] = HomeGesture.LOCK.stored
                 }
             }
         }

@@ -10,8 +10,8 @@ data class LaunchSettings(
     val splitEnabled: Boolean = true,
     /** Multi-window (both displays): "Open in floating window" and floating shortcuts in the app menus. */
     val floatingEnabled: Boolean = true,
-    /** Size of a newly opened floating window (both displays; one of FLOATING_SIZE_*). */
-    val floatingWindowSize: String = LauncherSettings.FLOATING_SIZE_MEDIUM,
+    /** Size of a newly opened floating window (both displays; one of [SizeChoice]). */
+    val floatingWindowSize: SizeChoice = SizeChoice.MEDIUM,
     /** With Folark's Vector module in SystemUI: a third app joins a split screen as a real third
      *  pane (Recents, saved app pairs) instead of floating over it. */
     val threeAppSplit: Boolean = true,

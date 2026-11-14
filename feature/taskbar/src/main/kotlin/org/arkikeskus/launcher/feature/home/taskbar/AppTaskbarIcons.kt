@@ -55,7 +55,7 @@ import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LiveActivity
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.TaskbarTheme
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.DEFAULT_NUDGE_COLOR
 import kotlin.math.abs
@@ -83,7 +83,7 @@ internal fun AppTaskbar.iconView(app: AppItem, s: TaskbarSetup, size: Int, hint:
         val inset = size / 12
         setPadding(inset, inset, inset, inset)
         // See-through bar: a soft shadow under each icon keeps it readable on any background.
-        if (s.theme == LauncherSettings.TASKBAR_THEME_CLEAR) {
+        if (s.theme == TaskbarTheme.CLEAR) {
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
                     val p = view.paddingLeft

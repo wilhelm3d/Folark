@@ -86,6 +86,9 @@ import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.IconRequest
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsAction
+import org.arkikeskus.launcher.model.RecentsAttachedSide
+import org.arkikeskus.launcher.model.RecentsCardLayout
 import org.arkikeskus.launcher.ui.component.pressClick
 import org.arkikeskus.launcher.ui.component.PressStyle
 import org.arkikeskus.launcher.ui.component.LocalPressStyle
@@ -166,14 +169,14 @@ internal class RecentsEnv(
     var coverScreen: Boolean = false
 
     /** The card gestures for the screen Recents is on (Settings ▸ Recents ▸ Gestures on a card). */
-    val swipeUpAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeUpAction else it.swipeUpAction }
-    val swipeDownAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeDownAction else it.swipeDownAction }
-    val swipeLeftAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeLeftAction else it.swipeLeftAction }
-    val swipeRightAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeRightAction else it.swipeRightAction }
-    val longPressAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerLongPressAction else it.longPressAction }
-    val doubleTapAction: String get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerDoubleTapAction else it.doubleTapAction }
+    val swipeUpAction: RecentsAction get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeUpAction else it.swipeUpAction }
+    val swipeDownAction: RecentsAction get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeDownAction else it.swipeDownAction }
+    val swipeLeftAction: RecentsAction get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeLeftAction else it.swipeLeftAction }
+    val swipeRightAction: RecentsAction get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerSwipeRightAction else it.swipeRightAction }
+    val longPressAction: RecentsAction get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerLongPressAction else it.longPressAction }
+    val doubleTapAction: RecentsAction get() = settings.recents.let { if (coverScreen && it.outerGestures) it.outerDoubleTapAction else it.doubleTapAction }
     /** Borderless cards (Settings ▸ Recents ▸ Card layout). */
-    val overlay: Boolean get() = settings.recents.cardLayout == LauncherSettings.RECENTS_CARD_OVERLAY
+    val overlay: Boolean get() = settings.recents.cardLayout == RecentsCardLayout.OVERLAY
     /** The app icon on each card, a card shadow, and the label size (Settings ▸ Recents). */
     val cardIcons: Boolean get() = settings.recents.cardIcons
     val cardShadow: Boolean get() = settings.recents.cardShadow
@@ -648,7 +651,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEdgeGlyph(edge:
 
 @Composable
 private fun DropHalf(label: Int, active: Float, accent: Color, attachedDiagram: Boolean, env: RecentsEnv, modifier: Modifier, panes: Int = 2) {
-    val attachedLeft = env.settings.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_LEFT
+    val attachedLeft = env.settings.recents.attachedSide == RecentsAttachedSide.LEFT
     Column(
         modifier
             .fillMaxHeight()

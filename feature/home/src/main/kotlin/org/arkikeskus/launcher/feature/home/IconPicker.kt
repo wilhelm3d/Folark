@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.IconShape
 
 /**
  * Picks one icon for one app out of the installed icon packs ([packs]: package to label). The grid
@@ -45,8 +46,8 @@ import org.arkikeskus.launcher.model.AppItem
 internal fun IconPickerDialog(
     app: AppItem,
     /** This app's own shape (null: it follows the global one), and setting it (null: follow again). */
-    shape: String?,
-    onShape: (String?) -> Unit,
+    shape: IconShape?,
+    onShape: (IconShape?) -> Unit,
     packs: List<Pair<String, String>>,
     hasCustomIcon: Boolean,
     loadNames: suspend (pack: String) -> List<String>,
@@ -164,15 +165,15 @@ internal fun IconPickerDialog(
 
 /** The shapes an app can have of its own, with their names. */
 private val APP_SHAPES = listOf(
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_SYSTEM to R.string.icon_shape_system,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_CIRCLE to R.string.icon_shape_circle,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_SQUIRCLE to R.string.icon_shape_squircle,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_ROUNDED to R.string.icon_shape_rounded,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_SQUARE to R.string.icon_shape_square,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_TEARDROP to R.string.icon_shape_teardrop,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_PEBBLE to R.string.icon_shape_pebble,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_ARCH to R.string.icon_shape_arch,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_HEXAGON to R.string.icon_shape_hexagon,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_DIAMOND to R.string.icon_shape_diamond,
-    org.arkikeskus.launcher.model.LauncherSettings.ICON_SHAPE_COOKIE to R.string.icon_shape_cookie,
+    IconShape.SYSTEM to R.string.icon_shape_system,
+    IconShape.CIRCLE to R.string.icon_shape_circle,
+    IconShape.SQUIRCLE to R.string.icon_shape_squircle,
+    IconShape.ROUNDED to R.string.icon_shape_rounded,
+    IconShape.SQUARE to R.string.icon_shape_square,
+    IconShape.TEARDROP to R.string.icon_shape_teardrop,
+    IconShape.PEBBLE to R.string.icon_shape_pebble,
+    IconShape.ARCH to R.string.icon_shape_arch,
+    IconShape.HEXAGON to R.string.icon_shape_hexagon,
+    IconShape.DIAMOND to R.string.icon_shape_diamond,
+    IconShape.COOKIE to R.string.icon_shape_cookie,
 )

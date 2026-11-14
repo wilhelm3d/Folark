@@ -10,7 +10,17 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.arkikeskus.launcher.model.AppPair
+import org.arkikeskus.launcher.model.AzPosition
+import org.arkikeskus.launcher.model.CountStyle
+import org.arkikeskus.launcher.model.DrawerAlignment
+import org.arkikeskus.launcher.model.DrawerLayout
+import org.arkikeskus.launcher.model.DrawerStyle
+import org.arkikeskus.launcher.model.DrawerTheme
+import org.arkikeskus.launcher.model.FoldAction
+import org.arkikeskus.launcher.model.FoldTransition
+import org.arkikeskus.launcher.model.HomeGesture
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SearchPosition
 import org.arkikeskus.launcher.model.ScreenType
 import org.junit.Test
 
@@ -195,19 +205,20 @@ class SettingsRepositoryTest {
     fun `notificationWidgetCountStyle defaults to number and round-trips`() = runTest {
         val repo = newRepository()
         assertThat(repo.settings.first().widgets.notificationCountStyle)
-            .isEqualTo(LauncherSettings.COUNT_NUMBER)
+            .isEqualTo(CountStyle.NUMBER)
 
-        repo.setNotificationWidgetCountStyle(LauncherSettings.COUNT_DOT)
+        repo.setNotificationWidgetCountStyle(CountStyle.DOT)
         assertThat(repo.settings.first().widgets.notificationCountStyle)
-            .isEqualTo(LauncherSettings.COUNT_DOT)
+            .isEqualTo(CountStyle.DOT)
     }
 
     @Test
     fun `notificationWidgetCountStyle falls back to number on an unknown stored value`() = runTest {
-        val repo = newRepository()
-        repo.setNotificationWidgetCountStyle("garbage")
+        val store = InMemoryDataStore()
+        store.edit { it[stringPreferencesKey("notif_widget_count_style")] = "garbage" }
+        val repo = SettingsRepository(store)
         assertThat(repo.settings.first().widgets.notificationCountStyle)
-            .isEqualTo(LauncherSettings.COUNT_NUMBER)
+            .isEqualTo(CountStyle.NUMBER)
     }
 
     @Test
@@ -299,13 +310,13 @@ class SettingsRepositoryTest {
     @Test
     fun `drawerLayoutMode defaults to grid and round-trips`() = runTest {
         val repo = newRepository()
-        assertThat(repo.settings.first().drawer.layoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_GRID)
+        assertThat(repo.settings.first().drawer.layoutMode).isEqualTo(DrawerLayout.GRID)
 
-        repo.setDrawerLayoutMode(LauncherSettings.DRAWER_LAYOUT_LIST)
-        assertThat(repo.settings.first().drawer.layoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_LIST)
+        repo.setDrawerLayoutMode(DrawerLayout.LIST)
+        assertThat(repo.settings.first().drawer.layoutMode).isEqualTo(DrawerLayout.LIST)
 
-        repo.setDrawerLayoutMode(LauncherSettings.DRAWER_LAYOUT_GRID)
-        assertThat(repo.settings.first().drawer.layoutMode).isEqualTo(LauncherSettings.DRAWER_LAYOUT_GRID)
+        repo.setDrawerLayoutMode(DrawerLayout.GRID)
+        assertThat(repo.settings.first().drawer.layoutMode).isEqualTo(DrawerLayout.GRID)
     }
 
     @Test
@@ -387,40 +398,40 @@ class SettingsRepositoryTest {
     @Test
     fun `advanced folding features roundtrip and persist correctly`() = runTest {
         val repo = newRepository()
-        repo.setFoldAction(LauncherSettings.ACTION_PAGE_0, ScreenType.OUTER)
-        repo.setUnfoldAction(LauncherSettings.ACTION_SEARCH, ScreenType.INNER)
-        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_SLIDE)
+        repo.setFoldAction(FoldAction.PAGE_0, ScreenType.OUTER)
+        repo.setUnfoldAction(FoldAction.SEARCH, ScreenType.INNER)
+        repo.setFoldTransitionStyle(FoldTransition.SLIDE)
 
         val outerSettings = repo.settings(ScreenType.OUTER).first()
-        assertThat(outerSettings.fold.foldAction).isEqualTo(LauncherSettings.ACTION_PAGE_0)
-        assertThat(outerSettings.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_SLIDE)
+        assertThat(outerSettings.fold.foldAction).isEqualTo(FoldAction.PAGE_0)
+        assertThat(outerSettings.fold.transitionStyle).isEqualTo(FoldTransition.SLIDE)
 
         val innerSettings = repo.settings(ScreenType.INNER).first()
-        assertThat(innerSettings.fold.unfoldAction).isEqualTo(LauncherSettings.ACTION_SEARCH)
+        assertThat(innerSettings.fold.unfoldAction).isEqualTo(FoldAction.SEARCH)
     }
 
     @Test
     fun `aquamorphic animations and fluid motion settings roundtrip and support independent outer and inner screen configuration`() = runTest {
         val repo = newRepository()
         repo.setAquamorphicTouchEnabled(false, ScreenType.OUTER)
-        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP, ScreenType.OUTER)
+        repo.setFoldTransitionStyle(FoldTransition.BOOK_UNFOLD_SWEEP, ScreenType.OUTER)
         repo.setAppLaunchZoomEnabled(false, ScreenType.OUTER)
         repo.setPageBounceEnabled(false, ScreenType.OUTER)
 
         repo.setAquamorphicTouchEnabled(true, ScreenType.INNER)
-        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE, ScreenType.INNER)
+        repo.setFoldTransitionStyle(FoldTransition.AQUAMORPHIC_RIPPLE, ScreenType.INNER)
         repo.setAppLaunchZoomEnabled(true, ScreenType.INNER)
         repo.setPageBounceEnabled(true, ScreenType.INNER)
 
         val outer = repo.settings(ScreenType.OUTER).first()
         assertThat(outer.motion.aquamorphicTouchEnabled).isFalse()
-        assertThat(outer.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP)
+        assertThat(outer.fold.transitionStyle).isEqualTo(FoldTransition.BOOK_UNFOLD_SWEEP)
         assertThat(outer.motion.appLaunchZoomEnabled).isFalse()
         assertThat(outer.home.pageBounceEnabled).isFalse()
 
         val inner = repo.settings(ScreenType.INNER).first()
         assertThat(inner.motion.aquamorphicTouchEnabled).isTrue()
-        assertThat(inner.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE)
+        assertThat(inner.fold.transitionStyle).isEqualTo(FoldTransition.AQUAMORPHIC_RIPPLE)
         assertThat(inner.motion.appLaunchZoomEnabled).isTrue()
         assertThat(inner.home.pageBounceEnabled).isTrue()
     }
@@ -429,45 +440,45 @@ class SettingsRepositoryTest {
     fun `advanced app drawer customizations roundtrip and support independent outer and inner screen configuration`() = runTest {
         val repo = newRepository()
         // Outer screen config
-        repo.setDrawerSearchPosition(LauncherSettings.SEARCH_BOTTOM, ScreenType.OUTER)
+        repo.setDrawerSearchPosition(SearchPosition.BOTTOM, ScreenType.OUTER)
         repo.setDrawerIndexBarEnabled(false, ScreenType.OUTER)
-        repo.setAzIndexPosition(LauncherSettings.AZ_POSITION_VERTICAL_LEFT, ScreenType.OUTER)
+        repo.setAzIndexPosition(AzPosition.VERTICAL_LEFT, ScreenType.OUTER)
         repo.setDrawerBackgroundBlur(12f, ScreenType.OUTER)
         repo.setDrawerScrimOpacity(0.7f, ScreenType.OUTER)
-        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_MOTO, ScreenType.OUTER)
+        repo.setDrawerStyle(DrawerStyle.MOTO, ScreenType.OUTER)
         repo.setDrawerAccentColor(0xFF00BCD4.toInt(), ScreenType.OUTER)
         repo.setShowDrawerLabels(false, ScreenType.OUTER)
         repo.setShowFrequentApps(true, ScreenType.OUTER)
 
         // Inner screen config (independent)
-        repo.setDrawerSearchPosition(LauncherSettings.SEARCH_TOP, ScreenType.INNER)
+        repo.setDrawerSearchPosition(SearchPosition.TOP, ScreenType.INNER)
         repo.setDrawerIndexBarEnabled(true, ScreenType.INNER)
-        repo.setAzIndexPosition(LauncherSettings.AZ_POSITION_HORIZONTAL_TOP, ScreenType.INNER)
+        repo.setAzIndexPosition(AzPosition.HORIZONTAL_TOP, ScreenType.INNER)
         repo.setDrawerBackgroundBlur(4f, ScreenType.INNER)
         repo.setDrawerScrimOpacity(0.3f, ScreenType.INNER)
-        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI, ScreenType.INNER)
+        repo.setDrawerStyle(DrawerStyle.ONE_UI, ScreenType.INNER)
         repo.setDrawerAccentColor(0xFFFF1744.toInt(), ScreenType.INNER)
         repo.setShowDrawerLabels(true, ScreenType.INNER)
         repo.setShowFrequentApps(false, ScreenType.INNER)
 
         val outer = repo.settings(ScreenType.OUTER).first()
-        assertThat(outer.drawer.searchPosition).isEqualTo(LauncherSettings.SEARCH_BOTTOM)
+        assertThat(outer.drawer.searchPosition).isEqualTo(SearchPosition.BOTTOM)
         assertThat(outer.drawer.indexBarEnabled).isFalse()
-        assertThat(outer.drawer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_VERTICAL_LEFT)
+        assertThat(outer.drawer.azIndexPosition).isEqualTo(AzPosition.VERTICAL_LEFT)
         assertThat(outer.drawer.backgroundBlur).isEqualTo(12f)
         assertThat(outer.drawer.scrimOpacity).isEqualTo(0.7f)
-        assertThat(outer.drawer.style).isEqualTo(LauncherSettings.DRAWER_STYLE_MOTO)
+        assertThat(outer.drawer.style).isEqualTo(DrawerStyle.MOTO)
         assertThat(outer.drawer.accentColor).isEqualTo(0xFF00BCD4.toInt())
         assertThat(outer.drawer.showLabels).isFalse()
         assertThat(outer.drawer.showFrequentApps).isTrue()
 
         val inner = repo.settings(ScreenType.INNER).first()
-        assertThat(inner.drawer.searchPosition).isEqualTo(LauncherSettings.SEARCH_TOP)
+        assertThat(inner.drawer.searchPosition).isEqualTo(SearchPosition.TOP)
         assertThat(inner.drawer.indexBarEnabled).isTrue()
-        assertThat(inner.drawer.azIndexPosition).isEqualTo(LauncherSettings.AZ_POSITION_HORIZONTAL_TOP)
+        assertThat(inner.drawer.azIndexPosition).isEqualTo(AzPosition.HORIZONTAL_TOP)
         assertThat(inner.drawer.backgroundBlur).isEqualTo(4f)
         assertThat(inner.drawer.scrimOpacity).isEqualTo(0.3f)
-        assertThat(inner.drawer.style).isEqualTo(LauncherSettings.DRAWER_STYLE_ONE_UI)
+        assertThat(inner.drawer.style).isEqualTo(DrawerStyle.ONE_UI)
         assertThat(inner.drawer.accentColor).isEqualTo(0xFFFF1744.toInt())
         assertThat(inner.drawer.showLabels).isTrue()
         assertThat(inner.drawer.showFrequentApps).isFalse()
@@ -494,13 +505,13 @@ class SettingsRepositoryTest {
     @Test
     fun `drawer style automatically adopts authentic signature brand color accent`() = runTest {
         val repo = newRepository()
-        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI, ScreenType.OUTER)
+        repo.setDrawerStyle(DrawerStyle.ONE_UI, ScreenType.OUTER)
         assertThat(repo.settings(ScreenType.OUTER).first().drawer.accentColor).isEqualTo(0xFF0A84FF.toInt())
 
-        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_MOTO, ScreenType.OUTER)
+        repo.setDrawerStyle(DrawerStyle.MOTO, ScreenType.OUTER)
         assertThat(repo.settings(ScreenType.OUTER).first().drawer.accentColor).isEqualTo(0xFF00BFA5.toInt())
 
-        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_NOTHING_OS, ScreenType.OUTER)
+        repo.setDrawerStyle(DrawerStyle.NOTHING_OS, ScreenType.OUTER)
         assertThat(repo.settings(ScreenType.OUTER).first().drawer.accentColor).isEqualTo(0xFFFF3B30.toInt())
     }
 
@@ -548,27 +559,27 @@ class SettingsRepositoryTest {
         val defaultOuter = repo.settings(ScreenType.OUTER).first()
         assertThat(defaultOuter.drawer.heightFraction).isEqualTo(1.0f)
         assertThat(defaultOuter.drawer.widthFraction).isEqualTo(1.0f)
-        assertThat(defaultOuter.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_CENTER)
+        assertThat(defaultOuter.drawer.alignment).isEqualTo(DrawerAlignment.CENTER)
 
         // Configure OUTER
         repo.setDrawerHeightFraction(0.8f, ScreenType.OUTER)
         repo.setDrawerWidthFraction(0.7f, ScreenType.OUTER)
-        repo.setDrawerAlignment(LauncherSettings.DRAWER_ALIGNMENT_LEFT, ScreenType.OUTER)
+        repo.setDrawerAlignment(DrawerAlignment.LEFT, ScreenType.OUTER)
 
         // Configure INNER
         repo.setDrawerHeightFraction(0.6f, ScreenType.INNER)
         repo.setDrawerWidthFraction(0.5f, ScreenType.INNER)
-        repo.setDrawerAlignment(LauncherSettings.DRAWER_ALIGNMENT_RIGHT, ScreenType.INNER)
+        repo.setDrawerAlignment(DrawerAlignment.RIGHT, ScreenType.INNER)
 
         val outer = repo.settings(ScreenType.OUTER).first()
         assertThat(outer.drawer.heightFraction).isEqualTo(0.8f)
         assertThat(outer.drawer.widthFraction).isEqualTo(0.7f)
-        assertThat(outer.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_LEFT)
+        assertThat(outer.drawer.alignment).isEqualTo(DrawerAlignment.LEFT)
 
         val inner = repo.settings(ScreenType.INNER).first()
         assertThat(inner.drawer.heightFraction).isEqualTo(0.6f)
         assertThat(inner.drawer.widthFraction).isEqualTo(0.5f)
-        assertThat(inner.drawer.alignment).isEqualTo(LauncherSettings.DRAWER_ALIGNMENT_RIGHT)
+        assertThat(inner.drawer.alignment).isEqualTo(DrawerAlignment.RIGHT)
     }
 
     @Test
@@ -606,9 +617,9 @@ class SettingsRepositoryTest {
         repo.setHideSystemStatusBar(true, ScreenType.OUTER)
         repo.setStatusBarScrimOpacity(0.9f, ScreenType.OUTER)
         repo.setShowPageIndicator(false, ScreenType.OUTER)
-        repo.setSwipeDownAction(LauncherSettings.GESTURE_SEARCH, ScreenType.OUTER)
-        repo.setDoubleTapAction(LauncherSettings.GESTURE_LOCK, ScreenType.OUTER)
-        repo.setSwipeUpAction(LauncherSettings.GESTURE_NONE, ScreenType.OUTER)
+        repo.setSwipeDownAction(HomeGesture.SEARCH, ScreenType.OUTER)
+        repo.setDoubleTapAction(HomeGesture.LOCK, ScreenType.OUTER)
+        repo.setSwipeUpAction(HomeGesture.NONE, ScreenType.OUTER)
 
         // Inner configurations
         repo.setHomeColumns(6, ScreenType.INNER)
@@ -630,9 +641,9 @@ class SettingsRepositoryTest {
         repo.setHideSystemStatusBar(false, ScreenType.INNER)
         repo.setStatusBarScrimOpacity(0.3f, ScreenType.INNER)
         repo.setShowPageIndicator(true, ScreenType.INNER)
-        repo.setSwipeDownAction(LauncherSettings.GESTURE_DRAWER, ScreenType.INNER)
-        repo.setDoubleTapAction(LauncherSettings.GESTURE_NOTIFICATIONS, ScreenType.INNER)
-        repo.setSwipeUpAction(LauncherSettings.GESTURE_SEARCH, ScreenType.INNER)
+        repo.setSwipeDownAction(HomeGesture.DRAWER, ScreenType.INNER)
+        repo.setDoubleTapAction(HomeGesture.NOTIFICATIONS, ScreenType.INNER)
+        repo.setSwipeUpAction(HomeGesture.SEARCH, ScreenType.INNER)
 
         // Assert Outer Screen settings
         val outer = repo.settings(ScreenType.OUTER).first()
@@ -655,9 +666,9 @@ class SettingsRepositoryTest {
         assertThat(outer.statusBar.hideSystem).isTrue()
         assertThat(outer.statusBar.scrimOpacity).isEqualTo(0.9f)
         assertThat(outer.home.showPageIndicator).isFalse()
-        assertThat(outer.home.swipeDownAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
-        assertThat(outer.home.doubleTapAction).isEqualTo(LauncherSettings.GESTURE_LOCK)
-        assertThat(outer.home.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_NONE)
+        assertThat(outer.home.swipeDownAction).isEqualTo(HomeGesture.SEARCH)
+        assertThat(outer.home.doubleTapAction).isEqualTo(HomeGesture.LOCK)
+        assertThat(outer.home.swipeUpAction).isEqualTo(HomeGesture.NONE)
 
         // Assert Inner Screen settings
         val inner = repo.settings(ScreenType.INNER).first()
@@ -680,9 +691,9 @@ class SettingsRepositoryTest {
         assertThat(inner.statusBar.hideSystem).isFalse()
         assertThat(inner.statusBar.scrimOpacity).isEqualTo(0.3f)
         assertThat(inner.home.showPageIndicator).isTrue()
-        assertThat(inner.home.swipeDownAction).isEqualTo(LauncherSettings.GESTURE_DRAWER)
-        assertThat(inner.home.doubleTapAction).isEqualTo(LauncherSettings.GESTURE_NOTIFICATIONS)
-        assertThat(inner.home.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
+        assertThat(inner.home.swipeDownAction).isEqualTo(HomeGesture.DRAWER)
+        assertThat(inner.home.doubleTapAction).isEqualTo(HomeGesture.NOTIFICATIONS)
+        assertThat(inner.home.swipeUpAction).isEqualTo(HomeGesture.SEARCH)
     }
 
     // --- Display profiles never inherit from each other ----------------------------------------
@@ -693,7 +704,7 @@ class SettingsRepositoryTest {
         store.edit {
             it[booleanPreferencesKey("show_home_labels")] = false
             it[floatPreferencesKey("dock_opacity")] = 0.8f
-            it[stringPreferencesKey("fold_transition_style")] = LauncherSettings.TRANSITION_SLIDE
+            it[stringPreferencesKey("fold_transition_style")] = FoldTransition.SLIDE.stored
         }
         val repo = SettingsRepository(store)
 
@@ -701,17 +712,17 @@ class SettingsRepositoryTest {
         val inherited = repo.settings(ScreenType.INNER).first()
         assertThat(inherited.home.showLabels).isFalse()
         assertThat(inherited.dock.backgroundOpacity).isEqualTo(0.8f)
-        assertThat(inherited.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_SLIDE)
+        assertThat(inherited.fold.transitionStyle).isEqualTo(FoldTransition.SLIDE)
 
         // ...but from now on an outer change stays on the outer display.
         repo.setShowHomeLabels(true, ScreenType.OUTER)
         repo.setDockBackgroundOpacity(0.1f, ScreenType.OUTER)
-        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_SCALE, ScreenType.OUTER)
+        repo.setFoldTransitionStyle(FoldTransition.SCALE, ScreenType.OUTER)
 
         val inner = repo.settings(ScreenType.INNER).first()
         assertThat(inner.home.showLabels).isFalse()
         assertThat(inner.dock.backgroundOpacity).isEqualTo(0.8f)
-        assertThat(inner.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_SLIDE)
+        assertThat(inner.fold.transitionStyle).isEqualTo(FoldTransition.SLIDE)
         val outer = repo.settings(ScreenType.OUTER).first()
         assertThat(outer.home.showLabels).isTrue()
         assertThat(outer.dock.backgroundOpacity).isEqualTo(0.1f)
@@ -736,22 +747,22 @@ class SettingsRepositoryTest {
     fun `drawer look is stored per display, clamped and opaque`() = runTest {
         val repo = newRepository()
         assertThat(repo.settings(ScreenType.OUTER).first().drawer.themeTint)
-            .isEqualTo(LauncherSettings.DRAWER_THEME_SYSTEM)
+            .isEqualTo(DrawerTheme.SYSTEM)
 
         repo.setDrawerGlassEnabled(true, ScreenType.INNER)
         repo.setDrawerPanelOpacity(0.01f, ScreenType.INNER)
-        repo.setDrawerThemeTint(LauncherSettings.DRAWER_THEME_CUSTOM, ScreenType.INNER)
+        repo.setDrawerThemeTint(DrawerTheme.CUSTOM, ScreenType.INNER)
         repo.setDrawerCustomColor(0x00123456, ScreenType.INNER)
 
         val inner = repo.settings(ScreenType.INNER).first()
         assertThat(inner.drawer.glassEnabled).isTrue()
         assertThat(inner.drawer.panelOpacity).isEqualTo(LauncherSettings.MIN_DRAWER_PANEL_OPACITY)
-        assertThat(inner.drawer.themeTint).isEqualTo(LauncherSettings.DRAWER_THEME_CUSTOM)
+        assertThat(inner.drawer.themeTint).isEqualTo(DrawerTheme.CUSTOM)
         assertThat(inner.drawer.customColor).isEqualTo(0xFF123456.toInt())
 
         val outer = repo.settings(ScreenType.OUTER).first()
         assertThat(outer.drawer.glassEnabled).isFalse()
-        assertThat(outer.drawer.themeTint).isEqualTo(LauncherSettings.DRAWER_THEME_SYSTEM)
+        assertThat(outer.drawer.themeTint).isEqualTo(DrawerTheme.SYSTEM)
     }
 
     @Test
@@ -759,7 +770,7 @@ class SettingsRepositoryTest {
         val repo = newRepository()
         repo.setDrawerAccentColor(0xFF7B1FA2.toInt(), ScreenType.OUTER)
 
-        repo.setDrawerStyle(LauncherSettings.DRAWER_STYLE_ONE_UI, ScreenType.OUTER)
+        repo.setDrawerStyle(DrawerStyle.ONE_UI, ScreenType.OUTER)
 
         assertThat(repo.settings(ScreenType.OUTER).first().drawer.accentColor).isEqualTo(0xFF7B1FA2.toInt())
     }
@@ -768,8 +779,8 @@ class SettingsRepositoryTest {
     fun `copyProfile copies settings but not the grid size or the dock apps`() = runTest {
         val repo = newRepository()
         repo.setDrawerGlassEnabled(true, ScreenType.INNER)
-        repo.setSwipeUpAction(LauncherSettings.GESTURE_SEARCH, ScreenType.INNER)
-        repo.setFoldTransitionStyle(LauncherSettings.TRANSITION_CROSSFADE, ScreenType.INNER)
+        repo.setSwipeUpAction(HomeGesture.SEARCH, ScreenType.INNER)
+        repo.setFoldTransitionStyle(FoldTransition.CROSSFADE, ScreenType.INNER)
         repo.setHomeColumns(7, ScreenType.INNER)
         repo.addToDock("pkg/Activity", ScreenType.INNER)
         repo.setDrawerScrimOpacity(0.9f, ScreenType.OUTER) // unset on the source: goes back to default
@@ -778,8 +789,8 @@ class SettingsRepositoryTest {
 
         val outer = repo.settings(ScreenType.OUTER).first()
         assertThat(outer.drawer.glassEnabled).isTrue()
-        assertThat(outer.home.swipeUpAction).isEqualTo(LauncherSettings.GESTURE_SEARCH)
-        assertThat(outer.fold.transitionStyle).isEqualTo(LauncherSettings.TRANSITION_CROSSFADE)
+        assertThat(outer.home.swipeUpAction).isEqualTo(HomeGesture.SEARCH)
+        assertThat(outer.fold.transitionStyle).isEqualTo(FoldTransition.CROSSFADE)
         assertThat(outer.drawer.scrimOpacity).isEqualTo(0.5f)
         assertThat(outer.home.columns).isEqualTo(4)
         assertThat(repo.dockFavorites(ScreenType.OUTER).first()).isEmpty()

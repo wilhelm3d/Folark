@@ -13,8 +13,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import org.arkikeskus.launcher.data.LauncherAppsSource
 import org.arkikeskus.launcher.data.SettingsRepository
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.DrawerAlignment
 import org.arkikeskus.launcher.model.IconEpochs
+import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import org.arkikeskus.launcher.data.NotificationNudge
@@ -34,10 +35,11 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import android.content.Context
+import org.arkikeskus.launcher.model.IconShape
 import org.arkikeskus.launcher.model.catching
 
 /** The app-icon style (icon pack + themed), so the shell's floating drag icon matches the surfaces. */
-data class IconStyle(val iconPack: String = "", val themed: Boolean = false, val shape: String = "")
+data class IconStyle(val iconPack: String = "", val themed: Boolean = false, val shape: IconShape = IconShape.SYSTEM)
 
 /**
  * Exposes just the icon-style settings to [LauncherShell] so the single floating drag icon — drawn
@@ -71,8 +73,8 @@ class LauncherShellViewModel @Inject constructor(
     val drawerWidthFraction: StateFlow<Float> = settings.map { it.drawer.widthFraction }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1.0f)
 
-    val drawerAlignment: StateFlow<String> = settings.map { it.drawer.alignment }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.DRAWER_ALIGNMENT_CENTER)
+    val drawerAlignment: StateFlow<DrawerAlignment> = settings.map { it.drawer.alignment }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DrawerAlignment.CENTER)
 
     val iconEpochs: StateFlow<IconEpochs> = launcherAppsSource.iconEpochs
 
@@ -128,6 +130,6 @@ class LauncherShellViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     /** Per-app icon shapes (app key → shape), over the global one; eagerly, like [customIcons]. */
-    val iconShapes: StateFlow<Map<String, String>> = settingsRepository.iconShapes
+    val iconShapes: StateFlow<Map<String, IconShape>> = settingsRepository.iconShapes
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 }

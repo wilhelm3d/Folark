@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RingMode
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.LocalBadgeStyle
 import org.arkikeskus.launcher.ui.component.BadgeStyle
@@ -62,9 +63,9 @@ internal fun NotificationsSection(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_icon_ring),
             options = listOf(
-                LauncherSettings.RING_OFF to stringResource(R.string.settings_icon_ring_off),
-                LauncherSettings.RING_PROGRESS to stringResource(R.string.settings_icon_ring_progress),
-                LauncherSettings.RING_ALL to stringResource(R.string.settings_icon_ring_all),
+                RingMode.OFF to stringResource(R.string.settings_icon_ring_off),
+                RingMode.PROGRESS to stringResource(R.string.settings_icon_ring_progress),
+                RingMode.ALL to stringResource(R.string.settings_icon_ring_all),
             ),
             selected = s.icons.ring,
             onSelect = viewModel::setIconRing,

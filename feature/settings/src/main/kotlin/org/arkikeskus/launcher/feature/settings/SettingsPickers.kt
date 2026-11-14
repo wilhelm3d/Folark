@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import org.arkikeskus.launcher.data.IconPackInfo
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.FoldAction
+import org.arkikeskus.launcher.model.FoldTransition
+import org.arkikeskus.launcher.model.HomeGesture
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
@@ -52,39 +55,39 @@ import org.arkikeskus.launcher.model.catching
 // Small shared pickers and labels used by several settings sections (split out of SettingsScreen.kt).
 
 @Composable
-internal fun gestureLabel(action: String): String = stringResource(
+internal fun gestureLabel(action: HomeGesture): String = stringResource(
     when (action) {
-        LauncherSettings.GESTURE_DRAWER -> R.string.settings_gesture_drawer
-        LauncherSettings.GESTURE_SEARCH -> R.string.settings_gesture_search
-        LauncherSettings.GESTURE_LOCK -> R.string.settings_gesture_lock
-        LauncherSettings.GESTURE_RECENTS -> R.string.settings_gesture_recents
-        LauncherSettings.GESTURE_NONE -> R.string.settings_gesture_none
-        LauncherSettings.GESTURE_MOTO_NOTE -> R.string.settings_gesture_moto_note
-        LauncherSettings.GESTURE_MOTO_VAULT -> R.string.settings_gesture_moto_vault
-        LauncherSettings.GESTURE_MOTO_READY_FOR -> R.string.settings_gesture_moto_ready_for
-        LauncherSettings.GESTURE_MOTO_GAMES -> R.string.settings_gesture_moto_games
-        LauncherSettings.GESTURE_MOTO_WEATHER -> R.string.settings_gesture_moto_weather
-        LauncherSettings.GESTURE_MOTO_STYLES -> R.string.settings_gesture_moto_styles
+        HomeGesture.DRAWER -> R.string.settings_gesture_drawer
+        HomeGesture.SEARCH -> R.string.settings_gesture_search
+        HomeGesture.LOCK -> R.string.settings_gesture_lock
+        HomeGesture.RECENTS -> R.string.settings_gesture_recents
+        HomeGesture.NONE -> R.string.settings_gesture_none
+        HomeGesture.MOTO_NOTE -> R.string.settings_gesture_moto_note
+        HomeGesture.MOTO_VAULT -> R.string.settings_gesture_moto_vault
+        HomeGesture.MOTO_READY_FOR -> R.string.settings_gesture_moto_ready_for
+        HomeGesture.MOTO_GAMES -> R.string.settings_gesture_moto_games
+        HomeGesture.MOTO_WEATHER -> R.string.settings_gesture_moto_weather
+        HomeGesture.MOTO_STYLES -> R.string.settings_gesture_moto_styles
         else -> R.string.settings_gesture_notifications
     }
 )
 
 /** Home gesture choices: Folark's own, then the Motorola screens this phone has, then none. */
-internal fun gestureOptions(context: android.content.Context): List<Pair<String, Int>> = listOf(
-    LauncherSettings.GESTURE_NOTIFICATIONS to R.string.settings_gesture_notifications,
-    LauncherSettings.GESTURE_DRAWER to R.string.settings_gesture_drawer,
-    LauncherSettings.GESTURE_SEARCH to R.string.settings_gesture_search,
-    LauncherSettings.GESTURE_LOCK to R.string.settings_gesture_lock,
-    LauncherSettings.GESTURE_RECENTS to R.string.settings_gesture_recents,
+internal fun gestureOptions(context: android.content.Context): List<Pair<HomeGesture, Int>> = listOf(
+    HomeGesture.NOTIFICATIONS to R.string.settings_gesture_notifications,
+    HomeGesture.DRAWER to R.string.settings_gesture_drawer,
+    HomeGesture.SEARCH to R.string.settings_gesture_search,
+    HomeGesture.LOCK to R.string.settings_gesture_lock,
+    HomeGesture.RECENTS to R.string.settings_gesture_recents,
 ) + listOf(
-    LauncherSettings.GESTURE_MOTO_NOTE to R.string.settings_gesture_moto_note,
-    LauncherSettings.GESTURE_MOTO_VAULT to R.string.settings_gesture_moto_vault,
-    LauncherSettings.GESTURE_MOTO_READY_FOR to R.string.settings_gesture_moto_ready_for,
-    LauncherSettings.GESTURE_MOTO_GAMES to R.string.settings_gesture_moto_games,
-    LauncherSettings.GESTURE_MOTO_WEATHER to R.string.settings_gesture_moto_weather,
-    LauncherSettings.GESTURE_MOTO_STYLES to R.string.settings_gesture_moto_styles,
+    HomeGesture.MOTO_NOTE to R.string.settings_gesture_moto_note,
+    HomeGesture.MOTO_VAULT to R.string.settings_gesture_moto_vault,
+    HomeGesture.MOTO_READY_FOR to R.string.settings_gesture_moto_ready_for,
+    HomeGesture.MOTO_GAMES to R.string.settings_gesture_moto_games,
+    HomeGesture.MOTO_WEATHER to R.string.settings_gesture_moto_weather,
+    HomeGesture.MOTO_STYLES to R.string.settings_gesture_moto_styles,
 ).filter { (gesture, _) -> MotoLinks.gestureAvailable(context, gesture) } + listOf(
-    LauncherSettings.GESTURE_NONE to R.string.settings_gesture_none,
+    HomeGesture.NONE to R.string.settings_gesture_none,
 )
 
 /** Gestures page: what a double tap on empty home space does (any home gesture, Motorola's too). */
@@ -110,7 +113,7 @@ internal fun DoubleTapActionRow(s: LauncherSettings, viewModel: SettingsViewMode
         description = gestureLabel(s.home.doubleTapAction),
         onClick = { picking = true },
     )
-    if (s.home.doubleTapAction == LauncherSettings.GESTURE_LOCK && !serviceEnabled) {
+    if (s.home.doubleTapAction == HomeGesture.LOCK && !serviceEnabled) {
         ExpressiveActionItem(
             title = stringResource(R.string.settings_double_tap_lock_grant),
             description = stringResource(R.string.settings_double_tap_lock_grant_desc),
@@ -124,7 +127,7 @@ internal fun DoubleTapActionRow(s: LauncherSettings, viewModel: SettingsViewMode
             selected = s.home.doubleTapAction,
             onPick = { choice ->
                 viewModel.setDoubleTapAction(choice, screenType)
-                if (choice == LauncherSettings.GESTURE_LOCK && !lockServiceEnabled(context)) {
+                if (choice == HomeGesture.LOCK && !lockServiceEnabled(context)) {
                     openAccessibilitySettings()
                 }
                 picking = false
@@ -163,11 +166,11 @@ internal fun BatchTimesEditor(initial: String, onSave: (String) -> Unit, onDismi
 }
 
 @Composable
-internal fun ChoicePicker(
+internal fun <T> ChoicePicker(
     @StringRes title: Int,
-    options: List<Pair<String, Int>>,
-    selected: String,
-    onPick: (String) -> Unit,
+    options: List<Pair<T, Int>>,
+    selected: T,
+    onPick: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val p = LocalExpressivePalette.current
@@ -330,27 +333,27 @@ internal fun HiddenAppsManager(
 }
 
 @Composable
-internal fun foldActionLabel(action: String): String = when (action) {
-    LauncherSettings.ACTION_PAGE_0 -> stringResource(R.string.settings_action_page_0)
-    LauncherSettings.ACTION_LOCK -> stringResource(R.string.settings_action_lock)
+internal fun foldActionLabel(action: FoldAction): String = when (action) {
+    FoldAction.PAGE_0 -> stringResource(R.string.settings_action_page_0)
+    FoldAction.LOCK -> stringResource(R.string.settings_action_lock)
     else -> stringResource(R.string.settings_action_stay)
 }
 
 @Composable
-internal fun unfoldActionLabel(action: String): String = when (action) {
-    LauncherSettings.ACTION_SEARCH -> stringResource(R.string.settings_action_search)
-    LauncherSettings.ACTION_DRAWER -> stringResource(R.string.settings_action_drawer)
+internal fun unfoldActionLabel(action: FoldAction): String = when (action) {
+    FoldAction.SEARCH -> stringResource(R.string.settings_action_search)
+    FoldAction.DRAWER -> stringResource(R.string.settings_action_drawer)
     else -> stringResource(R.string.settings_action_stay)
 }
 
 @Composable
-internal fun transitionLabel(style: String, inner: Boolean = true): String = when (style) {
-    LauncherSettings.TRANSITION_MORPH_SCALE_FADE -> stringResource(R.string.settings_transition_morph_scale_fade)
-    LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP -> stringResource(R.string.settings_transition_book_unfold_sweep)
-    LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE -> stringResource(R.string.settings_transition_aquamorphic_ripple)
-    LauncherSettings.TRANSITION_SCALE -> stringResource(R.string.settings_transition_scale)
-    LauncherSettings.TRANSITION_SLIDE -> stringResource(R.string.settings_transition_slide)
-    LauncherSettings.TRANSITION_LIVE_HINGE ->
+internal fun transitionLabel(style: FoldTransition, inner: Boolean = true): String = when (style) {
+    FoldTransition.MORPH_SCALE_FADE -> stringResource(R.string.settings_transition_morph_scale_fade)
+    FoldTransition.BOOK_UNFOLD_SWEEP -> stringResource(R.string.settings_transition_book_unfold_sweep)
+    FoldTransition.AQUAMORPHIC_RIPPLE -> stringResource(R.string.settings_transition_aquamorphic_ripple)
+    FoldTransition.SCALE -> stringResource(R.string.settings_transition_scale)
+    FoldTransition.SLIDE -> stringResource(R.string.settings_transition_slide)
+    FoldTransition.LIVE_HINGE ->
         stringResource(if (inner) R.string.settings_transition_live_hinge else R.string.settings_transition_hinge_timed)
     else -> stringResource(R.string.settings_transition_crossfade)
 }

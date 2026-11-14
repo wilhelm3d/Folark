@@ -22,7 +22,11 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.FolderPreview
+import org.arkikeskus.launcher.model.FolderShape
+import org.arkikeskus.launcher.model.FolderTheme
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SizeChoice
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import org.arkikeskus.launcher.ui.component.AppIcon
@@ -33,15 +37,14 @@ import org.arkikeskus.launcher.ui.component.badgeAlignment
 
 /**
  * How home folders look (Settings ▸ Grid ▸ Folders): the closed tile's [shape], colour [theme] and
- * [preview], and the opened folder's grid [openColumns] and [openSize]. The values are the
- * `LauncherSettings.FOLDER_*` constants.
+ * [preview], and the opened folder's grid [openColumns] and [openSize].
  */
 internal data class FolderStyle(
-    val shape: String = LauncherSettings.FOLDER_SHAPE_SQUIRCLE,
-    val theme: String = LauncherSettings.FOLDER_THEME_GLASS,
-    val preview: String = LauncherSettings.FOLDER_PREVIEW_GRID_2,
+    val shape: FolderShape = FolderShape.SQUIRCLE,
+    val theme: FolderTheme = FolderTheme.GLASS,
+    val preview: FolderPreview = FolderPreview.GRID_2,
     val openColumns: Int = 4,
-    val openSize: String = LauncherSettings.FOLDER_OPEN_MEDIUM,
+    val openSize: SizeChoice = SizeChoice.MEDIUM,
     /** The apps in the tile open with a tap on them (Settings ▸ Folders ▸ Open apps from the tile). */
     val directApps: Boolean = false,
 )
@@ -51,26 +54,26 @@ internal val LocalFolderStyle = compositionLocalOf { FolderStyle() }
 
 /** The solid background of a folder [theme], or null for Liquid Glass (which is not one colour). */
 @Composable
-internal fun folderThemeColor(theme: String): Color? = when (theme) {
-    LauncherSettings.FOLDER_THEME_DARK -> Color(0xE6131418)
-    LauncherSettings.FOLDER_THEME_LIGHT -> Color(0xEBF5F5F7)
-    LauncherSettings.FOLDER_THEME_ACCENT -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
+internal fun folderThemeColor(theme: FolderTheme): Color? = when (theme) {
+    FolderTheme.DARK -> Color(0xE6131418)
+    FolderTheme.LIGHT -> Color(0xEBF5F5F7)
+    FolderTheme.ACCENT -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
     else -> null
 }
 
 /** The text colour that reads on a folder [theme]'s background. */
 @Composable
-internal fun folderContentColor(theme: String): Color = when (theme) {
-    LauncherSettings.FOLDER_THEME_DARK -> Color.White
-    LauncherSettings.FOLDER_THEME_LIGHT -> Color(0xFF1B1B1F)
-    LauncherSettings.FOLDER_THEME_ACCENT -> MaterialTheme.colorScheme.onPrimaryContainer
+internal fun folderContentColor(theme: FolderTheme): Color = when (theme) {
+    FolderTheme.DARK -> Color.White
+    FolderTheme.LIGHT -> Color(0xFF1B1B1F)
+    FolderTheme.ACCENT -> MaterialTheme.colorScheme.onPrimaryContainer
     else -> MaterialTheme.colorScheme.onSurface
 }
 
 /** A folder background in the chosen [theme]: Liquid Glass, or a solid themed colour. */
 @Composable
 internal fun FolderSurface(
-    theme: String,
+    theme: FolderTheme,
     shape: Shape,
     glassBlurRadius: Float,
     glassDarkTint: Float,
@@ -118,10 +121,10 @@ internal fun FolderIcon(
             // with linearly scaled icons inverted the margin below ~45dp tiles (6–7 columns on a
             // narrow screen), squeezing the preview asymmetrically out of its card.
             val scale = size / 52.dp
-            val circle = style.shape == LauncherSettings.FOLDER_SHAPE_CIRCLE
+            val circle = style.shape == FolderShape.CIRCLE
             val tileShape: Shape = when (style.shape) {
-                LauncherSettings.FOLDER_SHAPE_CIRCLE -> CircleShape
-                LauncherSettings.FOLDER_SHAPE_SQUARE -> RoundedCornerShape(6.dp * scale)
+                FolderShape.CIRCLE -> CircleShape
+                FolderShape.SQUARE -> RoundedCornerShape(6.dp * scale)
                 else -> RoundedCornerShape(15.dp * scale)
             }
             // A circle cuts the corners off, so its preview sits further in.
@@ -140,10 +143,10 @@ internal fun FolderIcon(
                         .padding(inset),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (style.preview == LauncherSettings.FOLDER_PREVIEW_COVER) {
+                    if (style.preview == FolderPreview.COVER) {
                         PreviewSlot(apps.firstOrNull(), size - inset * 2)
                     } else {
-                        val perSide = if (style.preview == LauncherSettings.FOLDER_PREVIEW_GRID_3) 3 else 2
+                        val perSide = if (style.preview == FolderPreview.GRID_3) 3 else 2
                         val mini = (size - inset * 2 - gap * (perSide - 1)) / perSide
                         val slots = perSide * perSide
                         // Apps open from the tile: with more apps than places, the last place says how

@@ -19,6 +19,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.arkikeskus.launcher.model.DotColor
+import org.arkikeskus.launcher.model.DotPosition
+import org.arkikeskus.launcher.model.DotShape
 import org.arkikeskus.launcher.model.LauncherSettings
 
 /** Red dot used for notification badges; the white ring keeps it readable on any background. */
@@ -26,12 +29,12 @@ private val NotificationDotColor = Color(0xFFE53935)
 
 /**
  * How notification dots look under this subtree (Settings ▸ Notifications): shape, colour and the
- * corner of the icon they sit on. The values are the `LauncherSettings.DOT_*` constants.
+ * corner of the icon they sit on.
  */
 data class BadgeStyle(
-    val shape: String = LauncherSettings.DOT_SHAPE_CIRCLE,
-    val color: String = LauncherSettings.DOT_COLOR_RED,
-    val position: String = LauncherSettings.DOT_POSITION_TOP_END,
+    val shape: DotShape = DotShape.CIRCLE,
+    val color: DotColor = DotColor.RED,
+    val position: DotPosition = DotPosition.TOP_END,
 )
 
 val LocalBadgeStyle = compositionLocalOf { BadgeStyle() }
@@ -39,9 +42,9 @@ val LocalBadgeStyle = compositionLocalOf { BadgeStyle() }
 /** The corner a badge sits on — the `contentAlignment` of the Box that holds an icon and its badge. */
 @Composable
 fun badgeAlignment(): Alignment = when (LocalBadgeStyle.current.position) {
-    LauncherSettings.DOT_POSITION_TOP_START -> Alignment.TopStart
-    LauncherSettings.DOT_POSITION_BOTTOM_END -> Alignment.BottomEnd
-    LauncherSettings.DOT_POSITION_BOTTOM_START -> Alignment.BottomStart
+    DotPosition.TOP_START -> Alignment.TopStart
+    DotPosition.BOTTOM_END -> Alignment.BottomEnd
+    DotPosition.BOTTOM_START -> Alignment.BottomStart
     else -> Alignment.TopEnd
 }
 
@@ -56,20 +59,20 @@ fun NotificationBadge(count: Int, showCount: Boolean, scale: Float = 1f, modifie
     val s = scale.coerceIn(0.5f, 2.5f)
     val style = LocalBadgeStyle.current
     val shape: Shape = when (style.shape) {
-        LauncherSettings.DOT_SHAPE_SQUIRCLE -> RoundedCornerShape(percent = 34)
-        LauncherSettings.DOT_SHAPE_SQUARE -> RoundedCornerShape((2.5f * s).dp)
+        DotShape.SQUIRCLE -> RoundedCornerShape(percent = 34)
+        DotShape.SQUARE -> RoundedCornerShape((2.5f * s).dp)
         else -> CircleShape
     }
     val fill: Color
     val ring: Color
     val textColor: Color
     when (style.color) {
-        LauncherSettings.DOT_COLOR_ACCENT -> {
+        DotColor.ACCENT -> {
             fill = MaterialTheme.colorScheme.primary
             ring = Color.White
             textColor = MaterialTheme.colorScheme.onPrimary
         }
-        LauncherSettings.DOT_COLOR_WHITE -> {
+        DotColor.WHITE -> {
             fill = Color.White
             ring = Color.Black.copy(alpha = 0.28f)
             textColor = Color(0xFF1B1B1F)

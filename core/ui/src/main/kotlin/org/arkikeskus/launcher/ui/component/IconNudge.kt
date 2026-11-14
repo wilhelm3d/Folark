@@ -19,7 +19,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.NudgeEffect
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.pow
@@ -29,7 +29,7 @@ import kotlin.math.sin
 data class IconNudgeEvent(val badgeKey: String, val color: Int?, val time: Long, val id: Long)
 
 /** The nudges under this subtree, the effect they play and how soft (Settings ▸ Notifications); null = off. */
-class IconNudges(val effect: String, val softness: Float, val events: SnapshotStateMap<String, IconNudgeEvent>)
+class IconNudges(val effect: NudgeEffect, val softness: Float, val events: SnapshotStateMap<String, IconNudgeEvent>)
 
 val LocalIconNudges = compositionLocalOf<IconNudges?> { null }
 
@@ -68,13 +68,13 @@ object IconNudge {
     const val STALE_MS = 2_500L
 
     /** Fills [out] for [effect] at [t] (0..1); [softness] (0..1) makes Glow and Pulse gentler. */
-    fun frame(effect: String, t: Float, out: NudgeFrame, softness: Float = 0.5f) {
+    fun frame(effect: NudgeEffect, t: Float, out: NudgeFrame, softness: Float = 0.5f) {
         val soft = softness.coerceIn(0f, 1f)
         out.reset()
         if (t <= 0f || t >= 1f) return
         val fade = 1f - t
         when (effect) {
-            LauncherSettings.NUDGE_BOUNCE -> {
+            NudgeEffect.BOUNCE -> {
                 // Two hops, the second smaller, squashing a little on landing.
                 val hop = abs(sin(2.0 * PI * t).toFloat())
                 out.dy = -0.26f * hop * fade
@@ -82,10 +82,10 @@ object IconNudge {
                 out.scaleX = 1f + 0.10f * land
                 out.scaleY = 1f - 0.10f * land
             }
-            LauncherSettings.NUDGE_WIGGLE -> {
+            NudgeEffect.WIGGLE -> {
                 out.rotation = 13f * sin(2.0 * PI * 3.0 * t).toFloat() * fade
             }
-            LauncherSettings.NUDGE_PULSE -> {
+            NudgeEffect.PULSE -> {
                 // Two heartbeats: a sharp thump when hard, a gentle swell when soft.
                 val raw = abs(sin(2.0 * PI * t).toFloat())
                 val beat = raw.toDouble().pow(1.0 + 2.5 * (1.0 - soft)).toFloat()
@@ -93,7 +93,7 @@ object IconNudge {
                 out.scaleX = s
                 out.scaleY = s
             }
-            LauncherSettings.NUDGE_GLOW -> {
+            NudgeEffect.GLOW -> {
                 // A halo in the app's colour swelling and fading: tight and bright when hard,
                 // wide and faint when soft.
                 out.ringSoft = true
@@ -104,18 +104,18 @@ object IconNudge {
                 out.scaleX = s
                 out.scaleY = s
             }
-            LauncherSettings.NUDGE_TINT -> {
+            NudgeEffect.TINT -> {
                 // The icon fills with the app's colour, twice, then clears.
                 val wave = abs(sin(2.0 * PI * t).toFloat())
                 out.tintAlpha = (0.85f - 0.45f * soft) * wave * (1f - 0.3f * t)
             }
-            LauncherSettings.NUDGE_RIPPLE -> {
+            NudgeEffect.RIPPLE -> {
                 // Two rings spreading out from the icon.
                 val wave = (t * 2f) % 1f
                 out.ringScale = 1f + 0.9f * wave
                 out.ringAlpha = (1f - wave) * (if (t < 0.5f) 1f else 0.6f)
             }
-            LauncherSettings.NUDGE_JELLY -> {
+            NudgeEffect.JELLY -> {
                 // Squash and stretch, settling.
                 val w = sin(2.0 * PI * 2.0 * t).toFloat() * fade
                 out.scaleX = 1f + 0.18f * w
@@ -127,7 +127,7 @@ object IconNudge {
 
 /** Plays [effect] on this icon each time [event] changes (a new notification for its app). */
 @Composable
-fun Modifier.iconNudge(event: IconNudgeEvent?, effect: String, softness: Float = 0.5f, enabled: Boolean = true): Modifier {
+fun Modifier.iconNudge(event: IconNudgeEvent?, effect: NudgeEffect, softness: Float = 0.5f, enabled: Boolean = true): Modifier {
     val progress = remember { Animatable(1f) }
     LaunchedEffect(event?.id) {
         if (event == null || !enabled) return@LaunchedEffect
@@ -170,14 +170,14 @@ fun Modifier.iconNudge(event: IconNudgeEvent?, effect: String, softness: Float =
             scaleY = frame.scaleY
             rotationZ = frame.rotation
             // Squash from the bottom, as if landing.
-            transformOrigin = if (effect == LauncherSettings.NUDGE_BOUNCE) TransformOrigin(0.5f, 1f) else TransformOrigin.Center
+            transformOrigin = if (effect == NudgeEffect.BOUNCE) TransformOrigin(0.5f, 1f) else TransformOrigin.Center
             // The colour wash may only touch the icon's own pixels: draw it in a layer of its own.
             compositingStrategy = if (frame.tintAlpha > 0f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
         }
         .drawWithContent {
             drawContent()
             val t = progress.value
-            if (t >= 1f || effect != LauncherSettings.NUDGE_TINT) return@drawWithContent
+            if (t >= 1f || effect != NudgeEffect.TINT) return@drawWithContent
             IconNudge.frame(effect, t, frame, softness)
             if (frame.tintAlpha > 0f) drawRect(color.copy(alpha = frame.tintAlpha), blendMode = BlendMode.SrcAtop)
         }

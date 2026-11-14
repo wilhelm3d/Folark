@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.IconEpochs
 import org.arkikeskus.launcher.model.IconRequest
+import org.arkikeskus.launcher.model.IconShape
 import org.arkikeskus.launcher.model.iconRasterSize
 
 /**
@@ -48,9 +49,9 @@ val LocalThemedIcons = compositionLocalOf { false }
  */
 val LocalIconPack = compositionLocalOf { "" }
 
-/** Icon shape under this subtree (LauncherSettings.ICON_SHAPE_*; "" = the system's), fed into the
+/** Icon shape under this subtree ([IconShape]), fed into the
  *  Coil request like [LocalIconPack]. */
-val LocalIconShape = compositionLocalOf { "" }
+val LocalIconShape = compositionLocalOf { IconShape.SYSTEM }
 
 /**
  * Icon re-fetch tokens (see [IconEpochs]), provided once at the shell root. [AppIcon] folds the
@@ -81,8 +82,8 @@ val LocalAppLabelLines = compositionLocalOf { 1 }
  */
 val LocalCustomIcons = compositionLocalOf<Map<String, String>> { emptyMap() }
 
-/** Per-app icon shapes (app key → LauncherSettings.ICON_SHAPE_*), over [LocalIconShape]. */
-val LocalIconShapes = compositionLocalOf<Map<String, String>> { emptyMap() }
+/** Per-app icon shapes (app key → shape), over [LocalIconShape]. */
+val LocalIconShapes = compositionLocalOf<Map<String, IconShape>> { emptyMap() }
 
 /**
  * The per-display icon-size multiplier (Settings ▸ Grid): the surfaces multiply their preferred icon

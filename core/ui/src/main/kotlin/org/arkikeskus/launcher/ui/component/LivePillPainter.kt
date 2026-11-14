@@ -7,11 +7,12 @@ import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PathMeasure
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.SweepGradient
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.LiveEffect
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -27,6 +28,11 @@ class LivePillPainter {
     private val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val rect = RectF()
     private val clip = Path()
+    private val rim = Path()
+    private val rimFor = RectF()
+    private val rimDone = Path()
+    private val rimMeasure = PathMeasure()
+    private val arc = RectF()
     private val matrix = Matrix()
     private var glowRadius = 0f
 
@@ -39,7 +45,7 @@ class LivePillPainter {
         width: Float,
         height: Float,
         glowPad: Float,
-        effect: String,
+        effect: LiveEffect,
         t: Float,
         accent: Int,
         progress: Float?,
@@ -53,12 +59,12 @@ class LivePillPainter {
         val pulse = (sin(t * 2.0 * PI / PULSE_S).toFloat() + 1f) / 2f
 
         canvas.save()
-        if (effect == LauncherSettings.LIVE_EFFECT_BREATHE) {
+        if (effect == LiveEffect.BREATHE) {
             val s = 0.965f + 0.035f * pulse
             canvas.scale(s, s, rect.centerX(), rect.centerY())
         }
         // Glow: a soft halo of the app's colour around the pill, breathing.
-        if (effect == LauncherSettings.LIVE_EFFECT_GLOW && glowPad > 0f) {
+        if (effect == LiveEffect.GLOW && glowPad > 0f) {
             if (glowRadius != glowPad) {
                 glowRadius = glowPad
                 glow.maskFilter = BlurMaskFilter(glowPad * 0.9f, BlurMaskFilter.Blur.NORMAL)
@@ -79,7 +85,7 @@ class LivePillPainter {
         fx.color = withAlpha(accent, if (light) 34 else 46)
         canvas.drawRect(rect, fx)
         when (effect) {
-            LauncherSettings.LIVE_EFFECT_SHIMMER -> {
+            LiveEffect.SHIMMER -> {
                 // A band of light sweeping across, then a pause.
                 val cycle = (t % SHIMMER_S) / SHIMMER_S
                 val band = rect.width() * 0.45f
@@ -92,21 +98,7 @@ class LivePillPainter {
                 )
                 canvas.drawRect(rect, fx)
             }
-            LauncherSettings.LIVE_EFFECT_PROGRESS -> {
-                // The pill fills up with the app's colour as the task advances.
-                fx.shader = null
-                fx.color = withAlpha(accent, if (light) 90 else 110)
-                if (progress != null && !indeterminate) {
-                    canvas.drawRect(rect.left, rect.top, rect.left + rect.width() * progress.coerceIn(0f, 1f), rect.bottom, fx)
-                } else {
-                    // No end known: a block gliding back and forth.
-                    val w = rect.width() * 0.3f
-                    val p = (sin(t * 2.0 * PI / 2.2).toFloat() + 1f) / 2f
-                    val x = rect.left + (rect.width() - w) * p
-                    canvas.drawRect(x, rect.top, x + w, rect.bottom, fx)
-                }
-            }
-            LauncherSettings.LIVE_EFFECT_AURORA -> {
+            LiveEffect.AURORA -> {
                 // Two slow lights of the app's colour drifting inside the pill.
                 val a = (sin(t * 2.0 * PI / 5.0).toFloat() + 1f) / 2f
                 val b = (sin(t * 2.0 * PI / 7.0 + 1.7).toFloat() + 1f) / 2f
@@ -122,7 +114,7 @@ class LivePillPainter {
                 )
                 canvas.drawRect(rect, fx)
             }
-            LauncherSettings.LIVE_EFFECT_BREATHE -> {
+            LiveEffect.BREATHE -> {
                 fx.shader = null
                 fx.color = withAlpha(accent, (30 + 60 * pulse).toInt())
                 canvas.drawRect(rect, fx)
@@ -134,7 +126,7 @@ class LivePillPainter {
 
         // Orbit: a light running around the rim. Every other effect gets a quiet rim.
         stroke.strokeWidth = rect.height() * 0.06f
-        if (effect == LauncherSettings.LIVE_EFFECT_ORBIT) {
+        if (effect == LiveEffect.ORBIT) {
             val sweep = SweepGradient(
                 rect.centerX(), rect.centerY(),
                 intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, withAlpha(accent, 255), Color.WHITE, Color.TRANSPARENT),
@@ -151,7 +143,48 @@ class LivePillPainter {
         val inset = stroke.strokeWidth / 2f
         canvas.drawRoundRect(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset, r - inset, r - inset, stroke)
         stroke.shader = null
+        if (effect == LiveEffect.PROGRESS) drawProgressRim(canvas, r, accent, progress, indeterminate, pulse)
         canvas.restore()
+    }
+
+    /**
+     * Progress: the rim fills round the pill in the app's colour, clockwise from the top middle,
+     * with no bar inside the pill. With no known end the whole rim breathes in that colour instead.
+     */
+    private fun drawProgressRim(canvas: Canvas, r: Float, accent: Int, progress: Float?, indeterminate: Boolean, pulse: Float) {
+        stroke.strokeWidth = rect.height() * 0.09f
+        val inset = stroke.strokeWidth / 2f
+        val done = progress?.takeIf { !indeterminate }?.coerceIn(0f, 1f)
+        if (done == null) {
+            stroke.color = withAlpha(accent, (110 + 120 * pulse).toInt())
+            canvas.drawRoundRect(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset, r - inset, r - inset, stroke)
+            return
+        }
+        if (done <= 0f) return
+        rimMeasure.setPath(rimPath(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset), false)
+        rimDone.reset()
+        rimMeasure.getSegment(0f, rimMeasure.length * done, rimDone, true)
+        stroke.color = withAlpha(accent, 255)
+        stroke.strokeCap = Paint.Cap.ROUND
+        canvas.drawPath(rimDone, stroke)
+        stroke.strokeCap = Paint.Cap.BUTT
+    }
+
+    /** The pill's outline from the top middle, clockwise; built again only when the pill's size changes. */
+    private fun rimPath(left: Float, top: Float, right: Float, bottom: Float): Path {
+        if (rimFor.left == left && rimFor.top == top && rimFor.right == right && rimFor.bottom == bottom) return rim
+        rimFor.set(left, top, right, bottom)
+        val radius = (bottom - top) / 2f
+        rim.reset()
+        rim.moveTo((left + right) / 2f, top)
+        rim.lineTo(right - radius, top)
+        arc.set(right - 2 * radius, top, right, bottom)
+        rim.arcTo(arc, -90f, 180f, false)
+        rim.lineTo(left + radius, bottom)
+        arc.set(left, top, left + 2 * radius, bottom)
+        rim.arcTo(arc, 90f, 180f, false)
+        rim.close()
+        return rim
     }
 
     private fun withAlpha(color: Int, alpha: Int): Int =
@@ -167,7 +200,7 @@ class LivePillPainter {
 
     companion object {
         /** Whether [effect] moves (needs redrawing every frame). */
-        fun animates(effect: String): Boolean = effect != LauncherSettings.LIVE_EFFECT_STILL
+        fun animates(effect: LiveEffect): Boolean = effect != LiveEffect.STILL
 
         /** A colour for an app that set none: the system accent. */
         const val FALLBACK_ACCENT = 0xFF8AB4F8.toInt()

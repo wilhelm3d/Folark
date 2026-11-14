@@ -25,7 +25,8 @@ import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LiveActivity
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.DividerLock
+import org.arkikeskus.launcher.model.TaskbarTheme
 import kotlin.math.abs
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.AUTO_COLLAPSE_MS
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.MAX_SHORTCUTS
@@ -97,10 +98,10 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
                 }
                 // S13: the divider lock, one tap (Settings ▸ Recents & split screen ▸ Lock the divider).
                 if (SplitThree.ready(context)) {
-                    val locked = s.dividerLock != LauncherSettings.DIVIDER_LOCK_OFF
+                    val locked = s.dividerLock != DividerLock.OFF
                     rows += context.getString(if (locked) R.string.taskbar_split_unlock else R.string.taskbar_split_lock) to {
                         scope.launch {
-                            settingsRepo?.setSplitDividerLock(if (locked) LauncherSettings.DIVIDER_LOCK_OFF else LauncherSettings.DIVIDER_LOCK_ALL)
+                            settingsRepo?.setSplitDividerLock(if (locked) DividerLock.OFF else DividerLock.ALL)
                         }
                     }
                 }
@@ -119,7 +120,7 @@ internal fun AppTaskbar.showSplitMenu(anchor: View, s: TaskbarSetup, fixed: Bool
 /** A small card of text rows above [anchor]; a row without an action is a note. */
 @SuppressLint("ClickableViewAccessibility")
 internal fun AppTaskbar.showMenu(anchor: View, s: TaskbarSetup, fixed: Boolean, rows: List<Pair<String, (() -> Unit)?>>) {
-    val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+    val light = s.theme == TaskbarTheme.LIGHT
     val tint = if (light) Color.rgb(20, 20, 24) else Color.WHITE
     val panel = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -210,7 +211,7 @@ internal fun AppTaskbar.showShortcuts(app: AppItem, anchor: View, s: TaskbarSetu
             ))
             return@launch
         }
-        val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+        val light = s.theme == TaskbarTheme.LIGHT
         val tint = if (light) Color.rgb(20, 20, 24) else Color.WHITE
         val panel = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -331,7 +332,7 @@ internal fun AppTaskbar.showShortcuts(app: AppItem, anchor: View, s: TaskbarSetu
 internal fun AppTaskbar.showLiveDetails(item: org.arkikeskus.launcher.model.LiveActivity, anchor: View, s: TaskbarSetup, fixed: Boolean) {
     hideShortcuts()
     handler.removeCallbacks(collapse)
-    val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+    val light = s.theme == TaskbarTheme.LIGHT
     val ink = if (light) Color.rgb(20, 20, 24) else Color.WHITE
     val soft = if (light) Color.argb(170, 20, 20, 24) else Color.argb(190, 255, 255, 255)
     val accent = item.color ?: Color.rgb(143, 211, 255)

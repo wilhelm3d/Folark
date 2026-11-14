@@ -1,12 +1,13 @@
 package org.arkikeskus.launcher.data
 
 import org.arkikeskus.launcher.model.RootMode
+import org.arkikeskus.launcher.model.SizeChoice
 
 // The setters for launching apps and the root features.
 // Split out of SettingsRepository as extension functions, like SettingsRepositoryFolders.kt:
 // the same repository and the same calls, one file per settings group.
 
-suspend fun SettingsRepository.setFloatingWindowSize(value: String) = edit { it[Keys.FLOATING_WINDOW_SIZE] = value }
+suspend fun SettingsRepository.setFloatingWindowSize(value: SizeChoice) = edit { it[Keys.FLOATING_WINDOW_SIZE] = value.stored }
 suspend fun SettingsRepository.setThreeAppSplit(value: Boolean) = edit { it[Keys.THREE_APP_SPLIT] = value }
 suspend fun SettingsRepository.setThreeAppNative(value: Boolean) = edit { it[Keys.THREE_APP_NATIVE] = value }
 suspend fun SettingsRepository.setRootEnabled(value: Boolean) = edit { it[Keys.ROOT_ENABLED] = value }

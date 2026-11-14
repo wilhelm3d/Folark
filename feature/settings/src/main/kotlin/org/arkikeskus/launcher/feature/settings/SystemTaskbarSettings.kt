@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.root.SystemTaskbar
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.TaskbarSource
 
 /**
  * Settings ▸ Taskbar ▸ Which taskbar: Folark's own, or Android's (the system launcher's, which
@@ -23,13 +24,13 @@ internal fun SystemTaskbarRows(s: LauncherSettings, viewModel: SettingsViewModel
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_taskbar_source),
         options = listOf(
-            LauncherSettings.TASKBAR_SOURCE_FOLARK to stringResource(R.string.settings_taskbar_source_folark),
-            LauncherSettings.TASKBAR_SOURCE_SYSTEM to stringResource(R.string.settings_taskbar_source_system),
+            TaskbarSource.FOLARK to stringResource(R.string.settings_taskbar_source_folark),
+            TaskbarSource.SYSTEM to stringResource(R.string.settings_taskbar_source_system),
         ),
         selected = s.taskbar.source,
         onSelect = viewModel::setTaskbarSource,
     )
-    if (s.taskbar.source != LauncherSettings.TASKBAR_SOURCE_SYSTEM) return
+    if (s.taskbar.source != TaskbarSource.SYSTEM) return
     ExpressiveRowDivider()
     ExpressiveSegmentedControl(
         title = stringResource(R.string.settings_system_taskbar_mode),

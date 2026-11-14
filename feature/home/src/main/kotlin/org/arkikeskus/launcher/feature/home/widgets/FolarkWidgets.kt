@@ -86,6 +86,8 @@ import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.BatteryStatus
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.SizeChoice
+import org.arkikeskus.launcher.model.WidgetTheme
 import org.arkikeskus.launcher.ui.component.AppIcon
 import javax.inject.Inject
 import org.arkikeskus.launcher.model.catching
@@ -295,9 +297,9 @@ class FolarkWidgetsViewModel @Inject constructor(
     }
 }
 
-/** Background and text colour of one of Folark's own widgets in [theme] (LauncherSettings.WIDGET_THEME_*). */
+/** Background and text colour of one of Folark's own widgets in [theme]. */
 @Composable
-internal fun folarkWidgetColors(theme: String): Pair<Color, Color> {
+internal fun folarkWidgetColors(theme: WidgetTheme): Pair<Color, Color> {
     val (background, ink) = folarkThemeColors(theme)
     val alpha = LocalWidgetBackgroundAlpha.current
     // A faded card no longer backs dark text, so the text turns white on the wallpaper.
@@ -305,10 +307,10 @@ internal fun folarkWidgetColors(theme: String): Pair<Color, Color> {
 }
 
 @Composable
-private fun folarkThemeColors(theme: String): Pair<Color, Color> = when (theme) {
-    LauncherSettings.WIDGET_THEME_DARK -> Color(0xE6131418) to Color.White
-    LauncherSettings.WIDGET_THEME_LIGHT -> Color(0xF0F5F5F7) to Color(0xFF1B1B1F)
-    LauncherSettings.WIDGET_THEME_ACCENT ->
+private fun folarkThemeColors(theme: WidgetTheme): Pair<Color, Color> = when (theme) {
+    WidgetTheme.DARK -> Color(0xE6131418) to Color.White
+    WidgetTheme.LIGHT -> Color(0xF0F5F5F7) to Color(0xFF1B1B1F)
+    WidgetTheme.ACCENT ->
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f) to MaterialTheme.colorScheme.onPrimaryContainer
     // Default: the same translucent (or tonal) card as the other built-in widgets.
     else -> widgetSurfaceColor() to widgetContentColor()
@@ -317,7 +319,7 @@ private fun folarkThemeColors(theme: String): Pair<Color, Color> = when (theme) 
 /** The card every Folark widget sits on, in its chosen [theme]; [content] gets the text colour. */
 @Composable
 internal fun FolarkWidgetSurface(
-    theme: String,
+    theme: WidgetTheme,
     modifier: Modifier = Modifier,
     seeThrough: Boolean = false,
     content: @Composable BoxScope.(ink: Color) -> Unit,
@@ -384,8 +386,8 @@ internal fun NoteWidget(modifier: Modifier = Modifier, viewModel: FolarkWidgetsV
     val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf(false) }
     val fontSize = when (widgets.noteTextSize) {
-        LauncherSettings.FOLDER_OPEN_SMALL -> 13.sp
-        LauncherSettings.FOLDER_OPEN_LARGE -> 20.sp
+        SizeChoice.SMALL -> 13.sp
+        SizeChoice.LARGE -> 20.sp
         else -> 16.sp
     }
     // One stored line each: null = plain text, true/false = a checklist item's box.

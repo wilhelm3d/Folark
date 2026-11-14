@@ -22,6 +22,7 @@ import org.arkikeskus.launcher.ui.theme.LauncherFontFamily
 import org.arkikeskus.launcher.feature.settings.SettingsScreen
 import org.arkikeskus.launcher.launcher.system.FoldStateMonitor
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SettingsStyle
 import org.arkikeskus.launcher.ui.component.LocalFoldState
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 
@@ -41,7 +42,7 @@ class SettingsActivity : ComponentActivity() {
             val settingsFlow = remember(screenType) { settingsRepository.settings(screenType) }
             val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = LauncherSettings())
             // The Studio look is always dark: dark theme and light system-bar icons with it.
-            val studio = settings.appearance.settingsStyle == LauncherSettings.SETTINGS_STYLE_STUDIO
+            val studio = settings.appearance.settingsStyle == SettingsStyle.STUDIO
             LaunchedEffect(studio) {
                 if (studio) {
                     enableEdgeToEdge(

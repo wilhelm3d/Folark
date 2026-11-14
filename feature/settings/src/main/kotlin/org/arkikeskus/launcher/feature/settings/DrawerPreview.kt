@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SearchPosition
 import org.arkikeskus.launcher.ui.component.liquidGlass
 import org.arkikeskus.launcher.ui.drawer.drawerStyleSpec
 import org.arkikeskus.launcher.ui.drawer.rememberDrawerColors
@@ -41,7 +42,7 @@ internal fun DrawerPreview(s: LauncherSettings, modifier: Modifier = Modifier) {
     )
     val style = drawerStyleSpec(s.drawer.style)
     val corner = (if (s.drawer.cornerRadius >= 0) s.drawer.cornerRadius.dp else style.corner) * 0.6f
-    val searchAtBottom = s.drawer.searchPosition == LauncherSettings.SEARCH_BOTTOM
+    val searchAtBottom = s.drawer.searchPosition == SearchPosition.BOTTOM
 
     Box(
         modifier = modifier

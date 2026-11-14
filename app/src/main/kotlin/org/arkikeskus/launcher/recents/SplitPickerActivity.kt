@@ -31,7 +31,7 @@ import org.arkikeskus.launcher.feature.appdrawer.SplitPickAction
 import org.arkikeskus.launcher.feature.appdrawer.SHARE_THREE
 import org.arkikeskus.launcher.feature.appdrawer.SplitPickerDrawer
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.SplitPickerLook
+import org.arkikeskus.launcher.model.PickerOpen
 import org.arkikeskus.launcher.model.catching
 
 /**
@@ -121,7 +121,7 @@ class SplitPickerActivity : ComponentActivity() {
         }
     }
 
-    private fun pick(app: AppItem, peek: Boolean, openAnim: String, firstRight: Boolean = firstOnRight) {
+    private fun pick(app: AppItem, peek: Boolean, openAnim: PickerOpen, firstRight: Boolean = firstOnRight) {
         if (appPicked) return
         appPicked = true
         // Docked beside the first app: the pick opens right here, in this half of the split. Not
@@ -140,7 +140,7 @@ class SplitPickerActivity : ComponentActivity() {
                     viewModel.ensureBeside(firstPackage, firstTaskId, firstRight, app, peek)
                 }
                 // Zoom: the grown icon stays under the app until its window is up, then the picker goes.
-                if (openAnim == SplitPickerLook.OPEN_ZOOM) {
+                if (openAnim == PickerOpen.ZOOM) {
                     window.decorView.postDelayed({ if (!isFinishing) finishAndRemoveTask() }, ZOOM_FINISH_MS)
                     return
                 }
@@ -196,7 +196,7 @@ class SplitPickerActivity : ComponentActivity() {
      * fades in over the grown icon (which stays put); Fade: it fades in as the picker fades out;
      * Off: Android's own opening animation.
      */
-    private fun launchInThisStage(app: AppItem, openAnim: String): Boolean = catching {
+    private fun launchInThisStage(app: AppItem, openAnim: PickerOpen): Boolean = catching {
         val launchIntent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)
             .setComponent(app.componentName)
@@ -206,14 +206,14 @@ class SplitPickerActivity : ComponentActivity() {
     }.getOrDefault(false)
 
     /** An app of another profile (work, Private Space) can only be opened through [LauncherApps]. */
-    private fun launchOtherProfileHere(app: AppItem, openAnim: String): Boolean = catching {
+    private fun launchOtherProfileHere(app: AppItem, openAnim: PickerOpen): Boolean = catching {
         getSystemService(LauncherApps::class.java).startMainActivity(app.componentName, app.user, null, openOptions(openAnim))
         true
     }.getOrDefault(false)
 
-    private fun openOptions(openAnim: String): Bundle? = when (openAnim) {
-        SplitPickerLook.OPEN_ZOOM -> ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, 0).toBundle()
-        SplitPickerLook.OPEN_FADE -> ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, android.R.anim.fade_out).toBundle()
+    private fun openOptions(openAnim: PickerOpen): Bundle? = when (openAnim) {
+        PickerOpen.ZOOM -> ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, 0).toBundle()
+        PickerOpen.FADE -> ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, android.R.anim.fade_out).toBundle()
         else -> null
     }
 

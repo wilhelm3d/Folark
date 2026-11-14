@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import org.arkikeskus.launcher.feature.appdrawer.AppDrawerScreen
 import org.arkikeskus.launcher.feature.home.HomeScreen
 import org.arkikeskus.launcher.feature.home.taskbar.TaskbarSpace
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.FoldAction
 import org.arkikeskus.launcher.ui.component.LocalBadgeAvatars
 import org.arkikeskus.launcher.ui.component.LocalBatterySaver
 import org.arkikeskus.launcher.ui.component.LocalHomeCovered
@@ -56,7 +56,7 @@ fun LauncherShell(
     homeSignals: Flow<Boolean>,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
-    shellCommands: Flow<String> = emptyFlow(),
+    shellCommands: Flow<FoldAction> = emptyFlow(),
 ) {
     val viewModel = hiltViewModel<LauncherShellViewModel>()
     val screenType = LocalScreenType.current
@@ -99,7 +99,7 @@ fun LauncherShell(
     LaunchedEffect(shellCommands) {
         shellCommands.collect { command ->
             when (command) {
-                LauncherSettings.ACTION_DRAWER, LauncherSettings.ACTION_SEARCH -> slide.animateTo(1f)
+                FoldAction.DRAWER, FoldAction.SEARCH -> slide.animateTo(1f)
                 else -> Unit
             }
         }

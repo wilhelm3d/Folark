@@ -17,6 +17,7 @@ import android.view.View
 import androidx.core.graphics.drawable.toBitmap
 import org.arkikeskus.launcher.model.LiveActivity
 import org.arkikeskus.launcher.ui.component.LivePillPainter
+import org.arkikeskus.launcher.model.LiveEffect
 import org.arkikeskus.launcher.model.catching
 
 /**
@@ -28,7 +29,7 @@ import org.arkikeskus.launcher.model.catching
 internal class TaskbarLivePill(
     context: Context,
     private val heightPx: Int,
-    private val effect: String,
+    private val effect: LiveEffect,
     private val light: Boolean,
 ) : View(context) {
     private val painter = LivePillPainter()

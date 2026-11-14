@@ -23,20 +23,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.launch
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PressEffect
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.sin
 
 /** How buttons answer a press (Settings ▸ Recents ▸ Animations ▸ Button press). */
-data class PressStyle(val effect: String, val accent: Color, val speed: Float = 1f)
+data class PressStyle(val effect: PressEffect, val accent: Color, val speed: Float = 1f)
 
 /** The press style for buttons under this subtree; null = a plain tap (Android's ripple). */
 val LocalPressStyle = compositionLocalOf<PressStyle?> { null }
 
 /**
- * A tap target that answers the finger with [LocalPressStyle]'s effect (one of PRESS_*):
+ * A tap target that answers the finger with [LocalPressStyle]'s effect:
  * - Shrink: sinks in while held, springs back.
  * - Bounce: sinks deeper and overshoots on release.
  * - Glow: a halo of the accent colour while held.
@@ -47,7 +47,7 @@ val LocalPressStyle = compositionLocalOf<PressStyle?> { null }
  */
 fun Modifier.pressClick(onClick: () -> Unit): Modifier = composed {
     val style = LocalPressStyle.current
-    if (style == null || style.effect == LauncherSettings.PRESS_NONE) return@composed clickable(onClick = onClick)
+    if (style == null || style.effect == PressEffect.NONE) return@composed clickable(onClick = onClick)
     val source = remember { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
     val held = remember { Animatable(0f) }
@@ -61,17 +61,17 @@ fun Modifier.pressClick(onClick: () -> Unit): Modifier = composed {
                 is PressInteraction.Press -> {
                     at = interaction.pressPosition
                     scope.launch { held.animateTo(1f, tween(ms(110))) }
-                    if (style.effect == LauncherSettings.PRESS_RIPPLE) scope.launch { pulse.snapTo(0f); pulse.animateTo(1f, tween(ms(520))) }
+                    if (style.effect == PressEffect.RIPPLE) scope.launch { pulse.snapTo(0f); pulse.animateTo(1f, tween(ms(520))) }
                 }
                 is PressInteraction.Release, is PressInteraction.Cancel -> {
                     scope.launch {
                         when (style.effect) {
-                            LauncherSettings.PRESS_BOUNCE ->
+                            PressEffect.BOUNCE ->
                                 held.animateTo(0f, spring(dampingRatio = 0.32f, stiffness = Spring.StiffnessMedium * speed))
                             else -> held.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow * speed))
                         }
                     }
-                    if (style.effect == LauncherSettings.PRESS_JELLY) scope.launch { pulse.snapTo(0f); pulse.animateTo(1f, tween(ms(560))) }
+                    if (style.effect == PressEffect.JELLY) scope.launch { pulse.snapTo(0f); pulse.animateTo(1f, tween(ms(560))) }
                 }
             }
         }
@@ -80,10 +80,10 @@ fun Modifier.pressClick(onClick: () -> Unit): Modifier = composed {
         .graphicsLayer {
             val h = held.value
             when (style.effect) {
-                LauncherSettings.PRESS_SHRINK -> { val k = 1f - 0.07f * h; scaleX = k; scaleY = k }
-                LauncherSettings.PRESS_BOUNCE -> { val k = 1f - 0.12f * h; scaleX = k; scaleY = k }
-                LauncherSettings.PRESS_GLOW -> { val k = 1f + 0.03f * h; scaleX = k; scaleY = k }
-                LauncherSettings.PRESS_TILT -> {
+                PressEffect.SHRINK -> { val k = 1f - 0.07f * h; scaleX = k; scaleY = k }
+                PressEffect.BOUNCE -> { val k = 1f - 0.12f * h; scaleX = k; scaleY = k }
+                PressEffect.GLOW -> { val k = 1f + 0.03f * h; scaleX = k; scaleY = k }
+                PressEffect.TILT -> {
                     // Lean towards where the finger is.
                     val p = at
                     if (p != Offset.Unspecified && size.width > 0f && size.height > 0f) {
@@ -96,7 +96,7 @@ fun Modifier.pressClick(onClick: () -> Unit): Modifier = composed {
                     val k = 1f - 0.03f * h
                     scaleX = k; scaleY = k
                 }
-                LauncherSettings.PRESS_JELLY -> {
+                PressEffect.JELLY -> {
                     val q = pulse.value
                     val wobble = if (q < 1f) sin(q * 3f * PI).toFloat() * 0.12f * exp(-3f * q) else 0f
                     scaleX = 1f + 0.08f * h + wobble
@@ -107,7 +107,7 @@ fun Modifier.pressClick(onClick: () -> Unit): Modifier = composed {
         }
         .drawWithContent {
             when (style.effect) {
-                LauncherSettings.PRESS_GLOW -> {
+                PressEffect.GLOW -> {
                     val h = held.value
                     if (h > 0.01f) {
                         val r = size.minDimension / 2f
@@ -123,7 +123,7 @@ fun Modifier.pressClick(onClick: () -> Unit): Modifier = composed {
                     }
                     drawContent()
                 }
-                LauncherSettings.PRESS_RIPPLE -> {
+                PressEffect.RIPPLE -> {
                     drawContent()
                     val q = pulse.value
                     if (q < 1f && at != Offset.Unspecified) {

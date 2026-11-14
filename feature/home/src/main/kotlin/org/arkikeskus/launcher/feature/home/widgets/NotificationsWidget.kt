@@ -72,7 +72,7 @@ import org.arkikeskus.launcher.data.NotificationWidgetLayout
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.data.StatusNotification
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.CountStyle
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.NotificationBadge
@@ -110,10 +110,10 @@ class NotificationsWidgetViewModel @Inject constructor(
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     }.getOrDefault(false)
 
-    val countStyle: StateFlow<String> = _screenType.flatMapLatest { screenType ->
+    val countStyle: StateFlow<CountStyle> = _screenType.flatMapLatest { screenType ->
         settingsRepository.settings(screenType)
             .map { it.widgets.notificationCountStyle }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.COUNT_NUMBER)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CountStyle.NUMBER)
 
     /** One launcher entry per package+profile; see [NotificationWidgetLayout.representative]. */
     private val appsByBadgeKey: Flow<Map<String, AppItem>> = appRepository.apps.map { apps ->
@@ -258,13 +258,13 @@ internal fun NotificationsWidget(
 private fun NotificationSlot(
     slot: NotificationsWidgetViewModel.Slot,
     iconSize: Dp,
-    countStyle: String,
+    countStyle: CountStyle,
     scale: Float,
     interaction: MutableInteractionSource,
     onOpen: () -> Unit,
 ) {
-    val badgeCount = if (countStyle == LauncherSettings.COUNT_NONE) 0 else slot.notification.count
-    val showCount = countStyle == LauncherSettings.COUNT_NUMBER
+    val badgeCount = if (countStyle == CountStyle.NONE) 0 else slot.notification.count
+    val showCount = countStyle == CountStyle.NUMBER
     Box(
         modifier = Modifier.clickable(interactionSource = interaction, indication = null, onClick = onOpen),
     ) {

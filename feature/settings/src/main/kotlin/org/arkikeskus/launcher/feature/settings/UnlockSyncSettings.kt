@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import org.arkikeskus.launcher.data.ModulePrefs
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.UnlockStyle
 
 /**
  * Settings ▸ each display ▸ Also when unlocking ▸ Sync with the lock screen: with Folark's Vector
@@ -42,12 +43,12 @@ internal fun UnlockSyncRow(s: LauncherSettings, viewModel: SettingsViewModel) {
 }
 
 private val UNLOCK_STYLE_LABELS = listOf(
-    LauncherSettings.UNLOCK_STYLE_DISPLAY to R.string.settings_unlock_style_display,
-    LauncherSettings.UNLOCK_STYLE_ZOOM to R.string.settings_unlock_style_zoom,
-    LauncherSettings.UNLOCK_STYLE_RISE to R.string.settings_unlock_style_rise,
-    LauncherSettings.UNLOCK_STYLE_BLOOM to R.string.settings_unlock_style_bloom,
-    LauncherSettings.UNLOCK_STYLE_SWEEP to R.string.settings_unlock_style_sweep,
-    LauncherSettings.UNLOCK_STYLE_FOCUS to R.string.settings_unlock_style_focus,
+    UnlockStyle.DISPLAY to R.string.settings_unlock_style_display,
+    UnlockStyle.ZOOM to R.string.settings_unlock_style_zoom,
+    UnlockStyle.RISE to R.string.settings_unlock_style_rise,
+    UnlockStyle.BLOOM to R.string.settings_unlock_style_bloom,
+    UnlockStyle.SWEEP to R.string.settings_unlock_style_sweep,
+    UnlockStyle.FOCUS to R.string.settings_unlock_style_focus,
 )
 
 /**

@@ -32,22 +32,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsAttachedSide
+import org.arkikeskus.launcher.model.RecentsTheme
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 import kotlin.math.roundToInt
 
 private val THEMES = listOf(
-    LauncherSettings.RECENTS_THEME_FOLARK to R.string.settings_recents_theme_folark,
-    LauncherSettings.RECENTS_THEME_IPAD to R.string.settings_recents_theme_ipad,
-    LauncherSettings.RECENTS_THEME_CAROUSEL to R.string.settings_recents_theme_carousel,
-    LauncherSettings.RECENTS_THEME_DECK to R.string.settings_recents_theme_deck,
-    LauncherSettings.RECENTS_THEME_COMPACT to R.string.settings_recents_theme_compact,
-    LauncherSettings.RECENTS_THEME_SWITCHER to R.string.settings_recents_theme_switcher,
-    LauncherSettings.RECENTS_THEME_STACK to R.string.settings_recents_theme_stack,
-    LauncherSettings.RECENTS_THEME_ARC to R.string.settings_recents_theme_arc,
-    LauncherSettings.RECENTS_THEME_PORTRAIT to R.string.settings_recents_theme_portrait,
-    LauncherSettings.RECENTS_THEME_SPOTLIGHT to R.string.settings_recents_theme_spotlight,
-    LauncherSettings.RECENTS_THEME_GALLERY to R.string.settings_recents_theme_gallery,
+    RecentsTheme.FOLARK to R.string.settings_recents_theme_folark,
+    RecentsTheme.IPAD to R.string.settings_recents_theme_ipad,
+    RecentsTheme.CAROUSEL to R.string.settings_recents_theme_carousel,
+    RecentsTheme.DECK to R.string.settings_recents_theme_deck,
+    RecentsTheme.COMPACT to R.string.settings_recents_theme_compact,
+    RecentsTheme.SWITCHER to R.string.settings_recents_theme_switcher,
+    RecentsTheme.STACK to R.string.settings_recents_theme_stack,
+    RecentsTheme.ARC to R.string.settings_recents_theme_arc,
+    RecentsTheme.PORTRAIT to R.string.settings_recents_theme_portrait,
+    RecentsTheme.SPOTLIGHT to R.string.settings_recents_theme_spotlight,
+    RecentsTheme.GALLERY to R.string.settings_recents_theme_gallery,
 )
 
 /**
@@ -126,8 +128,8 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_recents_attached_side),
             options = listOf(
-                LauncherSettings.RECENTS_ATTACHED_LEFT to stringResource(R.string.settings_recents_attached_left),
-                LauncherSettings.RECENTS_ATTACHED_RIGHT to stringResource(R.string.settings_recents_attached_right),
+                RecentsAttachedSide.LEFT to stringResource(R.string.settings_recents_attached_left),
+                RecentsAttachedSide.RIGHT to stringResource(R.string.settings_recents_attached_right),
             ),
             selected = s.recents.attachedSide,
             onSelect = viewModel::setRecentsAttachedSide,
@@ -152,7 +154,7 @@ internal fun RecentsLookRows(s: LauncherSettings, viewModel: SettingsViewModel) 
 }
 
 /** A tiny drawing of each theme's layout. */
-private fun DrawScope.sketch(theme: String, glass: Boolean, accent: Color) {
+private fun DrawScope.sketch(theme: RecentsTheme, glass: Boolean, accent: Color) {
     val w = size.width
     val h = size.height
     fun card(x: Float, y: Float, cw: Float, ch: Float, r: Float = 6f, front: Boolean = false) {
@@ -168,7 +170,7 @@ private fun DrawScope.sketch(theme: String, glass: Boolean, accent: Color) {
     }
     fun dot(x: Float, y: Float, r: Float) = drawCircle(accent, r, Offset(x, y))
     when (theme) {
-        LauncherSettings.RECENTS_THEME_IPAD -> {
+        RecentsTheme.IPAD -> {
             val cw = w * 0.36f
             for (i in 0..2) {
                 val x = w * 0.06f + i * (cw + w * 0.08f)
@@ -176,23 +178,23 @@ private fun DrawScope.sketch(theme: String, glass: Boolean, accent: Color) {
                 card(x, h * 0.3f, cw, h * 0.6f)
             }
         }
-        LauncherSettings.RECENTS_THEME_CAROUSEL -> {
+        RecentsTheme.CAROUSEL -> {
             card(-w * 0.18f, h * 0.22f, w * 0.3f, h * 0.56f)
             card(w * 0.88f, h * 0.22f, w * 0.3f, h * 0.56f)
             card(w * 0.2f, h * 0.12f, w * 0.6f, h * 0.76f, 8f, front = true)
             dot(w * 0.26f, h * 0.06f, 3f)
         }
-        LauncherSettings.RECENTS_THEME_DECK -> {
+        RecentsTheme.DECK -> {
             for (i in 0..3) card(w * 0.06f + i * w * 0.2f, h * 0.14f, w * 0.34f, h * 0.72f, 8f, front = i == 3)
         }
-        LauncherSettings.RECENTS_THEME_COMPACT -> {
+        RecentsTheme.COMPACT -> {
             for (i in 0..3) {
                 val y = h * 0.08f + i * h * 0.22f
                 card(w * 0.06f, y, w * 0.88f, h * 0.18f, 4f)
                 dot(w * 0.14f, y + h * 0.09f, 3.5f)
             }
         }
-        LauncherSettings.RECENTS_THEME_STACK -> {
+        RecentsTheme.STACK -> {
             // A deck: the newest at the bottom, older ones smaller further up.
             for (i in 3 downTo 0) {
                 val k = 1f - 0.12f * i
@@ -200,35 +202,35 @@ private fun DrawScope.sketch(theme: String, glass: Boolean, accent: Color) {
                 card((w - cw) / 2f, h * (0.5f - 0.13f * i), cw, h * 0.42f * k, 7f, front = i == 0)
             }
         }
-        LauncherSettings.RECENTS_THEME_ARC -> {
+        RecentsTheme.ARC -> {
             for (i in -1..1) {
                 rotate(i * 12f, Offset(w / 2f, h * 1.6f)) {
                     card(w * 0.35f, h * 0.16f + kotlin.math.abs(i) * h * 0.05f, w * 0.3f, h * 0.62f, 7f, front = i == 0)
                 }
             }
         }
-        LauncherSettings.RECENTS_THEME_PORTRAIT -> {
+        RecentsTheme.PORTRAIT -> {
             // A tall very-rounded card in front, neighbours peeking, icon above.
             card(-w * 0.16f, h * 0.22f, w * 0.28f, h * 0.62f, 9f)
             card(w * 0.88f, h * 0.22f, w * 0.28f, h * 0.62f, 9f)
             dot(w * 0.3f, h * 0.1f, 3f)
             card(w * 0.26f, h * 0.18f, w * 0.48f, h * 0.72f, 11f, front = true)
         }
-        LauncherSettings.RECENTS_THEME_SPOTLIGHT -> {
+        RecentsTheme.SPOTLIGHT -> {
             // The middle card centred, its icon centred above.
             card(-w * 0.12f, h * 0.26f, w * 0.26f, h * 0.54f, 7f)
             card(w * 0.86f, h * 0.26f, w * 0.26f, h * 0.54f, 7f)
             dot(w * 0.5f, h * 0.1f, 3f)
             card(w * 0.28f, h * 0.2f, w * 0.44f, h * 0.68f, 8f, front = true)
         }
-        LauncherSettings.RECENTS_THEME_GALLERY -> {
+        RecentsTheme.GALLERY -> {
             // Two larger cards side by side, each with its icon above.
             dot(w * 0.28f, h * 0.14f, 2.5f)
             card(w * 0.08f, h * 0.22f, w * 0.4f, h * 0.66f, 7f, front = true)
             dot(w * 0.72f, h * 0.14f, 2.5f)
             card(w * 0.52f, h * 0.22f, w * 0.4f, h * 0.66f, 7f, front = true)
         }
-        LauncherSettings.RECENTS_THEME_SWITCHER -> {
+        RecentsTheme.SWITCHER -> {
             card(w * 0.08f, h * 0.2f, w * 0.84f, h * 0.6f, 10f)
             for (i in 0..3) drawCircle(accent.copy(alpha = if (i == 1) 1f else 0.55f), h * 0.11f, Offset(w * 0.22f + i * w * 0.19f, h * 0.5f))
         }

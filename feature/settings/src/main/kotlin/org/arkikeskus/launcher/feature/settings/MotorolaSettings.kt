@@ -49,6 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.IconShapes
 import org.arkikeskus.launcher.data.MotoLinks
+import org.arkikeskus.launcher.model.IconShape
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -57,20 +58,20 @@ import org.arkikeskus.launcher.model.catching
 
 /** Appearance card: the shape of app icons (both displays), as tiles drawn in each shape. */
 @Composable
-internal fun IconShapeRow(selected: String, onSelect: (String) -> Unit) {
+internal fun IconShapeRow(selected: IconShape, onSelect: (IconShape) -> Unit) {
     val palette = LocalExpressivePalette.current
     val shapes = listOf(
-        LauncherSettings.ICON_SHAPE_SYSTEM to R.string.settings_icon_shape_system,
-        LauncherSettings.ICON_SHAPE_CIRCLE to R.string.settings_icon_shape_circle,
-        LauncherSettings.ICON_SHAPE_SQUIRCLE to R.string.settings_icon_shape_squircle,
-        LauncherSettings.ICON_SHAPE_ROUNDED to R.string.settings_icon_shape_rounded,
-        LauncherSettings.ICON_SHAPE_TEARDROP to R.string.settings_icon_shape_teardrop,
-        LauncherSettings.ICON_SHAPE_PEBBLE to R.string.settings_icon_shape_pebble,
-        LauncherSettings.ICON_SHAPE_SQUARE to R.string.settings_icon_shape_square,
-        LauncherSettings.ICON_SHAPE_ARCH to R.string.settings_icon_shape_arch,
-        LauncherSettings.ICON_SHAPE_HEXAGON to R.string.settings_icon_shape_hexagon,
-        LauncherSettings.ICON_SHAPE_DIAMOND to R.string.settings_icon_shape_diamond,
-        LauncherSettings.ICON_SHAPE_COOKIE to R.string.settings_icon_shape_cookie,
+        IconShape.SYSTEM to R.string.settings_icon_shape_system,
+        IconShape.CIRCLE to R.string.settings_icon_shape_circle,
+        IconShape.SQUIRCLE to R.string.settings_icon_shape_squircle,
+        IconShape.ROUNDED to R.string.settings_icon_shape_rounded,
+        IconShape.TEARDROP to R.string.settings_icon_shape_teardrop,
+        IconShape.PEBBLE to R.string.settings_icon_shape_pebble,
+        IconShape.SQUARE to R.string.settings_icon_shape_square,
+        IconShape.ARCH to R.string.settings_icon_shape_arch,
+        IconShape.HEXAGON to R.string.settings_icon_shape_hexagon,
+        IconShape.DIAMOND to R.string.settings_icon_shape_diamond,
+        IconShape.COOKIE to R.string.settings_icon_shape_cookie,
     )
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(
@@ -105,7 +106,7 @@ internal fun IconShapeRow(selected: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun ShapeTile(shape: String, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ShapeTile(shape: IconShape, label: String, selected: Boolean, onClick: () -> Unit) {
     val palette = LocalExpressivePalette.current
     val tileShape = RoundedCornerShape(16.dp)
     val px = with(LocalDensity.current) { 36.dp.toPx() }

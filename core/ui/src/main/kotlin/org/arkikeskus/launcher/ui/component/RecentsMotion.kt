@@ -25,7 +25,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsEnter
+import org.arkikeskus.launcher.model.RecentsSelect
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.sin
@@ -47,32 +48,32 @@ object RecentsMotion {
 }
 
 /**
- * The card at [index] (in a grid of [columns]) comes in with [effect], one of RECENTS_ENTER_*.
+ * The card at [index] (in a grid of [columns]) comes in with [effect], one of [RecentsEnter].
  * [playKey] restarts it (a new opening of Recents, or the preview's replay).
  */
-fun Modifier.recentsEnter(effect: String, index: Int, columns: Int, speed: Float, playKey: Any?): Modifier = composed {
-    if (effect == LauncherSettings.RECENTS_ENTER_NONE) return@composed this
+fun Modifier.recentsEnter(effect: RecentsEnter, index: Int, columns: Int, speed: Float, playKey: Any?): Modifier = composed {
+    if (effect == RecentsEnter.NONE) return@composed this
     val progress = remember(playKey) { Animatable(0f) }
     val col = if (columns > 0) index % columns else 0
     val row = if (columns > 0) index / columns else index
     LaunchedEffect(playKey, effect) {
         progress.snapTo(0f)
         val order = when (effect) {
-            LauncherSettings.RECENTS_ENTER_CASCADE -> row + col
+            RecentsEnter.CASCADE -> row + col
             // Across the screen, column by column (a wave), row by row (a drop).
-            LauncherSettings.RECENTS_ENTER_WAVE -> col * 2 + row
-            LauncherSettings.RECENTS_ENTER_DROP -> row * 2 + col
-            LauncherSettings.RECENTS_ENTER_ZOOM -> 0
+            RecentsEnter.WAVE -> col * 2 + row
+            RecentsEnter.DROP -> row * 2 + col
+            RecentsEnter.ZOOM -> 0
             else -> index
         }
         delay(RecentsMotion.durationMs(RecentsMotion.STAGGER_MS, speed).toLong() * order.coerceAtMost(12))
         val ms = RecentsMotion.durationMs(RecentsMotion.ENTER_MS, speed)
         when (effect) {
-            LauncherSettings.RECENTS_ENTER_FAN, LauncherSettings.RECENTS_ENTER_CASCADE ->
+            RecentsEnter.FAN, RecentsEnter.CASCADE ->
                 progress.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow * speed.coerceIn(0.4f, 3f)))
-            LauncherSettings.RECENTS_ENTER_WAVE, LauncherSettings.RECENTS_ENTER_SWING ->
+            RecentsEnter.WAVE, RecentsEnter.SWING ->
                 progress.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow * speed.coerceIn(0.4f, 3f)))
-            LauncherSettings.RECENTS_ENTER_DROP ->
+            RecentsEnter.DROP ->
                 progress.animateTo(1f, spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessLow * speed.coerceIn(0.4f, 3f)))
             else -> progress.animateTo(1f, tween(ms, easing = FastOutSlowInEasing))
         }
@@ -82,27 +83,27 @@ fun Modifier.recentsEnter(effect: String, index: Int, columns: Int, speed: Float
         val p = progress.value
         val q = 1f - p
         when (effect) {
-            LauncherSettings.RECENTS_ENTER_RISE -> {
+            RecentsEnter.RISE -> {
                 translationY = q * 90.dp.toPx()
                 alpha = p.coerceIn(0f, 1f)
             }
-            LauncherSettings.RECENTS_ENTER_ZOOM -> {
+            RecentsEnter.ZOOM -> {
                 val s = 0.82f + 0.18f * p
                 scaleX = s; scaleY = s
                 alpha = p.coerceIn(0f, 1f)
             }
-            LauncherSettings.RECENTS_ENTER_CASCADE -> {
+            RecentsEnter.CASCADE -> {
                 translationY = -q * 70.dp.toPx()
                 rotationZ = -q * 7f
                 alpha = p.coerceIn(0f, 1f)
                 transformOrigin = TransformOrigin(0f, 0f)
             }
-            LauncherSettings.RECENTS_ENTER_FLIP -> {
+            RecentsEnter.FLIP -> {
                 rotationY = q * 90f
                 cameraDistance = 14f * density
                 alpha = if (p < 0.05f) 0f else 1f
             }
-            LauncherSettings.RECENTS_ENTER_FAN -> {
+            RecentsEnter.FAN -> {
                 // From a stack in the middle out to its place.
                 translationX = q * (center - col) * size.width
                 translationY = q * 40.dp.toPx()
@@ -111,23 +112,23 @@ fun Modifier.recentsEnter(effect: String, index: Int, columns: Int, speed: Float
                 scaleX = s; scaleY = s
                 alpha = (p * 1.6f).coerceIn(0f, 1f)
             }
-            LauncherSettings.RECENTS_ENTER_WAVE -> {
+            RecentsEnter.WAVE -> {
                 translationY = q * 46.dp.toPx()
                 val s = 0.9f + 0.1f * p
                 scaleX = s; scaleY = s
                 alpha = (p * 2f).coerceIn(0f, 1f)
             }
-            LauncherSettings.RECENTS_ENTER_SWING -> {
+            RecentsEnter.SWING -> {
                 transformOrigin = TransformOrigin(0.5f, 0f)
                 rotationX = -q * 80f
                 cameraDistance = 14f * density
                 alpha = (p * 2.5f).coerceIn(0f, 1f)
             }
-            LauncherSettings.RECENTS_ENTER_DROP -> {
+            RecentsEnter.DROP -> {
                 translationY = -q * 160.dp.toPx()
                 alpha = (p * 3f).coerceIn(0f, 1f)
             }
-            LauncherSettings.RECENTS_ENTER_FOCUS -> {
+            RecentsEnter.FOCUS -> {
                 val r = q * 26.dp.toPx()
                 renderEffect = if (r > 0.5f) BlurEffect(r, r) else null
                 val s = 1.08f - 0.08f * p
@@ -140,8 +141,8 @@ fun Modifier.recentsEnter(effect: String, index: Int, columns: Int, speed: Float
 
 /** The backdrop of Recents fades in with the cards. */
 @Composable
-fun rememberRecentsBackdrop(effect: String, speed: Float, playKey: Any?): () -> Float {
-    val a = remember(playKey) { Animatable(if (effect == LauncherSettings.RECENTS_ENTER_NONE) 1f else 0f) }
+fun rememberRecentsBackdrop(effect: RecentsEnter, speed: Float, playKey: Any?): () -> Float {
+    val a = remember(playKey) { Animatable(if (effect == RecentsEnter.NONE) 1f else 0f) }
     LaunchedEffect(playKey) {
         a.animateTo(1f, tween(RecentsMotion.durationMs(RecentsMotion.ENTER_MS, speed), easing = LinearEasing))
     }
@@ -149,11 +150,11 @@ fun rememberRecentsBackdrop(effect: String, speed: Float, playKey: Any?): () -> 
 }
 
 /**
- * A card answering a pick in split view with [effect] (one of RECENTS_SELECT_*). [slot] is its
+ * A card answering a pick in split view with [effect]. [slot] is its
  * place: 0 left, 1 middle or right, ... (it decides which way Tilt leans; -1 when not picked).
  */
 fun Modifier.recentsSelect(
-    effect: String,
+    effect: RecentsSelect,
     selected: Boolean,
     slot: Int,
     slots: Int,
@@ -161,7 +162,7 @@ fun Modifier.recentsSelect(
     corner: Dp,
     speed: Float,
 ): Modifier = composed {
-    if (effect == LauncherSettings.RECENTS_SELECT_NONE) return@composed this
+    if (effect == RecentsSelect.NONE) return@composed this
     val ms = RecentsMotion.durationMs(RecentsMotion.SELECT_MS, speed)
     // A one-shot 0→1 each time the card is picked; and a held 0/1 for as long as it stays picked.
     val shot = remember { Animatable(1f) }
@@ -178,7 +179,7 @@ fun Modifier.recentsSelect(
     )
     // The glow breathes a few times when a card is picked, then rests half lit: a card can stay
     // picked while Recents sits open, and an endless breath redrew it every frame meanwhile.
-    val glowOn = effect == LauncherSettings.RECENTS_SELECT_GLOW && selected
+    val glowOn = effect == RecentsSelect.GLOW && selected
     val breath = remember { Animatable(0f) }
     LaunchedEffect(glowOn, ms) {
         if (!glowOn) {
@@ -205,12 +206,12 @@ fun Modifier.recentsSelect(
         .graphicsLayer {
             val s = shot.value
             when (effect) {
-                LauncherSettings.RECENTS_SELECT_POP -> {
+                RecentsSelect.POP -> {
                     val bump = if (selected) sin(s * PI).toFloat() * 0.07f else 0f
                     val k = 1f + bump - held * 0.02f
                     scaleX = k; scaleY = k
                 }
-                LauncherSettings.RECENTS_SELECT_LIFT -> {
+                RecentsSelect.LIFT -> {
                     translationY = -held * 12.dp.toPx()
                     shadowElevation = held * 18.dp.toPx()
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(corner)
@@ -218,14 +219,14 @@ fun Modifier.recentsSelect(
                     val k = 1f + held * 0.025f
                     scaleX = k; scaleY = k
                 }
-                LauncherSettings.RECENTS_SELECT_TILT -> {
+                RecentsSelect.TILT -> {
                     rotationY = held * lean * 8f
                     rotationX = held * (if (lean == 0f) -5f else 0f)
                     cameraDistance = 16f * density
                     val k = 1f - held * 0.03f
                     scaleX = k; scaleY = k
                 }
-                LauncherSettings.RECENTS_SELECT_JIGGLE -> {
+                RecentsSelect.JIGGLE -> {
                     // A shake that dies away.
                     rotationZ = if (selected) sin(s * 6f * PI).toFloat() * 4.5f * exp(-3.2f * s) else 0f
                 }
@@ -236,7 +237,7 @@ fun Modifier.recentsSelect(
             drawContent()
             val r = corner.toPx()
             when (effect) {
-                LauncherSettings.RECENTS_SELECT_RING -> if (selected && shot.value < 1f) {
+                RecentsSelect.RING -> if (selected && shot.value < 1f) {
                     // A ring of the accent colour spreading out from the card.
                     val s = shot.value
                     val grow = s * 22.dp.toPx()
@@ -248,7 +249,7 @@ fun Modifier.recentsSelect(
                         style = Stroke(width = (3.dp.toPx() * (1f - s)).coerceAtLeast(0.5f)),
                     )
                 }
-                LauncherSettings.RECENTS_SELECT_GLOW -> if (held > 0.01f) {
+                RecentsSelect.GLOW -> if (held > 0.01f) {
                     // Soft halo: a few widening strokes, breathing while picked.
                     val b = breathe?.value ?: 0f
                     for (i in 1..4) {

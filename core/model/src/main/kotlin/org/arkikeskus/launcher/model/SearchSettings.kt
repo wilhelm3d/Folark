@@ -11,10 +11,10 @@ data class SearchSettings(
     val shortcuts: Boolean = true,
     val web: Boolean = true,
     /**
-     * Which engine "Search the web" opens: Android's own search ([LauncherSettings.SEARCH_ENGINE_SYSTEM])
+     * Which engine "Search the web" opens: Android's own search ([SearchEngine.SYSTEM])
      * or a browser page of a named engine. Nothing is sent before the row is tapped.
      */
-    val webEngine: String = LauncherSettings.SEARCH_ENGINE_SYSTEM,
+    val webEngine: SearchEngine = SearchEngine.SYSTEM,
     /** Include files and media from storage in search (gated by a read permission, requested when enabled). */
     val files: Boolean = false,
     /** Quick actions in search: timers, alarms, events, directions, email, notes, numbers, toggles. */
@@ -24,3 +24,12 @@ data class SearchSettings(
     /** The top app found shows its shortcuts (New message, New tab, …) right under it. */
     val inlineShortcuts: Boolean = true,
 )
+
+/** Search's web engines: Android's own search, or a named engine's page in the browser. */
+enum class SearchEngine(override val stored: String) : StoredChoice {
+    SYSTEM("system"),
+    GOOGLE("google"),
+    DUCKDUCKGO("duckduckgo"),
+    BING("bing"),
+    STARTPAGE("startpage"),
+}

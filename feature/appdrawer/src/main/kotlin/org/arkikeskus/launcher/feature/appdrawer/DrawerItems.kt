@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.SearchEngine
 import org.arkikeskus.launcher.model.SearchResult
 import org.arkikeskus.launcher.model.catching
 import org.arkikeskus.launcher.ui.AppShortcuts
@@ -205,7 +206,7 @@ internal fun DrawerItems.searchResults(
     contactResults: List<SearchResult.Contact>,
     shortcutResults: List<SearchResult.Shortcut>,
     searchWeb: Boolean,
-    searchWebEngine: String,
+    searchWebEngine: SearchEngine,
     searchInlineShortcuts: Boolean,
 ) {
     calc?.let { c ->

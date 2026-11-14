@@ -55,8 +55,10 @@ import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.SplitCoordinator
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LiveActivity
-import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.TaskbarAnim
+import org.arkikeskus.launcher.model.TaskbarHandleStyle
+import org.arkikeskus.launcher.model.TaskbarHandles
 import org.arkikeskus.launcher.ui.component.DEFAULT_NUDGE_COLOR
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -75,9 +77,9 @@ import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.homeVis
 @SuppressLint("ClickableViewAccessibility")
 internal fun AppTaskbar.showHandles(s: TaskbarSetup) {
     val sides = when (s.handles) {
-        LauncherSettings.TASKBAR_HANDLES_LEFT -> listOf(Gravity.START)
-        LauncherSettings.TASKBAR_HANDLES_RIGHT -> listOf(Gravity.END)
-        LauncherSettings.TASKBAR_HANDLES_CENTER -> listOf(Gravity.CENTER_HORIZONTAL)
+        TaskbarHandles.LEFT -> listOf(Gravity.START)
+        TaskbarHandles.RIGHT -> listOf(Gravity.END)
+        TaskbarHandles.CENTER -> listOf(Gravity.CENTER_HORIZONTAL)
         else -> listOf(Gravity.START, Gravity.END)
     }
     val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -116,15 +118,15 @@ internal fun AppTaskbar.showHandles(s: TaskbarSetup) {
 }
 
 /** The pull-hint view for [style] (a line, one/two arrows, dots or a text label), bottom-centred. */
-internal fun AppTaskbar.handleHintView(style: String): Pair<View, FrameLayout.LayoutParams> {
+internal fun AppTaskbar.handleHintView(style: TaskbarHandleStyle): Pair<View, FrameLayout.LayoutParams> {
     val white = Color.argb(185, 255, 255, 255)
     fun lp(w: Int, h: Int) = FrameLayout.LayoutParams(w, h, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(2) }
     return when (style) {
-        LauncherSettings.TASKBAR_HANDLE_ARROW ->
+        TaskbarHandleStyle.ARROW ->
             ChevronView(context, 1, white).also { it.elevation = dpf(2f) } to lp(dp(30), dp(13))
-        LauncherSettings.TASKBAR_HANDLE_DOUBLE ->
+        TaskbarHandleStyle.DOUBLE ->
             ChevronView(context, 2, white).also { it.elevation = dpf(2f) } to lp(dp(30), dp(20))
-        LauncherSettings.TASKBAR_HANDLE_DOTS -> {
+        TaskbarHandleStyle.DOTS -> {
             val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; elevation = dpf(2f) }
             repeat(3) { i ->
                 row.addView(
@@ -136,7 +138,7 @@ internal fun AppTaskbar.handleHintView(style: String): Pair<View, FrameLayout.La
             }
             row to lp(FrameLayout.LayoutParams.WRAP_CONTENT, dp(5))
         }
-        LauncherSettings.TASKBAR_HANDLE_TEXT -> {
+        TaskbarHandleStyle.TEXT -> {
             val tv = TextView(context).apply {
                 text = context.getString(R.string.taskbar_handle_text)
                 setTextColor(white)
@@ -253,17 +255,17 @@ internal fun AppTaskbar.hideToHandles() {
 }
 
 /** Plays the chosen show animation on the bar [view] as it appears. */
-internal fun AppTaskbar.animateBarIn(view: View, anim: String) {
+internal fun AppTaskbar.animateBarIn(view: View, anim: TaskbarAnim) {
     val dist = dpf(90f)
     view.animate().cancel()
     view.translationY = 0f; view.alpha = 1f; view.scaleX = 1f; view.scaleY = 1f; view.rotationX = 0f
     val a = view.animate()
     when (anim) {
-        LauncherSettings.TASKBAR_ANIM_FADE -> { view.alpha = 0f; a.alpha(1f).setDuration(220L) }
-        LauncherSettings.TASKBAR_ANIM_SCALE -> { view.scaleX = 0.82f; view.scaleY = 0.82f; view.alpha = 0f; a.scaleX(1f).scaleY(1f).alpha(1f).setDuration(240L).interpolator = DecelerateInterpolator() }
-        LauncherSettings.TASKBAR_ANIM_RISE -> { view.translationY = dist; view.alpha = 0f; a.translationY(0f).alpha(1f).setDuration(260L).interpolator = DecelerateInterpolator() }
-        LauncherSettings.TASKBAR_ANIM_BOUNCE -> { view.translationY = dist; a.translationY(0f).setDuration(430L).interpolator = OvershootInterpolator(2.4f) }
-        LauncherSettings.TASKBAR_ANIM_FLIP -> {
+        TaskbarAnim.FADE -> { view.alpha = 0f; a.alpha(1f).setDuration(220L) }
+        TaskbarAnim.SCALE -> { view.scaleX = 0.82f; view.scaleY = 0.82f; view.alpha = 0f; a.scaleX(1f).scaleY(1f).alpha(1f).setDuration(240L).interpolator = DecelerateInterpolator() }
+        TaskbarAnim.RISE -> { view.translationY = dist; view.alpha = 0f; a.translationY(0f).alpha(1f).setDuration(260L).interpolator = DecelerateInterpolator() }
+        TaskbarAnim.BOUNCE -> { view.translationY = dist; a.translationY(0f).setDuration(430L).interpolator = OvershootInterpolator(2.4f) }
+        TaskbarAnim.FLIP -> {
             // Tips up about its bottom edge.
             view.pivotY = view.height.toFloat().takeIf { it > 0f } ?: dpf(64f)
             view.pivotX = view.width / 2f
@@ -271,12 +273,12 @@ internal fun AppTaskbar.animateBarIn(view: View, anim: String) {
             view.rotationX = 90f; view.alpha = 0f
             a.rotationX(0f).alpha(1f).setDuration(320L).interpolator = DecelerateInterpolator(1.6f)
         }
-        LauncherSettings.TASKBAR_ANIM_UNFOLD -> {
+        TaskbarAnim.UNFOLD -> {
             view.pivotX = view.width / 2f
             view.scaleX = 0.08f; view.alpha = 0f
             a.scaleX(1f).alpha(1f).setDuration(340L).interpolator = DecelerateInterpolator(2f)
         }
-        LauncherSettings.TASKBAR_ANIM_POP -> {
+        TaskbarAnim.POP -> {
             view.scaleX = 0.6f; view.scaleY = 0.6f; view.alpha = 0f
             a.scaleX(1f).scaleY(1f).alpha(1f).setDuration(380L).interpolator = OvershootInterpolator(1.8f)
         }
@@ -286,21 +288,21 @@ internal fun AppTaskbar.animateBarIn(view: View, anim: String) {
 }
 
 /** Plays the chosen hide animation on the bar [view], then runs [onEnd] (which removes it). */
-internal fun AppTaskbar.animateBarOut(view: View, anim: String, onEnd: () -> Unit) {
+internal fun AppTaskbar.animateBarOut(view: View, anim: TaskbarAnim, onEnd: () -> Unit) {
     val dist = dpf(90f)
     view.animate().cancel()
     val a = view.animate().setDuration(190L)
     when (anim) {
-        LauncherSettings.TASKBAR_ANIM_FADE -> a.alpha(0f)
-        LauncherSettings.TASKBAR_ANIM_SCALE -> a.scaleX(0.82f).scaleY(0.82f).alpha(0f)
-        LauncherSettings.TASKBAR_ANIM_RISE -> a.translationY(dist).alpha(0f)
-        LauncherSettings.TASKBAR_ANIM_FLIP -> {
+        TaskbarAnim.FADE -> a.alpha(0f)
+        TaskbarAnim.SCALE -> a.scaleX(0.82f).scaleY(0.82f).alpha(0f)
+        TaskbarAnim.RISE -> a.translationY(dist).alpha(0f)
+        TaskbarAnim.FLIP -> {
             view.pivotY = view.height.toFloat()
             view.cameraDistance = 12_000f * context.resources.displayMetrics.density
             a.rotationX(90f).alpha(0f)
         }
-        LauncherSettings.TASKBAR_ANIM_UNFOLD -> a.scaleX(0.08f).alpha(0f)
-        LauncherSettings.TASKBAR_ANIM_POP -> a.scaleX(0.6f).scaleY(0.6f).alpha(0f)
+        TaskbarAnim.UNFOLD -> a.scaleX(0.08f).alpha(0f)
+        TaskbarAnim.POP -> a.scaleX(0.6f).scaleY(0.6f).alpha(0f)
         else -> a.translationY(dist) // SLIDE, BOUNCE
     }
     a.withEndAction { onEnd() }.start()

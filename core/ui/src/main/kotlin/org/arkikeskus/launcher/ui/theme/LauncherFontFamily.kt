@@ -4,7 +4,7 @@ import android.graphics.Typeface
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.FontChoice
 import org.arkikeskus.launcher.ui.R
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -38,18 +38,18 @@ object LauncherFontFamily {
         Font(R.font.space_grotesk, FontWeight.Bold),
     )
 
-    fun resolve(key: String): FontFamily = when (key.lowercase()) {
-        "ndot", "nothing_dot", "dot_matrix" -> NDot
-        "ntype", "nothing_type" -> NType
-        "space_grotesk", "grotesk" -> SpaceGrotesk
-        "serif" -> Serif
-        "monospace", "mono" -> Monospace
-        LauncherSettings.FONT_FAMILY_CONDENSED -> system("sans-serif-condensed")
-        LauncherSettings.FONT_FAMILY_LIGHT -> system("sans-serif-light")
-        LauncherSettings.FONT_FAMILY_MEDIUM -> system("sans-serif-medium")
-        LauncherSettings.FONT_FAMILY_CASUAL -> system("casual")
-        LauncherSettings.FONT_FAMILY_SMALLCAPS -> system("sans-serif-smallcaps")
-        LauncherSettings.FONT_FAMILY_CURSIVE -> system("cursive")
+    fun resolve(key: FontChoice): FontFamily = when (key) {
+        FontChoice.NDOT -> NDot
+        FontChoice.NTYPE -> NType
+        FontChoice.SPACE_GROTESK -> SpaceGrotesk
+        FontChoice.SERIF -> Serif
+        FontChoice.MONOSPACE -> Monospace
+        FontChoice.CONDENSED -> system("sans-serif-condensed")
+        FontChoice.LIGHT -> system("sans-serif-light")
+        FontChoice.MEDIUM -> system("sans-serif-medium")
+        FontChoice.CASUAL -> system("casual")
+        FontChoice.SMALLCAPS -> system("sans-serif-smallcaps")
+        FontChoice.CURSIVE -> system("cursive")
         else -> phoneFamily(key) ?: Default
     }
 
@@ -57,8 +57,8 @@ object LauncherFontFamily {
      * The font for the setting [key], or null for the system font (the default) and, for the
      * heading font, "the same as the text".
      */
-    fun resolveOrNull(key: String): FontFamily? =
-        key.takeIf { it != LauncherSettings.FONT_FAMILY_DEFAULT && it != LauncherSettings.FONT_FAMILY_SAME }?.let(::resolve)
+    fun resolveOrNull(key: FontChoice): FontFamily? =
+        key.takeIf { it != FontChoice.DEFAULT && it != FontChoice.SAME }?.let(::resolve)
 
     /** One of Android's own named families (always there; the system falls back if not). */
     private fun system(name: String): FontFamily =
@@ -67,27 +67,27 @@ object LauncherFontFamily {
     private val systemFamilies = ConcurrentHashMap<String, FontFamily>()
 
     /** Fonts that ship on Motorola phones: file and weight per style. */
-    private val PHONE_FONTS: Map<String, List<Pair<String, Int>>> = mapOf(
-        LauncherSettings.FONT_FAMILY_MOTO_ROOKERY to listOf(
+    private val PHONE_FONTS: Map<FontChoice, List<Pair<String, Int>>> = mapOf(
+        FontChoice.MOTO_ROOKERY to listOf(
             "RookeryNew-Regular.ttf" to 400, "RookeryNew-Medium.ttf" to 500, "RookeryNew-Bold.ttf" to 700,
         ),
-        LauncherSettings.FONT_FAMILY_MOTO_WORK_SANS to listOf(
+        FontChoice.MOTO_WORK_SANS to listOf(
             "WorkSans-Regular.ttf" to 400, "WorkSans-Medium.ttf" to 500, "WorkSans-Bold.ttf" to 700,
         ),
-        LauncherSettings.FONT_FAMILY_MOTO_EXO2 to listOf("Exo2-Regular.ttf" to 400, "Exo2-Medium.ttf" to 500),
-        LauncherSettings.FONT_FAMILY_MOTO_ROBOTO_SLAB to listOf(
+        FontChoice.MOTO_EXO2 to listOf("Exo2-Regular.ttf" to 400, "Exo2-Medium.ttf" to 500),
+        FontChoice.MOTO_ROBOTO_SLAB to listOf(
             "RobotoSlab-Regular.ttf" to 400, "RobotoSlab-Medium.ttf" to 500,
         ),
     )
     private const val PHONE_FONT_DIR = "/product/fonts/"
-    private val phoneFamilies = ConcurrentHashMap<String, FontFamily>()
+    private val phoneFamilies = ConcurrentHashMap<FontChoice, FontFamily>()
 
     /** Whether [key] can be used here: Folark's own fonts always, the phone's only where they exist. */
-    fun isAvailable(key: String): Boolean =
+    fun isAvailable(key: FontChoice): Boolean =
         PHONE_FONTS[key]?.any { File(PHONE_FONT_DIR + it.first).canRead() } ?: true
 
     /** One of the phone's font families, read from its files once; null if the phone lacks it. */
-    private fun phoneFamily(key: String): FontFamily? {
+    private fun phoneFamily(key: FontChoice): FontFamily? {
         phoneFamilies[key]?.let { return it }
         val files = PHONE_FONTS[key] ?: return null
         val typeface = catching {

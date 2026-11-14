@@ -2,6 +2,7 @@ package org.arkikeskus.launcher.data
 
 import android.content.Context
 import android.content.Intent
+import org.arkikeskus.launcher.model.HomeGesture
 import org.arkikeskus.launcher.model.LauncherSettings
 import java.io.File
 import org.arkikeskus.launcher.model.catching
@@ -50,23 +51,23 @@ object MotoLinks {
 
     private val PICTURE_TYPES = setOf("jpg", "jpeg", "png", "webp")
 
-    /** What each Motorola home gesture (LauncherSettings.GESTURE_MOTO_*) opens: the first the phone has. */
-    private fun gestureIntents(context: Context, gesture: String): List<Intent> = when (gesture) {
+    /** What each Motorola home gesture ([HomeGesture.MOTO]) opens: the first the phone has. */
+    private fun gestureIntents(context: Context, gesture: HomeGesture): List<Intent> = when (gesture) {
         // Moto Note (Journal), or the older stylus notes app: a new drawing, else the notes list.
-        LauncherSettings.GESTURE_MOTO_NOTE -> listOf(
+        HomeGesture.MOTO_NOTE -> listOf(
             "com.motorola.journal.DRAW_NOTE",
             "com.motorola.stylus.DRAW_NOTE",
             "com.motorola.journal.OPEN",
             "com.motorola.stylus.OPEN",
         ).map(::intent)
-        LauncherSettings.GESTURE_MOTO_VAULT -> listOf(intent("com.motorola.securevault.LAUNCH_SECURE_VAULT"))
-        LauncherSettings.GESTURE_MOTO_READY_FOR -> listOf(intent("com.motorola.readyfor.OPEN_READY_FOR"))
-        LauncherSettings.GESTURE_MOTO_GAMES -> listOfNotNull(
+        HomeGesture.MOTO_VAULT -> listOf(intent("com.motorola.securevault.LAUNCH_SECURE_VAULT"))
+        HomeGesture.MOTO_READY_FOR -> listOf(intent("com.motorola.readyfor.OPEN_READY_FOR"))
+        HomeGesture.MOTO_GAMES -> listOfNotNull(
             catching { context.packageManager.getLaunchIntentForPackage(GAME_MODE_PACKAGE) }.getOrNull()
                 ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
-        LauncherSettings.GESTURE_MOTO_WEATHER -> listOf(intent(WEATHER))
-        LauncherSettings.GESTURE_MOTO_STYLES -> listOf(intent(STYLES))
+        HomeGesture.MOTO_WEATHER -> listOf(intent(WEATHER))
+        HomeGesture.MOTO_STYLES -> listOf(intent(STYLES))
         else -> emptyList()
     }
 
@@ -75,11 +76,11 @@ object MotoLinks {
     }.getOrDefault(false)
 
     /** Whether this phone has what [gesture] opens (Settings offers only those). */
-    fun gestureAvailable(context: Context, gesture: String): Boolean =
+    fun gestureAvailable(context: Context, gesture: HomeGesture): Boolean =
         gestureIntents(context, gesture).any { resolves(context, it) }
 
     /** Runs a Motorola home gesture; false if the phone has nothing for it. */
-    fun runGesture(context: Context, gesture: String): Boolean {
+    fun runGesture(context: Context, gesture: HomeGesture): Boolean {
         val target = gestureIntents(context, gesture).firstOrNull { resolves(context, it) } ?: return false
         return catching { context.startActivity(target) }.isSuccess
     }

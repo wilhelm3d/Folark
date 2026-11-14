@@ -91,6 +91,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp as lerpDp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.PickerOpen
+import org.arkikeskus.launcher.model.PickerRecents
 import org.arkikeskus.launcher.model.SplitPickerLook
 import org.arkikeskus.launcher.ui.component.AppIcon
 import kotlin.math.roundToInt
@@ -193,7 +195,7 @@ fun SplitPickerDrawer(
     // The glow out of the tapped icon (the same as the taskbar's when an app starts from it).
     var glowing by remember { mutableStateOf<Opening?>(null) }
     val glowProgress = remember { Animatable(0f) }
-    val zoom = pickCount == 1 && look.openAnim == SplitPickerLook.OPEN_ZOOM && ValueAnimator.areAnimatorsEnabled()
+    val zoom = pickCount == 1 && look.openAnim == PickerOpen.ZOOM && ValueAnimator.areAnimatorsEnabled()
     val pick: (AppItem, Rect?) -> Unit = pick@{ app, from ->
         if (opening != null || glowing != null) return@pick
         if (pickCount > 1) {
@@ -283,8 +285,8 @@ fun SplitPickerDrawer(
                 if (pairedBefore.isNotEmpty()) {
                     AppRow(stringResource(R.string.split_picker_paired), pairedBefore, look.labels, menu, badge, pick)
                 }
-                if (look.recents != SplitPickerLook.RECENTS_OFF && recents.isNotEmpty()) {
-                    RecentsRow(recents.take(look.recentsCount), previews = look.recents == SplitPickerLook.RECENTS_PREVIEWS, labels = look.labels, onPick = pick)
+                if (look.recents != PickerRecents.OFF && recents.isNotEmpty()) {
+                    RecentsRow(recents.take(look.recentsCount), previews = look.recents == PickerRecents.PREVIEWS, labels = look.labels, onPick = pick)
                 }
             }
 

@@ -33,7 +33,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.arkikeskus.launcher.model.DockAlignment
+import org.arkikeskus.launcher.model.FoldTransition
+import org.arkikeskus.launcher.model.FolderPreview
+import org.arkikeskus.launcher.model.FolderShape
+import org.arkikeskus.launcher.model.FolderTheme
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SizeChoice
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.badgeAlignment
 import org.arkikeskus.launcher.ui.component.LocalScreenType
@@ -180,7 +186,7 @@ internal fun DisplayProfilesSection(
             ExpressiveRowDivider()
             UnlockSyncRow(s = s, viewModel = viewModel)
         }
-        if (s.fold.transitionStyle == LauncherSettings.TRANSITION_LIVE_HINGE) {
+        if (s.fold.transitionStyle == FoldTransition.LIVE_HINGE) {
             LiveHingeRows(s = s, viewModel = viewModel, inner = inner)
         }
         ExpressiveRowDivider()
@@ -344,10 +350,10 @@ internal fun FoldersCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_folder_theme),
             options = listOf(
-                LauncherSettings.FOLDER_THEME_GLASS to stringResource(R.string.settings_folder_theme_glass),
-                LauncherSettings.FOLDER_THEME_DARK to stringResource(R.string.settings_folder_theme_dark),
-                LauncherSettings.FOLDER_THEME_LIGHT to stringResource(R.string.settings_folder_theme_light),
-                LauncherSettings.FOLDER_THEME_ACCENT to stringResource(R.string.settings_folder_theme_accent),
+                FolderTheme.GLASS to stringResource(R.string.settings_folder_theme_glass),
+                FolderTheme.DARK to stringResource(R.string.settings_folder_theme_dark),
+                FolderTheme.LIGHT to stringResource(R.string.settings_folder_theme_light),
+                FolderTheme.ACCENT to stringResource(R.string.settings_folder_theme_accent),
             ),
             selected = s.folders.theme,
             onSelect = { viewModel.setFolderTheme(it, screenType) },
@@ -357,9 +363,9 @@ internal fun FoldersCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_folder_shape),
             options = listOf(
-                LauncherSettings.FOLDER_SHAPE_SQUIRCLE to stringResource(R.string.settings_folder_shape_squircle),
-                LauncherSettings.FOLDER_SHAPE_CIRCLE to stringResource(R.string.settings_folder_shape_circle),
-                LauncherSettings.FOLDER_SHAPE_SQUARE to stringResource(R.string.settings_folder_shape_square),
+                FolderShape.SQUIRCLE to stringResource(R.string.settings_folder_shape_squircle),
+                FolderShape.CIRCLE to stringResource(R.string.settings_folder_shape_circle),
+                FolderShape.SQUARE to stringResource(R.string.settings_folder_shape_square),
             ),
             selected = s.folders.shape,
             onSelect = { viewModel.setFolderShape(it, screenType) },
@@ -369,9 +375,9 @@ internal fun FoldersCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_folder_preview),
             options = listOf(
-                LauncherSettings.FOLDER_PREVIEW_GRID_2 to stringResource(R.string.settings_folder_preview_grid2),
-                LauncherSettings.FOLDER_PREVIEW_GRID_3 to stringResource(R.string.settings_folder_preview_grid3),
-                LauncherSettings.FOLDER_PREVIEW_COVER to stringResource(R.string.settings_folder_preview_cover),
+                FolderPreview.GRID_2 to stringResource(R.string.settings_folder_preview_grid2),
+                FolderPreview.GRID_3 to stringResource(R.string.settings_folder_preview_grid3),
+                FolderPreview.COVER to stringResource(R.string.settings_folder_preview_cover),
             ),
             selected = s.folders.preview,
             onSelect = { viewModel.setFolderPreview(it, screenType) },
@@ -381,9 +387,9 @@ internal fun FoldersCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_folder_open_size),
             options = listOf(
-                LauncherSettings.FOLDER_OPEN_SMALL to stringResource(R.string.settings_folder_open_small),
-                LauncherSettings.FOLDER_OPEN_MEDIUM to stringResource(R.string.settings_folder_open_medium),
-                LauncherSettings.FOLDER_OPEN_LARGE to stringResource(R.string.settings_folder_open_large),
+                SizeChoice.SMALL to stringResource(R.string.settings_folder_open_small),
+                SizeChoice.MEDIUM to stringResource(R.string.settings_folder_open_medium),
+                SizeChoice.LARGE to stringResource(R.string.settings_folder_open_large),
             ),
             selected = s.folders.openSize,
             onSelect = { viewModel.setFolderOpenSize(it, screenType) },
@@ -405,7 +411,7 @@ internal fun FoldersCard(
             checked = s.folders.tapFirstApp,
             onCheckedChange = { viewModel.setFolderTapFirstApp(it, screenType) },
         )
-        if (s.folders.preview != LauncherSettings.FOLDER_PREVIEW_COVER) {
+        if (s.folders.preview != FolderPreview.COVER) {
             ExpressiveRowDivider()
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_folder_direct_apps),
@@ -466,10 +472,10 @@ internal fun DockCard(
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_inner_dock_alignment),
                 options = listOf(
-                    LauncherSettings.DOCK_ALIGNMENT_CENTER to stringResource(R.string.settings_dock_align_center),
-                    LauncherSettings.DOCK_ALIGNMENT_LEFT to stringResource(R.string.settings_dock_align_left),
-                    LauncherSettings.DOCK_ALIGNMENT_RIGHT to stringResource(R.string.settings_dock_align_right),
-                    LauncherSettings.DOCK_ALIGNMENT_FLOATING to stringResource(R.string.settings_dock_align_floating),
+                    DockAlignment.CENTER to stringResource(R.string.settings_dock_align_center),
+                    DockAlignment.LEFT to stringResource(R.string.settings_dock_align_left),
+                    DockAlignment.RIGHT to stringResource(R.string.settings_dock_align_right),
+                    DockAlignment.FLOATING to stringResource(R.string.settings_dock_align_floating),
                 ),
                 selected = s.dock.innerAlignment,
                 onSelect = { viewModel.setInnerDockAlignment(it, screenType) },

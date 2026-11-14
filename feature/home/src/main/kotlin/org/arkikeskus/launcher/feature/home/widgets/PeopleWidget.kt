@@ -118,7 +118,7 @@ import org.arkikeskus.launcher.data.search.ContactDataSource
 import org.arkikeskus.launcher.data.search.PermissionChecker
 import org.arkikeskus.launcher.data.search.RawContact
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PeoplePrivacy
 import org.arkikeskus.launcher.ui.IconMenuItem
 import org.arkikeskus.launcher.ui.IconMenuPopup
 import org.arkikeskus.launcher.ui.LauncherIcons
@@ -182,13 +182,13 @@ class PeopleWidgetViewModel @Inject constructor(
         val canCall: Boolean get() = number != null || live?.delivered?.any { it.callBack != null } == true
 
         /** "Count only" hides who wrote, except for people the user pinned themselves and app tiles. */
-        fun hidesName(privacy: String): Boolean =
-            privacy == LauncherSettings.PRIVACY_COUNT && pinned == null && !isApp
+        fun hidesName(privacy: PeoplePrivacy): Boolean =
+            privacy == PeoplePrivacy.COUNT && pinned == null && !isApp
 
         /** A notification's title (an app tile's headline, a mail's subject) is content, not the
          *  sender: it shows only when message text is allowed at all. */
-        fun shownTitle(privacy: String): String? =
-            live?.newest?.title?.takeIf { privacy == LauncherSettings.PRIVACY_ALL }
+        fun shownTitle(privacy: PeoplePrivacy): String? =
+            live?.newest?.title?.takeIf { privacy == PeoplePrivacy.ALL }
     }
 
     /** Whether our notification listener is enabled — re-checked on home resume. */
@@ -202,10 +202,10 @@ class PeopleWidgetViewModel @Inject constructor(
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     }.getOrDefault(false)
 
-    val privacy: StateFlow<String> = _screenType.flatMapLatest { screenType ->
+    val privacy: StateFlow<PeoplePrivacy> = _screenType.flatMapLatest { screenType ->
         settingsRepository.settings(screenType)
             .map { it.widgets.peoplePrivacy }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherSettings.PRIVACY_ALL)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PeoplePrivacy.ALL)
 
     /** The user's "same person" links (alias key → target key); tiles with links can be split again. */
     val aliases: StateFlow<Map<String, String>> = settingsRepository.peopleAliases
@@ -567,7 +567,7 @@ private fun freshness(ageMs: Long): Float {
 @Composable
 private fun PersonTile(
     tile: PeopleWidgetViewModel.Tile,
-    privacy: String,
+    privacy: PeoplePrivacy,
     now: Long,
     wide: Boolean,
     onOpen: () -> Unit,
@@ -781,7 +781,7 @@ private fun tileTimeLabel(tile: PeopleWidgetViewModel.Tile, now: Long): String =
 
 /** What the wide tile says under the name, honoring the privacy setting. */
 @Composable
-private fun previewText(tile: PeopleWidgetViewModel.Tile, privacy: String): String {
+private fun previewText(tile: PeopleWidgetViewModel.Tile, privacy: PeoplePrivacy): String {
     val newest = tile.live?.newest ?: return ""
     val kindLabel = stringResource(
         when (newest.kind) {
@@ -793,11 +793,11 @@ private fun previewText(tile: PeopleWidgetViewModel.Tile, privacy: String): Stri
     )
     if (newest.kind == PersonEventKind.APP) {
         // The title line already shows in "sender only"; the text is the private part.
-        return if (privacy == LauncherSettings.PRIVACY_ALL) newest.text?.takeIf { it.isNotBlank() } ?: kindLabel else kindLabel
+        return if (privacy == PeoplePrivacy.ALL) newest.text?.takeIf { it.isNotBlank() } ?: kindLabel else kindLabel
     }
     // In a group the tile is the group; the sender goes in front of the text ("Mikko: Oletko…").
     val sender = newest.sender?.takeIf { it.isNotBlank() }
-    if (privacy != LauncherSettings.PRIVACY_ALL) return if (privacy == LauncherSettings.PRIVACY_SENDER && sender != null) sender else kindLabel
+    if (privacy != PeoplePrivacy.ALL) return if (privacy == PeoplePrivacy.SENDER && sender != null) sender else kindLabel
     if (newest.kind == PersonEventKind.MISSED_CALL) return kindLabel
     val body = newest.text?.takeIf { it.isNotBlank() } ?: kindLabel
     return if (sender != null) "$sender: $body" else body
@@ -808,7 +808,7 @@ private fun previewText(tile: PeopleWidgetViewModel.Tile, privacy: String): Stri
 @Composable
 private fun AllTilesDialog(
     tiles: List<PeopleWidgetViewModel.Tile>,
-    privacy: String,
+    privacy: PeoplePrivacy,
     now: Long,
     onOpen: (PeopleWidgetViewModel.Tile) -> Unit,
     onLongPress: (PeopleWidgetViewModel.Tile) -> Unit,
@@ -860,7 +860,7 @@ private fun AllTilesDialog(
 @Composable
 internal fun LinkDialog(
     tile: PeopleWidgetViewModel.Tile,
-    privacy: String,
+    privacy: PeoplePrivacy,
     candidates: List<PeopleWidgetViewModel.Tile>,
     onPick: (PeopleWidgetViewModel.Tile) -> Unit,
     onDismiss: () -> Unit,
@@ -890,13 +890,13 @@ internal fun LinkDialog(
 }
 
 @Composable
-private fun PeopleWidgetViewModel.Tile.shownName(privacy: String): String =
+private fun PeopleWidgetViewModel.Tile.shownName(privacy: PeoplePrivacy): String =
     if (hidesName(privacy)) stringResource(R.string.people_hidden_name) else name
 
 @Composable
 internal fun ReplyDialog(
     tile: PeopleWidgetViewModel.Tile,
-    privacy: String,
+    privacy: PeoplePrivacy,
     onSend: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {

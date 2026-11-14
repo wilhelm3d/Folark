@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Settings with fixed choices are enums (14 November)
+- Code: the 90 remaining String settings with a fixed set of choices (drawer, dock, folders, icons, dots, home gestures, fold, Recents, taskbar, widgets, motion, fonts, the split picker) are enums now, 68 in all next to the Root modes. Each one keeps the text it was always stored as (`StoredChoice.stored`), so settings, backups and the Vector module's divider lock read back exactly as before; a test pins every stored text.
+- A stored value that is not one of the choices reads as that setting's default everywhere. Some settings were read unchecked before (minus-one screen, icon rings, settings style, the taskbar handles and media icon, among others), and a damaged value could leave them showing no choice at all.
+- Code: mixing up two settings, or a setting and a text, is a compile error now; Settings' `ChoicePicker` takes the enum itself, and the `LauncherSettings` constants for these choices are gone. The search index generator also reads generic functions (`fun <T> ChoicePicker`), so the index stays the same.
+
+### Live pill without a bar (14 November)
+- The Progress effect of the live pill (Settings ▸ Live activities) no longer draws a bar: the pill's rim fills round it in the app's colour, clockwise from the top, instead of the pill filling up from the left, and with no known end the rim breathes in that colour instead of a block sliding back and forth. On home and on the taskbar alike.
+- The opened-up pill (long press) shows the progress as a ring round the app's icon instead of a bar under the text; a busy task with no known end has an arc circling the icon. The ring redraws by itself without recomposing the card.
+
 ### Code review, second round (14 November)
 - System updates (Settings ▸ Backup & restore): the switch shows whether the updates are really blocked (it read only whether the update app was switched off, and showed "on" while the updates were held back). The update app's own state is shown at once; with root, its real background permission is read a moment later.
 - Clipboard history (Settings ▸ App drawer ▸ Clipboard row): "Keep copied items" for Always (as before), 1 hour, 1 day or 1 week; older items and their pictures go by themselves.

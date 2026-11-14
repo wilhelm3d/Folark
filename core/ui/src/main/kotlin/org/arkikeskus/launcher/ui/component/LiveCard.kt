@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -35,12 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -57,8 +59,9 @@ import org.arkikeskus.launcher.model.catching
 
 /**
  * A live activity opened up (a long press on its pill): everything a glance needs without opening
- * the app — the app, the title and text, a big ticking clock / ETA / percentage, a full progress
- * bar, and the notification's own buttons (pause, stop, cancel...) plus Open. With several going
+ * the app — the app, the title and text, a big ticking clock / ETA / percentage, the progress as a
+ * ring round the app's icon (no bar), and the notification's own buttons (pause, stop, cancel...)
+ * plus Open. With several going
  * on at once, a swipe sideways moves between them ([count] dots at the bottom).
  */
 @Composable
@@ -78,14 +81,16 @@ fun LiveCard(
         catching { activity.icon?.loadDrawable(context)?.squareBitmap(64)?.asImageBitmap() }.getOrNull()
     }
     val now by rememberSecondTick(activity.ticks)
-    val progress by animateFloatAsState(activity.progress ?: 0f, tween(500), label = "progress")
-    // The moving sweep of a busy bar: only animated when there is one (it draws every frame).
-    val sweep = if (activity.indeterminate) {
-        val busy = rememberInfiniteTransition(label = "busy")
-        busy.animateFloat(0f, 1f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "sweep").value
+    // Both read only while drawing the ring, so they redraw it and recompose nothing.
+    val progress = animateFloatAsState(activity.progress ?: 0f, tween(500), label = "progress")
+    // A busy arc circling the icon: only animated when there is no known end (it draws every frame).
+    val busyTurn: State<Float>? = if (activity.indeterminate) {
+        rememberInfiniteTransition(label = "busy")
+            .animateFloat(0f, 1f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "turn")
     } else {
-        0f
+        null
     }
+    val hasProgress = activity.progress != null || activity.indeterminate
     var dragged by remember { mutableFloatStateOf(0f) }
     val shape = RoundedCornerShape(28.dp)
     Column(
@@ -116,8 +121,30 @@ fun LiveCard(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (icon != null) {
-                Image(icon, contentDescription = null, colorFilter = ColorFilter.tint(shown), modifier = Modifier.size(22.dp))
+            if (icon != null || hasProgress) {
+                Box(
+                    Modifier
+                        .size(if (hasProgress) 34.dp else 22.dp)
+                        .drawBehind {
+                            if (!hasProgress) return@drawBehind
+                            val width = 2.5.dp.toPx()
+                            val topLeft = Offset(width / 2, width / 2)
+                            val arcSize = Size(size.width - width, size.height - width)
+                            drawArc(Color.White.copy(alpha = 0.12f), 0f, 360f, false, topLeft, arcSize, style = Stroke(width))
+                            val turn = busyTurn?.value
+                            val start = if (turn != null) -90f + 360f * turn else -90f
+                            val sweep = if (turn != null) 90f else 360f * progress.value
+                            drawArc(shown, start, sweep, false, topLeft, arcSize, style = Stroke(width, cap = StrokeCap.Round))
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (icon != null) {
+                        Image(
+                            icon, contentDescription = null, colorFilter = ColorFilter.tint(shown),
+                            modifier = Modifier.size(if (hasProgress) 18.dp else 22.dp),
+                        )
+                    }
+                }
             }
             Text(
                 activity.appLabel.ifBlank { activity.packageName },
@@ -140,24 +167,6 @@ fun LiveCard(
         val body = activity.bigText?.takeIf { it.isNotBlank() } ?: activity.text
         if (body.isNotBlank() && body != activity.title) {
             Text(body, color = Color.White.copy(alpha = 0.78f), fontSize = 14.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
-        }
-        if (activity.progress != null || activity.indeterminate) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .drawBehind {
-                        val r = CornerRadius(size.height / 2)
-                        if (activity.indeterminate) {
-                            val w = size.width * 0.3f
-                            drawRoundRect(shown, Offset(-w + (size.width + w) * sweep, 0f), Size(w, size.height), r)
-                        } else {
-                            drawRoundRect(shown, Offset.Zero, Size(size.width * progress, size.height), r)
-                        }
-                    },
-            )
         }
         Spacer(Modifier.height(2.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

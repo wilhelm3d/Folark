@@ -12,15 +12,15 @@ data class DrawerSettings(
     /** Let app-drawer labels (apps, folders, the "most used" row) wrap onto a second line — the
      *  drawer's long-standing look, so this defaults on. */
     val twoLineLabels: Boolean = true,
-    val searchPosition: String = LauncherSettings.SEARCH_TOP,
+    val searchPosition: SearchPosition = SearchPosition.TOP,
     val indexBarEnabled: Boolean = true,
-    val azIndexPosition: String = LauncherSettings.AZ_POSITION_VERTICAL_RIGHT,
+    val azIndexPosition: AzPosition = AzPosition.VERTICAL_RIGHT,
     /** Size of the A-Z index bar's letters and touch strip: 1 = normal. */
     val azIndexScale: Float = 1f,
     /** Corner radius of the app drawer panel in dp; [LauncherSettings.DRAWER_CORNER_AUTO] follows the drawer style. */
     val cornerRadius: Int = LauncherSettings.DRAWER_CORNER_AUTO,
     /** The pull handle at the top of the drawer: a bar, or a small arrow that turns as the drawer moves. */
-    val handleStyle: String = LauncherSettings.DRAWER_HANDLE_BAR,
+    val handleStyle: DrawerHandle = DrawerHandle.BAR,
     /** Extra room kept free under the drawer, in dp (for a system taskbar that the system does not report). */
     val bottomSpace: Int = 0,
     /** Small "A", "B", "C" headings between the apps of the full list. */
@@ -35,12 +35,12 @@ data class DrawerSettings(
     val scrimOpacity: Float = 0.5f,
     val glassBlurRadius: Float = 25.0f,
     val glassDarkTint: Float = 0.45f,
-    val style: String = LauncherSettings.DRAWER_STYLE_STANDARD_GRID,
-    /** Drawer background theme, one of the DRAWER_THEME_* values. [LauncherSettings.DRAWER_THEME_SYSTEM] follows the
+    val style: DrawerStyle = DrawerStyle.STANDARD_GRID,
+    /** Drawer background theme, one of [DrawerTheme]. [DrawerTheme.SYSTEM] follows the
      *  launcher theme (light/dark), which is what the drawer always did before themes were wired up. */
-    val themeTint: String = LauncherSettings.DRAWER_THEME_SYSTEM,
+    val themeTint: DrawerTheme = DrawerTheme.SYSTEM,
     val accentColor: Int = LauncherSettings.DEFAULT_DRAWER_ACCENT,
-    /** ARGB background used by [LauncherSettings.DRAWER_THEME_CUSTOM]. */
+    /** ARGB background used by [DrawerTheme.CUSTOM]. */
     val customColor: Int = LauncherSettings.DEFAULT_DRAWER_CUSTOM_COLOR,
     /** Liquid Glass: the drawer panel becomes translucent ([panelOpacity]) with a specular rim
      *  and sheen, over the wallpaper blurred by [backgroundBlur]. */
@@ -49,7 +49,7 @@ data class DrawerSettings(
     val panelOpacity: Float = LauncherSettings.DEFAULT_DRAWER_PANEL_OPACITY,
     val heightFraction: Float = 1.0f,
     val widthFraction: Float = 1.0f,
-    val alignment: String = LauncherSettings.DRAWER_ALIGNMENT_CENTER,
+    val alignment: DrawerAlignment = DrawerAlignment.CENTER,
     /** Reopen the app drawer scrolled back to the top (Pixel-style) rather than remembering the last
      *  scroll position — keeps the "most used" row and A–Z start visible on every open. */
     val opensAtTop: Boolean = true,
@@ -73,5 +73,76 @@ data class DrawerSettings(
     val hiddenLock: Boolean = false,
     /** Unfolded: the drawer's tabs as a list on the left, their apps on the right. */
     val twoPane: Boolean = false,
-    val layoutMode: String = LauncherSettings.DRAWER_LAYOUT_GRID,
+    val layoutMode: DrawerLayout = DrawerLayout.GRID,
 )
+
+/** Where the drawer's AâZ index sits. */
+enum class AzPosition(override val stored: String) : StoredChoice {
+    VERTICAL_RIGHT("VERTICAL_RIGHT"),
+    VERTICAL_LEFT("VERTICAL_LEFT"),
+    HORIZONTAL_TOP("HORIZONTAL_TOP"),
+    HORIZONTAL_BOTTOM("HORIZONTAL_BOTTOM"),
+}
+
+/** How the drawer's list lines up its rows. */
+enum class DrawerAlignment(override val stored: String) : StoredChoice {
+    LEFT("left"),
+    CENTER("center"),
+    RIGHT("right"),
+}
+
+/** The hint at the bottom of home that the drawer pulls up from. */
+enum class DrawerHandle(override val stored: String) : StoredChoice {
+    BAR("bar"),
+    ARROW("arrow"),
+}
+
+/** The app drawer as a grid of icons or as a list. */
+enum class DrawerLayout(override val stored: String) : StoredChoice {
+    GRID("grid"),
+    LIST("list"),
+}
+
+/** The app drawer's style. */
+enum class DrawerStyle(override val stored: String) : StoredChoice {
+    STANDARD_GRID("standard_grid"),
+    ONE_UI("one_ui"),
+    NOTHING_OS("nothing_os"),
+    MOTO("moto"),
+    VERTICAL("vertical"),
+    HORIZONTAL("horizontal"),
+    ;
+
+    /** The accent this style ships with. */
+    val defaultAccent: Int
+        get() = when (this) {
+            ONE_UI -> 0xFF0A84FF.toInt()
+            MOTO -> 0xFF00BFA5.toInt()
+            NOTHING_OS -> 0xFFFF3B30.toInt()
+            else -> LauncherSettings.DEFAULT_DRAWER_ACCENT
+        }
+
+    companion object {
+        /** The accents the styles ship with: a style change only replaces the accent while it still
+         *  is one of these (i.e. the user never picked their own). */
+        val DEFAULT_ACCENTS: Set<Int> = entries.mapTo(HashSet()) { it.defaultAccent }
+    }
+}
+
+/** The app drawer's colours, in the order the settings picker shows them. */
+enum class DrawerTheme(override val stored: String) : StoredChoice {
+    SYSTEM("system"),
+    MATERIAL_YOU("material_you"),
+    DEFAULT_DARK("default_dark"),
+    OBSIDIAN_BLACK("obsidian_black"),
+    LIGHT("light"),
+    ACCENT_TINT("accent_tint"),
+    MONOCHROME("monochrome"),
+    CUSTOM("custom"),
+}
+
+/** Where the drawer's search bar sits. */
+enum class SearchPosition(override val stored: String) : StoredChoice {
+    TOP("top"),
+    BOTTOM("bottom"),
+}

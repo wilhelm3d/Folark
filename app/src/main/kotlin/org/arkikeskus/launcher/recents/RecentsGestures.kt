@@ -30,7 +30,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsAction
 import org.arkikeskus.launcher.ui.component.recentsEnter
 import org.arkikeskus.launcher.ui.component.recentsSelect
 import kotlin.math.abs
@@ -57,24 +57,24 @@ internal fun RecentsEnv.cardModifier(
 ): Modifier {
     // Labels for the card's custom accessibility actions (the swipe equivalents), per action.
     @Composable
-    fun actionLabel(action: String): String? = when (action) {
-        LauncherSettings.RECENTS_ACTION_CLOSE ->
+    fun actionLabel(action: RecentsAction): String? = when (action) {
+        RecentsAction.CLOSE ->
             stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_close)
-        LauncherSettings.RECENTS_ACTION_SPLIT ->
+        RecentsAction.SPLIT ->
             stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_split)
-        LauncherSettings.RECENTS_ACTION_POPUP ->
+        RecentsAction.POPUP ->
             stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_popup)
-        LauncherSettings.RECENTS_ACTION_UNSPLIT ->
+        RecentsAction.UNSPLIT ->
             stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_unsplit)
-        LauncherSettings.RECENTS_ACTION_INFO ->
+        RecentsAction.INFO ->
             stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_info)
-        LauncherSettings.RECENTS_ACTION_OPEN ->
+        RecentsAction.OPEN ->
             stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_open)
-        LauncherSettings.RECENTS_ACTION_PIN ->
+        RecentsAction.PIN ->
             stringResource(org.arkikeskus.launcher.feature.settings.R.string.settings_recents_action_pin)
         else -> null
     }
-    val openLabel = actionLabel(LauncherSettings.RECENTS_ACTION_OPEN).orEmpty()
+    val openLabel = actionLabel(RecentsAction.OPEN).orEmpty()
     val hapticContext = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val offset = remember(card.key) { Animatable(0f) }
@@ -102,14 +102,14 @@ internal fun RecentsEnv.cardModifier(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val s = settings
     // The gestures of the screen Recents is on (the outer screen may have its own).
-    val swipeUp = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeUpAction, card)
-    val swipeDown = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeDownAction, card)
+    val swipeUp = if (selecting) RecentsAction.NONE else usable(swipeUpAction, card)
+    val swipeDown = if (selecting) RecentsAction.NONE else usable(swipeDownAction, card)
     // Up / down only where cards don't scroll up and down; left / right only where they don't scroll sideways.
     val vertical = closeAxis == Orientation.Vertical
-    val swipeLeft = if (selecting || !sideSwipes) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeLeftAction, card)
-    val swipeRight = if (selecting || !sideSwipes) LauncherSettings.RECENTS_ACTION_NONE else usable(swipeRightAction, card)
-    val longPress = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(longPressAction, card)
-    val doubleTap = if (selecting) LauncherSettings.RECENTS_ACTION_NONE else usable(doubleTapAction, card)
+    val swipeLeft = if (selecting || !sideSwipes) RecentsAction.NONE else usable(swipeLeftAction, card)
+    val swipeRight = if (selecting || !sideSwipes) RecentsAction.NONE else usable(swipeRightAction, card)
+    val longPress = if (selecting) RecentsAction.NONE else usable(longPressAction, card)
+    val doubleTap = if (selecting) RecentsAction.NONE else usable(doubleTapAction, card)
     // Labels for the card's custom accessibility actions (the swipe equivalents), per action.
     val upLabel = actionLabel(swipeUp)
     val downLabel = actionLabel(swipeDown)
@@ -119,10 +119,10 @@ internal fun RecentsEnv.cardModifier(
     val env = rememberUpdatedState(this)
 
     /** A finished swipe: flies away (off the screen, that way) for Close, springs back for anything else. */
-    fun finishSwipe(action: String, towardStart: Boolean, sideways: Boolean) {
+    fun finishSwipe(action: RecentsAction, towardStart: Boolean, sideways: Boolean) {
         val moving = if (sideways) offsetX else offset
         scope.launch {
-            if (action == LauncherSettings.RECENTS_ACTION_CLOSE) {
+            if (action == RecentsAction.CLOSE) {
                 moving.animateTo(if (towardStart) -dismissPx * 8 else dismissPx * 8, tween(220))
                 env.value.perform(action, card)
             } else {
@@ -157,12 +157,12 @@ internal fun RecentsEnv.cardModifier(
             // actions as named custom actions. "Nothing" and the long-press menu are left out
             // (menu is reachable by double-tap-and-hold, which TalkBack already performs).
             customActions = buildList {
-                fun action(label: String?, name: String, run: () -> Unit) {
-                    if (name != LauncherSettings.RECENTS_ACTION_NONE && label != null) {
+                fun action(label: String?, name: RecentsAction, run: () -> Unit) {
+                    if (name != RecentsAction.NONE && label != null) {
                         add(androidx.compose.ui.semantics.CustomAccessibilityAction(label) { run(); true })
                     }
                 }
-                action(openLabel, LauncherSettings.RECENTS_ACTION_OPEN) { env.value.onTap(card) }
+                action(openLabel, RecentsAction.OPEN) { env.value.onTap(card) }
                 action(upLabel, swipeUp) { env.value.perform(swipeUp, card) }
                 action(downLabel, swipeDown) { env.value.perform(swipeDown, card) }
                 action(leftLabel, swipeLeft) { env.value.perform(swipeLeft, card) }
@@ -198,7 +198,7 @@ internal fun RecentsEnv.cardModifier(
                     // ---------------------------------------------------- long press
                     org.arkikeskus.launcher.data.Haptics.play(hapticContext, org.arkikeskus.launcher.data.Haptics.Event.PICK_UP)
                     // The menu opens at once, under the finger; moving on drags the card instead.
-                    val withMenu = longPress == LauncherSettings.RECENTS_ACTION_MENU
+                    val withMenu = longPress == RecentsAction.MENU
                     if (withMenu) env.value.menu.open(card, origin + down.position)
                     var travelled = 0f
                     var dragging = false
@@ -238,7 +238,7 @@ internal fun RecentsEnv.cardModifier(
 
                 if (released) {
                     // ---------------------------------------------------- tap, or double tap
-                    if (doubleTap != LauncherSettings.RECENTS_ACTION_NONE) {
+                    if (doubleTap != RecentsAction.NONE) {
                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                             awaitFirstDown(requireUnconsumed = false)
                         }
@@ -266,7 +266,7 @@ internal fun RecentsEnv.cardModifier(
                 val toStart = if (sideways) swipeLeft else swipeUp
                 val toEnd = if (sideways) swipeRight else swipeDown
                 val allowed = clear && (if (sideways) sideSwipes else vertical)
-                if (!allowed || (toStart == LauncherSettings.RECENTS_ACTION_NONE && toEnd == LauncherSettings.RECENTS_ACTION_NONE)) {
+                if (!allowed || (toStart == RecentsAction.NONE && toEnd == RecentsAction.NONE)) {
                     return@awaitEachGesture // the list's scroll takes it
                 }
                 slopChange?.consume()
@@ -284,13 +284,13 @@ internal fun RecentsEnv.cardModifier(
                     total += if (sideways) d.x else d.y
                     // Only the directions that do something move freely; the others resist.
                     val dirAction = if (total < 0) toStart else toEnd
-                    val shown = if (dirAction == LauncherSettings.RECENTS_ACTION_NONE) total * 0.25f else total
+                    val shown = if (dirAction == RecentsAction.NONE) total * 0.25f else total
                     scope.launch { moving.snapTo(shown) }
                 }
                 val v = tracker.calculateVelocity()
                 val speed = if (sideways) v.x else v.y
                 val finalAction = if (total < 0) toStart else toEnd
-                if (finalAction != LauncherSettings.RECENTS_ACTION_NONE && (abs(total) > dismissPx || abs(speed) > 2200f && speed * total > 0)) {
+                if (finalAction != RecentsAction.NONE && (abs(total) > dismissPx || abs(speed) > 2200f && speed * total > 0)) {
                     finishSwipe(finalAction, towardStart = total < 0, sideways = sideways)
                 } else {
                     scope.launch { moving.animateTo(0f) }
@@ -303,34 +303,34 @@ internal fun RecentsEnv.cardModifier(
  * [action] if it can be done on [card] now (Close and Close the others need root; Full screen a
  * split card; Split 3 apps the three-app split switch).
  */
-private fun RecentsEnv.usable(action: String, card: RecentsCard): String = when (action) {
-    LauncherSettings.RECENTS_ACTION_CLOSE -> if (canClose && !card.pinned) action else LauncherSettings.RECENTS_ACTION_NONE
-    LauncherSettings.RECENTS_ACTION_UNSPLIT -> if (card.isSplit) action else LauncherSettings.RECENTS_ACTION_NONE
-    LauncherSettings.RECENTS_ACTION_SPLIT, LauncherSettings.RECENTS_ACTION_POPUP ->
-        if (card.isSplit) LauncherSettings.RECENTS_ACTION_NONE else action
-    LauncherSettings.RECENTS_ACTION_SPLIT3 ->
-        if (card.isSplit || !settings.launch.threeAppSplit) LauncherSettings.RECENTS_ACTION_NONE else action
-    LauncherSettings.RECENTS_ACTION_CLOSE_OTHERS ->
-        if (canClose && drag.cards.any { it.key != card.key && !it.pinned }) action else LauncherSettings.RECENTS_ACTION_NONE
+private fun RecentsEnv.usable(action: RecentsAction, card: RecentsCard): RecentsAction = when (action) {
+    RecentsAction.CLOSE -> if (canClose && !card.pinned) action else RecentsAction.NONE
+    RecentsAction.UNSPLIT -> if (card.isSplit) action else RecentsAction.NONE
+    RecentsAction.SPLIT, RecentsAction.POPUP ->
+        if (card.isSplit) RecentsAction.NONE else action
+    RecentsAction.SPLIT3 ->
+        if (card.isSplit || !settings.launch.threeAppSplit) RecentsAction.NONE else action
+    RecentsAction.CLOSE_OTHERS ->
+        if (canClose && drag.cards.any { it.key != card.key && !it.pinned }) action else RecentsAction.NONE
     else -> action
 }
 
 /** Does a gesture's action on [card]. */
-internal fun RecentsEnv.perform(action: String, card: RecentsCard) {
+internal fun RecentsEnv.perform(action: RecentsAction, card: RecentsCard) {
     when (action) {
-        LauncherSettings.RECENTS_ACTION_CLOSE -> if (canClose) onClose(card)
-        LauncherSettings.RECENTS_ACTION_SPLIT -> onSplit(card)
-        LauncherSettings.RECENTS_ACTION_POPUP -> onPopUp(card)
-        LauncherSettings.RECENTS_ACTION_UNSPLIT -> onUnsplit(card)
-        LauncherSettings.RECENTS_ACTION_INFO -> onAppInfo(card)
-        LauncherSettings.RECENTS_ACTION_PIN -> onTogglePin(card)
-        LauncherSettings.RECENTS_ACTION_MENU -> menu.open(card, drag.bounds[card.key]?.center ?: Offset.Zero)
-        LauncherSettings.RECENTS_ACTION_OPEN -> onTap(card)
-        LauncherSettings.RECENTS_ACTION_PEEK -> if (card.isSplit) onPeekSplit(card) else onPeekPick(card)
-        LauncherSettings.RECENTS_ACTION_SPLIT3 -> onSplitThree(card)
-        LauncherSettings.RECENTS_ACTION_CLOSE_OTHERS ->
+        RecentsAction.CLOSE -> if (canClose) onClose(card)
+        RecentsAction.SPLIT -> onSplit(card)
+        RecentsAction.POPUP -> onPopUp(card)
+        RecentsAction.UNSPLIT -> onUnsplit(card)
+        RecentsAction.INFO -> onAppInfo(card)
+        RecentsAction.PIN -> onTogglePin(card)
+        RecentsAction.MENU -> menu.open(card, drag.bounds[card.key]?.center ?: Offset.Zero)
+        RecentsAction.OPEN -> onTap(card)
+        RecentsAction.PEEK -> if (card.isSplit) onPeekSplit(card) else onPeekPick(card)
+        RecentsAction.SPLIT3 -> onSplitThree(card)
+        RecentsAction.CLOSE_OTHERS ->
             if (canClose) drag.cards.filter { it.key != card.key && !it.pinned }.forEach(onClose)
-        LauncherSettings.RECENTS_ACTION_CLOSE_ALL -> onCloseAll()
+        RecentsAction.CLOSE_ALL -> onCloseAll()
         else -> {}
     }
 }

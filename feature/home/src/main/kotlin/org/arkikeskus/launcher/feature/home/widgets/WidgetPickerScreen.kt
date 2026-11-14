@@ -60,6 +60,7 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.data.local.HomeItemEntity
+import org.arkikeskus.launcher.model.DrawerAlignment
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.LauncherIcons
@@ -251,12 +252,12 @@ private fun InnerWidgetGalleryPanel(
     val effectiveWidthFraction = settings.drawer.widthFraction.coerceIn(0.4f, 1.0f)
         .let { if (sidebar) it.coerceAtMost(0.5f) else it }
     val effectiveAlignment = settings.drawer.alignment.let {
-        if (sidebar && it != LauncherSettings.DRAWER_ALIGNMENT_LEFT) LauncherSettings.DRAWER_ALIGNMENT_RIGHT else it
+        if (sidebar && it != DrawerAlignment.LEFT) DrawerAlignment.RIGHT else it
     }
 
-    val sheetAlignment = when (effectiveAlignment.lowercase()) {
-        LauncherSettings.DRAWER_ALIGNMENT_LEFT -> Alignment.BottomStart
-        LauncherSettings.DRAWER_ALIGNMENT_RIGHT -> Alignment.BottomEnd
+    val sheetAlignment = when (effectiveAlignment) {
+        DrawerAlignment.LEFT -> Alignment.BottomStart
+        DrawerAlignment.RIGHT -> Alignment.BottomEnd
         else -> Alignment.BottomCenter
     }
 
@@ -272,7 +273,7 @@ private fun InnerWidgetGalleryPanel(
     val panelShape = when {
         !sidebar && effectiveHeightFraction >= 1.0f && effectiveWidthFraction >= 1.0f -> RoundedCornerShape(0.dp)
         !sidebar -> RoundedCornerShape(topStart = drawerStyle.corner, topEnd = drawerStyle.corner)
-        effectiveAlignment == LauncherSettings.DRAWER_ALIGNMENT_LEFT ->
+        effectiveAlignment == DrawerAlignment.LEFT ->
             RoundedCornerShape(topEnd = drawerStyle.corner, bottomEnd = drawerStyle.corner)
         else -> RoundedCornerShape(topStart = drawerStyle.corner, bottomStart = drawerStyle.corner)
     }

@@ -16,7 +16,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.TaskbarMediaShape
+import org.arkikeskus.launcher.model.TaskbarTheme
 import kotlin.math.abs
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.AUTO_COLLAPSE_MS
 import org.arkikeskus.launcher.feature.home.taskbar.AppTaskbar.Companion.MEDIA_CONTROLS_MS
@@ -30,7 +31,7 @@ internal fun AppTaskbar.mediaIconView(s: TaskbarSetup, size: Int, controls: View
     val playing = media.state
     val player = playing?.let { st -> allApps.firstOrNull { it.packageName == st.packageName } }
     val inset = size / 12
-    val round = s.mediaShape != LauncherSettings.TASKBAR_MEDIA_SHAPE_ROUNDED
+    val round = s.mediaShape != TaskbarMediaShape.ROUNDED
     val frame = FrameLayout(context).apply {
         contentDescription = playing?.title?.ifEmpty { null } ?: context.getString(R.string.taskbar_media)
         clipChildren = false
@@ -146,7 +147,7 @@ internal fun AppTaskbar.stopAndHideMedia() {
 
 /** The player card above the bar: cover, title and artist, back, play/pause and forward. */
 internal fun AppTaskbar.mediaControlsView(s: TaskbarSetup): View {
-    val light = s.theme == LauncherSettings.TASKBAR_THEME_LIGHT
+    val light = s.theme == TaskbarTheme.LIGHT
     val tint = if (light) Color.rgb(20, 20, 24) else Color.WHITE
     val playingNow = media.state
     val panel = LinearLayout(context).apply {

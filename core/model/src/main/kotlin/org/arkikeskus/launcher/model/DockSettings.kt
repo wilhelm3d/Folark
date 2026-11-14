@@ -9,5 +9,13 @@ data class DockSettings(
     val columns: Int = 4,
     val showLabels: Boolean = false,
     val backgroundOpacity: Float = 0.35f,
-    val innerAlignment: String = LauncherSettings.DOCK_ALIGNMENT_CENTER,
+    val innerAlignment: DockAlignment = DockAlignment.CENTER,
 )
+
+/** How the dock lines up its icons on the inner display. */
+enum class DockAlignment(override val stored: String) : StoredChoice {
+    CENTER("center"),
+    LEFT("left"),
+    RIGHT("right"),
+    FLOATING("floating"),
+}

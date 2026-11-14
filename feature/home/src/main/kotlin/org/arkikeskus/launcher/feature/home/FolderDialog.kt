@@ -51,7 +51,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.FolderAnimation
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SizeChoice
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LiquidGlassContainer
 import org.arkikeskus.launcher.ui.component.isDefaultOrBlankFolderName
@@ -71,8 +73,8 @@ internal fun FolderDialog(
     badgeScale: Float,
     glassBlurRadius: Float,
     glassDarkTint: Float,
-    /** How the folder opens (LauncherSettings.FOLDER_ANIM_*), and the animation speed multiplier. */
-    openAnimation: String = LauncherSettings.FOLDER_ANIM_SHEET,
+    /** How the folder opens ([FolderAnimation]), and the animation speed multiplier. */
+    openAnimation: FolderAnimation = FolderAnimation.SHEET,
     animationSpeed: Float = 1f,
     onRename: (String) -> Unit,
     onAppClick: (AppItem) -> Unit,
@@ -92,12 +94,12 @@ internal fun FolderDialog(
     val style = LocalFolderStyle.current
     val contentColor = folderContentColor(style.theme)
     val (openIconSize, openMaxHeight) = when (style.openSize) {
-        LauncherSettings.FOLDER_OPEN_SMALL -> 44.dp to 260.dp
-        LauncherSettings.FOLDER_OPEN_LARGE -> 68.dp to 520.dp
+        SizeChoice.SMALL -> 44.dp to 260.dp
+        SizeChoice.LARGE -> 68.dp to 520.dp
         else -> 56.dp to 360.dp
     }
 
-    val asSheet = openAnimation == LauncherSettings.FOLDER_ANIM_SHEET
+    val asSheet = openAnimation == FolderAnimation.SHEET
     val content: @Composable (Shape) -> Unit = { shape ->
         FolderSurface(
             theme = style.theme,
@@ -176,7 +178,7 @@ internal fun FolderDialog(
         }
     } else {
         // A centred card that zooms or fades in (or just appears), at the chosen animation speed.
-        val progress = remember(folder.id) { Animatable(if (openAnimation == LauncherSettings.FOLDER_ANIM_NONE) 1f else 0f) }
+        val progress = remember(folder.id) { Animatable(if (openAnimation == FolderAnimation.NONE) 1f else 0f) }
         LaunchedEffect(folder.id) {
             progress.animateTo(1f, tween((240 / animationSpeed.coerceAtLeast(0.1f)).toInt(), easing = FastOutSlowInEasing))
         }
@@ -187,7 +189,7 @@ internal fun FolderDialog(
                     .widthIn(max = 520.dp)
                     .graphicsLayer {
                         alpha = progress.value
-                        if (openAnimation == LauncherSettings.FOLDER_ANIM_ZOOM) {
+                        if (openAnimation == FolderAnimation.ZOOM) {
                             val scale = 0.8f + 0.2f * progress.value
                             scaleX = scale
                             scaleY = scale

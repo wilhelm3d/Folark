@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import org.arkikeskus.launcher.data.Haptics
+import org.arkikeskus.launcher.model.HapticsStrength
 import org.arkikeskus.launcher.model.LauncherSettings
 
 /**
@@ -36,9 +37,9 @@ internal fun HapticsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_haptics_strength),
             options = listOf(
-                LauncherSettings.HAPTICS_LIGHT to stringResource(R.string.settings_haptics_light),
-                LauncherSettings.HAPTICS_MEDIUM to stringResource(R.string.settings_haptics_medium),
-                LauncherSettings.HAPTICS_STRONG to stringResource(R.string.settings_haptics_strong),
+                HapticsStrength.LIGHT to stringResource(R.string.settings_haptics_light),
+                HapticsStrength.MEDIUM to stringResource(R.string.settings_haptics_medium),
+                HapticsStrength.STRONG to stringResource(R.string.settings_haptics_strong),
             ),
             selected = m.hapticsStrength,
             onSelect = {

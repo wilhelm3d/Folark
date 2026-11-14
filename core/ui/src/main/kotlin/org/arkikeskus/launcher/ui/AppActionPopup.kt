@@ -53,6 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PopupTheme
 import org.arkikeskus.launcher.ui.component.liquidGlass
 import org.arkikeskus.launcher.ui.component.LocalGlassLevel
 import org.arkikeskus.launcher.ui.expressive.DarkExpressivePalette
@@ -352,7 +353,7 @@ private fun ExpressivePopupCard(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // Left-aligned caret so [caretStart] is a true offset from the card's left edge.
                 if (showCaret && !preferAbove) Caret(pointingUp = true, color = cardColor, modifier = Modifier.align(Alignment.Start).padding(start = caretStart))
-                val glass = LocalPopupTheme.current == LauncherSettings.POPUP_THEME_GLASS
+                val glass = LocalPopupTheme.current == PopupTheme.GLASS
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = if (glass) Color.Transparent else cardColor,
@@ -378,15 +379,15 @@ private fun ExpressivePopupCard(
 
 /**
  * The look of the long-press menus under this subtree (Settings ▸ Appearance), one of
- * `LauncherSettings.POPUP_THEME_*`. Provided once at the launcher root.
+ * [PopupTheme]. Provided once at the launcher root.
  */
-val LocalPopupTheme = compositionLocalOf { LauncherSettings.POPUP_THEME_CLASSIC }
+val LocalPopupTheme = compositionLocalOf { PopupTheme.CLASSIC }
 
 /** Resolves [LocalPopupTheme] into the palette and accent the popup rows draw with. */
 @Composable
 private fun PopupThemed(content: @Composable () -> Unit) {
     when (LocalPopupTheme.current) {
-        LauncherSettings.POPUP_THEME_MATERIAL -> {
+        PopupTheme.MATERIAL -> {
             // The launcher's own Material colours (wallpaper-based where the system provides them).
             val scheme = MaterialTheme.colorScheme
             CompositionLocalProvider(
@@ -405,12 +406,12 @@ private fun PopupThemed(content: @Composable () -> Unit) {
                 content = content,
             )
         }
-        LauncherSettings.POPUP_THEME_DARK ->
+        PopupTheme.DARK ->
             CompositionLocalProvider(LocalExpressivePalette provides DarkExpressivePalette, content = content)
-        LauncherSettings.POPUP_THEME_LIGHT ->
+        PopupTheme.LIGHT ->
             CompositionLocalProvider(LocalExpressivePalette provides LightExpressivePalette, content = content)
         // Liquid Glass: the dark palette over a see-through tint (how see-through: the glass level).
-        LauncherSettings.POPUP_THEME_GLASS -> {
+        PopupTheme.GLASS -> {
             val level = LocalGlassLevel.current
             CompositionLocalProvider(
                 LocalExpressivePalette provides DarkExpressivePalette.copy(surfaceHi = Color.Black.copy(alpha = 0.62f - 0.38f * level)),

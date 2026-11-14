@@ -9,7 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import org.arkikeskus.launcher.data.PinnedPerson
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PeoplePrivacy
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,7 +27,7 @@ class PeopleDialogPrivacyTest {
 
     @Test fun countOnlyReplyDoesNotRevealRecipient() {
         compose.setContent {
-            MaterialTheme { ReplyDialog(tile("Private Recipient"), LauncherSettings.PRIVACY_COUNT, {}, {}) }
+            MaterialTheme { ReplyDialog(tile("Private Recipient"), PeoplePrivacy.COUNT, {}, {}) }
         }
         compose.onNodeWithText("Private Recipient", substring = true).assertDoesNotExist()
         compose.onNodeWithText("New message", substring = true).assertIsDisplayed()
@@ -37,7 +37,7 @@ class PeopleDialogPrivacyTest {
         compose.setContent {
             MaterialTheme {
                 LinkDialog(
-                    tile("Private Source"), LauncherSettings.PRIVACY_COUNT,
+                    tile("Private Source"), PeoplePrivacy.COUNT,
                     listOf(tile("Hidden Candidate"), tile("Pinned Friend", pinned = true)), {}, {},
                 )
             }
@@ -50,7 +50,7 @@ class PeopleDialogPrivacyTest {
 
     @Test fun senderPrivacyKeepsRecipientAvailableInReply() {
         compose.setContent {
-            MaterialTheme { ReplyDialog(tile("Visible Recipient"), LauncherSettings.PRIVACY_SENDER, {}, {}) }
+            MaterialTheme { ReplyDialog(tile("Visible Recipient"), PeoplePrivacy.SENDER, {}, {}) }
         }
         compose.onNodeWithText("Visible Recipient", substring = true).assertIsDisplayed()
     }

@@ -10,22 +10,23 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsAction
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
 
 private val ACTIONS = listOf(
-    LauncherSettings.RECENTS_ACTION_NONE to R.string.settings_recents_action_none,
-    LauncherSettings.RECENTS_ACTION_MENU to R.string.settings_recents_action_menu,
-    LauncherSettings.RECENTS_ACTION_CLOSE to R.string.settings_recents_action_close,
-    LauncherSettings.RECENTS_ACTION_SPLIT to R.string.settings_recents_action_split,
-    LauncherSettings.RECENTS_ACTION_POPUP to R.string.settings_recents_action_popup,
-    LauncherSettings.RECENTS_ACTION_UNSPLIT to R.string.settings_recents_action_unsplit,
-    LauncherSettings.RECENTS_ACTION_PIN to R.string.settings_recents_action_pin,
-    LauncherSettings.RECENTS_ACTION_INFO to R.string.settings_recents_action_info,
-    LauncherSettings.RECENTS_ACTION_OPEN to R.string.settings_recents_action_open,
-    LauncherSettings.RECENTS_ACTION_PEEK to R.string.settings_recents_action_peek,
-    LauncherSettings.RECENTS_ACTION_SPLIT3 to R.string.settings_recents_action_split3,
-    LauncherSettings.RECENTS_ACTION_CLOSE_OTHERS to R.string.settings_recents_action_close_others,
-    LauncherSettings.RECENTS_ACTION_CLOSE_ALL to R.string.settings_recents_action_close_all,
+    RecentsAction.NONE to R.string.settings_recents_action_none,
+    RecentsAction.MENU to R.string.settings_recents_action_menu,
+    RecentsAction.CLOSE to R.string.settings_recents_action_close,
+    RecentsAction.SPLIT to R.string.settings_recents_action_split,
+    RecentsAction.POPUP to R.string.settings_recents_action_popup,
+    RecentsAction.UNSPLIT to R.string.settings_recents_action_unsplit,
+    RecentsAction.PIN to R.string.settings_recents_action_pin,
+    RecentsAction.INFO to R.string.settings_recents_action_info,
+    RecentsAction.OPEN to R.string.settings_recents_action_open,
+    RecentsAction.PEEK to R.string.settings_recents_action_peek,
+    RecentsAction.SPLIT3 to R.string.settings_recents_action_split3,
+    RecentsAction.CLOSE_OTHERS to R.string.settings_recents_action_close_others,
+    RecentsAction.CLOSE_ALL to R.string.settings_recents_action_close_all,
 )
 
 /**
@@ -114,7 +115,7 @@ private fun ButtonSwitch(title: Int, subtitle: Int?, checked: Boolean, onChange:
 }
 
 @Composable
-private fun GesturePicker(title: Int, selected: String, onSelect: (String) -> Unit) {
+private fun GesturePicker(title: Int, selected: RecentsAction, onSelect: (RecentsAction) -> Unit) {
     ExpressiveSegmentedControl(
         title = stringResource(title),
         options = ACTIONS.map { (key, label) -> key to stringResource(label) },

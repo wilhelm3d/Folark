@@ -9,7 +9,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import org.arkikeskus.launcher.data.IconPackInfo
 import org.arkikeskus.launcher.model.AppItem
+import org.arkikeskus.launcher.model.CountStyle
+import org.arkikeskus.launcher.model.DrawerLayout
+import org.arkikeskus.launcher.model.DrawerTheme
+import org.arkikeskus.launcher.model.FoldAction
+import org.arkikeskus.launcher.model.FoldTransition
+import org.arkikeskus.launcher.model.HomeGesture
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PeoplePrivacy
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -90,9 +97,9 @@ internal fun SettingsDialogHost(
         SettingsDialog.CountStyle -> ChoicePicker(
             title = R.string.settings_notif_widget_count,
             options = listOf(
-                LauncherSettings.COUNT_NUMBER to R.string.settings_notif_widget_count_number,
-                LauncherSettings.COUNT_DOT to R.string.settings_notif_widget_count_dot,
-                LauncherSettings.COUNT_NONE to R.string.settings_notif_widget_count_none,
+                CountStyle.NUMBER to R.string.settings_notif_widget_count_number,
+                CountStyle.DOT to R.string.settings_notif_widget_count_dot,
+                CountStyle.NONE to R.string.settings_notif_widget_count_none,
             ),
             selected = s.widgets.notificationCountStyle,
             onPick = {
@@ -104,8 +111,8 @@ internal fun SettingsDialogHost(
         SettingsDialog.DrawerLayout -> ChoicePicker(
             title = R.string.settings_drawer_layout_mode,
             options = listOf(
-                LauncherSettings.DRAWER_LAYOUT_GRID to R.string.settings_drawer_layout_grid,
-                LauncherSettings.DRAWER_LAYOUT_LIST to R.string.settings_drawer_layout_list,
+                DrawerLayout.GRID to R.string.settings_drawer_layout_grid,
+                DrawerLayout.LIST to R.string.settings_drawer_layout_list,
             ),
             selected = s.drawer.layoutMode,
             onPick = {
@@ -125,9 +132,9 @@ internal fun SettingsDialogHost(
         SettingsDialog.PeoplePrivacy -> ChoicePicker(
             title = R.string.settings_people_privacy,
             options = listOf(
-                LauncherSettings.PRIVACY_ALL to R.string.settings_people_privacy_all,
-                LauncherSettings.PRIVACY_SENDER to R.string.settings_people_privacy_sender,
-                LauncherSettings.PRIVACY_COUNT to R.string.settings_people_privacy_count,
+                PeoplePrivacy.ALL to R.string.settings_people_privacy_all,
+                PeoplePrivacy.SENDER to R.string.settings_people_privacy_sender,
+                PeoplePrivacy.COUNT to R.string.settings_people_privacy_count,
             ),
             selected = s.widgets.peoplePrivacy,
             onPick = {
@@ -146,9 +153,9 @@ internal fun SettingsDialogHost(
         SettingsDialog.SwipeUp -> ChoicePicker(
             title = R.string.settings_swipe_up_action,
             options = listOf(
-                LauncherSettings.GESTURE_DRAWER to R.string.settings_gesture_drawer,
-                LauncherSettings.GESTURE_SEARCH to R.string.settings_gesture_search,
-                LauncherSettings.GESTURE_NONE to R.string.settings_gesture_none,
+                HomeGesture.DRAWER to R.string.settings_gesture_drawer,
+                HomeGesture.SEARCH to R.string.settings_gesture_search,
+                HomeGesture.NONE to R.string.settings_gesture_none,
             ),
             selected = s.home.swipeUpAction,
             onPick = { viewModel.setSwipeUpAction(it, profile); onDismiss() },
@@ -157,9 +164,9 @@ internal fun SettingsDialogHost(
         SettingsDialog.FoldAction -> ChoicePicker(
             title = R.string.settings_fold_action,
             options = listOf(
-                LauncherSettings.ACTION_STAY to R.string.settings_action_stay,
-                LauncherSettings.ACTION_PAGE_0 to R.string.settings_action_page_0,
-                LauncherSettings.ACTION_LOCK to R.string.settings_action_lock,
+                FoldAction.STAY to R.string.settings_action_stay,
+                FoldAction.PAGE_0 to R.string.settings_action_page_0,
+                FoldAction.LOCK to R.string.settings_action_lock,
             ),
             selected = s.fold.foldAction,
             onPick = { viewModel.setFoldAction(it, profile); onDismiss() },
@@ -168,9 +175,9 @@ internal fun SettingsDialogHost(
         SettingsDialog.UnfoldAction -> ChoicePicker(
             title = R.string.settings_unfold_action,
             options = listOf(
-                LauncherSettings.ACTION_STAY to R.string.settings_action_stay,
-                LauncherSettings.ACTION_SEARCH to R.string.settings_action_search,
-                LauncherSettings.ACTION_DRAWER to R.string.settings_action_drawer,
+                FoldAction.STAY to R.string.settings_action_stay,
+                FoldAction.SEARCH to R.string.settings_action_search,
+                FoldAction.DRAWER to R.string.settings_action_drawer,
             ),
             selected = s.fold.unfoldAction,
             onPick = { viewModel.setUnfoldAction(it, profile); onDismiss() },
@@ -190,7 +197,7 @@ internal fun SettingsDialogHost(
                         ColorTarget.DRAWER_ACCENT -> viewModel.setDrawerAccentColor(argb, profile)
                         ColorTarget.DRAWER_BACKGROUND -> {
                             viewModel.setDrawerCustomColor(argb, profile)
-                            viewModel.setDrawerThemeTint(LauncherSettings.DRAWER_THEME_CUSTOM, profile)
+                            viewModel.setDrawerThemeTint(DrawerTheme.CUSTOM, profile)
                         }
                         ColorTarget.APP_LABEL -> viewModel.setAppLabelColor(argb, profile)
                     }
@@ -233,20 +240,20 @@ internal fun SettingsDialogHost(
         SettingsDialog.FoldTransition -> ChoicePicker(
             title = R.string.settings_fold_transition,
             options = listOf(
-                LauncherSettings.TRANSITION_MORPH_SCALE_FADE to R.string.settings_transition_morph_scale_fade,
-                LauncherSettings.TRANSITION_BOOK_UNFOLD_SWEEP to R.string.settings_transition_book_unfold_sweep,
-                LauncherSettings.TRANSITION_AQUAMORPHIC_RIPPLE to R.string.settings_transition_aquamorphic_ripple,
-                LauncherSettings.TRANSITION_CROSSFADE to R.string.settings_transition_crossfade,
-                LauncherSettings.TRANSITION_SCALE to R.string.settings_transition_scale,
-                LauncherSettings.TRANSITION_SLIDE to R.string.settings_transition_slide,
+                FoldTransition.MORPH_SCALE_FADE to R.string.settings_transition_morph_scale_fade,
+                FoldTransition.BOOK_UNFOLD_SWEEP to R.string.settings_transition_book_unfold_sweep,
+                FoldTransition.AQUAMORPHIC_RIPPLE to R.string.settings_transition_aquamorphic_ripple,
+                FoldTransition.CROSSFADE to R.string.settings_transition_crossfade,
+                FoldTransition.SCALE to R.string.settings_transition_scale,
+                FoldTransition.SLIDE to R.string.settings_transition_slide,
             ) + listOfNotNull(
                 // Inner display: follows the hinge while opening (phones with a hinge sensor).
                 // Outer display: the same effects, played on a timer after closing.
                 if (profile == ScreenType.INNER) {
-                    (LauncherSettings.TRANSITION_LIVE_HINGE to R.string.settings_transition_live_hinge)
+                    (FoldTransition.LIVE_HINGE to R.string.settings_transition_live_hinge)
                         .takeIf { hasHingeSensor(context) }
                 } else {
-                    LauncherSettings.TRANSITION_LIVE_HINGE to R.string.settings_transition_hinge_timed
+                    FoldTransition.LIVE_HINGE to R.string.settings_transition_hinge_timed
                 },
             ),
             selected = s.fold.transitionStyle,

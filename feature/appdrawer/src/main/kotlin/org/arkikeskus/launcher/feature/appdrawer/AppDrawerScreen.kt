@@ -2,8 +2,14 @@ package org.arkikeskus.launcher.feature.appdrawer
 
 import org.arkikeskus.launcher.ui.R as UiR
 import org.arkikeskus.launcher.ui.RemoveChoices
+import org.arkikeskus.launcher.model.AzPosition
+import org.arkikeskus.launcher.model.DrawerAlignment
+import org.arkikeskus.launcher.model.DrawerHandle
+import org.arkikeskus.launcher.model.DrawerLayout
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.SearchEngine
+import org.arkikeskus.launcher.model.SearchPosition
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
@@ -127,7 +133,7 @@ fun AppDrawerScreen(
     drawerOpen: Boolean = true,
     drawerHeightFraction: Float? = null,
     drawerWidthFraction: Float? = null,
-    drawerAlignment: String? = null,
+    drawerAlignment: DrawerAlignment? = null,
     /** How far open the drawer is, 0..1 — a lambda so it is read while drawing, not composing. */
     drawerProgress: () -> Float = { 1.0f },
     viewModel: AppDrawerViewModel = hiltViewModel(),
@@ -152,7 +158,7 @@ fun AppDrawerScreen(
         .let { if (sidebar) it.coerceAtMost(SIDEBAR_MAX_WIDTH_FRACTION) else it }
     val effectiveAlignment = (drawerAlignment ?: uiState.drawerAlignment).let {
         // A sidebar has to sit on a side; "centre" means the default trailing edge.
-        if (sidebar && it != LauncherSettings.DRAWER_ALIGNMENT_LEFT) LauncherSettings.DRAWER_ALIGNMENT_RIGHT else it
+        if (sidebar && it != DrawerAlignment.LEFT) DrawerAlignment.RIGHT else it
     }
     val drawerColors = rememberDrawerColors(
         theme = uiState.drawerThemeTint,
@@ -223,7 +229,7 @@ fun AppDrawerScreen(
     LaunchedEffect(edgeScroll, uiState.drawerLayoutMode) {
         if (edgeScroll == 0f) return@LaunchedEffect
         while (true) {
-            if (uiState.drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) {
+            if (uiState.drawerLayoutMode == DrawerLayout.LIST) {
                 listState.scrollBy(edgeScroll)
             } else {
                 gridState.scrollBy(edgeScroll)
@@ -300,7 +306,7 @@ fun AppDrawerScreen(
         AppDrawerContent(
             colors = drawerColors,
             style = drawerStyle,
-            searchAtBottom = uiState.drawerSearchPosition == LauncherSettings.SEARCH_BOTTOM,
+            searchAtBottom = uiState.drawerSearchPosition == SearchPosition.BOTTOM,
             sidebar = sidebar,
             apps = uiState.apps,
             frequentApps = uiState.frequentApps,
@@ -607,7 +613,7 @@ private fun AppDrawerContent(
     shortcutResults: List<SearchResult.Shortcut> = emptyList(),
     actionResults: List<SearchResult.Action> = emptyList(),
     searchWeb: Boolean = false,
-    searchWebEngine: String = org.arkikeskus.launcher.model.LauncherSettings.SEARCH_ENGINE_SYSTEM,
+    searchWebEngine: SearchEngine = SearchEngine.SYSTEM,
     hiddenCount: Int = 0,
     hiddenLock: Boolean = false,
     onHiddenApps: () -> Unit = {},
@@ -628,12 +634,12 @@ private fun AppDrawerContent(
     locked: Boolean,
     gridState: LazyGridState,
     listState: LazyListState,
-    drawerLayoutMode: String = LauncherSettings.DRAWER_LAYOUT_GRID,
+    drawerLayoutMode: DrawerLayout = DrawerLayout.GRID,
     drawerIndexBarEnabled: Boolean = true,
-    azIndexPosition: String = LauncherSettings.AZ_POSITION_VERTICAL_RIGHT,
+    azIndexPosition: AzPosition = AzPosition.VERTICAL_RIGHT,
     azIndexScale: Float = 1f,
     drawerCornerRadius: Int = LauncherSettings.DRAWER_CORNER_AUTO,
-    drawerHandleStyle: String = LauncherSettings.DRAWER_HANDLE_BAR,
+    drawerHandleStyle: DrawerHandle = DrawerHandle.BAR,
     drawerBottomSpace: Int = 0,
     drawerLetterHeaders: Boolean = false,
     drawerLargeLetterPopup: Boolean = true,
@@ -642,7 +648,7 @@ private fun AppDrawerContent(
     drawerOpen: Boolean = true,
     drawerHeightFraction: Float = 1.0f,
     drawerWidthFraction: Float = 1.0f,
-    drawerAlignment: String = LauncherSettings.DRAWER_ALIGNMENT_CENTER,
+    drawerAlignment: DrawerAlignment = DrawerAlignment.CENTER,
     drawerScrimOpacity: Float = 0.5f,
     /** How far open the drawer is, 0..1 — a lambda so it is read while drawing, not composing. */
     drawerProgress: () -> Float = { 1.0f },
@@ -662,9 +668,9 @@ private fun AppDrawerContent(
     }
     val pullConnection = rememberDrawerPullConnection(onDrawerDrag, onDrawerSettle, drawerOpen, drawerFlickClose, onClose)
 
-    val sheetAlignment = when (drawerAlignment.lowercase()) {
-        LauncherSettings.DRAWER_ALIGNMENT_LEFT -> Alignment.BottomStart
-        LauncherSettings.DRAWER_ALIGNMENT_RIGHT -> Alignment.BottomEnd
+    val sheetAlignment = when (drawerAlignment) {
+        DrawerAlignment.LEFT -> Alignment.BottomStart
+        DrawerAlignment.RIGHT -> Alignment.BottomEnd
         else -> Alignment.BottomCenter
     }
 
@@ -723,7 +729,7 @@ private fun AppDrawerContent(
                     .padding(bottom = maxOf(drawerBottomSpace.dp, LocalTaskbarInset.current))
                     .nestedScroll(pullConnection),
             ) {
-            DragHandle(width = style.handleWidth, arrow = drawerHandleStyle == LauncherSettings.DRAWER_HANDLE_ARROW, progress = drawerProgress)
+            DragHandle(width = style.handleWidth, arrow = drawerHandleStyle == DrawerHandle.ARROW, progress = drawerProgress)
             if (showSearch && !searchAtBottom) {
                 DrawerSearchField(query = query, onQueryChange = onQueryChange, colors = colors, style = style)
             }
@@ -748,8 +754,8 @@ private fun AppDrawerContent(
             // Room kept free for a horizontal A-Z bar, so it never lies over the apps.
             val indexStrip = if (drawerIndexBarEnabled && !searching) 26.dp * azIndexScale else 0.dp
             val indexStripPadding = PaddingValues(
-                top = if (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_TOP) indexStrip else 0.dp,
-                bottom = if (azIndexPosition == LauncherSettings.AZ_POSITION_HORIZONTAL_BOTTOM) indexStrip else 0.dp,
+                top = if (azIndexPosition == AzPosition.HORIZONTAL_TOP) indexStrip else 0.dp,
+                bottom = if (azIndexPosition == AzPosition.HORIZONTAL_BOTTOM) indexStrip else 0.dp,
             )
             // Letter headings: the apps in runs under their first letter (one run when off or searching).
             val letterRuns = remember(apps, drawerLetterHeaders, searching) { runsByLetter(apps, drawerLetterHeaders && !searching) }
@@ -804,7 +810,7 @@ private fun AppDrawerContent(
                         selectedTab = { currentSelectedTab }, onSelectTab = { currentSelectTab(it) },
                     ),
             ) {
-                if (drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST) {
+                if (drawerLayoutMode == DrawerLayout.LIST) {
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(vertical = 8.dp),
@@ -835,7 +841,7 @@ private fun AppDrawerContent(
                         // Only the tiles drawn above the list push the apps down; with folders
                         // as tabs there are none, so counting folders here would overshoot.
                         itemsAbove = (if (clipboardRow) 1 else 0) + (if (frequentApps.isNotEmpty()) 1 else 0) + folderTiles.size,
-                        listLayout = drawerLayoutMode == LauncherSettings.DRAWER_LAYOUT_LIST,
+                        listLayout = drawerLayoutMode == DrawerLayout.LIST,
                         listState = listState,
                         gridState = gridState,
                         largeLetterPopup = drawerLargeLetterPopup,

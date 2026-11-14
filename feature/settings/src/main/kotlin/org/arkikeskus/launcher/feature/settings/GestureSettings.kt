@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.MinusOne
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalScreenType
@@ -88,8 +89,8 @@ internal fun GesturesSection(
         ExpressiveActionItem(
             title = stringResource(R.string.settings_minus_one_title),
             description = when (s.home.minusOneScreen) {
-                LauncherSettings.MINUS_ONE_GOOGLE -> stringResource(R.string.settings_minus_one_google)
-                LauncherSettings.MINUS_ONE_SMART_FEED -> stringResource(R.string.settings_minus_one_smart_feed)
+                MinusOne.GOOGLE -> stringResource(R.string.settings_minus_one_google)
+                MinusOne.SMART_FEED -> stringResource(R.string.settings_minus_one_smart_feed)
                 else -> stringResource(R.string.settings_minus_one_none)
             },
             onClick = { pickingMinusOne = true },
@@ -98,9 +99,9 @@ internal fun GesturesSection(
             ChoicePicker(
                 title = R.string.settings_minus_one_title,
                 options = listOf(
-                    LauncherSettings.MINUS_ONE_NONE to R.string.settings_minus_one_none,
-                    LauncherSettings.MINUS_ONE_GOOGLE to R.string.settings_minus_one_google,
-                    LauncherSettings.MINUS_ONE_SMART_FEED to R.string.settings_minus_one_smart_feed,
+                    MinusOne.NONE to R.string.settings_minus_one_none,
+                    MinusOne.GOOGLE to R.string.settings_minus_one_google,
+                    MinusOne.SMART_FEED to R.string.settings_minus_one_smart_feed,
                 ),
                 selected = s.home.minusOneScreen,
                 onPick = { viewModel.setMinusOneScreen(it); pickingMinusOne = false },

@@ -11,7 +11,12 @@ import androidx.compose.material.icons.rounded.ViewCarousel
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import org.arkikeskus.launcher.data.IconPackInfo
+import org.arkikeskus.launcher.model.CountStyle
+import org.arkikeskus.launcher.model.IconShape
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PeoplePrivacy
+import org.arkikeskus.launcher.model.SettingsStyle
+import org.arkikeskus.launcher.model.ThemedStyle
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.LocalScreenType
 import kotlin.math.roundToInt
@@ -33,8 +38,8 @@ internal fun SettingsLookCard(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_look_style),
             options = listOf(
-                LauncherSettings.SETTINGS_STYLE_STANDARD to stringResource(R.string.settings_look_standard),
-                LauncherSettings.SETTINGS_STYLE_STUDIO to stringResource(R.string.settings_look_studio),
+                SettingsStyle.STANDARD to stringResource(R.string.settings_look_standard),
+                SettingsStyle.STUDIO to stringResource(R.string.settings_look_studio),
             ),
             selected = s.appearance.settingsStyle,
             onSelect = viewModel::setSettingsStyle,
@@ -152,12 +157,12 @@ internal fun IconsCard(
                 ExpressiveSegmentedControl(
                     title = stringResource(R.string.settings_themed_style),
                     options = listOf(
-                        LauncherSettings.THEMED_STYLE_CLASSIC to stringResource(R.string.settings_themed_style_classic),
-                        LauncherSettings.THEMED_STYLE_INVERTED to stringResource(R.string.settings_themed_style_inverted),
-                        LauncherSettings.THEMED_STYLE_GLASS to stringResource(R.string.settings_themed_style_glass),
-                        LauncherSettings.THEMED_STYLE_DUOTONE to stringResource(R.string.settings_themed_style_duotone),
-                        LauncherSettings.THEMED_STYLE_OWN to stringResource(R.string.settings_themed_style_own),
-                        LauncherSettings.THEMED_STYLE_SOFT to stringResource(R.string.settings_themed_style_soft),
+                        ThemedStyle.CLASSIC to stringResource(R.string.settings_themed_style_classic),
+                        ThemedStyle.INVERTED to stringResource(R.string.settings_themed_style_inverted),
+                        ThemedStyle.GLASS to stringResource(R.string.settings_themed_style_glass),
+                        ThemedStyle.DUOTONE to stringResource(R.string.settings_themed_style_duotone),
+                        ThemedStyle.OWN to stringResource(R.string.settings_themed_style_own),
+                        ThemedStyle.SOFT to stringResource(R.string.settings_themed_style_soft),
                     ),
                     selected = s.icons.themedIconStyle,
                     onSelect = viewModel::setThemedIconStyle,
@@ -184,7 +189,7 @@ internal fun IconsCard(
         ExpressiveRowDivider()
 
         IconShapeRow(selected = s.icons.shape, onSelect = viewModel::setIconShape)
-        if (s.icons.shape != LauncherSettings.ICON_SHAPE_SYSTEM) {
+        if (s.icons.shape != IconShape.SYSTEM) {
             ExpressiveRowDivider()
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_icon_shape_all),
@@ -295,8 +300,8 @@ internal fun WidgetsCard(
             title = stringResource(R.string.settings_notif_widget_count),
             description = stringResource(
                 when (s.widgets.notificationCountStyle) {
-                    LauncherSettings.COUNT_DOT -> R.string.settings_notif_widget_count_dot
-                    LauncherSettings.COUNT_NONE -> R.string.settings_notif_widget_count_none
+                    CountStyle.DOT -> R.string.settings_notif_widget_count_dot
+                    CountStyle.NONE -> R.string.settings_notif_widget_count_none
                     else -> R.string.settings_notif_widget_count_number
                 },
             ),
@@ -309,8 +314,8 @@ internal fun WidgetsCard(
             shared = true,
             description = stringResource(
                 when (s.widgets.peoplePrivacy) {
-                    LauncherSettings.PRIVACY_SENDER -> R.string.settings_people_privacy_sender
-                    LauncherSettings.PRIVACY_COUNT -> R.string.settings_people_privacy_count
+                    PeoplePrivacy.SENDER -> R.string.settings_people_privacy_sender
+                    PeoplePrivacy.COUNT -> R.string.settings_people_privacy_count
                     else -> R.string.settings_people_privacy_all
                 },
             ),

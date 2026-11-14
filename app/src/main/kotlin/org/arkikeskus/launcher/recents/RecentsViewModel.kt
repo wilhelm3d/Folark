@@ -38,8 +38,10 @@ import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.data.root.RootTasks
 import org.arkikeskus.launcher.data.root.ShellSafe
 import org.arkikeskus.launcher.model.AppItem
-import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.AppPair
+import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsAttachedSide
+import org.arkikeskus.launcher.model.RecentsSort
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import org.arkikeskus.launcher.data.LaunchOrigin
@@ -229,7 +231,7 @@ class RecentsViewModel @Inject constructor(
                 cards += RecentsCard(listOf(task), listOf(app), app.label, task.inactiveMs, pinned = pinKey(task) in s.recents.pinned)
             }
         }
-        val ordered = if (s.recents.sort == LauncherSettings.RECENTS_SORT_NAME) cards.sortedBy { it.label.lowercase() } else cards
+        val ordered = if (s.recents.sort == RecentsSort.NAME) cards.sortedBy { it.label.lowercase() } else cards
         val sorted = ordered.sortedByDescending { it.pinned }
         val shown = sorted.filter { it.pinned } + sorted.filterNot { it.pinned }.take((s.recents.maxApps - sorted.count { it.pinned }).coerceAtLeast(0))
         if (root && s.recents.pinKeepAlive) {
@@ -608,10 +610,10 @@ class RecentsViewModel @Inject constructor(
      * Attached (peek) view: clears stale split state first, pairs [main] and [peek], and snaps to
      * Motorola's peek target (or drags the divider to a safe non-dismiss peek fraction).
      */
-    fun openAttached(main: RecentsCard, peek: RecentsCard, side: String, peekFraction: Float, screen: android.graphics.Rect) {
+    fun openAttached(main: RecentsCard, peek: RecentsCard, side: RecentsAttachedSide, peekFraction: Float, screen: android.graphics.Rect) {
         val mainTask = main.tasks.firstOrNull() ?: return
         val peekTask = peek.tasks.firstOrNull() ?: return
-        val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
+        val left = side != RecentsAttachedSide.RIGHT
         appScope.launch {
             // The peeking app on its side, the main app on the other.
             val formed = splitCoordinator.pair(
@@ -626,7 +628,7 @@ class RecentsViewModel @Inject constructor(
 
     fun nativeSplitSelect(card: RecentsCard) {
         val task = card.tasks.firstOrNull()?.taskId ?: return
-        val index = if (settings.value.recents.attachedSide == LauncherSettings.RECENTS_ATTACHED_RIGHT) 1 else 0
+        val index = if (settings.value.recents.attachedSide == RecentsAttachedSide.RIGHT) 1 else 0
         appScope.launch {
             openNow(card)
             SplitThree.splitSelect(context, task, index)
@@ -655,8 +657,8 @@ class RecentsViewModel @Inject constructor(
         }
     }
 
-    fun peekSplit(card: RecentsCard, side: String, screen: android.graphics.Rect, peekFraction: Float) {
-        val left = side != LauncherSettings.RECENTS_ATTACHED_RIGHT
+    fun peekSplit(card: RecentsCard, side: RecentsAttachedSide, screen: android.graphics.Rect, peekFraction: Float) {
+        val left = side != RecentsAttachedSide.RIGHT
         appScope.launch {
             openNow(card)
             // A three-app split: Motorola's three-app peek (the middle app big, the others at the edges).

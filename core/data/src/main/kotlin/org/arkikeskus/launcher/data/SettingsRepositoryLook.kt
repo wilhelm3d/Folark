@@ -1,7 +1,14 @@
 package org.arkikeskus.launcher.data
 
+import org.arkikeskus.launcher.model.AppOpenAnimation
+import org.arkikeskus.launcher.model.BatterySaverMode
+import org.arkikeskus.launcher.model.FontChoice
+import org.arkikeskus.launcher.model.HapticsStrength
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.PopupTheme
 import org.arkikeskus.launcher.model.ScreenType
+import org.arkikeskus.launcher.model.SettingsStyle
+import org.arkikeskus.launcher.model.UnlockStyle
 
 // The setters for the look: status bar, motion and appearance.
 // Split out of SettingsRepository as extension functions, like SettingsRepositoryFolders.kt:
@@ -9,20 +16,20 @@ import org.arkikeskus.launcher.model.ScreenType
 
 suspend fun SettingsRepository.setAquamorphicTouchEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.aquamorphicTouchEnabled(screenType)] = value }
 suspend fun SettingsRepository.setAppLaunchZoomEnabled(value: Boolean, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.appLaunchZoomEnabled(screenType)] = value }
-suspend fun SettingsRepository.setPopupTheme(value: String, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.popupTheme(screenType)] = value }
+suspend fun SettingsRepository.setPopupTheme(value: PopupTheme, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.popupTheme(screenType)] = value.stored }
 suspend fun SettingsRepository.setAnimationSpeed(value: Float) = edit {
     it[Keys.ANIMATION_SPEED] = value.coerceIn(LauncherSettings.MIN_ANIMATION_SPEED, LauncherSettings.MAX_ANIMATION_SPEED)
 }
-suspend fun SettingsRepository.setAppOpenAnimation(value: String) = edit { it[Keys.APP_OPEN_ANIMATION] = value }
-suspend fun SettingsRepository.setBatterySaverMode(value: String) = edit { it[Keys.BATTERY_SAVER_MODE] = value }
+suspend fun SettingsRepository.setAppOpenAnimation(value: AppOpenAnimation) = edit { it[Keys.APP_OPEN_ANIMATION] = value.stored }
+suspend fun SettingsRepository.setBatterySaverMode(value: BatterySaverMode) = edit { it[Keys.BATTERY_SAVER_MODE] = value.stored }
 suspend fun SettingsRepository.setBatterySaverLowBattery(value: Boolean) = edit { it[Keys.BATTERY_SAVER_LOW_BATTERY] = value }
 suspend fun SettingsRepository.setBatterySaverWhenHot(value: Boolean) = edit { it[Keys.BATTERY_SAVER_WHEN_HOT] = value }
-suspend fun SettingsRepository.setAppFontFamily(value: String, st: ScreenType) = edit { it[Keys.appFontFamily(st)] = value }
-suspend fun SettingsRepository.setAppHeadingFont(value: String, st: ScreenType) = edit { it[Keys.appHeadingFont(st)] = value }
+suspend fun SettingsRepository.setAppFontFamily(value: FontChoice, st: ScreenType) = edit { it[Keys.appFontFamily(st)] = value.stored }
+suspend fun SettingsRepository.setAppHeadingFont(value: FontChoice, st: ScreenType) = edit { it[Keys.appHeadingFont(st)] = value.stored }
 suspend fun SettingsRepository.setAppFontBold(value: Boolean, st: ScreenType) = edit { it[Keys.appFontBold(st)] = value }
 suspend fun SettingsRepository.setAppFontSizeScale(value: Float, st: ScreenType) = edit { it[Keys.appFontSizeScale(st)] = value.coerceIn(0.7f, 1.4f) }
-suspend fun SettingsRepository.setSettingsStyle(value: String) = edit { it[Keys.SETTINGS_STYLE] = value }
-suspend fun SettingsRepository.setHapticsStrength(value: String) = edit { it[Keys.HAPTICS_STRENGTH] = value }
+suspend fun SettingsRepository.setSettingsStyle(value: SettingsStyle) = edit { it[Keys.SETTINGS_STYLE] = value.stored }
+suspend fun SettingsRepository.setHapticsStrength(value: HapticsStrength) = edit { it[Keys.HAPTICS_STRENGTH] = value.stored }
 suspend fun SettingsRepository.setHapticsDrag(value: Boolean) = edit { it[Keys.HAPTICS_DRAG] = value }
 suspend fun SettingsRepository.setHapticsRecents(value: Boolean) = edit { it[Keys.HAPTICS_RECENTS] = value }
 suspend fun SettingsRepository.setHapticsClose(value: Boolean) = edit { it[Keys.HAPTICS_CLOSE] = value }
@@ -40,7 +47,7 @@ suspend fun SettingsRepository.setSystemBarPaddingCover(value: Int) = edit {
 }
 suspend fun SettingsRepository.setUnlockTransition(value: Boolean) = edit { it[Keys.UNLOCK_TRANSITION] = value }
 suspend fun SettingsRepository.setUnlockSystemHook(value: Boolean) = edit { it[Keys.UNLOCK_SYSTEM_HOOK] = value }
-suspend fun SettingsRepository.setUnlockStyle(value: String) = edit { it[Keys.UNLOCK_STYLE] = value }
+suspend fun SettingsRepository.setUnlockStyle(value: UnlockStyle) = edit { it[Keys.UNLOCK_STYLE] = value.stored }
 suspend fun SettingsRepository.setDpiWorkspace(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiWorkspace(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }
 suspend fun SettingsRepository.setDpiAppDrawer(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiAppDrawer(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }
 suspend fun SettingsRepository.setDpiSettings(value: Float, screenType: ScreenType = ScreenType.OUTER) = edit { it[Keys.dpiSettings(screenType)] = value.coerceIn(LauncherSettings.MIN_DPI_SCALE, LauncherSettings.MAX_DPI_SCALE) }

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.model.LiveActivity
+import org.arkikeskus.launcher.model.LiveEffect
 import org.arkikeskus.launcher.ui.component.LivePill
 import org.arkikeskus.launcher.ui.expressive.LocalAccent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -74,7 +75,7 @@ internal fun LiveActivityRows(s: LauncherSettings, viewModel: SettingsViewModel)
 }
 
 @Composable
-private fun LiveActivityPreview(effect: String) {
+private fun LiveActivityPreview(effect: LiveEffect) {
     val accent = LocalAccent.current
     // A kitchen timer counting down, a little over half way: shows every effect, progress included.
     val sample = remember(accent) {
@@ -117,11 +118,11 @@ private fun LiveActivityPreview(effect: String) {
 }
 
 private val LIVE_EFFECT_LABELS = listOf(
-    LauncherSettings.LIVE_EFFECT_GLOW to R.string.settings_live_effect_glow,
-    LauncherSettings.LIVE_EFFECT_SHIMMER to R.string.settings_live_effect_shimmer,
-    LauncherSettings.LIVE_EFFECT_PROGRESS to R.string.settings_live_effect_progress,
-    LauncherSettings.LIVE_EFFECT_ORBIT to R.string.settings_live_effect_orbit,
-    LauncherSettings.LIVE_EFFECT_BREATHE to R.string.settings_live_effect_breathe,
-    LauncherSettings.LIVE_EFFECT_AURORA to R.string.settings_live_effect_aurora,
-    LauncherSettings.LIVE_EFFECT_STILL to R.string.settings_live_effect_still,
+    LiveEffect.GLOW to R.string.settings_live_effect_glow,
+    LiveEffect.SHIMMER to R.string.settings_live_effect_shimmer,
+    LiveEffect.PROGRESS to R.string.settings_live_effect_progress,
+    LiveEffect.ORBIT to R.string.settings_live_effect_orbit,
+    LiveEffect.BREATHE to R.string.settings_live_effect_breathe,
+    LiveEffect.AURORA to R.string.settings_live_effect_aurora,
+    LiveEffect.STILL to R.string.settings_live_effect_still,
 )

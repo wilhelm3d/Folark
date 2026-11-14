@@ -26,6 +26,9 @@ import org.arkikeskus.launcher.data.ModulePrefs
 import org.arkikeskus.launcher.data.ShellSplit
 import org.arkikeskus.launcher.data.root.RootShell
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RecentsCardLayout
+import org.arkikeskus.launcher.model.RecentsSort
+import org.arkikeskus.launcher.model.TaskbarRecentsButton
 import kotlin.math.roundToInt
 
 /**
@@ -146,9 +149,9 @@ internal fun RecentsSection(s: LauncherSettings, viewModel: SettingsViewModel) {
         ExpressiveSwitchRow(
             title = stringResource(R.string.settings_recents_taskbar_button),
             subtitle = stringResource(R.string.settings_recents_taskbar_button_desc),
-            checked = s.taskbar.recentsButton == LauncherSettings.TASKBAR_RECENTS_FOLARK,
+            checked = s.taskbar.recentsButton == TaskbarRecentsButton.FOLARK,
             onCheckedChange = {
-                viewModel.setTaskbarRecentsButton(if (it) LauncherSettings.TASKBAR_RECENTS_FOLARK else LauncherSettings.TASKBAR_RECENTS_SYSTEM)
+                viewModel.setTaskbarRecentsButton(if (it) TaskbarRecentsButton.FOLARK else TaskbarRecentsButton.SYSTEM)
             },
         )
     }
@@ -197,13 +200,13 @@ private fun RecentsMoreCards(s: LauncherSettings, viewModel: SettingsViewModel, 
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_recents_card_layout),
             options = listOf(
-                LauncherSettings.RECENTS_CARD_OVERLAY to stringResource(R.string.settings_recents_card_overlay),
-                LauncherSettings.RECENTS_CARD_HEADER to stringResource(R.string.settings_recents_card_header),
+                RecentsCardLayout.OVERLAY to stringResource(R.string.settings_recents_card_overlay),
+                RecentsCardLayout.HEADER to stringResource(R.string.settings_recents_card_header),
             ),
             selected = s.recents.cardLayout,
             onSelect = viewModel::setRecentsCardLayout,
         )
-        if (s.recents.cardLayout == LauncherSettings.RECENTS_CARD_OVERLAY) {
+        if (s.recents.cardLayout == RecentsCardLayout.OVERLAY) {
             ExpressiveRowDivider()
             ExpressiveSwitchRow(
                 title = stringResource(R.string.settings_recents_overlay_labels),
@@ -245,8 +248,8 @@ private fun RecentsMoreCards(s: LauncherSettings, viewModel: SettingsViewModel, 
             ExpressiveSegmentedControl(
                 title = stringResource(R.string.settings_recents_sort),
                 options = listOf(
-                    LauncherSettings.RECENTS_SORT_RECENT to stringResource(R.string.settings_recents_sort_recent),
-                    LauncherSettings.RECENTS_SORT_NAME to stringResource(R.string.settings_recents_sort_name),
+                    RecentsSort.RECENT to stringResource(R.string.settings_recents_sort_recent),
+                    RecentsSort.NAME to stringResource(R.string.settings_recents_sort_name),
                 ),
                 selected = s.recents.sort,
                 onSelect = viewModel::setRecentsSort,

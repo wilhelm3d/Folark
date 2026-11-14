@@ -47,7 +47,10 @@ import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.model.AppItem
 import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.IconEpochs
+import org.arkikeskus.launcher.model.AppOpenAnimation
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.SizeChoice
+import org.arkikeskus.launcher.model.ThemedStyle
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -292,13 +295,13 @@ class LauncherAppsSource @Inject constructor(
      */
     fun launch(
         appItem: AppItem,
-        animation: String = LauncherSettings.APP_OPEN_SYSTEM,
+        animation: AppOpenAnimation = AppOpenAnimation.SYSTEM,
         speed: Float = 1f,
     ): Result<Unit> = catching {
-        val fromIcon = animation == LauncherSettings.APP_OPEN_ICON || animation == LauncherSettings.APP_OPEN_REVEAL
+        val fromIcon = animation == AppOpenAnimation.ICON || animation == AppOpenAnimation.REVEAL
         val origin = if (fromIcon) LaunchOrigin.take() else null
         val options = if (origin != null) {
-            fromIconOptions(origin.first, origin.second, reveal = animation == LauncherSettings.APP_OPEN_REVEAL)
+            fromIconOptions(origin.first, origin.second, reveal = animation == AppOpenAnimation.REVEAL)
         } else {
             openOptions(animation, speed)
         }
@@ -330,24 +333,24 @@ class LauncherAppsSource @Inject constructor(
      * Launch options for the chosen app-open animation; null leaves it to the system. View
      * animations have fixed lengths, so the speed setting picks one of three prepared sets.
      */
-    private fun openOptions(animation: String, speed: Float): Bundle? {
+    private fun openOptions(animation: AppOpenAnimation, speed: Float): Bundle? {
         val tier = when {
             speed >= 1.4f -> 0
             speed <= 0.75f -> 2
             else -> 1
         }
         val enter = when (animation) {
-            LauncherSettings.APP_OPEN_ZOOM ->
+            AppOpenAnimation.ZOOM ->
                 intArrayOf(R.anim.folark_open_zoom_fast, R.anim.folark_open_zoom_normal, R.anim.folark_open_zoom_slow)[tier]
-            LauncherSettings.APP_OPEN_SLIDE ->
+            AppOpenAnimation.SLIDE ->
                 intArrayOf(R.anim.folark_open_slide_fast, R.anim.folark_open_slide_normal, R.anim.folark_open_slide_slow)[tier]
-            LauncherSettings.APP_OPEN_FADE ->
+            AppOpenAnimation.FADE ->
                 intArrayOf(R.anim.folark_open_fade_fast, R.anim.folark_open_fade_normal, R.anim.folark_open_fade_slow)[tier]
-            LauncherSettings.APP_OPEN_POP ->
+            AppOpenAnimation.POP ->
                 intArrayOf(R.anim.folark_open_pop_fast, R.anim.folark_open_pop_normal, R.anim.folark_open_pop_slow)[tier]
-            LauncherSettings.APP_OPEN_UNFOLD ->
+            AppOpenAnimation.UNFOLD ->
                 intArrayOf(R.anim.folark_open_unfold_fast, R.anim.folark_open_unfold_normal, R.anim.folark_open_unfold_slow)[tier]
-            LauncherSettings.APP_OPEN_NONE -> return ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
+            AppOpenAnimation.NONE -> return ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
             else -> return null
         }
         val exit = intArrayOf(R.anim.folark_open_hold_fast, R.anim.folark_open_hold_normal, R.anim.folark_open_hold_slow)[tier]
@@ -364,13 +367,13 @@ class LauncherAppsSource @Inject constructor(
      */
     fun launchFloating(
         appItem: AppItem,
-        size: String = LauncherSettings.FLOATING_SIZE_MEDIUM,
+        size: SizeChoice = SizeChoice.MEDIUM,
     ): Result<Unit> = catching {
         launcherApps.startMainActivity(appItem.componentName, appItem.user, null, floatingOptions(size))
     }
 
     /** Launch options for a floating window: a Motorola pop-up where possible, else Folark's own. */
-    private fun floatingOptions(size: String): Bundle {
+    private fun floatingOptions(size: SizeChoice): Bundle {
         motoPopupOptions()?.let { return it }
         return plainFloatingOptions(size)
     }
@@ -395,15 +398,15 @@ class LauncherAppsSource @Inject constructor(
     private var motoPopupAvailable: Boolean? = null
 
     /** Launch options for a centred freeform window of the chosen [size] on the current display. */
-    private fun plainFloatingOptions(size: String): Bundle {
+    private fun plainFloatingOptions(size: SizeChoice): Bundle {
         val screen = currentScreenSize()
         val width = screen.x
         val height = screen.y
         // A wide (unfolded) display gets a phone-shaped window; a narrow one a shorter, near-full-width one.
         val wide = width > height * 0.85f
         val factor = when (size) {
-            LauncherSettings.FLOATING_SIZE_SMALL -> 0.78f
-            LauncherSettings.FLOATING_SIZE_LARGE -> 1.22f
+            SizeChoice.SMALL -> 0.78f
+            SizeChoice.LARGE -> 1.22f
             else -> 1f
         }
         val density = context.resources.displayMetrics.density
@@ -480,7 +483,7 @@ class LauncherAppsSource @Inject constructor(
     suspend fun snapSplit(snap: Int, forTask: Int = -1): Boolean = SplitThree.ready(context) && SplitThree.snap(context, snap, forTask)
 
     /** Opens the optional third app of [pair] in a floating window over the split pair. */
-    fun launchAppPairThird(pair: AppPair, size: String): Result<Unit> = catching {
+    fun launchAppPairThird(pair: AppPair, size: SizeChoice): Result<Unit> = catching {
         launcherApps.startMainActivity(
             pair.app3ComponentName, userForSerial(pair.app3UserSerial), null, floatingOptions(size),
         )
@@ -583,9 +586,9 @@ class LauncherAppsSource @Inject constructor(
     @Volatile
     var shapeAllIcons: Boolean = true
 
-    /** Mirrors Settings ▸ Themed icon style, one of LauncherSettings.THEMED_STYLE_* (kept current by AppRepository). */
+    /** Mirrors Settings ▸ Themed icon style, (kept current by AppRepository). */
     @Volatile
-    var themedIconStyle: String = LauncherSettings.THEMED_STYLE_CLASSIC
+    var themedIconStyle: ThemedStyle = ThemedStyle.CLASSIC
 
     /**
      * Builds a themed icon from [info]'s monochrome layer, or null if it has none (most non-Google
@@ -607,8 +610,8 @@ class LauncherAppsSource @Inject constructor(
     private fun styleForeground(colors: Pair<Int, Int>): Int {
         val (bg, fg) = colors
         return when (themedIconStyle) {
-            LauncherSettings.THEMED_STYLE_INVERTED -> bg
-            LauncherSettings.THEMED_STYLE_GLASS -> Color.argb(242, 255, 255, 255)
+            ThemedStyle.INVERTED -> bg
+            ThemedStyle.GLASS -> Color.argb(242, 255, 255, 255)
             else -> fg
         }
     }
@@ -618,8 +621,8 @@ class LauncherAppsSource @Inject constructor(
     private fun styleBackground(colors: Pair<Int, Int>): Drawable {
         val (bg, fg) = colors
         return when (themedIconStyle) {
-            LauncherSettings.THEMED_STYLE_INVERTED -> ColorDrawable(fg)
-            LauncherSettings.THEMED_STYLE_GLASS -> {
+            ThemedStyle.INVERTED -> ColorDrawable(fg)
+            ThemedStyle.GLASS -> {
                 // Lighter at the top, like light catching a pane of glass, with a hint of the accent.
                 val accent = context.getColor(android.R.color.system_accent1_300)
                 GradientDrawable(
@@ -653,7 +656,7 @@ class LauncherAppsSource @Inject constructor(
         val (themeBg, themeFg) = colors
         fun luminance(c: Int): Int = (Color.red(c) * 299 + Color.green(c) * 587 + Color.blue(c) * 114) / 1000
 
-        if (themedIconStyle == LauncherSettings.THEMED_STYLE_DUOTONE) {
+        if (themedIconStyle == ThemedStyle.DUOTONE) {
             // The full picture (background layer included), each pixel placed between the two colours.
             val bitmap = Bitmap.createBitmap(edge, edge, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
@@ -737,11 +740,11 @@ class LauncherAppsSource @Inject constructor(
      */
     @RequiresApi(Build.VERSION_CODES.S)
     private fun themedColors(dark: Boolean, icon: Drawable, key: String): Pair<Int, Int> {
-        val own = themedIconStyle == LauncherSettings.THEMED_STYLE_OWN || themedIconStyle == LauncherSettings.THEMED_STYLE_SOFT
+        val own = themedIconStyle == ThemedStyle.OWN || themedIconStyle == ThemedStyle.SOFT
         val appColor = if (own) appColor(key, icon) else null
         if (appColor == null) return themedColors(dark)
         val sat = IconColors.saturation(appColor)
-        return if (themedIconStyle == LauncherSettings.THEMED_STYLE_OWN) {
+        return if (themedIconStyle == ThemedStyle.OWN) {
             // A bold plate in the app's colour, the glyph almost white with a hint of it.
             if (dark) {
                 IconColors.tone(appColor, sat.coerceIn(0.45f, 0.8f), 0.5f) to IconColors.tone(appColor, 0.12f, 1f)

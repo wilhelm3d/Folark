@@ -2,7 +2,7 @@ package org.arkikeskus.launcher.feature.appdrawer
 
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.AzPosition
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,7 +65,7 @@ internal fun DrawerLetterHeader(letter: Char) {
 
 @Composable
 internal fun DrawerIndexBar(
-    position: String,
+    position: AzPosition,
     onLetterSelected: (Char) -> Unit,
     modifier: Modifier = Modifier,
     /** Settings ▸ App drawer ▸ index bar size: scales the letters and the strip they sit in. */
@@ -89,7 +89,7 @@ internal fun DrawerIndexBar(
 
     fun updateSelection(offset: Offset) {
         val count = alphabet.size
-        val isVertical = currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
+        val isVertical = currentPosition == AzPosition.VERTICAL_RIGHT || currentPosition == AzPosition.VERTICAL_LEFT
         val fraction = if (isVertical) {
             if (barSize.height > 0) (offset.y / barSize.height).coerceIn(0f, 1f) else 0f
         } else {
@@ -114,7 +114,7 @@ internal fun DrawerIndexBar(
     /** One drag step: letters, or (after a hold) a smooth scroll along the bar's direction. */
     fun dragStep(position: Offset, amount: Offset) {
         val now = android.os.SystemClock.uptimeMillis()
-        val isVertical = currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || currentPosition == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
+        val isVertical = currentPosition == AzPosition.VERTICAL_RIGHT || currentPosition == AzPosition.VERTICAL_LEFT
         val along = if (isVertical) amount.y else amount.x
         val scroll = currentFineScroll
         if (scroll != null && !fine && kotlin.math.abs(along) > 0.5f && lastMoveAt > 0 && now - lastMoveAt >= FINE_SCROLL_HOLD_MS) {
@@ -132,7 +132,7 @@ internal fun DrawerIndexBar(
     }
 
     Box(modifier = modifier) {
-        val isVertical = position == LauncherSettings.AZ_POSITION_VERTICAL_RIGHT || position == LauncherSettings.AZ_POSITION_VERTICAL_LEFT
+        val isVertical = position == AzPosition.VERTICAL_RIGHT || position == AzPosition.VERTICAL_LEFT
         if (isVertical) {
             Column(
                 modifier = Modifier

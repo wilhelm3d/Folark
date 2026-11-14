@@ -60,7 +60,8 @@ import kotlinx.coroutines.flow.stateIn
 import org.arkikeskus.launcher.data.SettingsRepository
 import org.arkikeskus.launcher.launcher.system.BatteryMonitor
 import org.arkikeskus.launcher.model.BatteryStatus
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.ClockMinuteColor
+import org.arkikeskus.launcher.model.ClockStyle
 import org.arkikeskus.launcher.model.ScreenType
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -105,43 +106,43 @@ private class ClockLook(
     val isNeumorphic: Boolean = false,
 )
 
-private fun clockLook(style: String): ClockLook = when (style) {
+private fun clockLook(style: ClockStyle): ClockLook = when (style) {
     // Bold hours against thin, accent-coloured minutes, set to the left.
-    LauncherSettings.CLOCK_STYLE_DUO -> ClockLook(
+    ClockStyle.DUO -> ClockLook(
         hourWeight = FontWeight.Bold, minuteWeight = FontWeight.ExtraLight, accentMinutes = true,
         infoWeight = FontWeight.Normal, centred = false,
     )
     // One light weight throughout, set to the left.
-    LauncherSettings.CLOCK_STYLE_LIGHT -> ClockLook(
+    ClockStyle.LIGHT -> ClockLook(
         hourWeight = FontWeight.Light, minuteWeight = FontWeight.Light, infoWeight = FontWeight.Normal,
         centred = false, charWidth = 0.56f,
     )
     // Heavy monospaced digits, capitals and a red dot.
-    LauncherSettings.CLOCK_STYLE_DOT -> ClockLook(
+    ClockStyle.DOT -> ClockLook(
         family = FontFamily.Monospace, hourWeight = FontWeight.ExtraBold, minuteWeight = FontWeight.ExtraBold,
         infoWeight = FontWeight.Bold, upperCaseInfo = true, redDot = true, charWidth = 0.62f,
     )
     // The date above a large, semi-bold time, centred.
-    LauncherSettings.CLOCK_STYLE_STACKED -> ClockLook(
+    ClockStyle.STACKED -> ClockLook(
         hourWeight = FontWeight.SemiBold, minuteWeight = FontWeight.SemiBold, infoAbove = true,
     )
-    LauncherSettings.CLOCK_STYLE_GLASS_PILL -> ClockLook(
+    ClockStyle.GLASS_PILL -> ClockLook(
         hourWeight = FontWeight.Bold, minuteWeight = FontWeight.Medium, accentMinutes = true,
         isGlassPill = true, centred = true,
     )
-    LauncherSettings.CLOCK_STYLE_OUTLINE -> ClockLook(
+    ClockStyle.OUTLINE -> ClockLook(
         hourWeight = FontWeight.Bold, minuteWeight = FontWeight.Light,
         isOutline = true, centred = true,
     )
-    LauncherSettings.CLOCK_STYLE_VERTICAL_STACK -> ClockLook(
+    ClockStyle.VERTICAL_STACK -> ClockLook(
         hourWeight = FontWeight.Black, minuteWeight = FontWeight.Black,
         isVerticalStack = true, centred = true, charWidth = 0.50f,
     )
-    LauncherSettings.CLOCK_STYLE_NEUMORPHIC -> ClockLook(
+    ClockStyle.NEUMORPHIC -> ClockLook(
         hourWeight = FontWeight.Bold, minuteWeight = FontWeight.Bold,
         isNeumorphic = true, centred = true,
     )
-    LauncherSettings.CLOCK_STYLE_NOTHING_NDOT -> ClockLook(
+    ClockStyle.NOTHING_NDOT -> ClockLook(
         family = org.arkikeskus.launcher.ui.theme.LauncherFontFamily.NDot,
         hourWeight = FontWeight.Bold, minuteWeight = FontWeight.Bold,
         accentMinutes = true, redDot = true, upperCaseInfo = true, charWidth = 0.65f,
@@ -201,11 +202,11 @@ internal fun NothingClockWidget(
     // Settings ▸ Folark widgets ▸ Clock minutes: a fixed shade from white to black, or what the
     // style uses; and how opaque they are.
     val minuteBase = when (widgets.clockMinuteColor) {
-        LauncherSettings.CLOCK_MINUTE_WHITE -> Color.White
-        LauncherSettings.CLOCK_MINUTE_LIGHT_GREY -> Color(0xFFC4C7CC)
-        LauncherSettings.CLOCK_MINUTE_GREY -> Color(0xFF8A8E95)
-        LauncherSettings.CLOCK_MINUTE_DARK_GREY -> Color(0xFF4A4D52)
-        LauncherSettings.CLOCK_MINUTE_BLACK -> Color(0xFF0E0F11)
+        ClockMinuteColor.WHITE -> Color.White
+        ClockMinuteColor.LIGHT_GREY -> Color(0xFFC4C7CC)
+        ClockMinuteColor.GREY -> Color(0xFF8A8E95)
+        ClockMinuteColor.DARK_GREY -> Color(0xFF4A4D52)
+        ClockMinuteColor.BLACK -> Color(0xFF0E0F11)
         else -> if (look.accentMinutes) MaterialTheme.colorScheme.primary else ink
     }
     val minuteColor = minuteBase.copy(alpha = minuteBase.alpha * widgets.clockMinuteOpacity.coerceIn(0.1f, 1f))

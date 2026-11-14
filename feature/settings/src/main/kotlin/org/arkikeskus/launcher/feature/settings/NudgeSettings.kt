@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.NudgeEffect
 import org.arkikeskus.launcher.ui.component.IconNudge
 import org.arkikeskus.launcher.ui.component.IconNudgeEvent
 import org.arkikeskus.launcher.ui.component.iconNudge
@@ -100,7 +101,7 @@ internal fun IconNudgeRows(s: LauncherSettings, viewModel: SettingsViewModel, pr
 
 /** The chosen effect on a big icon, replaying every few seconds and on a tap. */
 @Composable
-private fun NudgePreview(icon: ImageBitmap?, effect: String, softness: Float) {
+private fun NudgePreview(icon: ImageBitmap?, effect: NudgeEffect, softness: Float) {
     val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
     val event = rememberLoopingNudge(effect, startDelayMs = 0L, visible)
     var tapped by remember { mutableStateOf<IconNudgeEvent?>(null) }
@@ -133,7 +134,7 @@ private fun NudgePreview(icon: ImageBitmap?, effect: String, softness: Float) {
 
 /** Every effect at once, each replaying in turn; the chosen one is ringed. Tap to choose. */
 @Composable
-private fun NudgeGallery(icon: ImageBitmap?, selected: String, softness: Float, onPick: (String) -> Unit) {
+private fun NudgeGallery(icon: ImageBitmap?, selected: NudgeEffect, softness: Float, onPick: (NudgeEffect) -> Unit) {
     val palette = LocalExpressivePalette.current
     val accent = LocalAccent.current
     val visible = org.arkikeskus.launcher.ui.component.rememberOnScreen()
@@ -188,7 +189,7 @@ private fun NudgeGallery(icon: ImageBitmap?, selected: String, softness: Float, 
 }
 
 @Composable
-private fun NudgeIcon(icon: ImageBitmap?, event: IconNudgeEvent?, effect: String, softness: Float, size: Dp) {
+private fun NudgeIcon(icon: ImageBitmap?, event: IconNudgeEvent?, effect: NudgeEffect, softness: Float, size: Dp) {
     val accent = LocalAccent.current
     if (icon != null) {
         Image(icon, contentDescription = null, modifier = Modifier.iconNudge(event, effect, softness).size(size))
@@ -200,7 +201,7 @@ private fun NudgeIcon(icon: ImageBitmap?, event: IconNudgeEvent?, effect: String
 /** A nudge that fires every few seconds while shown (after [startDelayMs]), in the accent colour. */
 @Composable
 private fun rememberLoopingNudge(
-    effect: String,
+    effect: NudgeEffect,
     startDelayMs: Long,
     visible: androidx.compose.runtime.MutableState<Boolean>? = null,
 ): androidx.compose.runtime.State<IconNudgeEvent?> {
@@ -224,14 +225,14 @@ private const val GALLERY_STAGGER_MS = 260L
 private val PREVIEW_BACKDROP = Color(0xFF2B3550)
 
 /** The effects the softness slider changes. */
-private val SOFTENABLE = setOf(LauncherSettings.NUDGE_GLOW, LauncherSettings.NUDGE_PULSE, LauncherSettings.NUDGE_TINT)
+private val SOFTENABLE = setOf(NudgeEffect.GLOW, NudgeEffect.PULSE, NudgeEffect.TINT)
 
 private val NUDGE_LABELS = listOf(
-    LauncherSettings.NUDGE_BOUNCE to R.string.settings_nudge_bounce,
-    LauncherSettings.NUDGE_WIGGLE to R.string.settings_nudge_wiggle,
-    LauncherSettings.NUDGE_PULSE to R.string.settings_nudge_pulse,
-    LauncherSettings.NUDGE_GLOW to R.string.settings_nudge_glow,
-    LauncherSettings.NUDGE_RIPPLE to R.string.settings_nudge_ripple,
-    LauncherSettings.NUDGE_JELLY to R.string.settings_nudge_jelly,
-    LauncherSettings.NUDGE_TINT to R.string.settings_nudge_tint,
+    NudgeEffect.BOUNCE to R.string.settings_nudge_bounce,
+    NudgeEffect.WIGGLE to R.string.settings_nudge_wiggle,
+    NudgeEffect.PULSE to R.string.settings_nudge_pulse,
+    NudgeEffect.GLOW to R.string.settings_nudge_glow,
+    NudgeEffect.RIPPLE to R.string.settings_nudge_ripple,
+    NudgeEffect.JELLY to R.string.settings_nudge_jelly,
+    NudgeEffect.TINT to R.string.settings_nudge_tint,
 )

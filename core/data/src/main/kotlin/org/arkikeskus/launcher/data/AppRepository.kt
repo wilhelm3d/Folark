@@ -23,6 +23,8 @@ import org.arkikeskus.launcher.model.AppPair
 import org.arkikeskus.launcher.model.ScreenType
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.arkikeskus.launcher.model.AppOpenAnimation
+import org.arkikeskus.launcher.model.SizeChoice
 import org.arkikeskus.launcher.model.catching
 
 /**
@@ -310,16 +312,16 @@ class AppRepositoryImpl @Inject constructor(
 
     /** The floating-window size setting, kept current so a launch from a tap never waits on storage. */
     @Volatile
-    private var cachedFloatingSize: String = org.arkikeskus.launcher.model.LauncherSettings.FLOATING_SIZE_MEDIUM
+    private var cachedFloatingSize: SizeChoice = SizeChoice.MEDIUM
 
     /** The app-open animation and animation speed settings, kept current the same way. */
     @Volatile
-    private var cachedOpenAnimation: String = org.arkikeskus.launcher.model.LauncherSettings.APP_OPEN_ICON
+    private var cachedOpenAnimation: AppOpenAnimation = AppOpenAnimation.ICON
 
     @Volatile
     private var cachedAnimationSpeed: Float = 1f
 
-    private fun floatingWindowSize(): String = cachedFloatingSize
+    private fun floatingWindowSize(): SizeChoice = cachedFloatingSize
 
     @Volatile
     private var cachedThreeAppSplit: Boolean = true

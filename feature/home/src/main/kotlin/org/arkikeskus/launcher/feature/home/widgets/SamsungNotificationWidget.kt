@@ -30,7 +30,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.arkikeskus.launcher.data.StatusNotification
-import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.CountStyle
 import org.arkikeskus.launcher.model.ScreenType
 import org.arkikeskus.launcher.ui.component.AppIcon
 import org.arkikeskus.launcher.ui.component.LocalScreenType
@@ -199,12 +199,12 @@ internal fun SamsungNotificationWidget(
 private fun SamsungNotificationSlot(
     slot: NotificationsWidgetViewModel.Slot,
     iconSize: Dp,
-    countStyle: String,
+    countStyle: CountStyle,
     interaction: MutableInteractionSource,
     onOpen: () -> Unit,
 ) {
-    val badgeCount = if (countStyle == LauncherSettings.COUNT_NONE) 0 else slot.notification.count
-    val showCount = countStyle == LauncherSettings.COUNT_NUMBER
+    val badgeCount = if (countStyle == CountStyle.NONE) 0 else slot.notification.count
+    val showCount = countStyle == CountStyle.NUMBER
     Box(
         modifier = Modifier.clickable(interactionSource = interaction, indication = null, onClick = onOpen),
     ) {

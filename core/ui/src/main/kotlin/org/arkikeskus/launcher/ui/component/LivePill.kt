@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.arkikeskus.launcher.model.LiveActivity
+import org.arkikeskus.launcher.model.LiveEffect
 import org.arkikeskus.launcher.model.catching
 
 /**
@@ -50,7 +51,7 @@ import org.arkikeskus.launcher.model.catching
 @Composable
 fun LivePill(
     activity: LiveActivity,
-    effect: String,
+    effect: LiveEffect,
     animate: Boolean,
     light: Boolean,
     onClick: () -> Unit,

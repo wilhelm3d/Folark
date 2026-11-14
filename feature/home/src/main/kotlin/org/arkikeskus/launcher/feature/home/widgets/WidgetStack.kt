@@ -61,6 +61,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.arkikeskus.launcher.data.local.HomeItemEntity
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.StackIndicator
 import org.arkikeskus.launcher.ui.component.LocalBatterySaver
 import org.arkikeskus.launcher.ui.component.LocalHomeCovered
 import androidx.compose.runtime.rememberCoroutineScope
@@ -334,8 +335,8 @@ internal fun WidgetStackContainer(
         }
 
         // Animated bottom page indicator: dots, a segmented bar, or nothing.
-        val barIndicator = stackStyle.indicator == LauncherSettings.STACK_INDICATOR_BAR
-        if (stack.items.size > 1 && stackStyle.indicator != LauncherSettings.STACK_INDICATOR_NONE) {
+        val barIndicator = stackStyle.indicator == StackIndicator.BAR
+        if (stack.items.size > 1 && stackStyle.indicator != StackIndicator.NONE) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -366,10 +367,10 @@ internal fun WidgetStackContainer(
 }
 
 /** How widget stacks are drawn (Settings ▸ Appearance): corner radius in dp, the page indicator
- *  (`LauncherSettings.STACK_INDICATOR_*`) and whether the options pill shows. */
+ *  ([StackIndicator]) and whether the options pill shows. */
 internal data class StackStyle(
     val cornerRadius: Int = 24,
-    val indicator: String = LauncherSettings.STACK_INDICATOR_DOTS,
+    val indicator: StackIndicator = StackIndicator.DOTS,
     val showPill: Boolean = false,
     /** Seconds until a stack shows its next widget by itself; 0 = never. */
     val autoRotateSeconds: Int = 0,

@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.arkikeskus.launcher.model.AppOpenAnimation
 import org.arkikeskus.launcher.model.LauncherSettings
 import org.arkikeskus.launcher.ui.expressive.Accent
 import org.arkikeskus.launcher.ui.expressive.LocalExpressivePalette
@@ -96,11 +97,11 @@ internal fun StartSection(
         ExpressiveSegmentedControl(
             title = stringResource(R.string.settings_app_open_animation),
             options = listOf(
-                LauncherSettings.APP_OPEN_ICON to stringResource(R.string.settings_anim_icon),
-                LauncherSettings.APP_OPEN_ZOOM to stringResource(R.string.settings_anim_zoom),
-                LauncherSettings.APP_OPEN_POP to stringResource(R.string.settings_anim_pop),
-                LauncherSettings.APP_OPEN_UNFOLD to stringResource(R.string.settings_anim_unfold),
-                LauncherSettings.APP_OPEN_SYSTEM to stringResource(R.string.settings_anim_system),
+                AppOpenAnimation.ICON to stringResource(R.string.settings_anim_icon),
+                AppOpenAnimation.ZOOM to stringResource(R.string.settings_anim_zoom),
+                AppOpenAnimation.POP to stringResource(R.string.settings_anim_pop),
+                AppOpenAnimation.UNFOLD to stringResource(R.string.settings_anim_unfold),
+                AppOpenAnimation.SYSTEM to stringResource(R.string.settings_anim_system),
             ),
             selected = s.motion.appOpenAnimation,
             onSelect = viewModel::setAppOpenAnimation,

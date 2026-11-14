@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import org.arkikeskus.launcher.model.LauncherSettings
+import org.arkikeskus.launcher.model.RingMode
 
 /**
  * What a ring around an app's icon shows: the progress of something it is doing (a download, an
@@ -36,12 +37,12 @@ data class IconRing(
 )
 
 /**
- * The rings on this surface: [mode] (LauncherSettings.RING_*) and the running ones by badge key.
+ * The rings on this surface: [mode] ([RingMode]) and the running ones by badge key.
  * Each app's ring is its own state, so a download ticking along redraws that one icon, not every
  * icon on home and in the drawer.
  */
 @androidx.compose.runtime.Stable
-class IconRings(val mode: String) {
+class IconRings(val mode: RingMode) {
     private val states = HashMap<String, androidx.compose.runtime.MutableState<IconRing?>>()
 
     /** [key]'s ring now (read in composition: only that icon follows it). */
@@ -64,9 +65,9 @@ val LocalIconRings = compositionLocalOf<IconRings?> { null }
  * outside the icon. Nothing at all while there is nothing to show, so icons without a ring cost
  * one lookup.
  */
-fun Modifier.iconRing(ring: IconRing?, unread: Boolean, mode: String, accent: Color): Modifier {
-    if (mode == LauncherSettings.RING_OFF) return this
-    val showUnread = unread && mode == LauncherSettings.RING_ALL
+fun Modifier.iconRing(ring: IconRing?, unread: Boolean, mode: RingMode, accent: Color): Modifier {
+    if (mode == RingMode.OFF) return this
+    val showUnread = unread && mode == RingMode.ALL
     if (ring == null && !showUnread) return this
     return composed {
         val color = ring?.color?.let { Color(it).copy(alpha = 1f) } ?: accent
