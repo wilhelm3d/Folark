@@ -119,8 +119,8 @@ class RecentsActivity : ComponentActivity() {
                     onNativeThird = { card -> viewModel.nativeThreeAppSelect(card); leave() },
                     onSavePair = { card ->
                         val saved = viewModel.saveAsPair(card)
-                        android.widget.Toast.makeText(
-                            this,
+                        if (!isFinishing) android.widget.Toast.makeText(
+                            applicationContext,
                             if (saved) org.arkikeskus.launcher.R.string.recents_pair_saved else org.arkikeskus.launcher.R.string.recents_pair_not_saved,
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
@@ -128,8 +128,8 @@ class RecentsActivity : ComponentActivity() {
                     onAddToHome = { card ->
                         val inner = resources.configuration.smallestScreenWidthDp >= 600
                         val added = viewModel.addToHome(card, if (inner) org.arkikeskus.launcher.model.ScreenType.INNER else org.arkikeskus.launcher.model.ScreenType.OUTER)
-                        android.widget.Toast.makeText(
-                            this,
+                        if (!isFinishing) android.widget.Toast.makeText(
+                            applicationContext,
                             if (added) org.arkikeskus.launcher.R.string.recents_home_added else org.arkikeskus.launcher.R.string.recents_pair_not_saved,
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
@@ -164,7 +164,11 @@ class RecentsActivity : ComponentActivity() {
 
     private fun leave() {
         finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, android.R.anim.fade_out)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, android.R.anim.fade_out)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, android.R.anim.fade_out)
+        }
     }
 }

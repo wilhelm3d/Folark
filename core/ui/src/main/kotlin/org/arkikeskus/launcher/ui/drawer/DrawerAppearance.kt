@@ -79,11 +79,11 @@ fun drawerStyleSpec(style: DrawerStyle): DrawerStyleSpec = when (style) {
         fontFamily = FontFamily.Monospace, handleWidth = 28.dp,
     )
     DrawerStyle.MOTO -> DrawerStyleSpec(
-        corner = 24.dp, searchShape = RoundedCornerShape(16.dp), searchOutlined = false,
+        corner = 24.dp, searchShape = RoundedCornerShape(50), searchOutlined = false,
         fontFamily = null, handleWidth = 36.dp,
     )
     else -> DrawerStyleSpec(
-        corner = 28.dp, searchShape = RoundedCornerShape(22.dp), searchOutlined = false,
+        corner = 28.dp, searchShape = RoundedCornerShape(50), searchOutlined = false,
         fontFamily = null, handleWidth = 36.dp,
     )
 }

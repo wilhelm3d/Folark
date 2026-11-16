@@ -183,7 +183,7 @@ internal object DividerSnaps {
             return
         }
         // Known to be there: [fits] above needs a layout.
-        val active: Any = layout
+        val active = checkNotNull(layout) { "layout null despite fits check" }
         val ok = catching {
             val algorithm = field(active, "mDividerSnapAlgorithm") ?: error("no DividerSnapAlgorithm")
             val leftRight = field(algorithm, "mIsLeftRightSplit") as? Boolean ?: true

@@ -2,7 +2,11 @@ package org.arkikeskus.launcher.feature.home.taskbar
 
 import org.arkikeskus.launcher.feature.taskbar.R
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.PowerManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -123,7 +127,26 @@ internal class TaskbarLivePill(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         lastTouchAt = SystemClock.uptimeMillis()
+        cachedPowerSave = power?.isPowerSaveMode == true
+        catching {
+            context.registerReceiver(
+                powerSaveReceiver,
+                IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+            )
+        }
         invalidate()
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        catching { context.unregisterReceiver(powerSaveReceiver) }
+    }
+
+    private val powerSaveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            cachedPowerSave = power?.isPowerSaveMode == true
+            invalidate()
+        }
     }
 
     /** A touch on the pill (or the bar shown again) wakes the effect for another minute. */
@@ -140,7 +163,8 @@ internal class TaskbarLivePill(
     private var tintFor: Int? = null
     private val iconRect = android.graphics.RectF()
     private val power = context.getSystemService(android.os.PowerManager::class.java)
-    private fun powerSave(): Boolean = power?.isPowerSaveMode == true
+    private var cachedPowerSave = false
+    private fun powerSave(): Boolean = cachedPowerSave
 
     private companion object {
         /** The effect moves this long after the pill appears or is touched, then stands still. */

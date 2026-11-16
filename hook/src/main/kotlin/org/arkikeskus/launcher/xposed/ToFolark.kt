@@ -17,8 +17,23 @@ internal object ToFolark {
     /** How long split events gather before they go to Folark together. */
     private const val EVENT_BATCH_MS = 24L
 
-    /** Everything sent to Folark goes out here, in order and off WM Shell's thread. */
-    val outbox = Executors.newSingleThreadScheduledExecutor()
+    /**
+     * Everything sent to Folark goes out here, in order and off WM Shell's thread.
+     * Recreated by [reset] on each hook install so a reload never leaves a stale executor thread
+     * alive in the system_server process.
+     */
+    @Volatile var outbox = Executors.newSingleThreadScheduledExecutor()
+        private set
+
+    /**
+     * Shuts the current outbox down and starts a fresh one. Called by [SplitThreeHook.install]
+     * before re-hooking so a hook reload (LSPosed module update, SystemUI restart) doesn't leave
+     * the old executor's thread alive.
+     */
+    fun reset() {
+        outbox.shutdown()
+        outbox = Executors.newSingleThreadScheduledExecutor()
+    }
     /** Split events waiting to go to Folark together (E4: a three-app start fires about six). */
     private val pendingEvents = ArrayList<Bundle>()
     private var flushQueued = false

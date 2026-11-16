@@ -66,6 +66,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -144,11 +145,14 @@ internal fun DrawerFolderTile(
         // with linearly scaled icons inverted the margin below ~45dp tiles (6–7 drawer columns on a
         // narrow screen), squeezing the 2×2 preview asymmetrically out of its card.
         val scale = tileSize / 56.dp
+        val tileShape = RoundedCornerShape(tileSize * 0.28f)
         Box(contentAlignment = Alignment.TopEnd) {
             Box(
                 modifier = Modifier
                     .size(tileSize)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                    .clip(tileShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.12f), tileShape)
                     .padding(7.dp * scale),
                 contentAlignment = Alignment.Center,
             ) {
@@ -202,6 +206,7 @@ internal fun DrawerTabRow(
     onMove: (Int, Int) -> Unit = { _, _ -> },
     /** Settings ▸ App drawer ▸ Lock the tab order: a chip can no longer be picked up. */
     reorderable: Boolean = true,
+    onNewFolder: (() -> Unit)? = null,
 ) {
     var renameId by remember { mutableStateOf<Long?>(null) }
     // The chip held down after a long press: it follows the finger, and the tab moves on release.
@@ -314,6 +319,22 @@ internal fun DrawerTabRow(
                     }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )
+        }
+        if (onNewFolder != null) {
+            Box(
+                modifier = Modifier
+                    .background(palette.btn, RoundedCornerShape(50))
+                    .clickable(onClick = onNewFolder)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Add,
+                    contentDescription = stringResource(R.string.folder_new),
+                    tint = palette.text,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 

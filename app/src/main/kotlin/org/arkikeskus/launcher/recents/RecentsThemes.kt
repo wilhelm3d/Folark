@@ -400,7 +400,6 @@ internal fun SwitcherTheme(cards: List<RecentsCard>, env: RecentsEnv) {
                     Text(card.label, color = Ink, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     val slot = env.slotLabel(card)
                     if (slot != null || env.canClose) Box(Modifier.height(30.dp)) { CardTrailing(card, env) }
-                    else Spacer(Modifier.size(0.dp))
                 }
             }
         }
@@ -482,12 +481,20 @@ internal fun OverlayCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (env.settings.recents.btnPin) {
-                        OverlayCircle(if (card.pinned) env.accent else Color.Black.copy(alpha = 0.38f), { env.onTogglePin(card) }) {
+                        OverlayCircle(
+                            if (card.pinned) env.accent else Color.Black.copy(alpha = 0.38f),
+                            { env.onTogglePin(card) },
+                            stringResource(if (card.pinned) R.string.recents_menu_unpin else R.string.recents_menu_pin),
+                        ) {
                             PinGlyph(if (card.pinned) env.onAccent else Color.White)
                         }
                     }
                     if (env.canClose && env.settings.recents.btnClose && !card.pinned) {
-                        OverlayCircle(Color.Black.copy(alpha = 0.38f), { env.onClose(card) }) {
+                        OverlayCircle(
+                            Color.Black.copy(alpha = 0.38f),
+                            { env.onClose(card) },
+                            stringResource(R.string.recents_menu_close),
+                        ) {
                             CrossGlyph(Color.White)
                         }
                     }
@@ -518,9 +525,9 @@ internal fun OverlayCard(
 }
 
 @Composable
-private fun OverlayCircle(bg: Color, onClick: () -> Unit, glyph: @Composable () -> Unit) {
+private fun OverlayCircle(bg: Color, onClick: () -> Unit, label: String? = null, glyph: @Composable () -> Unit) {
     Box(
-        Modifier.size(30.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
+        Modifier.size(30.dp).clip(CircleShape).background(bg).clickable(onClickLabel = label, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { glyph() }
 }

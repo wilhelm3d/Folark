@@ -183,25 +183,13 @@ internal fun DrawerTabBar(
     onEditFolder: (Long) -> Unit,
     onDeleteTab: (Long) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        DrawerTabRow(
-            tabs = tabs, selected = selectedTab, onSelect = onSelectTab,
-            drag = folderDrag, onRename = onRenameFolder,
-            modifier = Modifier.weight(1f),
-            onMove = onMoveTab, reorderable = tabsReorderable,
-        )
-        // "+": a new folder tab, created here and filled in the card that opens.
-        IconButton(onClick = onNewFolder, modifier = Modifier.padding(end = 8.dp)) {
-            Icon(
-                Icons.Rounded.Add,
-                contentDescription = stringResource(R.string.folder_new),
-                tint = LocalAccent.current,
-            )
-        }
-        if (selectedTab != null) {
-            OpenTabSettingsMenu(folders, selectedTab, onEditFolder, onDeleteTab, Modifier.padding(end = 8.dp))
-        }
-    }
+    DrawerTabRow(
+        tabs = tabs, selected = selectedTab, onSelect = onSelectTab,
+        drag = folderDrag, onRename = onRenameFolder,
+        modifier = Modifier.fillMaxWidth(),
+        onMove = onMoveTab, reorderable = tabsReorderable,
+        onNewFolder = onNewFolder,
+    )
 }
 
 /** The settings menu of the open tab [selectedTab], when that tab is a folder. */

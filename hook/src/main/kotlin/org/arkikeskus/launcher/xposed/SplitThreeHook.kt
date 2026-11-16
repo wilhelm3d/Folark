@@ -103,7 +103,7 @@ internal object SplitThreeHook {
 
     private const val STAGE_COORDINATOR = "com.android.wm.shell.splitscreen.StageCoordinator"
     /** Whether Folark's listener stepped out for the setSideStagePosition running on this thread. */
-    private val stepOut = ThreadLocal<Boolean>()
+    private val stepOut = ThreadLocal.withInitial { false }
 
     private const val LISTENER = "com.android.wm.shell.splitscreen.SplitScreen\$SplitScreenListener"
 
@@ -117,6 +117,8 @@ internal object SplitThreeHook {
     fun install(loader: ClassLoader, log: (String) -> Unit) {
         this.log = log
         ToFolark.log = log
+        // Reset the outbox so a hook reload doesn't leave stale executor threads alive.
+        ToFolark.reset()
         this.loader = loader
         val cls = catching { XposedHelpers.findClass(CONTROLLER, loader) }.getOrNull()
         if (cls == null) {
@@ -224,8 +226,11 @@ internal object SplitThreeHook {
     }.getOrNull()
 
     private fun keep(found: Any?) {
-        if (found == null || controller != null) return
-        controller = found
+        if (found == null) return
+        synchronized(this) {
+            if (controller != null) return
+            controller = found
+        }
         listen()
     }
 

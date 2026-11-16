@@ -1,8 +1,11 @@
 package org.arkikeskus.launcher.feature.appdrawer
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -113,7 +116,10 @@ internal fun FolderPopover(
     LaunchedEffect(Unit) { shown = true }
     val progress by animateFloatAsState(
         targetValue = if (shown && !closing) 1f else 0f,
-        animationSpec = tween(160),
+        animationSpec = if (shown && !closing)
+            spring(dampingRatio = 0.72f, stiffness = 420f)
+        else
+            tween(130, easing = FastOutLinearInEasing),
         label = "folderPopover",
     )
 
@@ -319,14 +325,11 @@ internal fun FolderPopover(
 
                 // Adding apps: type here and tap, instead of opening a second list. The field only
                 // grows results while it has something in it, so the card stays the folder.
-                val inFolder = remember(folder.apps) { folder.apps.map { it.key }.toSet() }
-                val matches = remember(query, allApps, inFolder) {
-                    if (query.isBlank()) {
-                        emptyList()
-                    } else {
-                        allApps.filter { it.key !in inFolder && it.label.contains(query, ignoreCase = true) }.take(5)
-                    }
-                }
+                val inFolder by remember(folder.id) { derivedStateOf { folder.apps.map { it.key }.toSet() } }
+                val matches by remember(folder.id) { derivedStateOf {
+                    if (query.isBlank()) emptyList()
+                    else allApps.filter { it.key !in inFolder && it.label.contains(query, ignoreCase = true) }.take(5)
+                } }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -547,7 +550,6 @@ internal fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) 
         confirmButton = {
             TextButton(
                 onClick = { onCreate(name.trim().ifEmpty { defaultName }) },
-                enabled = name.isNotBlank(),
             ) {
                 Text(stringResource(R.string.folder_new_create))
             }
